@@ -1,12 +1,13 @@
 import * as React from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, MessageCard, Textarea, type MessageRole } from '@adham/ui';
+import { MessageCard, type MessageRole } from '@adham/ui';
 import { adhamClient, type ConversationMessageDto } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
+import { NavigationRail, PrimarySidebar, ContextPanel, useShellLayout } from '@/widgets/shell';
+import { WorkspaceHeader, EmptyWelcome, Composer } from '@/widgets/compose';
 
-/** The backend sends a free-form role string; the design system needs a closed set. */
+/** Map backend roles to design system MessageRole */
 function toMessageRole(role: string): MessageRole {
   return role === 'user' || role === 'system' ? role : 'assistant';
 }
@@ -16,10 +17,11 @@ export const Route = createFileRoute('/')({
 });
 
 function IndexComponent() {
-  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { focusMode } = useShellLayout();
   const [inputText, setInputText] = React.useState('');
   const [activeSessionId, setActiveSessionId] = React.useState<string | null>(null);
+  const [sessions, setSessions] = React.useState<Array<{ id: string; title: string }>>([]);
 
   // Authoritative bootstrap query
   const { data: bootstrap, isLoading: isBootstrapLoading } = useQuery({
@@ -62,8 +64,14 @@ function IndexComponent() {
       const sess = await adhamClient.createSession(wsId, projId, {
         title: 'Initial Session',
       });
-      sessId = sess.sessionId;
-      setActiveSessionId(sessId);
+      const newId = sess.sessionId;
+      sessId = newId;
+      setActiveSessionId(newId);
+      setSessions((prev) =>
+        prev.some((s) => s.id === newId)
+          ? prev
+          : [{ id: newId, title: sess.title || 'Initial Session' }, ...prev],
+      );
     }
 
     return { workspaceId: wsId, projectId: projId, sessionId: sessId };
@@ -109,81 +117,73 @@ function IndexComponent() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || submitMutation.isPending) return;
-    submitMutation.mutate(inputText.trim());
+  const handleNewSession = async () => {
+    if (!workspaceId || !projectId) return;
+    const title = `Session ${sessions.length + 1}`;
+    const sess = await adhamClient.createSession(workspaceId, projectId, { title });
+    setSessions((prev) => [{ id: sess.sessionId, title }, ...prev]);
+    setActiveSessionId(sess.sessionId);
   };
 
   const messages: ConversationMessageDto[] = conversation?.items || [];
+  const currentSession = sessions.find((s) => s.id === activeSessionId);
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-between p-6">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border-subtle py-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground">
-            <span className="inline-block size-3 rounded-full bg-brand" />
-            {t('appName')}
-          </h1>
-          <p className="text-xs text-foreground-muted">{t('tagline')}</p>
-        </div>
-        <div className="rounded border border-border-subtle bg-surface-subtle px-2 py-1 font-mono text-xs">
-          {isBootstrapLoading || submitMutation.isPending ? t('status.loading') : t('status.ready')}
-        </div>
-      </header>
+    <div className="flex h-full w-full overflow-hidden bg-background">
+      {/* 1. Navigation Rail (40px) */}
+      {!focusMode && <NavigationRail />}
 
-      {/* Conversation or Calm Center */}
-      <section className="flex-1 space-y-4 overflow-y-auto py-8">
-        {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-            <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-selection">
-              <span className="text-2xl font-bold text-accent">🐎</span>
+      {/* 2. Primary Collapsible Sidebar (247px - 600px) */}
+      {!focusMode && (
+        <PrimarySidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={setActiveSessionId}
+          onNewSession={handleNewSession}
+        />
+      )}
+
+      {/* 3. Central Workspace */}
+      <main className="flex flex-1 flex-col min-w-0 h-full overflow-hidden bg-background">
+        <WorkspaceHeader
+          sessionTitle={currentSession?.title}
+          isLoading={isBootstrapLoading || submitMutation.isPending}
+        />
+
+        {/* Conversation or Calm Center */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {messages.length === 0 ? (
+            <EmptyWelcome onSelectPrompt={(prompt) => setInputText(prompt)} />
+          ) : (
+            <div className="mx-auto max-w-4xl space-y-4">
+              {messages.map((msg) => (
+                <MessageCard
+                  key={msg.messageId}
+                  role={toMessageRole(msg.role)}
+                  text={msg.text}
+                  timestamp={new Date(msg.createdAt).toLocaleTimeString()}
+                  dateTime={msg.createdAt}
+                />
+              ))}
             </div>
-            <h2 className="mb-2 text-2xl font-semibold">{t('welcome')}</h2>
-            <p className="max-w-md text-sm text-foreground-secondary">
-              A private workspace where people and intelligent agents work together safely.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((msg) => (
-              <MessageCard
-                key={msg.messageId}
-                role={toMessageRole(msg.role)}
-                text={msg.text}
-                timestamp={new Date(msg.createdAt).toLocaleTimeString()}
-                dateTime={msg.createdAt}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          )}
+        </div>
 
-      {/* Input Box */}
-      <footer className="border-t border-border-subtle pt-4">
-        <form onSubmit={handleSubmit} className="relative">
-          <Textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-            placeholder={t('compose.placeholder')}
-            rows={3}
-            className="pe-28"
-          />
-          {/* Logical inset: a fixed side would mirror wrong in Arabic. */}
-          <div className="absolute end-3 bottom-4 flex items-center gap-2">
-            <Button type="submit" size="sm" disabled={!inputText.trim()}>
-              {submitMutation.isPending ? t('status.loading') : t('compose.send')}
-            </Button>
-          </div>
-        </form>
-      </footer>
-    </main>
+        {/* Docked Expanding Composer */}
+        <Composer
+          inputText={inputText}
+          onChangeInput={setInputText}
+          onSubmit={() => {
+            if (inputText.trim() && !submitMutation.isPending) {
+              submitMutation.mutate(inputText.trim());
+            }
+          }}
+          isSubmitting={submitMutation.isPending}
+        />
+      </main>
+
+      {/* 4. Context Panel */}
+      {!focusMode && <ContextPanel />}
+    </div>
   );
 }
