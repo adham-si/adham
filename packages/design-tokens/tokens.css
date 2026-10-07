@@ -177,6 +177,26 @@
   }
 }
 
+/* Tier-1 scales that are not `--color-*` still need a Tailwind namespace to
+   generate utilities. `--control-md` alone produces nothing: Tailwind only
+   generates `min-h-*`, `size-*`, `z-*` etc. from `--spacing-*`, `--z-index-*`
+   and their peers. Mapping the tier-1 values into those namespaces is what
+   makes `min-h-control-md`, `size-icon-md` and `z-dialog` real utilities. */
+@theme inline {
+  --spacing-control-sm: var(--control-sm);
+  --spacing-control-md: var(--control-md);
+  --spacing-control-lg: var(--control-lg);
+
+  --spacing-icon-sm: var(--icon-sm);
+  --spacing-icon-md: var(--icon-md);
+  --spacing-icon-lg: var(--icon-lg);
+
+  --z-index-dialog: var(--z-dialog);
+  --z-index-menu: var(--z-menu);
+  --z-index-popover: var(--z-popover);
+  --z-index-toast: var(--z-toast);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);

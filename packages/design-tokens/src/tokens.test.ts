@@ -5,29 +5,34 @@ import { SCALES, SEMANTIC_VARS } from './index';
 const baseUrl = import.meta.url;
 const css = readFileSync(new URL('../tokens.css', baseUrl), 'utf8');
 
-const TIER1_PREFIXES = [
-  'space-',
-  'radius-',
-  'control-',
-  'font-size-',
-  'line-height-',
-  'icon-',
-  'duration-',
-  'ease-',
-  'z-',
-] as const;
+/**
+ * Tier 2 is defined structurally, not by prefix guessing: a semantic runtime var
+ * is one declared in the theme block — the `:root` carrying `color-scheme: light`
+ * or the `.dark` carrying `color-scheme: dark`. Tier-1 scales live in `@theme`,
+ * and the `--spacing-*` / `--z-index-*` aliases in `@theme inline` are tier-1 too,
+ * so a prefix list would misclassify them the moment the scales grow. Anchoring on
+ * `color-scheme` also skips the `:root` blocks nested in the reduced-motion and
+ * forced-colors media queries.
+ */
+function themeBlockVars(scheme: 'light' | 'dark'): Set<string> {
+  const selector = scheme === 'light' ? ':root' : '\\.dark';
+  const names = new Set<string>();
+  for (const block of css.matchAll(new RegExp(`${selector}\\s*{([^{}]*)}`, 'g'))) {
+    const body = block[1] ?? '';
+    if (!body.includes(`color-scheme: ${scheme}`)) continue;
+    for (const decl of body.matchAll(/--([a-z0-9-]+):/g)) {
+      if (decl[1] !== undefined) names.add(decl[1]);
+    }
+  }
+  return names;
+}
 
-const declared = new Set(
-  [...css.matchAll(/^\s*--([a-z0-9-]+):/gm)]
-    .map((m) => m[1])
-    .filter((name): name is string => name !== undefined),
-);
-const tier2 = new Set(
-  [...declared].filter(
-    (name) =>
-      !name.startsWith('color-') && !TIER1_PREFIXES.some((prefix) => name.startsWith(prefix)),
-  ),
-);
+const tier2 = new Set([...themeBlockVars('light'), ...themeBlockVars('dark')]);
+
+/** Every `@theme inline` block concatenated — there is more than one. */
+const inlineTheme = [...css.matchAll(/@theme inline\s*{([^}]*)}/g)]
+  .map((block) => block[1] ?? '')
+  .join('\n');
 
 describe('parity between tokens.css and the typed mirror', () => {
   it('exports every semantic name declared in tokens.css', () => {
@@ -43,11 +48,31 @@ describe('parity between tokens.css and the typed mirror', () => {
   });
 
   it('maps every tier-2 name to a Tailwind utility in @theme inline', () => {
-    const inline = css.match(/@theme inline\s*{([^}]*)}/)?.[1] ?? '';
     for (const name of tier2) {
-      expect(inline, `--color-${name}: var(--${name}) missing from @theme inline`).toContain(
+      expect(inlineTheme, `--color-${name}: var(--${name}) missing from @theme inline`).toContain(
         `--color-${name}: var(--${name})`,
       );
+    }
+  });
+
+  it('maps the non-color tier-1 scales into namespaces Tailwind generates utilities from', () => {
+    // `--control-md` alone produces nothing. Tailwind only emits `min-h-*` and
+    // `size-*` from `--spacing-*`, and `z-*` from `--z-index-*`, so the tier-1
+    // values must be aliased into those namespaces or the utilities do not exist.
+    const required = [
+      '--spacing-control-sm: var(--control-sm)',
+      '--spacing-control-md: var(--control-md)',
+      '--spacing-control-lg: var(--control-lg)',
+      '--spacing-icon-sm: var(--icon-sm)',
+      '--spacing-icon-md: var(--icon-md)',
+      '--spacing-icon-lg: var(--icon-lg)',
+      '--z-index-dialog: var(--z-dialog)',
+      '--z-index-menu: var(--z-menu)',
+      '--z-index-popover: var(--z-popover)',
+      '--z-index-toast: var(--z-toast)',
+    ];
+    for (const declaration of required) {
+      expect(inlineTheme, `${declaration} missing from @theme inline`).toContain(declaration);
     }
   });
 
@@ -96,8 +121,10 @@ const RGB_TOKENS = ['scrim', 'shadow-floating'] as const;
 
 function themeVars(scheme: 'light' | 'dark'): Map<string, string> {
   const vars = new Map<string, string>();
-  for (const block of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const body = block[2] ?? '';
+  const selector = scheme === 'light' ? ':root' : '\\.dark';
+  const pattern = new RegExp(`${selector}\\s*{([^{}]*)}`, 'g');
+  for (const block of css.matchAll(pattern)) {
+    const body = block[1] ?? '';
     if (!body.includes(`color-scheme: ${scheme}`)) continue;
     for (const decl of body.matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
       const name = decl[1];
