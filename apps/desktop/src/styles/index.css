@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "@adham/design-tokens/tokens.css";
 
+/*
+  Tailwind v4 only auto-detects sources under the directory holding this file.
+  `packages/ui` is a sibling workspace package, so without these its classes
+  never reach the build: min-h-control-*, size-icon-*, z-dialog, z-menu,
+  bg-action, bg-scrim, outline-focus, ps-3/pe-3 were all silently missing.
+
+  Four levels up: this file sits at apps/desktop/src/styles/, so styles -> src
+  -> desktop -> apps -> repo root. Three would resolve to apps/packages/ui.
+*/
+@source "../../../../packages/ui/src";
+@source "../../../../packages/design-tokens/src";
+
 :root {
   font-family:
     Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,

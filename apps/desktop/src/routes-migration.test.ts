@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -36,14 +36,9 @@ describe('route migration to semantic utilities', () => {
     expect(source).not.toMatch(DIRECTION_LOCKED);
   });
 
-  it('index.tsx uses the logical inset for the send button', () => {
-    expect(routeSource).toContain('end-3');
-    expect(routeSource).not.toContain('right-3');
-  });
-
-  it('index.tsx insets the textarea logically so the button never covers text', () => {
-    expect(routeSource).toContain('pe-28');
-    expect(routeSource).not.toContain('pr-24');
+  it('index.tsx uses logical insets, never a fixed side', () => {
+    expect(routeSource).not.toMatch(/(^|\s)(right-|left-)(?![\w-]*:)/);
+    expect(routeSource).not.toMatch(/(^|\s)pr-\d/);
   });
 
   it('styles/index.css does not declare a scheme, which would override the theme', () => {
@@ -56,12 +51,47 @@ describe('route migration to semantic utilities', () => {
     expect(stylesSource).not.toContain('--color-bg-canvas');
   });
 
-  it('index.tsx delegates to the design-system components', () => {
-    expect(routeSource).toContain('MessageCard');
-    expect(routeSource).toContain('Textarea');
+  it('index.tsx composes design-system components rather than reinventing them', () => {
+    expect(routeSource).toMatch(/import\s+\{[^}]*\}\s+from\s+'@adham\/ui'/);
   });
 
   it('__root.tsx wraps the app in the theme provider', () => {
     expect(rootSource).toContain('ThemeProvider');
+  });
+});
+
+/**
+ * Regression guard for a bug that shipped silently: Tailwind v4 only scans
+ * sources under the directory holding the CSS entry, so `packages/ui` — a
+ * sibling workspace package — was never scanned. Every component class was
+ * absent from the built CSS and nothing failed.
+ */
+describe('Tailwind source scanning reaches the shared packages', () => {
+  const stylesDir = path.join(desktopRoot, 'src', 'styles');
+
+  it.each([
+    ['packages/ui/src', 'packages/ui/src/button.tsx'],
+    ['packages/design-tokens/src', 'packages/design-tokens/src/index.ts'],
+  ])('%s is declared as an @source and resolves to a real directory', (declared, marker) => {
+    const directive = new RegExp(`@source\\s+"([^"]*${declared.replace('/', '\\/')})"`).exec(
+      stylesSource,
+    );
+    expect(directive, `@source for ${declared} missing from styles/index.css`).not.toBeNull();
+
+    const resolved = path.resolve(stylesDir, directive?.[1] ?? '');
+    expect(existsSync(resolved), `@source "${directive?.[1]}" resolves to ${resolved}`).toBe(true);
+    // A wrong depth still resolves to *a* directory only if it exists; assert the
+    // expected content is really there so a miscount cannot pass.
+    expect(existsSync(path.join(resolved, path.basename(marker)))).toBe(true);
+  });
+
+  it('every @source directive resolves to an existing directory', () => {
+    const directives = [...stylesSource.matchAll(/@source\s+"([^"]+)"/g)].map(
+      (match) => match[1] ?? '',
+    );
+    expect(directives.length).toBeGreaterThan(0);
+    for (const directive of directives) {
+      expect(existsSync(path.resolve(stylesDir, directive)), directive).toBe(true);
+    }
   });
 });
