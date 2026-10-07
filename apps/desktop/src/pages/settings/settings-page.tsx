@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SidebarItem, AdhamIcon } from '@adham/ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Search01Icon } from '@hugeicons/core-free-icons';
 import { useShellLayout, type SettingsPageId } from '@/widgets/shell/layout-context';
 import { AppearancePage } from './appearance';
 import { ModelsPage } from './models';
@@ -147,45 +149,36 @@ export function SettingsPage() {
       role="dialog"
       aria-modal="true"
       aria-label={t('settings.title')}
-      className="fixed inset-0 z-dialog flex items-center justify-center p-4"
+      className="fixed inset-0 z-dialog flex items-center justify-center p-4 sm:p-6 md:p-8"
     >
       {/* Scrim backdrop */}
       <div onClick={closeSettings} className="absolute inset-0 bg-scrim" />
 
       {/* Centered Modal Frame */}
-      <div className="relative flex flex-col md:flex-row w-full max-w-4xl h-[620px] max-h-[90vh] rounded-xl border border-border bg-surface-raised shadow-floating overflow-hidden">
-        {/* Left Settings Pages Navigation (240px) */}
+      <div className="relative flex flex-col md:flex-row w-full max-w-5xl h-[720px] max-h-[88vh] rounded-xl border border-border bg-surface-raised shadow-floating overflow-hidden">
+        {/* Left Settings Pages Navigation (272px) */}
         <aside
           aria-label="Settings Categories"
-          className="flex w-full md:w-60 shrink-0 flex-col border-e border-border-subtle bg-surface-subtle p-3 select-none"
+          className="flex w-full md:w-[272px] shrink-0 flex-col border-e border-border-subtle bg-surface-subtle p-3 select-none"
         >
-          {/* Header & Search */}
-          <div className="mb-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-                {t('settings.title')}
-              </span>
-            </div>
-
-            <div className="relative">
+          {/* Search Header */}
+          <div className="mb-3">
+            <div className="relative flex items-center">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('settings.search')}
-                className="w-full min-h-control-sm rounded-md border border-border-subtle bg-surface ps-7 pe-2 text-xs text-foreground placeholder:text-foreground-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="w-full min-h-control-md rounded-md border border-border-subtle bg-surface ps-9 pe-3 text-sm text-foreground placeholder:text-foreground-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               />
-              <span className="absolute start-2 top-2.5 text-foreground-muted pointer-events-none">
-                <AdhamIcon size="sm">
-                  <path d="M21 21l-4.35-4.35" />
-                  <circle cx="11" cy="11" r="7" />
-                </AdhamIcon>
+              <span className="pointer-events-none absolute start-3 flex items-center justify-center text-foreground-muted">
+                <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.5} />
               </span>
             </div>
           </div>
 
           {/* Grouped Settings Pages List */}
-          <div className="flex-1 space-y-3 overflow-y-auto">
+          <div className="flex-1 space-y-3 overflow-y-auto pe-1">
             {filteredCategories.map((cat) => (
               <div key={cat.name} className="space-y-1">
                 <div className="ps-2 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">

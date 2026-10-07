@@ -61,7 +61,7 @@ export const defaultResources = {
       },
       settings: {
         title: 'Settings',
-        search: 'Search settings...',
+        search: 'Search settings',
         close: 'Close settings',
         categories: {
           personal: 'Personal',
@@ -240,7 +240,7 @@ export const defaultResources = {
       },
       settings: {
         title: 'الإعدادات',
-        search: 'البحث في الإعدادات...',
+        search: 'البحث في الإعدادات',
         close: 'إغلاق الإعدادات',
         categories: {
           personal: 'شخصي',
@@ -418,7 +418,7 @@ export const defaultResources = {
       },
       settings: {
         title: '系统设置',
-        search: '搜索设置项...',
+        search: '搜索设置',
         close: '关闭设置',
         categories: {
           personal: '个性化',
@@ -596,7 +596,7 @@ export const defaultResources = {
       },
       settings: {
         title: 'Настройки',
-        search: 'Поиск по настройкам...',
+        search: 'Поиск по настройкам',
         close: 'Закрыть настройки',
         categories: {
           personal: 'Персональные',

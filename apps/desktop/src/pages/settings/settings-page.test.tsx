@@ -131,7 +131,7 @@ describe('SettingsPage Component', () => {
 
     fireEvent.click(screen.getByText('Open'));
 
-    const searchInput = screen.getByPlaceholderText('Search settings...');
+    const searchInput = screen.getByPlaceholderText('Search settings');
     fireEvent.change(searchInput, { target: { value: 'Storage' } });
 
     const categoriesAside = screen.getByLabelText('Settings Categories');
