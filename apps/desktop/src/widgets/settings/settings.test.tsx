@@ -4,25 +4,25 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ThemeProvider } from '../../theme/theme-provider';
 import '../../shared/i18n';
 import { ShellLayoutProvider, useShellLayout } from '../shell/layout-context';
-import { SettingsModal } from './settings-modal';
+import { Settings } from './settings';
 
 function TestSettingsWrapper({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <ShellLayoutProvider>
         {children}
-        <SettingsModal />
+        <Settings />
       </ShellLayoutProvider>
     </ThemeProvider>
   );
 }
 
-describe('SettingsModal Widget', () => {
+describe('Settings Widget', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('renders modal when openSettings is triggered and dismisses on close button', () => {
+  it('renders settings dialog when openSettings is triggered and dismisses on close button', () => {
     function Trigger() {
       const { openSettings } = useShellLayout();
       return (
@@ -38,23 +38,23 @@ describe('SettingsModal Widget', () => {
       </TestSettingsWrapper>,
     );
 
-    // Modal is initially closed
+    // Dialog is initially closed
     expect(screen.queryByRole('dialog')).toBeNull();
 
     // Trigger open
     fireEvent.click(screen.getByText('Open Settings Trigger'));
 
-    // Modal is now open
+    // Dialog is now open
     expect(screen.getByRole('dialog')).not.toBeNull();
     expect(screen.getAllByText('Appearance & Language').length).toBeGreaterThanOrEqual(1);
 
-    // Close button dismisses modal
+    // Close button dismisses dialog
     const closeBtn = screen.getByRole('button', { name: 'Close settings' });
     fireEvent.click(closeBtn);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('switches tabs and displays tab content', () => {
+  it('switches settings pages and displays page content', () => {
     function Trigger() {
       const { openSettings } = useShellLayout();
       return (
@@ -72,18 +72,18 @@ describe('SettingsModal Widget', () => {
 
     fireEvent.click(screen.getByText('Open'));
 
-    // Switch to Models tab
-    const modelsTab = screen.getByRole('button', { name: /Models & Providers/i });
-    fireEvent.click(modelsTab);
+    // Switch to Models page
+    const modelsPageBtn = screen.getByRole('button', { name: /Models & Providers/i });
+    fireEvent.click(modelsPageBtn);
     expect(screen.getByText('Ollama Local Engine')).not.toBeNull();
 
-    // Switch to Privacy tab
-    const privacyTab = screen.getByRole('button', { name: /Privacy & Data/i });
-    fireEvent.click(privacyTab);
+    // Switch to Privacy page
+    const privacyPageBtn = screen.getByRole('button', { name: /Privacy & Data/i });
+    fireEvent.click(privacyPageBtn);
     expect(screen.getByText('Strict Enforcement')).not.toBeNull();
   });
 
-  it('filters tabs based on search input', () => {
+  it('filters settings pages list based on search input', () => {
     function Trigger() {
       const { openSettings } = useShellLayout();
       return (

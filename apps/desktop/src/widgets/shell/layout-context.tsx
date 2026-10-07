@@ -1,13 +1,14 @@
 import * as React from 'react';
 
 export type ContextTab = 'plan' | 'activity' | 'graph' | 'agents' | 'context' | 'artifacts';
-export type SettingsTab =
+export type SettingsPageId =
   | 'appearance'
   | 'general'
   | 'models'
   | 'privacy'
   | 'storage'
   | 'extensions';
+export type SettingsTab = SettingsPageId;
 
 export interface ShellLayoutContextValue {
   sidebarOpen: boolean;
@@ -17,7 +18,8 @@ export interface ShellLayoutContextValue {
   focusMode: boolean;
   activeRailDestination: string;
   settingsOpen: boolean;
-  activeSettingsTab: SettingsTab;
+  activeSettingsPage: SettingsPageId;
+  activeSettingsTab: SettingsPageId;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
@@ -26,9 +28,10 @@ export interface ShellLayoutContextValue {
   setContextPanelTab: (tab: ContextTab) => void;
   toggleFocusMode: () => void;
   setActiveRailDestination: (dest: string) => void;
-  openSettings: (tab?: SettingsTab) => void;
+  openSettings: (page?: SettingsPageId) => void;
   closeSettings: () => void;
-  setActiveSettingsTab: (tab: SettingsTab) => void;
+  setActiveSettingsPage: (page: SettingsPageId) => void;
+  setActiveSettingsTab: (page: SettingsPageId) => void;
 }
 
 const ShellLayoutContext = React.createContext<ShellLayoutContextValue | null>(null);
@@ -138,10 +141,10 @@ export function ShellLayoutProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const [settingsOpen, setSettingsOpen] = React.useState<boolean>(false);
-  const [activeSettingsTab, setActiveSettingsTab] = React.useState<SettingsTab>('appearance');
+  const [activeSettingsPage, setActiveSettingsPage] = React.useState<SettingsPageId>('appearance');
 
-  const openSettings = React.useCallback((tab?: SettingsTab) => {
-    if (tab) setActiveSettingsTab(tab);
+  const openSettings = React.useCallback((page?: SettingsPageId) => {
+    if (page) setActiveSettingsPage(page);
     setSettingsOpen(true);
   }, []);
 
@@ -158,7 +161,8 @@ export function ShellLayoutProvider({ children }: { children: React.ReactNode })
       focusMode,
       activeRailDestination,
       settingsOpen,
-      activeSettingsTab,
+      activeSettingsPage,
+      activeSettingsTab: activeSettingsPage,
       toggleSidebar,
       setSidebarOpen,
       setSidebarWidth,
@@ -169,7 +173,8 @@ export function ShellLayoutProvider({ children }: { children: React.ReactNode })
       setActiveRailDestination,
       openSettings,
       closeSettings,
-      setActiveSettingsTab,
+      setActiveSettingsPage,
+      setActiveSettingsTab: setActiveSettingsPage,
     }),
     [
       sidebarOpen,
@@ -179,7 +184,7 @@ export function ShellLayoutProvider({ children }: { children: React.ReactNode })
       focusMode,
       activeRailDestination,
       settingsOpen,
-      activeSettingsTab,
+      activeSettingsPage,
       toggleSidebar,
       setSidebarOpen,
       setSidebarWidth,

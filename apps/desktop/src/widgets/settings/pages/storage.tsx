@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 import { adhamClient, type StorageStatus } from '@/shared/api/adham-client';
 
-export function StorageTab() {
+export function StoragePage() {
   const { t } = useTranslation();
   const [status, setStatus] = React.useState<StorageStatus | null>(null);
   const [isRebuilding, setIsRebuilding] = React.useState(false);

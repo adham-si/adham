@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-export function ModelsTab() {
+export function ModelsPage() {
   const { t } = useTranslation();
 
   return (

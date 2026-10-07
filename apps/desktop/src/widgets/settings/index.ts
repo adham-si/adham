@@ -1,2 +1,2 @@
-export * from './settings-modal';
-export * from './tabs';
+export { Settings } from './settings';
+export * from './pages';

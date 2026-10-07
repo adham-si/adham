@@ -11,13 +11,13 @@
 
 | Component | Path | Responsibility | Spec Section |
 |---|---|---|---|
-| `SettingsModal` | `apps/desktop/src/widgets/settings/settings-modal.tsx` | Dialog overlay with `z-dialog`, backdrop scrim, Esc key dismiss, search category filtering, two-column layout | §1 Modal Structure |
-| `AppearanceTab` | `apps/desktop/src/widgets/settings/tabs/appearance-tab.tsx` | Theme switching (System, Light, Dark) via `useTheme`, dynamic language switcher (EN, AR, ZH-CN, RU) with `dir` RTL mirroring | §14 Appearance & Language |
-| `ModelsTab` | `apps/desktop/src/widgets/settings/tabs/models-tab.tsx` | Ollama local engine status, model selection, fallback policy toggle | §7 Providers |
-| `PrivacyTab` | `apps/desktop/src/widgets/settings/tabs/privacy-tab.tsx` | Local workspace sandbox isolation, zero telemetry policy confirmation | §8 Privacy & Sandboxing |
-| `StorageTab` | `apps/desktop/src/widgets/settings/tabs/storage-tab.tsx` | Local SQLite WAL engine status, schema version, synthetic database metrics | §12 Storage & Backup |
-| `ExtensionsTab` | `apps/desktop/src/widgets/settings/tabs/extensions-tab.tsx` | MCP & Skills tools, Plugin trust security engine | §10 Extensions & MCP |
-| Settings State | `apps/desktop/src/widgets/shell/layout-context.tsx` | `settingsOpen`, `activeSettingsTab`, `openSettings(tab?)`, `closeSettings()`, `setActiveSettingsTab(tab)` | §2 Navigation |
+| `Settings` | `apps/desktop/src/widgets/settings/settings.tsx` | Dialog overlay with `z-dialog`, backdrop scrim, Esc key dismiss, search filtering, two-column layout showing list of pages | §1 Modal Structure |
+| `AppearancePage` | `apps/desktop/src/widgets/settings/pages/appearance.tsx` | Theme switching (System, Light, Dark) via `useTheme`, dynamic language switcher (EN, AR, ZH-CN, RU) with `dir` RTL mirroring | §14 Appearance & Language |
+| `ModelsPage` | `apps/desktop/src/widgets/settings/pages/models.tsx` | Ollama local engine status, model selection, fallback policy toggle | §7 Providers |
+| `PrivacyPage` | `apps/desktop/src/widgets/settings/pages/privacy.tsx` | Local workspace sandbox isolation, zero telemetry policy confirmation | §8 Privacy & Sandboxing |
+| `StoragePage` | `apps/desktop/src/widgets/settings/pages/storage.tsx` | Local SQLite WAL engine status, schema version, synthetic database metrics | §12 Storage & Backup |
+| `ExtensionsPage` | `apps/desktop/src/widgets/settings/pages/extensions.tsx` | MCP & Skills tools, Plugin trust security engine | §10 Extensions & MCP |
+| Settings State | `apps/desktop/src/widgets/shell/layout-context.tsx` | `settingsOpen`, `activeSettingsPage`, `openSettings(page?)`, `closeSettings()`, `setActiveSettingsPage(page)` | §2 Navigation |
 | Settings Launcher | `apps/desktop/src/widgets/shell/navigation-rail.tsx` | Footer gear icon wired directly to `openSettings()` | §2 Entry Points |
 | Internationalization | `apps/desktop/src/shared/i18n/index.ts` | Complete translation dictionary for all settings labels, descriptions, and categories in EN, AR, ZH-CN, RU | §14 Localization |
 
@@ -65,10 +65,10 @@ dist/assets/index-DwKL9bvy.js   543.52 kB
       Tests  224 passed (224)
    Duration  2.77s
 ```
-Includes dedicated Settings Modal tests in `apps/desktop/src/widgets/settings/settings-modal.test.tsx`:
-1. Modal opens via `openSettings` trigger and dismisses via close button and backdrop scrim.
-2. Tab category switching displays corresponding settings panels (Appearance, Models, Privacy).
-3. Search filtering dynamically filters available categories.
+Includes dedicated Settings tests in `apps/desktop/src/widgets/settings/settings.test.tsx`:
+1. Modal presentation dialog opens via `openSettings` trigger and dismisses via close button and backdrop scrim.
+2. Category switching displays corresponding settings pages (Appearance, Models, Privacy).
+3. Search filtering dynamically filters available categories and pages.
 
 ---
 

@@ -49,15 +49,19 @@ Implement the Adham Settings modal overlay specified in `docs/Frontend UX — Se
   - `activeSettingsTab: string` (persisted in session, default `'appearance'`)
 - Wire Settings icon in `apps/desktop/src/widgets/shell/navigation-rail.tsx` to `openSettings()`.
 
-### Step 2: Settings Modal Widget (`apps/desktop/src/widgets/settings/`)
-- Create `SettingsModal` in `apps/desktop/src/widgets/settings/settings-modal.tsx`:
-  - Full-featured overlay with accessible backdrop scrim, dialog focus trapping, and `Esc` close.
-  - Left navigation column:
+### Step 2: Settings Widget (`apps/desktop/src/widgets/settings/`)
+- Create `Settings` in `apps/desktop/src/widgets/settings/settings.tsx`:
+  - Full-featured overlay using modal presentation with accessible backdrop scrim, dialog focus, and `Esc` close.
+  - Left navigation column displaying the list of settings pages:
     * Search filter input.
-    * Category sections: Personal (General, Appearance), Intelligence (Models & Providers), Privacy & Storage, Extensions.
-    * Active tab indicator.
-  - Right content pane with tab views:
-    * **Appearance & Language:** Live theme switcher (Light / Dark / System), Language selector (EN / AR / ZH-CN / RU with automatic RTL switching), Density selector.
+    * Category sections: Personal (Appearance), Intelligence (Models & Providers), Workspace (Privacy, Storage), Extensions.
+    * Active page indicator.
+  - Right content pane rendering the selected settings page from `widgets/settings/pages/`:
+    * **Appearance & Language (`pages/appearance.tsx`):** Live theme switcher (Light / Dark / System), Language selector (EN / AR / ZH-CN / RU with automatic RTL switching), High contrast note.
+    * **Models & Providers (`pages/models.tsx`):** Ollama status, default model, fallback policies.
+    * **Privacy & Sandboxing (`pages/privacy.tsx`):** Workspace sandbox boundaries and telemetry policy.
+    * **Storage & Recovery (`pages/storage.tsx`):** SQLite WAL mode, schema version, and projection rebuild.
+    * **Extensions (`pages/extensions.tsx`):** MCP tool grants and plugin trust verification.
     * **Models & Providers:** Ollama local connection status, provider accounts, fallback policy.
     * **Privacy & Storage:** Project sandbox isolation status, SQLite WAL database path (`%LOCALAPPDATA%\Adham\data`), storage health check.
     * **Extensions:** Installed MCP tools, sandboxed plugins, and skills status.

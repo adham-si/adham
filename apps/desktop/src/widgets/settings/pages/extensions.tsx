@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-export function ExtensionsTab() {
+export function ExtensionsPage() {
   const { t } = useTranslation();
 
   return (

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 import { useTheme } from '@/theme/use-theme';
 
-export function AppearanceTab() {
+export function AppearancePage() {
   const { t, i18n } = useTranslation();
   const { appearance, setAppearance } = useTheme();
 
