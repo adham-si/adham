@@ -8,6 +8,7 @@ members = [
     "crates/adham-desktop-api",
     "crates/adham-runtime",
     "crates/adham-provider",
+    "crates/adham-tools",
     "apps/desktop/src-tauri",
     "xtask",
 ]
