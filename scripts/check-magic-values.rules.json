@@ -1,0 +1,27 @@
+[
+  {
+    "id": "hex-literal",
+    "pattern": "#[0-9a-fA-F]{3,8}\\b",
+    "message": "hex literal — use a semantic token utility (e.g. bg-action, text-foreground)"
+  },
+  {
+    "id": "arbitrary-var",
+    "pattern": "\\b(?:bg|text|border|ring|outline|fill|stroke|shadow|from|to|via|decoration|accent|caret|divide|placeholder)-\\[var\\(",
+    "message": "arbitrary var() value — use the semantic utility directly (e.g. bg-surface)"
+  },
+  {
+    "id": "arbitrary-var-radius",
+    "pattern": "\\brounded-\\[var\\(",
+    "message": "arbitrary var() radius — use a radius utility (e.g. rounded-md)"
+  },
+  {
+    "id": "bare-z",
+    "pattern": "\\bz-(?:xs|sm|md|lg|xl|\\d{1,3})\\b",
+    "message": "bare z-index — use the layering token (z-dialog, z-menu, z-popover, z-toast)"
+  },
+  {
+    "id": "default-palette",
+    "pattern": "\\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via|decoration|accent|caret|divide|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\\d{2,3}\\b",
+    "message": "cleared Tailwind default palette — define a semantic token instead"
+  }
+]
