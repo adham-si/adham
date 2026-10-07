@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const desktopRoot = path.resolve(__dirname, '..', '..');
+// Lives outside src/routes/ deliberately: TanStack's file router treats every
+// file in that directory as a route module and warns when none exports a Route.
+const desktopRoot = path.resolve(__dirname, '..');
 const routeSource = readFileSync(path.join(desktopRoot, 'src', 'routes', 'index.tsx'), 'utf8');
 const rootSource = readFileSync(path.join(desktopRoot, 'src', 'routes', '__root.tsx'), 'utf8');
 const stylesSource = readFileSync(path.join(desktopRoot, 'src', 'styles', 'index.css'), 'utf8');
