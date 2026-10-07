@@ -1,11 +1,27 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { SidebarItem, AdhamIcon } from '@adham/ui';
+import { SidebarItem } from '@adham/ui';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Search01Icon } from '@hugeicons/core-free-icons';
+import {
+  Search01Icon,
+  PreferenceHorizontalIcon,
+  AiMagicIcon,
+  AiArtIcon,
+  Route01Icon,
+  McpServerIcon,
+  AiDrawingIcon,
+  PuzzleIcon,
+  BrickWallFireIcon,
+  Coins01Icon,
+  ChartAnalysisIcon,
+  ServerStack03Icon,
+  CircleQuestionMarkIcon,
+  Cancel01Icon,
+} from '@hugeicons/core-free-icons';
 import { useShellLayout, type SettingsPageId } from '@/widgets/shell/layout-context';
 import { AppearancePage } from './appearance';
 import { ModelsPage } from './models';
+import { ProvidersPage } from './providers';
 import { RoutingPage } from './routing';
 import { McpPage } from './mcp';
 import { SkillsPage } from './skills';
@@ -14,7 +30,6 @@ import { GovernancePage } from './governance';
 import { BudgetPage } from './budget';
 import { UsagePage } from './usage';
 import { DataPage } from './data';
-import { PrivacyPage } from './privacy';
 import { InfoPage } from './info';
 
 export function SettingsPage() {
@@ -37,99 +52,92 @@ export function SettingsPage() {
 
   if (!settingsOpen) return null;
 
-  const categories = [
+  const categories: Array<{
+    name: string;
+    pages: Array<{ id: SettingsPageId; label: string; icon: React.ReactNode }>;
+  }> = [
     {
-      name: t('settings.categories.personal'),
+      name: 'Personal',
       pages: [
         {
-          id: 'appearance' as SettingsPageId,
-          label: t('settings.tabs.appearance'),
-          icon: (
-            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-          ),
+          id: 'appearance',
+          label: 'Appearance',
+          icon: <HugeiconsIcon icon={PreferenceHorizontalIcon} size={16} strokeWidth={1.5} />,
         },
       ],
     },
     {
-      name: t('settings.categories.intelligence'),
+      name: 'Intelligence',
       pages: [
         {
-          id: 'models' as SettingsPageId,
-          label: t('settings.tabs.models'),
-          icon: <path d="M12 2v20m10-10H2" />,
+          id: 'models',
+          label: 'AI Models',
+          icon: <HugeiconsIcon icon={AiMagicIcon} size={16} strokeWidth={1.5} />,
         },
         {
-          id: 'routing' as SettingsPageId,
-          label: 'Routing & Fallbacks',
-          icon: <path d="M18 6L6 18M6 6l12 12" />,
+          id: 'providers',
+          label: 'AI Providers',
+          icon: <HugeiconsIcon icon={AiArtIcon} size={16} strokeWidth={1.5} />,
+        },
+        {
+          id: 'routing',
+          label: 'Routing',
+          icon: <HugeiconsIcon icon={Route01Icon} size={16} strokeWidth={1.5} />,
         },
       ],
     },
     {
-      name: t('settings.categories.extensions'),
+      name: 'Extensions',
       pages: [
         {
-          id: 'mcp' as SettingsPageId,
-          label: t('settings.extensions.mcp'),
-          icon: <path d="M20 7h-9m9 5H7m13 5H4" />,
+          id: 'mcp',
+          label: 'MCP',
+          icon: <HugeiconsIcon icon={McpServerIcon} size={16} strokeWidth={1.5} />,
         },
         {
-          id: 'skills' as SettingsPageId,
-          label: t('settings.extensions.skills'),
-          icon: (
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-          ),
+          id: 'skills',
+          label: 'Skills',
+          icon: <HugeiconsIcon icon={AiDrawingIcon} size={16} strokeWidth={1.5} />,
         },
         {
-          id: 'plugins' as SettingsPageId,
-          label: t('settings.extensions.plugins'),
-          icon: (
-            <path d="M16 16v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h1m11 7h2a2 2 0 002-2V6a2 2 0 00-2-2h-5a2 2 0 00-2 2v2" />
-          ),
+          id: 'plugins',
+          label: 'Plugins',
+          icon: <HugeiconsIcon icon={PuzzleIcon} size={16} strokeWidth={1.5} />,
         },
       ],
     },
     {
-      name: 'Governance & Operations',
+      name: 'Operations & Policy',
       pages: [
         {
-          id: 'governance' as SettingsPageId,
-          label: 'Policies & Governance',
-          icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+          id: 'security',
+          label: 'Security',
+          icon: <HugeiconsIcon icon={BrickWallFireIcon} size={16} strokeWidth={1.5} />,
         },
         {
-          id: 'budget' as SettingsPageId,
-          label: 'Budget & Limits',
-          icon: <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />,
+          id: 'budget',
+          label: 'Budget',
+          icon: <HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.5} />,
         },
         {
-          id: 'usage' as SettingsPageId,
-          label: 'Usage & Analytics',
-          icon: <path d="M18 20V10M12 20V4M6 20v-6" />,
+          id: 'usage',
+          label: 'Usage',
+          icon: <HugeiconsIcon icon={ChartAnalysisIcon} size={16} strokeWidth={1.5} />,
         },
       ],
     },
     {
-      name: t('settings.categories.workspace'),
+      name: 'System',
       pages: [
         {
-          id: 'data' as SettingsPageId,
-          label: t('settings.tabs.storage'),
-          icon: (
-            <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-          ),
+          id: 'data',
+          label: 'Data',
+          icon: <HugeiconsIcon icon={ServerStack03Icon} size={16} strokeWidth={1.5} />,
         },
         {
-          id: 'privacy' as SettingsPageId,
-          label: t('settings.tabs.privacy'),
-          icon: <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />,
-        },
-        {
-          id: 'info' as SettingsPageId,
-          label: 'System Info & Diagnostics',
-          icon: (
-            <path d="M12 16v-4m0-4h.01M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z" />
-          ),
+          id: 'info',
+          label: 'About',
+          icon: <HugeiconsIcon icon={CircleQuestionMarkIcon} size={16} strokeWidth={1.5} />,
         },
       ],
     },
@@ -161,7 +169,7 @@ export function SettingsPage() {
           aria-label="Settings Categories"
           className="flex w-full md:w-[272px] shrink-0 flex-col border-e border-border-subtle bg-surface-subtle p-3 select-none"
         >
-          {/* Search Header */}
+          {/* Search Header without title */}
           <div className="mb-3">
             <div className="relative flex items-center">
               <input
@@ -189,9 +197,9 @@ export function SettingsPage() {
                     key={page.id}
                     selected={activeSettingsPage === page.id}
                     onClick={() => setActiveSettingsPage(page.id)}
-                    className="w-full justify-start text-xs"
+                    className="w-full justify-start text-xs gap-2.5"
                   >
-                    <AdhamIcon size="sm">{page.icon}</AdhamIcon>
+                    {page.icon}
                     <span className="truncate">{page.label}</span>
                   </SidebarItem>
                 ))}
@@ -218,25 +226,25 @@ export function SettingsPage() {
               aria-label={t('settings.close')}
               className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
-              <AdhamIcon size="sm">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </AdhamIcon>
+              <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
             </button>
           </div>
 
           {/* Active Settings Page View */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8">
             {activeSettingsPage === 'appearance' && <AppearancePage />}
             {activeSettingsPage === 'models' && <ModelsPage />}
+            {activeSettingsPage === 'providers' && <ProvidersPage />}
             {activeSettingsPage === 'routing' && <RoutingPage />}
             {activeSettingsPage === 'mcp' && <McpPage />}
             {activeSettingsPage === 'skills' && <SkillsPage />}
             {activeSettingsPage === 'plugins' && <PluginsPage />}
-            {activeSettingsPage === 'governance' && <GovernancePage />}
+            {(activeSettingsPage === 'security' || activeSettingsPage === 'governance') && (
+              <GovernancePage />
+            )}
             {activeSettingsPage === 'budget' && <BudgetPage />}
             {activeSettingsPage === 'usage' && <UsagePage />}
             {activeSettingsPage === 'data' && <DataPage />}
-            {activeSettingsPage === 'privacy' && <PrivacyPage />}
             {activeSettingsPage === 'info' && <InfoPage />}
           </div>
         </main>

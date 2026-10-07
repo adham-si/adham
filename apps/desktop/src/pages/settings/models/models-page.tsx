@@ -7,8 +7,10 @@ export function ModelsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-base font-semibold text-foreground">{t('settings.models.title')}</h3>
-        <p className="text-xs text-foreground-secondary">{t('settings.models.desc')}</p>
+        <h3 className="text-base font-semibold text-foreground">AI Models</h3>
+        <p className="text-xs text-foreground-secondary">
+          Manage installed local models, inference parameters, and default engines.
+        </p>
       </div>
 
       {/* Primary Local Model */}

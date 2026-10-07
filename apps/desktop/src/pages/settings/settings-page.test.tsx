@@ -72,44 +72,44 @@ describe('SettingsPage Component', () => {
 
     fireEvent.click(screen.getByText('Open'));
 
-    // Switch to Models page
-    const modelsPageBtn = screen.getByRole('button', { name: /Models & Providers/i });
+    // Switch to AI Models page
+    const modelsPageBtn = screen.getByRole('button', { name: /^AI Models/i });
     fireEvent.click(modelsPageBtn);
     expect(screen.getByText('Ollama Local Engine')).not.toBeNull();
 
-    // Switch to Privacy page
-    const privacyPageBtn = screen.getByRole('button', { name: /Privacy & Data/i });
-    fireEvent.click(privacyPageBtn);
-    expect(screen.getByText('Strict Enforcement')).not.toBeNull();
+    // Switch to AI Providers page
+    const providersPageBtn = screen.getByRole('button', { name: /^AI Providers/i });
+    fireEvent.click(providersPageBtn);
+    expect(screen.getByText('Anthropic')).not.toBeNull();
+
+    // Switch to Security page
+    const secPageBtn = screen.getByRole('button', { name: /^Security/i });
+    fireEvent.click(secPageBtn);
+    expect(screen.getByText('Mandatory Security Guardrails')).not.toBeNull();
 
     // Switch to MCP page
-    const mcpPageBtn = screen.getByRole('button', { name: /Model Context Protocol/i });
+    const mcpPageBtn = screen.getByRole('button', { name: /^MCP/i });
     fireEvent.click(mcpPageBtn);
     expect(screen.getByText('P0-13 Governed')).not.toBeNull();
 
     // Switch to Routing page
-    const routingPageBtn = screen.getByRole('button', { name: /Routing & Fallbacks/i });
+    const routingPageBtn = screen.getByRole('button', { name: /^Routing/i });
     fireEvent.click(routingPageBtn);
     expect(screen.getByText('Deterministic Fallback Chain')).not.toBeNull();
 
-    // Switch to Governance page
-    const govPageBtn = screen.getByRole('button', { name: /Policies & Governance/i });
-    fireEvent.click(govPageBtn);
-    expect(screen.getByText('Mandatory Security Guardrails')).not.toBeNull();
-
     // Switch to Budget page
-    const budgetPageBtn = screen.getByRole('button', { name: /Budget & Limits/i });
+    const budgetPageBtn = screen.getByRole('button', { name: /^Budget/i });
     fireEvent.click(budgetPageBtn);
     expect(screen.getByText('Token Allowances')).not.toBeNull();
 
     // Switch to Usage page
-    const usagePageBtn = screen.getByRole('button', { name: /Usage & Analytics/i });
+    const usagePageBtn = screen.getByRole('button', { name: /^Usage/i });
     fireEvent.click(usagePageBtn);
     expect(screen.getByText('Model Utilization')).not.toBeNull();
 
-    // Switch to Info page
-    const infoPageBtn = screen.getByRole('button', { name: /System Info & Diagnostics/i });
-    fireEvent.click(infoPageBtn);
+    // Switch to About page
+    const aboutPageBtn = screen.getByRole('button', { name: /^About/i });
+    fireEvent.click(aboutPageBtn);
     expect(screen.getByText('Environment & Engine')).not.toBeNull();
   });
 
@@ -132,10 +132,10 @@ describe('SettingsPage Component', () => {
     fireEvent.click(screen.getByText('Open'));
 
     const searchInput = screen.getByPlaceholderText('Search settings');
-    fireEvent.change(searchInput, { target: { value: 'Storage' } });
+    fireEvent.change(searchInput, { target: { value: 'Budget' } });
 
     const categoriesAside = screen.getByLabelText('Settings Categories');
-    expect(within(categoriesAside).getByText('Storage & Backup')).not.toBeNull();
-    expect(within(categoriesAside).queryByText('Appearance & Language')).toBeNull();
+    expect(within(categoriesAside).getByText('Budget')).not.toBeNull();
+    expect(within(categoriesAside).queryByText('Appearance')).toBeNull();
   });
 });
