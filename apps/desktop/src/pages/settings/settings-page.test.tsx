@@ -1,23 +1,23 @@
 import * as React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ThemeProvider } from '../../theme/theme-provider';
-import '../../shared/i18n';
-import { ShellLayoutProvider, useShellLayout } from '../shell/layout-context';
-import { Settings } from './settings';
+import { ThemeProvider } from '@/theme/theme-provider';
+import '@/shared/i18n';
+import { ShellLayoutProvider, useShellLayout } from '@/widgets/shell/layout-context';
+import { SettingsPage } from './settings-page';
 
 function TestSettingsWrapper({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <ShellLayoutProvider>
         {children}
-        <Settings />
+        <SettingsPage />
       </ShellLayoutProvider>
     </ThemeProvider>
   );
 }
 
-describe('Settings Widget', () => {
+describe('SettingsPage Component', () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -81,6 +81,11 @@ describe('Settings Widget', () => {
     const privacyPageBtn = screen.getByRole('button', { name: /Privacy & Data/i });
     fireEvent.click(privacyPageBtn);
     expect(screen.getByText('Strict Enforcement')).not.toBeNull();
+
+    // Switch to MCP page
+    const mcpPageBtn = screen.getByRole('button', { name: /Model Context Protocol/i });
+    fireEvent.click(mcpPageBtn);
+    expect(screen.getByText('P0-13 Governed')).not.toBeNull();
   });
 
   it('filters settings pages list based on search input', () => {

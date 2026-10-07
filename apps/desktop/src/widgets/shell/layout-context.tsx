@@ -5,6 +5,10 @@ export type SettingsPageId =
   | 'appearance'
   | 'general'
   | 'models'
+  | 'mcp'
+  | 'skills'
+  | 'plugins'
+  | 'data'
   | 'privacy'
   | 'storage'
   | 'extensions';

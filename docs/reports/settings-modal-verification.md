@@ -11,12 +11,14 @@
 
 | Component | Path | Responsibility | Spec Section |
 |---|---|---|---|
-| `Settings` | `apps/desktop/src/widgets/settings/settings.tsx` | Dialog overlay with `z-dialog`, backdrop scrim, Esc key dismiss, search filtering, two-column layout showing list of pages | §1 Modal Structure |
-| `AppearancePage` | `apps/desktop/src/widgets/settings/pages/appearance.tsx` | Theme switching (System, Light, Dark) via `useTheme`, dynamic language switcher (EN, AR, ZH-CN, RU) with `dir` RTL mirroring | §14 Appearance & Language |
-| `ModelsPage` | `apps/desktop/src/widgets/settings/pages/models.tsx` | Ollama local engine status, model selection, fallback policy toggle | §7 Providers |
-| `PrivacyPage` | `apps/desktop/src/widgets/settings/pages/privacy.tsx` | Local workspace sandbox isolation, zero telemetry policy confirmation | §8 Privacy & Sandboxing |
-| `StoragePage` | `apps/desktop/src/widgets/settings/pages/storage.tsx` | Local SQLite WAL engine status, schema version, synthetic database metrics | §12 Storage & Backup |
-| `ExtensionsPage` | `apps/desktop/src/widgets/settings/pages/extensions.tsx` | MCP & Skills tools, Plugin trust security engine | §10 Extensions & MCP |
+| `SettingsPage` | `apps/desktop/src/pages/settings/settings-page.tsx` | Main settings container presenting pages list via modal overlay (`z-dialog`, backdrop scrim, Esc key dismiss, search filtering) | §1 Modal Structure |
+| `AppearancePage` | `apps/desktop/src/pages/settings/appearance/appearance-page.tsx` | Theme switching (System, Light, Dark) via `useTheme`, dynamic language switcher (EN, AR, ZH-CN, RU) with `dir` RTL mirroring | §14 Appearance & Language |
+| `ModelsPage` | `apps/desktop/src/pages/settings/models/models-page.tsx` | Ollama local engine status, model selection, fallback policy toggle | §7 Providers |
+| `McpPage` | `apps/desktop/src/pages/settings/mcp/mcp-page.tsx` | MCP server connection governance and tool policies | §10 Extensions & MCP (P0-13) |
+| `SkillsPage` | `apps/desktop/src/pages/settings/skills/skills-page.tsx` | Agent instructional playbooks and discovery roots | §10 Extensions & MCP (P0-13) |
+| `PluginsPage` | `apps/desktop/src/pages/settings/plugins/plugins-page.tsx` | Isolated package trust and lifecycle verification engine | §10 Extensions & MCP (P0-14) |
+| `DataPage` | `apps/desktop/src/pages/settings/data/data-page.tsx` | Local SQLite WAL engine status, schema version, synthetic database metrics | §12 Storage & Backup |
+| `PrivacyPage` | `apps/desktop/src/pages/settings/privacy/privacy-page.tsx` | Local workspace sandbox isolation, zero telemetry policy confirmation | §8 Privacy & Sandboxing |
 | Settings State | `apps/desktop/src/widgets/shell/layout-context.tsx` | `settingsOpen`, `activeSettingsPage`, `openSettings(page?)`, `closeSettings()`, `setActiveSettingsPage(page)` | §2 Navigation |
 | Settings Launcher | `apps/desktop/src/widgets/shell/navigation-rail.tsx` | Footer gear icon wired directly to `openSettings()` | §2 Entry Points |
 | Internationalization | `apps/desktop/src/shared/i18n/index.ts` | Complete translation dictionary for all settings labels, descriptions, and categories in EN, AR, ZH-CN, RU | §14 Localization |
@@ -65,9 +67,9 @@ dist/assets/index-DwKL9bvy.js   543.52 kB
       Tests  224 passed (224)
    Duration  2.77s
 ```
-Includes dedicated Settings tests in `apps/desktop/src/widgets/settings/settings.test.tsx`:
+Includes dedicated Settings tests in `apps/desktop/src/pages/settings/settings-page.test.tsx`:
 1. Modal presentation dialog opens via `openSettings` trigger and dismisses via close button and backdrop scrim.
-2. Category switching displays corresponding settings pages (Appearance, Models, Privacy).
+2. Category switching displays corresponding settings pages (Appearance, Models, Privacy, MCP).
 3. Search filtering dynamically filters available categories and pages.
 
 ---

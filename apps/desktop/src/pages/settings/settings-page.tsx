@@ -1,10 +1,16 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SidebarItem, AdhamIcon } from '@adham/ui';
-import { useShellLayout, type SettingsPageId } from '../shell/layout-context';
-import { AppearancePage, ModelsPage, PrivacyPage, StoragePage, ExtensionsPage } from './pages';
+import { useShellLayout, type SettingsPageId } from '@/widgets/shell/layout-context';
+import { AppearancePage } from './appearance';
+import { ModelsPage } from './models';
+import { McpPage } from './mcp';
+import { SkillsPage } from './skills';
+import { PluginsPage } from './plugins';
+import { DataPage } from './data';
+import { PrivacyPage } from './privacy';
 
-export function Settings() {
+export function SettingsPage() {
   const { t } = useTranslation();
   const { settingsOpen, closeSettings, activeSettingsPage, setActiveSettingsPage } =
     useShellLayout();
@@ -48,29 +54,43 @@ export function Settings() {
       ],
     },
     {
-      name: t('settings.categories.workspace'),
+      name: t('settings.categories.extensions'),
       pages: [
         {
-          id: 'privacy' as SettingsPageId,
-          label: t('settings.tabs.privacy'),
-          icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+          id: 'mcp' as SettingsPageId,
+          label: t('settings.extensions.mcp'),
+          icon: <path d="M20 7h-9m9 5H7m13 5H4" />,
         },
         {
-          id: 'storage' as SettingsPageId,
-          label: t('settings.tabs.storage'),
+          id: 'skills' as SettingsPageId,
+          label: t('settings.extensions.skills'),
           icon: (
-            <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          ),
+        },
+        {
+          id: 'plugins' as SettingsPageId,
+          label: t('settings.extensions.plugins'),
+          icon: (
+            <path d="M16 16v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h1m11 7h2a2 2 0 002-2V6a2 2 0 00-2-2h-5a2 2 0 00-2 2v2" />
           ),
         },
       ],
     },
     {
-      name: t('settings.categories.extensions'),
+      name: t('settings.categories.workspace'),
       pages: [
         {
-          id: 'extensions' as SettingsPageId,
-          label: t('settings.tabs.extensions'),
-          icon: <path d="M20 7h-9m9 5H7m13 5H4" />,
+          id: 'data' as SettingsPageId,
+          label: t('settings.tabs.storage'),
+          icon: (
+            <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          ),
+        },
+        {
+          id: 'privacy' as SettingsPageId,
+          label: t('settings.tabs.privacy'),
+          icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
         },
       ],
     },
@@ -175,9 +195,11 @@ export function Settings() {
           <div className="flex-1 overflow-y-auto p-6">
             {activeSettingsPage === 'appearance' && <AppearancePage />}
             {activeSettingsPage === 'models' && <ModelsPage />}
+            {activeSettingsPage === 'mcp' && <McpPage />}
+            {activeSettingsPage === 'skills' && <SkillsPage />}
+            {activeSettingsPage === 'plugins' && <PluginsPage />}
+            {activeSettingsPage === 'data' && <DataPage />}
             {activeSettingsPage === 'privacy' && <PrivacyPage />}
-            {activeSettingsPage === 'storage' && <StoragePage />}
-            {activeSettingsPage === 'extensions' && <ExtensionsPage />}
           </div>
         </main>
       </div>
