@@ -33,7 +33,9 @@ pub async fn handle_create_workspace(
                 });
             }
         } else {
-            return Err("REQUEST_ID_CONFLICT: request_id reused with differing payload".to_string());
+            return Err(
+                "REQUEST_ID_CONFLICT: request_id reused with differing payload".to_string(),
+            );
         }
     }
 
@@ -75,7 +77,11 @@ pub async fn handle_create_workspace(
         metadata_json: b"{}".to_vec(),
     };
 
-    let result = ctx.store.append_event(req).await.map_err(|e| e.to_string())?;
+    let result = ctx
+        .store
+        .append_event(req)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let summary = WorkspaceSummary {
         workspace_id: workspace_id.to_string(),
@@ -156,7 +162,9 @@ pub async fn handle_create_project(
                 });
             }
         } else {
-            return Err("REQUEST_ID_CONFLICT: request_id reused with differing payload".to_string());
+            return Err(
+                "REQUEST_ID_CONFLICT: request_id reused with differing payload".to_string(),
+            );
         }
     }
 
@@ -198,7 +206,11 @@ pub async fn handle_create_project(
         metadata_json: b"{}".to_vec(),
     };
 
-    let result = ctx.store.append_event(req).await.map_err(|e| e.to_string())?;
+    let result = ctx
+        .store
+        .append_event(req)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let summary = ProjectSummary {
         project_id: project_id.to_string(),

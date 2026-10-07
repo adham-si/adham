@@ -56,7 +56,10 @@ pub async fn handle_submit_message(
             if row_ws.as_deref() != Some(&workspace_id.to_string())
                 || row_proj.as_deref() != Some(&project_id.to_string())
             {
-                return Err("CONTEXT_MISMATCH: session does not belong to specified project or workspace".to_string());
+                return Err(
+                    "CONTEXT_MISMATCH: session does not belong to specified project or workspace"
+                        .to_string(),
+                );
             }
         }
         None => {
@@ -158,24 +161,18 @@ pub async fn handle_submit_message(
         .map_err(|e| e.to_string())?;
 
     // 5. Update synchronous projection
-    sqlx::query(
-        r#"
-        INSERT INTO conversation_messages (
-            message_id, workspace_id, project_id, session_id, role, content_id,
-            source_event_id, source_global_position, created_at_us
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        "#,
+    adham_projections::ConversationProjection::insert_message(
+        &ctx.pool,
+        &message_id.to_string(),
+        &workspace_id.to_string(),
+        &project_id.to_string(),
+        &session_id.to_string(),
+        "user",
+        &content_id.to_string(),
+        &result.event_id.to_string(),
+        result.global_position,
+        now_us,
     )
-    .bind(message_id.to_string())
-    .bind(workspace_id.to_string())
-    .bind(project_id.to_string())
-    .bind(session_id.to_string())
-    .bind("user")
-    .bind(content_id.to_string())
-    .bind(result.event_id.to_string())
-    .bind(result.global_position)
-    .bind(now_us)
-    .execute(&ctx.pool)
     .await
     .map_err(|e| e.to_string())?;
 

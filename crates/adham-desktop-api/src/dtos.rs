@@ -218,11 +218,7 @@ impl ErrorEnvelope {
                 false,
             )
         } else {
-            (
-                PublicErrorCode::InternalError,
-                "error.internalError",
-                true,
-            )
+            (PublicErrorCode::InternalError, "error.internalError", true)
         };
 
         Self {

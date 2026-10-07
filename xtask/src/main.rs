@@ -1,9 +1,8 @@
 use adham_core_types::{ActorKind, EventActor, EventScope};
 use adham_desktop_api::{
-    BootstrapState, CommandContext, ConversationMessageDto, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
-    ProjectSummary, RebuildProjectionsResponse, SessionSummary, StorageStatus,
-    SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
+    BootstrapState, CommandContext, ConversationMessageDto, ConversationPage, CreateProjectPayload,
+    CreateSessionPayload, CreateWorkspacePayload, ProjectSummary, RebuildProjectionsResponse,
+    SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
 };
 use std::fs;
 use std::path::Path;

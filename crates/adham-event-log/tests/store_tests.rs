@@ -1,5 +1,7 @@
 use adham_core_types::*;
-use adham_event_log::{create_sqlite_pool, AppendEventRequest, ChecksumCalculator, SqliteEventStore};
+use adham_event_log::{
+    create_sqlite_pool, AppendEventRequest, ChecksumCalculator, SqliteEventStore,
+};
 use std::path::PathBuf;
 
 fn test_db_path() -> PathBuf {

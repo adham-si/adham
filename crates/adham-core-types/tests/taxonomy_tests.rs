@@ -137,7 +137,11 @@ fn test_schema_registry_consistency() {
     for event in events {
         let schema_rel = event["schema"].as_str().expect("schema relative path");
         let schema_path = manifest_path.join(schema_rel.trim_start_matches("./"));
-        assert!(schema_path.exists(), "Schema file {:?} must exist", schema_path);
+        assert!(
+            schema_path.exists(),
+            "Schema file {:?} must exist",
+            schema_path
+        );
     }
 }
 
@@ -174,7 +178,8 @@ fn test_event_envelope_roundtrip() {
     };
 
     let json = serde_json::to_string(&envelope).expect("serialize envelope");
-    let de: EventEnvelope<WorkspaceCreatedV1> = serde_json::from_str(&json).expect("deserialize envelope");
+    let de: EventEnvelope<WorkspaceCreatedV1> =
+        serde_json::from_str(&json).expect("deserialize envelope");
     assert_eq!(de.event_id, envelope.event_id);
     assert_eq!(de.event_type, EVENT_TYPE_WORKSPACE_CREATED);
     assert_eq!(de.payload.name, "WS");

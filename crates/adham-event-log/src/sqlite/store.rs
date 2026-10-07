@@ -52,7 +52,10 @@ impl SqliteEventStore {
         &self.pool
     }
 
-    pub async fn check_receipt(&self, request_id: &RequestId) -> Result<Option<CommandReceiptRecord>, DomainError> {
+    pub async fn check_receipt(
+        &self,
+        request_id: &RequestId,
+    ) -> Result<Option<CommandReceiptRecord>, DomainError> {
         let row = sqlx::query(
             "SELECT request_id, command_type, command_version, scope_fingerprint, request_fingerprint, correlation_id, outcome_code, response_json FROM command_receipts WHERE request_id = ?"
         )
@@ -106,7 +109,10 @@ impl SqliteEventStore {
         Ok(())
     }
 
-    pub async fn get_content(&self, content_id: &ContentId) -> Result<Option<Vec<u8>>, DomainError> {
+    pub async fn get_content(
+        &self,
+        content_id: &ContentId,
+    ) -> Result<Option<Vec<u8>>, DomainError> {
         let row = sqlx::query("SELECT protected_bytes FROM content_records WHERE content_id = ?")
             .bind(content_id.to_string())
             .fetch_optional(&self.pool)
@@ -120,16 +126,19 @@ impl SqliteEventStore {
         &self,
         req: AppendEventRequest,
     ) -> Result<AppendEventResult, DomainError> {
-        let mut tx = self.pool.begin().await.map_err(|e| DomainError::Storage(e.to_string()))?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
 
         // 1. Check or initialize stream
-        let stream_row = sqlx::query(
-            "SELECT current_sequence, last_checksum FROM streams WHERE stream_id = ?"
-        )
-        .bind(&req.stream_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        let stream_row =
+            sqlx::query("SELECT current_sequence, last_checksum FROM streams WHERE stream_id = ?")
+                .bind(&req.stream_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|e| DomainError::Storage(e.to_string()))?;
 
         let (current_seq, last_checksum): (u64, Option<String>) = match stream_row {
             Some(row) => (
@@ -226,7 +235,9 @@ impl SqliteEventStore {
         .await
         .map_err(|e| DomainError::Storage(e.to_string()))?;
 
-        tx.commit().await.map_err(|e| DomainError::Storage(e.to_string()))?;
+        tx.commit()
+            .await
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
 
         Ok(AppendEventResult {
             event_id,
