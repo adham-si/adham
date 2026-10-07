@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
+import { ThemeProvider } from '@/theme/theme-provider';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -7,8 +8,10 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <div className="min-h-screen bg-[var(--color-bg-canvas,#FAFAFA)] text-[var(--color-text-primary,#121214)] flex flex-col">
-      <Outlet />
-    </div>
+    <ThemeProvider>
+      <div className="flex min-h-screen flex-col bg-background text-foreground">
+        <Outlet />
+      </div>
+    </ThemeProvider>
   );
 }

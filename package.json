@@ -8,7 +8,9 @@
     "lint": "oxlint --deny-warnings .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
+    "check:magic-values": "node scripts/check-magic-values.mjs",
+    "check:magic-values:self-test": "node scripts/check-magic-values.self-test.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:magic-values && pnpm check:magic-values:self-test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
