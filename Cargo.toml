@@ -12,6 +12,7 @@ members = [
     "crates/adham-verify",
     "crates/adham-graph",
     "crates/adham-memory",
+    "crates/adham-extensions",
     "apps/desktop/src-tauri",
     "xtask",
 ]

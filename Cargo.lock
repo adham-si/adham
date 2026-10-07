@@ -69,6 +69,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "adham-extensions"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-platform",
+ "adham-tools",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "adham-graph"
 version = "0.1.0"
 dependencies = [
