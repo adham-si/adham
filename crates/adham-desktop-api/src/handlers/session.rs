@@ -27,13 +27,12 @@ pub async fn handle_create_session(
 
     // Verify project belongs to workspace
     let proj_stream = format!("project:{}", project_id);
-    let proj_row = sqlx::query(
-        "SELECT workspace_id FROM events WHERE stream_id = ? AND stream_sequence = 1",
-    )
-    .bind(&proj_stream)
-    .fetch_optional(&ctx.pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let proj_row =
+        sqlx::query("SELECT workspace_id FROM events WHERE stream_id = ? AND stream_sequence = 1")
+            .bind(&proj_stream)
+            .fetch_optional(&ctx.pool)
+            .await
+            .map_err(|e| e.to_string())?;
 
     match proj_row {
         Some(row) => {

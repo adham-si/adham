@@ -54,7 +54,36 @@ impl ConversationProjection {
         .await
         .map_err(|e| DomainError::Storage(e.to_string()))?;
 
+        sqlx::query(
+            r#"
+            INSERT INTO projection_checkpoints (
+                projection_name, projection_version, last_global_position, status, error_code, updated_at_us
+            ) VALUES ('conversation_messages', 1, ?, 'active', NULL, ?)
+            ON CONFLICT(projection_name) DO UPDATE SET
+                last_global_position = excluded.last_global_position,
+                status = excluded.status,
+                error_code = excluded.error_code,
+                updated_at_us = excluded.updated_at_us
+            "#,
+        )
+        .bind(source_global_position)
+        .bind(created_at_us)
+        .execute(pool)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+
         Ok(())
+    }
+
+    pub async fn get_checkpoint(pool: &Pool<Sqlite>) -> Result<Option<i64>, DomainError> {
+        let row = sqlx::query(
+            "SELECT last_global_position FROM projection_checkpoints WHERE projection_name = 'conversation_messages'",
+        )
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+
+        Ok(row.map(|r| r.get("last_global_position")))
     }
 
     pub async fn get_session_messages(
@@ -102,7 +131,10 @@ impl ConversationProjection {
 
     pub async fn rebuild(pool: &Pool<Sqlite>) -> Result<u64, DomainError> {
         info!("Rebuilding conversation projection from canonical events...");
-        let mut tx = pool.begin().await.map_err(|e| DomainError::Storage(e.to_string()))?;
+        let mut tx = pool
+            .begin()
+            .await
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
 
         // 1. Wipe existing projection
         sqlx::query("DELETE FROM conversation_messages")
@@ -136,8 +168,10 @@ impl ConversationProjection {
             let occurred_at_us: i64 = row.get("occurred_at_us");
             let payload_bytes: Vec<u8> = row.get("payload_json");
 
-            let payload: MessageSubmittedV1 = serde_json::from_slice(&payload_bytes)
-                .map_err(|e| DomainError::Validation(format!("Invalid MessageSubmittedV1 payload: {e}")))?;
+            let payload: MessageSubmittedV1 =
+                serde_json::from_slice(&payload_bytes).map_err(|e| {
+                    DomainError::Validation(format!("Invalid MessageSubmittedV1 payload: {e}"))
+                })?;
 
             sqlx::query(
                 r#"
@@ -184,7 +218,9 @@ impl ConversationProjection {
         .await
         .map_err(|e| DomainError::Storage(e.to_string()))?;
 
-        tx.commit().await.map_err(|e| DomainError::Storage(e.to_string()))?;
+        tx.commit()
+            .await
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
         info!("Conversation projection rebuilt successfully ({count} messages replayed).");
 
         Ok(count)

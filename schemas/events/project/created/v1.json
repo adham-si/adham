@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProjectCreatedV1",
+  "type": "object",
+  "required": ["project_id", "workspace_id", "name", "storage_kind"],
+  "properties": {
+    "project_id": { "type": "string" },
+    "workspace_id": { "type": "string" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "storage_kind": { "type": "string", "enum": ["isolated"] }
+  },
+  "additionalProperties": false
+}

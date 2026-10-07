@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EventEnvelopeV1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "event_version",
+    "stream_id",
+    "stream_sequence",
+    "request_id",
+    "correlation_id",
+    "actor",
+    "scope",
+    "occurred_at",
+    "payload",
+    "checksum"
+  ],
+  "properties": {
+    "event_id": { "type": "string" },
+    "event_type": { "type": "string" },
+    "event_version": { "type": "integer", "minimum": 1 },
+    "stream_id": { "type": "string" },
+    "stream_sequence": { "type": "integer", "minimum": 1 },
+    "request_id": { "type": "string" },
+    "correlation_id": { "type": "string" },
+    "causation_id": { "type": ["string", "null"] },
+    "actor": {
+      "type": "object",
+      "required": ["actor_id", "kind"],
+      "properties": {
+        "actor_id": { "type": "string" },
+        "kind": { "type": "string", "enum": ["LocalHuman", "System", "Migration"] }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["installation_id"],
+      "properties": {
+        "installation_id": { "type": "string" },
+        "workspace_id": { "type": ["string", "null"] },
+        "project_id": { "type": ["string", "null"] },
+        "session_id": { "type": ["string", "null"] }
+      }
+    },
+    "occurred_at": { "type": "string" },
+    "payload": { "type": "object" },
+    "previous_checksum": { "type": ["string", "null"] },
+    "checksum": { "type": "string" }
+  }
+}

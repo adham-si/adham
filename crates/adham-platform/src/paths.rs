@@ -40,7 +40,11 @@ impl PlatformStoragePolicy {
     pub fn ensure_directories(&self) -> Result<(), PlatformError> {
         if !self.data_dir.exists() {
             std::fs::create_dir_all(&self.data_dir).map_err(|e| {
-                PlatformError::DirectoryCreationFailed(format!("{}: {}", self.data_dir.display(), e))
+                PlatformError::DirectoryCreationFailed(format!(
+                    "{}: {}",
+                    self.data_dir.display(),
+                    e
+                ))
             })?;
         }
         Ok(())

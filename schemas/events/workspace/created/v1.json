@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkspaceCreatedV1",
+  "type": "object",
+  "required": ["workspace_id", "name", "kind", "preferred_language"],
+  "properties": {
+    "workspace_id": { "type": "string" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "kind": { "type": "string", "enum": ["personal"] },
+    "preferred_language": { "type": "string", "enum": ["en", "ar", "zh-CN", "ru"] }
+  },
+  "additionalProperties": false
+}

@@ -29,16 +29,19 @@ pub async fn handle_get_bootstrap_state(ctx: &super::ApiContext) -> Result<Boots
 }
 
 pub async fn handle_get_storage_status(ctx: &super::ApiContext) -> Result<StorageStatus, String> {
-    let row = sqlx::query("PRAGMA journal_mode")
-        .fetch_one(&ctx.pool)
+    let health = adham_event_log::verify_storage_health(&ctx.pool)
         .await
         .map_err(|e| e.to_string())?;
 
-    let journal_mode: String = row.get(0);
+    let status = if health.is_healthy {
+        "ready".to_string()
+    } else {
+        "degraded".to_string()
+    };
 
     Ok(StorageStatus {
-        status: "ready".to_string(),
-        journal_mode,
+        status,
+        journal_mode: health.journal_mode,
         schema_version: 1,
     })
 }

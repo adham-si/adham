@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MessageSubmittedV1",
+  "type": "object",
+  "required": ["message_id", "content_id", "content_kind", "size_bytes"],
+  "properties": {
+    "message_id": { "type": "string" },
+    "content_id": { "type": "string" },
+    "content_kind": { "type": "string", "enum": ["user_text"] },
+    "size_bytes": { "type": "integer", "minimum": 1, "maximum": 65536 }
+  },
+  "additionalProperties": false
+}

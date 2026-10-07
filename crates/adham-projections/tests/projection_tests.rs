@@ -87,6 +87,11 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
     .await
     .expect("insert message 1 projection");
 
+    let cp1 = ConversationProjection::get_checkpoint(&pool)
+        .await
+        .expect("get checkpoint 1");
+    assert_eq!(cp1, Some(evt1.global_position));
+
     // 2. Submit message 2
     let msg2_id = MessageId::new_v7();
     let content2_id = ContentId::new_v7();
@@ -151,6 +156,11 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
     .await
     .expect("insert message 2 projection");
 
+    let cp2 = ConversationProjection::get_checkpoint(&pool)
+        .await
+        .expect("get checkpoint 2");
+    assert_eq!(cp2, Some(evt2.global_position));
+
     // 3. Query projection
     let messages = ConversationProjection::get_session_messages(&pool, &sess_id)
         .await
@@ -165,12 +175,20 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
         .expect("rebuild projection");
     assert_eq!(replayed, 2);
 
+    let cp_rebuilt = ConversationProjection::get_checkpoint(&pool)
+        .await
+        .expect("get checkpoint after rebuild");
+    assert_eq!(cp_rebuilt, Some(evt2.global_position));
+
     let messages_after_rebuild = ConversationProjection::get_session_messages(&pool, &sess_id)
         .await
         .expect("get messages after rebuild");
     assert_eq!(messages_after_rebuild.len(), 2);
     assert_eq!(messages_after_rebuild[0].content, "Hello, Adham system!");
-    assert_eq!(messages_after_rebuild[1].content, "This is a second prompt.");
+    assert_eq!(
+        messages_after_rebuild[1].content,
+        "This is a second prompt."
+    );
 
     let _ = std::fs::remove_file(db_path);
 }

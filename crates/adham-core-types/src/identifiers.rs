@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 macro_rules! define_id {
     ($name:ident) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
+        #[derive(
+            Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS,
+        )]
         #[ts(export, type = "string")]
         pub struct $name(pub Uuid);
 
@@ -24,7 +26,9 @@ macro_rules! define_id {
             }
 
             pub fn from_client_str(s: &str) -> Self {
-                Uuid::parse_str(s).map(Self).unwrap_or_else(|_| Self::new_v7())
+                Uuid::parse_str(s)
+                    .map(Self)
+                    .unwrap_or_else(|_| Self::new_v7())
             }
 
             pub fn as_uuid(&self) -> &Uuid {

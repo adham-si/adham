@@ -12,6 +12,15 @@ import type {
   SubmittedMessage,
   WorkspaceSummary,
 } from '@adham/contracts-generated';
+import {
+  BootstrapStateSchema,
+  ConversationPageSchema,
+  ProjectSummarySchema,
+  SessionSummarySchema,
+  StorageStatusSchema,
+  SubmittedMessageSchema,
+  WorkspaceSummarySchema,
+} from './schemas';
 
 export type {
   BootstrapState,
@@ -41,7 +50,39 @@ function generateRequestId(): string {
   return crypto.randomUUID();
 }
 
-export class AdhamApiClient {
+export interface AdhamClient {
+  getBootstrapState(): Promise<BootstrapState>;
+  createWorkspace(payload: {
+    name: string;
+    kind: string;
+    preferredLanguage: string;
+  }): Promise<WorkspaceSummary>;
+  createProject(
+    workspaceId: string,
+    payload: { name: string; storageKind: string },
+  ): Promise<ProjectSummary>;
+  createSession(
+    workspaceId: string,
+    projectId: string,
+    payload: { title: string | null },
+  ): Promise<SessionSummary>;
+  submitMessage(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { text: string },
+  ): Promise<SubmittedMessage>;
+  getConversation(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    cursor?: string,
+    limit?: number,
+  ): Promise<ConversationPage>;
+  getStorageStatus(): Promise<StorageStatus>;
+}
+
+export class AdhamApiClient implements AdhamClient {
   private wrapCommand<T>(
     payload: T,
     context: CommandContext = {
@@ -59,7 +100,8 @@ export class AdhamApiClient {
   }
 
   async getBootstrapState(): Promise<BootstrapState> {
-    return invoke<BootstrapState>('get_bootstrap_state');
+    const raw = await invoke('get_bootstrap_state');
+    return BootstrapStateSchema.parse(raw);
   }
 
   async createWorkspace(payload: {
@@ -71,7 +113,7 @@ export class AdhamApiClient {
     const result = await invoke<CommandResult<WorkspaceSummary>>('create_workspace', {
       request: envelope,
     });
-    return result.data;
+    return WorkspaceSummarySchema.parse(result.data);
   }
 
   async createProject(
@@ -86,7 +128,7 @@ export class AdhamApiClient {
     const result = await invoke<CommandResult<ProjectSummary>>('create_project', {
       request: envelope,
     });
-    return result.data;
+    return ProjectSummarySchema.parse(result.data);
   }
 
   async createSession(
@@ -102,7 +144,7 @@ export class AdhamApiClient {
     const result = await invoke<CommandResult<SessionSummary>>('create_session', {
       request: envelope,
     });
-    return result.data;
+    return SessionSummarySchema.parse(result.data);
   }
 
   async submitMessage(
@@ -119,7 +161,7 @@ export class AdhamApiClient {
     const result = await invoke<CommandResult<SubmittedMessage>>('submit_message', {
       request: envelope,
     });
-    return result.data;
+    return SubmittedMessageSchema.parse(result.data);
   }
 
   async getConversation(
@@ -129,7 +171,7 @@ export class AdhamApiClient {
     cursor?: string,
     limit?: number,
   ): Promise<ConversationPage> {
-    return invoke<ConversationPage>('get_conversation', {
+    const raw = await invoke('get_conversation', {
       context: {
         workspaceId,
         projectId,
@@ -138,10 +180,12 @@ export class AdhamApiClient {
       cursor,
       limit,
     });
+    return ConversationPageSchema.parse(raw);
   }
 
   async getStorageStatus(): Promise<StorageStatus> {
-    return invoke<StorageStatus>('get_storage_status');
+    const raw = await invoke('get_storage_status');
+    return StorageStatusSchema.parse(raw);
   }
 }
 

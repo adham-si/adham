@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@adham/ui';
 import { adhamClient, type ConversationMessageDto } from '@/shared/api/adham-client';
+import { queryKeys } from '@/shared/api/query-keys';
 
 export const Route = createFileRoute('/')({
   component: IndexComponent,
@@ -13,36 +14,93 @@ function IndexComponent() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [inputText, setInputText] = React.useState('');
+  const [activeSessionId, setActiveSessionId] = React.useState<string | null>(null);
 
-  // Bootstrap check
+  // Authoritative bootstrap query
   const { data: bootstrap, isLoading: isBootstrapLoading } = useQuery({
-    queryKey: ['bootstrap'],
-    queryFn: () => adhamClient.getBootstrapState().catch(() => ({ isInitialized: false })),
+    queryKey: queryKeys.bootstrap,
+    queryFn: () =>
+      adhamClient.getBootstrapState().catch(() => ({
+        isInitialized: false,
+        activeWorkspaceId: null,
+        activeProjectId: null,
+      })),
   });
 
-  const workspaceId = bootstrap?.activeWorkspaceId || 'default-workspace';
-  const projectId = bootstrap?.activeProjectId || 'default-project';
-  const sessionId = 'default-session';
+  const workspaceId = bootstrap?.activeWorkspaceId;
+  const projectId = bootstrap?.activeProjectId;
 
-  // Conversation query
+  // Ensure active workspace, project, and session exist
+  const ensureActiveContext = React.useCallback(async () => {
+    let wsId = bootstrap?.activeWorkspaceId;
+    let projId = bootstrap?.activeProjectId;
+
+    if (!bootstrap?.isInitialized || !wsId || !projId) {
+      const ws = await adhamClient.createWorkspace({
+        name: 'Personal Workspace',
+        kind: 'personal',
+        preferredLanguage: 'en',
+      });
+      wsId = ws.workspaceId;
+
+      const proj = await adhamClient.createProject(wsId, {
+        name: 'Default Project',
+        storageKind: 'isolated',
+      });
+      projId = proj.projectId;
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap });
+    }
+
+    let sessId = activeSessionId;
+    if (!sessId) {
+      const sess = await adhamClient.createSession(wsId, projId, {
+        title: 'Initial Session',
+      });
+      sessId = sess.sessionId;
+      setActiveSessionId(sessId);
+    }
+
+    return { workspaceId: wsId, projectId: projId, sessionId: sessId };
+  }, [bootstrap, activeSessionId, queryClient]);
+
+  // Auto-bootstrap on initial launch if uninitialized
+  React.useEffect(() => {
+    if (bootstrap && !bootstrap.isInitialized) {
+      ensureActiveContext().catch(console.error);
+    }
+  }, [bootstrap, ensureActiveContext]);
+
+  // Synchronous conversation projection query
   const { data: conversation } = useQuery({
-    queryKey: ['conversation', workspaceId, projectId, sessionId],
-    queryFn: () =>
-      adhamClient
-        .getConversation(workspaceId, projectId, sessionId)
-        .catch(() => ({ items: [], projectionPosition: '0' })),
-    enabled: Boolean(bootstrap),
+    queryKey:
+      workspaceId && projectId && activeSessionId
+        ? queryKeys.conversation(workspaceId, projectId, activeSessionId)
+        : ['conversation', 'empty'],
+    queryFn: () => {
+      if (!workspaceId || !projectId || !activeSessionId) {
+        return { items: [], projectionPosition: '0' };
+      }
+      return adhamClient
+        .getConversation(workspaceId, projectId, activeSessionId)
+        .catch(() => ({ items: [], projectionPosition: '0' }));
+    },
+    enabled: Boolean(workspaceId && projectId && activeSessionId),
   });
 
   // Submit message mutation
   const submitMutation = useMutation({
-    mutationFn: (text: string) =>
-      adhamClient.submitMessage(workspaceId, projectId, sessionId, { text }),
+    mutationFn: async (text: string) => {
+      const ctx = await ensureActiveContext();
+      return adhamClient.submitMessage(ctx.workspaceId, ctx.projectId, ctx.sessionId, { text });
+    },
     onSuccess: () => {
       setInputText('');
-      queryClient.invalidateQueries({
-        queryKey: ['conversation', workspaceId, projectId, sessionId],
-      });
+      if (workspaceId && projectId && activeSessionId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.conversation(workspaceId, projectId, activeSessionId),
+        });
+      }
     },
   });
 
@@ -66,7 +124,7 @@ function IndexComponent() {
           <p className="text-xs text-[var(--color-text-muted,#8B8B99)]">{t('tagline')}</p>
         </div>
         <div className="text-xs font-mono px-2 py-1 bg-[var(--color-bg-subtle,#F4F4F6)] rounded border border-[var(--color-border-subtle,#E2E2E6)]">
-          {isBootstrapLoading ? t('status.loading') : t('status.ready')}
+          {isBootstrapLoading || submitMutation.isPending ? t('status.loading') : t('status.ready')}
         </div>
       </header>
 
