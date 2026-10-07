@@ -46,7 +46,7 @@ describe('SettingsPage Component', () => {
 
     // Dialog is now open
     expect(screen.getByRole('dialog')).not.toBeNull();
-    expect(screen.getAllByText('Appearance & Language').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Preferences').length).toBeGreaterThanOrEqual(1);
 
     // Close button dismisses dialog
     const closeBtn = screen.getByRole('button', { name: 'Close settings' });
@@ -136,6 +136,6 @@ describe('SettingsPage Component', () => {
 
     const categoriesAside = screen.getByLabelText('Settings Categories');
     expect(within(categoriesAside).getByText('Budget')).not.toBeNull();
-    expect(within(categoriesAside).queryByText('Appearance')).toBeNull();
+    expect(within(categoriesAside).queryByText('Preferences')).toBeNull();
   });
 });

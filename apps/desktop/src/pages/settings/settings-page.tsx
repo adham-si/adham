@@ -61,7 +61,7 @@ export function SettingsPage() {
       pages: [
         {
           id: 'appearance',
-          label: 'Appearance',
+          label: 'Preferences',
           icon: <HugeiconsIcon icon={PreferenceHorizontalIcon} />,
         },
       ],
