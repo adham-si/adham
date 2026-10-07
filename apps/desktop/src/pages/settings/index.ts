@@ -1,5 +1,5 @@
 export { SettingsPage } from './settings-page';
-export * from './appearance';
+export * from './preferences';
 export * from './models';
 export * from './providers';
 export * from './routing';

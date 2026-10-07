@@ -33,8 +33,8 @@ export function UsagePage() {
         </p>
       </div>
 
-      {/* Metrics Row (Clean Notion summary style, no heavy borders) */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 py-2 border-b border-border-subtle/40">
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 py-2 border-b border-border-subtle pb-4">
         {metrics.map((m) => (
           <div key={m.label} className="space-y-1">
             <span className="text-xs text-foreground-secondary">{m.label}</span>
@@ -44,12 +44,16 @@ export function UsagePage() {
         ))}
       </div>
 
-      {/* Analytics Preferences Section (Image 1 style) */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Analytics options</h3>
-        <div className="divide-y divide-border-subtle/40">
+      {/* Analytics Preferences Section */}
+      <section aria-labelledby="analytics-options-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="analytics-options-heading" className="text-sm font-semibold text-foreground">
+            Analytics options
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Timeframe */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Reporting timeframe</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -69,7 +73,7 @@ export function UsagePage() {
           </div>
 
           {/* Include local tokens */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Track local model tokens</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -94,14 +98,18 @@ export function UsagePage() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Model Utilization Section (Image 2 clean list style) */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-foreground pt-2">Model utilization</h3>
-        <div className="divide-y divide-border-subtle/40">
+      {/* Model Utilization Section */}
+      <section aria-labelledby="model-utilization-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="model-utilization-heading" className="text-sm font-semibold text-foreground">
+            Model utilization
+          </h3>
+        </div>
+        <div className="space-y-4">
           {recentModels.map((row) => (
-            <div key={row.model} className="flex items-center justify-between py-2.5">
+            <div key={row.model} className="flex items-center justify-between">
               <div>
                 <span className="text-sm font-medium text-foreground">{row.model}</span>
                 <span className="ms-2 text-xs text-foreground-secondary">({row.provider})</span>
@@ -117,7 +125,7 @@ export function UsagePage() {
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

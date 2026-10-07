@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ThemeProvider } from '../../theme/theme-provider';
 import '../../shared/i18n';
@@ -18,6 +18,7 @@ function TestShellWrapper({ children }: { children: React.ReactNode }) {
 
 describe('Shell Layout Components', () => {
   beforeEach(() => {
+    cleanup();
     localStorage.clear();
   });
   it('NavigationRail renders destinations and responds to toggle sidebar', () => {
@@ -25,7 +26,7 @@ describe('Shell Layout Components', () => {
       const { sidebarOpen } = useShellLayout();
       return (
         <div>
-          <NavigationRail />
+          <NavigationRail showIcons />
           <div data-testid="sidebar-state">{sidebarOpen ? 'open' : 'closed'}</div>
         </div>
       );

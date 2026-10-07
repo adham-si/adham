@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
+  Add01Icon,
   McpServerIcon,
   GlobalSearchIcon,
   Folder01Icon,
@@ -10,144 +10,148 @@ import {
   GitBranchIcon,
   SourceCodeIcon,
 } from '@hugeicons/core-free-icons';
+import {
+  McpFilterTabs,
+  type McpFilterTab,
+  McpServersList,
+  type McpServerItem,
+  McpSandboxSection,
+} from './components';
 
 export function McpPage() {
-  const { t } = useTranslation();
-  const [tab, setTab] = React.useState<'discover' | 'manage'>('discover');
+  const [tab, setTab] = React.useState<McpFilterTab>('all');
+  const [configuredIds, setConfiguredIds] = React.useState<Set<string>>(
+    () => new Set(['playwright', 'filesystem']),
+  );
 
-  const mcpServers = [
+  const mcpServers: McpServerItem[] = [
     {
       id: 'playwright',
       name: 'Playwright',
       desc: 'Browser automation server bounded to local scratch directory.',
       icon: <HugeiconsIcon icon={GlobalSearchIcon} />,
-      status: 'active',
-      buttonText: 'Configured',
+      transport: 'stdio',
+      category: 'automation',
     },
     {
       id: 'filesystem',
       name: 'FileSystem',
       desc: 'Sandboxed directory operations and workspace filesystem bridge.',
       icon: <HugeiconsIcon icon={Folder01Icon} />,
-      status: 'active',
-      buttonText: 'Configured',
+      transport: 'stdio',
+      category: 'filesystem',
     },
     {
       id: 'context7',
       name: 'Context7',
       desc: 'Up-to-date documentation indexer and library research server.',
       icon: <HugeiconsIcon icon={McpServerIcon} />,
-      status: 'available',
-      buttonText: 'Enable',
+      transport: 'sse',
+      category: 'knowledge',
     },
     {
       id: 'github',
       name: 'GitHub',
       desc: 'Connect repositories, issues, and pull requests into agent tasks.',
       icon: <HugeiconsIcon icon={GitBranchIcon} />,
-      status: 'available',
-      buttonText: 'Enable',
+      transport: 'stdio',
+      category: 'development',
     },
     {
       id: 'database',
       name: 'PostgreSQL',
       desc: 'Read schemas and safely run inspected queries on local databases.',
       icon: <HugeiconsIcon icon={Database01Icon} />,
-      status: 'available',
-      buttonText: 'Enable',
+      transport: 'stdio',
+      category: 'database',
     },
     {
       id: 'vscode',
       name: 'Editor Bridge',
       desc: 'Synchronize active files and diagnostics with desktop editor.',
       icon: <HugeiconsIcon icon={SourceCodeIcon} />,
-      status: 'available',
-      buttonText: 'Enable',
+      transport: 'stdio',
+      category: 'ide',
+    },
+    {
+      id: 'brave-search',
+      name: 'Brave Search',
+      desc: 'Live web search API and structured query retrieval.',
+      icon: <img src="/media/software/brave.svg" alt="Brave" className="size-5 object-contain" />,
+      transport: 'sse',
+      category: 'search',
+    },
+    {
+      id: 'governed-memory',
+      name: 'Governed Memory',
+      desc: 'Vector retrieval and durable session knowledge store.',
+      icon: <HugeiconsIcon icon={McpServerIcon} />,
+      transport: 'stdio',
+      category: 'memory',
     },
   ];
+
+  const handleToggle = (id: string) => {
+    setConfiguredIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const filteredServers = mcpServers.filter((s) => {
+    if (tab === 'configured') return configuredIds.has(s.id);
+    if (tab === 'available') return !configuredIds.has(s.id);
+    return true;
+  });
+
+  const counts = {
+    all: mcpServers.length,
+    configured: configuredIds.size,
+    available: mcpServers.length - configuredIds.size,
+  };
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">
-          {t('settings.extensions.mcp', { defaultValue: 'Model Context Protocol (MCP)' })}
-        </h2>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">Model Context Protocol</h2>
         <p className="text-xs text-foreground-secondary mt-1">
-          Use MCP servers to connect tools, local databases, and external environments.{' '}
-          <span className="text-action cursor-pointer hover:underline">Learn more</span>
+          Connect tools, local databases, and external environments via standard MCP servers.
         </p>
       </div>
 
-      {/* Pill sub-tabs */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setTab('discover')}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            tab === 'discover'
-              ? 'bg-surface-muted text-foreground'
-              : 'text-foreground-secondary hover:text-foreground hover:bg-surface-hover'
-          }`}
-        >
-          Discover MCP servers
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('manage')}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            tab === 'manage'
-              ? 'bg-surface-muted text-foreground'
-              : 'text-foreground-secondary hover:text-foreground hover:bg-surface-hover'
-          }`}
-        >
-          Manage active servers
-        </button>
-      </div>
+      {/* Sandbox & Isolation Note */}
+      <McpSandboxSection />
 
-      {/* Section Header with Action Button */}
-      <div className="flex items-center justify-between pt-1">
-        <h3 className="text-sm font-semibold text-foreground">Servers to use with Adham</h3>
-        <Button size="sm" variant="primary">
-          + Add an MCP server
-        </Button>
-      </div>
+      {/* Branded Filter Tabs */}
+      <McpFilterTabs activeTab={tab} onTabChange={setTab} counts={counts} />
 
-      {/* 2-Column Grid (Image 2 style) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        {mcpServers.map((server) => {
-          const isConfigured = server.status === 'active';
-          return (
-            <div
-              key={server.id}
-              className="flex items-center justify-between rounded-lg p-2.5 transition-colors hover:bg-surface-subtle"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-foreground [&_svg]:size-icon-sm">
-                  {server.icon}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-foreground truncate">
-                    {server.name}
-                  </div>
-                  <div className="text-xs text-foreground-secondary truncate max-w-[180px] sm:max-w-[220px]">
-                    {server.desc}
-                  </div>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant={isConfigured ? 'secondary' : 'secondary'}
-                className="ms-3 shrink-0"
-              >
-                {server.buttonText}
-              </Button>
-            </div>
-          );
-        })}
-      </div>
+      {/* Section Header with Action and Notion-style separator line */}
+      <section aria-labelledby="mcp-servers-heading" className="space-y-4">
+        <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
+          <h3 id="mcp-servers-heading" className="text-sm font-semibold text-foreground">
+            Servers to use with Adham
+          </h3>
+          <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
+            <HugeiconsIcon icon={Add01Icon} />
+            <span>Add server</span>
+          </Button>
+        </div>
 
-      {/* Footer connection link */}
+        {/* Dynamic MCP Servers List */}
+        <McpServersList
+          servers={filteredServers}
+          configuredIds={configuredIds}
+          onToggle={handleToggle}
+        />
+      </section>
+
+      {/* Footer Documentation Link */}
       <div className="pt-2 text-xs text-foreground-secondary">
         Want to bring your own local databases, APIs, or custom servers?{' '}
         <span className="text-action cursor-pointer hover:underline">Documentation & guides →</span>

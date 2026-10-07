@@ -19,7 +19,7 @@ import {
   Cancel01Icon,
 } from '@hugeicons/core-free-icons';
 import { useShellLayout, type SettingsPageId } from '@/widgets/shell/layout-context';
-import { AppearancePage } from './appearance';
+import { PreferencesPage } from './preferences';
 import { ModelsPage } from './models';
 import { ProvidersPage } from './providers';
 import { RoutingPage } from './routing';
@@ -60,7 +60,7 @@ export function SettingsPage() {
       name: 'Personal',
       pages: [
         {
-          id: 'appearance',
+          id: 'preferences',
           label: 'Preferences',
           icon: <HugeiconsIcon icon={PreferenceHorizontalIcon} />,
         },
@@ -163,7 +163,7 @@ export function SettingsPage() {
       <div onClick={closeSettings} className="absolute inset-0 bg-scrim" />
 
       {/* Centered Modal Frame */}
-      <div className="relative flex flex-col md:flex-row w-full max-w-5xl h-[720px] max-h-[88vh] rounded-xl border border-border bg-surface-raised shadow-floating overflow-hidden">
+      <div className="relative flex flex-col md:flex-row w-full max-w-5xl xl:max-w-6xl h-[85vh] max-h-[880px] min-h-[580px] rounded-xl border border-border bg-surface-raised shadow-floating overflow-hidden">
         {/* Left Settings Pages Navigation (272px) */}
         <aside
           aria-label="Settings Categories"
@@ -212,7 +212,7 @@ export function SettingsPage() {
         <main className="relative flex-1 flex flex-col min-w-0 bg-surface overflow-hidden">
           {/* Active Settings Page View */}
           <div className="flex-1 overflow-y-auto p-6 sm:p-8 pe-12">
-            {activeSettingsPage === 'appearance' && <AppearancePage />}
+            {activeSettingsPage === 'preferences' && <PreferencesPage />}
             {activeSettingsPage === 'models' && <ModelsPage />}
             {activeSettingsPage === 'providers' && <ProvidersPage />}
             {activeSettingsPage === 'routing' && <RoutingPage />}

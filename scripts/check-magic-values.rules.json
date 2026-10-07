@@ -23,5 +23,10 @@
     "id": "default-palette",
     "pattern": "\\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via|decoration|accent|caret|divide|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\\d{2,3}\\b",
     "message": "cleared Tailwind default palette — define a semantic token instead"
+  },
+  {
+    "id": "border-width",
+    "pattern": "\\bborder-(?:[xytblr]{1,2}-)?[2-9]\\d*\\b|\\bborder-(?:[xytblr]{1,2}-)?\\[\\d+px\\]",
+    "message": "border wider than 1px — borders are 1px only (`border`); the focus ring uses outline-2"
   }
 ]

@@ -58,7 +58,7 @@ describe('SettingsPage Component', () => {
     function Trigger() {
       const { openSettings } = useShellLayout();
       return (
-        <button type="button" onClick={() => openSettings('appearance')}>
+        <button type="button" onClick={() => openSettings('preferences')}>
           Open
         </button>
       );

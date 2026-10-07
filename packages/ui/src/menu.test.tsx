@@ -230,6 +230,28 @@ describe('Menu', () => {
     expect(screen.getByRole('menu').className).toContain('z-menu');
   });
 
+  it('popup rows breathe: 4px gap like nav lists, separators carry no margins', () => {
+    render(
+      <Menu label="Actions">
+        <MenuGroup label="File">
+          <MenuItem value="open">Open</MenuItem>
+        </MenuGroup>
+        <MenuSeparator />
+        <MenuItem value="save">Save</MenuItem>
+      </Menu>,
+    );
+    const { className } = screen.getByRole('menu');
+    expect(className).toContain('flex');
+    expect(className).toContain('flex-col');
+    expect(className).toContain('gap-1');
+    expect(screen.getByRole('separator').className).not.toContain('my-1');
+    // Group heading keeps top air but no bottom padding: the container gap owns
+    // the 4px below it, so heading-to-row never stacks to 8px.
+    const heading = screen.getByText('File');
+    expect(heading.className).not.toContain('pb-1');
+    expect(heading.className).toContain('pt-1');
+  });
+
   it('clicking an item reports its value', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

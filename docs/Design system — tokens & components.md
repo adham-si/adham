@@ -96,7 +96,16 @@ variables. Over the full pairing matrix, in **both** themes:
 
 `--border-subtle` is **exempt**: it draws separation between regions, never the sole
 indicator of a control's extent. Any boundary identifying an interactive control uses
-`--border` or stronger and must clear 3:1.
+`--border` or stronger and must clear 3:1. Exception: a labelled button or field
+(Input/Textarea) may rest at `--border-subtle` — its label, not the outline alone,
+identifies the control. Buttons restore `--border` on `focus-visible` only;
+fields stay quiet on hover — focus replaces the 1px border with a 2px `--focus`
+ring (`outline-2`, `-outline-offset-1`). **Hover never touches a control border**:
+buttons signal hover through background colour, not border colour.
+
+Border widths are **1px everywhere** — the focus ring is the only 2px line, drawn as
+an outline, never as `border-2`/`border-4` (forbidden by `check-magic-values`, rule
+`border-width`).
 
 `--foreground-disabled` and `--surface-disabled` are informational. WCAG 1.4.3 exempts
 disabled controls, so they are not gated.
@@ -131,8 +140,9 @@ The nine states do not apply uniformly.
 
 | Component | Variants / props | Accessibility |
 |---|---|---|
-| `Button` | `primary · secondary · ghost · danger · link` × `sm/md/lg` | native `<button>`; `loading` → `aria-busy`; `type` defaults to `button` |
-| `Input`, `Textarea` | `sm/md/lg`, `invalid`, `readOnly`, `errorMessage` | `aria-invalid` + `aria-describedby` → `role="alert"` node |
+| `Button` | `primary · secondary · ghost · danger · link` × `sm/md/lg`, `iconOnly` | native `<button>`; `loading` → `aria-busy` + spinner (stopped under reduced motion); icon-only requires `aria-label`; `type` defaults to `button` |
+| `Input`, `Textarea` | `sm/md/lg`, `invalid`, `readOnly`, `errorMessage`; 1px border: rest `--border-subtle` (hover leaves it untouched), focus = 2px `--focus` ring (invalid: danger ring); state changes are instant, no transition | `aria-invalid` + `aria-describedby` → `role="alert"` node |
+| `Select` | `options`, `value`/`defaultValue`/`onValueChange`, `placeholder`, `indicator`/`indicatorOpen`, `sm/md/lg`, `invalid`, `errorMessage`; same 1px boundary contract as fields | trigger `aria-haspopup="listbox"` + `aria-expanded`; arrows/`Home`/`End`/`Enter`/`Escape`/`Tab`, focus return; error `role="alert"` |
 | `SidebarItem` | `selected`, `disabled`, `href` | `aria-current="page"`; `<a>` or `<button>` |
 | `Menu` | `MenuItem`, `MenuGroup`, `MenuSeparator` | roving tabindex, arrows, `Home`/`End`, `Escape`, focus return |
 | `Dialog` | `sm/md/lg`, `label` | `role="dialog"`, `aria-modal`, focus trap, focus return |
@@ -151,20 +161,21 @@ Semantic HTML first. No third-party visual system.
 | `ps-3` / `pe-3` / `end-3` | `pl-3` / `pr-3` / `right-3` |
 | `z-dialog`, `z-menu` | `z-50` |
 | `outline-focus` | `shadow` for a focus ring |
+| `border` (1px) + focus `outline-2 -outline-offset-1` | `border-2` / `border-4` |
 | `text-start` | `text-left` |
 
 ## Enforcement
 
 `scripts/check-magic-values.mjs`, wired into `pnpm check`. Scans `packages/ui/src` and
-`apps/desktop/src` for hex literals, arbitrary `var()` values, bare `z-` utilities, and
-Tailwind's cleared default palette (`--color-*: initial` wipes it, so `bg-red-600` cannot
-sneak in).
+`apps/desktop/src` for hex literals, arbitrary `var()` values, bare `z-` utilities,
+non-1px border widths, and Tailwind's cleared default palette (`--color-*: initial`
+wipes it, so `bg-red-600` cannot sneak in).
 
 It strips comments before scanning. Strings are still scanned, since a hex colour inside a
 string is a real violation. A gate that fires on `// see PR #1234` is a gate people learn
 to bypass.
 
-`scripts/check-magic-values.self-test.mjs` asserts the rule set against 19 cases, including
+`scripts/check-magic-values.self-test.mjs` asserts the rule set against 25 cases, including
 negative ones, so a regex change cannot silently weaken the gate.
 
 ## Theme switching

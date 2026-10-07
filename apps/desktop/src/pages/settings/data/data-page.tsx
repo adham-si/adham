@@ -36,12 +36,16 @@ export function DataPage() {
         </p>
       </div>
 
-      {/* Storage Information Section (Image 1 style) */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Storage details</h3>
-        <div className="divide-y divide-border-subtle/40">
+      {/* Storage Information Section */}
+      <section aria-labelledby="storage-details-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="storage-details-heading" className="text-sm font-semibold text-foreground">
+            Storage details
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Storage Directory */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Database location</div>
               <div className="text-xs text-foreground-secondary mt-0.5 font-mono">
@@ -54,7 +58,7 @@ export function DataPage() {
           </div>
 
           {/* Journal Mode */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">SQLite journal mode</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -67,7 +71,7 @@ export function DataPage() {
           </div>
 
           {/* Schema Version */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Schema version</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -80,7 +84,7 @@ export function DataPage() {
           </div>
 
           {/* Auto-vacuum */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Automatic database vacuum</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -105,14 +109,18 @@ export function DataPage() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Maintenance Actions Section */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Maintenance & recovery</h3>
-        <div className="divide-y divide-border-subtle/40">
+      <section aria-labelledby="maintenance-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="maintenance-heading" className="text-sm font-semibold text-foreground">
+            Maintenance & recovery
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Rebuild Projection */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Rebuild projections</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -125,7 +133,7 @@ export function DataPage() {
           </div>
 
           {/* Purge Scratch */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Clear scratch cache</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -137,7 +145,7 @@ export function DataPage() {
             </Button>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -110,9 +110,9 @@ export const defaultResources = {
         extensions: {
           title: 'Skills, Plugins & MCP',
           desc: 'Inspect installed extensions, tool policies, and verified package trust.',
-          plugins: 'Agent Plugins (P0-14)',
-          mcp: 'Model Context Protocol (P0-13)',
-          skills: 'Agent Skills (P0-13)',
+          plugins: 'Agent Plugins',
+          mcp: 'Model Context Protocol',
+          skills: 'Agent Skills',
         },
       },
       gallery: {
@@ -467,9 +467,9 @@ export const defaultResources = {
         extensions: {
           title: '技能、插件与 MCP',
           desc: '查看已安装扩展、工具策略及安全认证状态。',
-          plugins: '智能体插件 (P0-14)',
-          mcp: '模型上下文协议 (P0-13)',
-          skills: '智能体技能 (P0-13)',
+          plugins: '智能体插件',
+          mcp: '模型上下文协议',
+          skills: '智能体技能',
         },
       },
       gallery: {
@@ -645,9 +645,9 @@ export const defaultResources = {
         extensions: {
           title: 'Навыки, Плагины и MCP',
           desc: 'Установленные расширения, политики безопасности и статус пакетов.',
-          plugins: 'Плагины агентов (P0-14)',
-          mcp: 'Протокол контекста моделей (P0-13)',
-          skills: 'Навыки агентов (P0-13)',
+          plugins: 'Плагины агентов',
+          mcp: 'Протокол контекста моделей',
+          skills: 'Навыки агентов',
         },
       },
       gallery: {

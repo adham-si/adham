@@ -23,12 +23,16 @@ export function PrivacyPage() {
         </p>
       </div>
 
-      {/* Telemetry Section (Image 1 style) */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Telemetry & telemetry</h3>
-        <div className="divide-y divide-border-subtle/40">
+      {/* Telemetry Section */}
+      <section aria-labelledby="telemetry-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="telemetry-heading" className="text-sm font-semibold text-foreground">
+            Telemetry & analytics
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Crash Reports */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Anonymous crash reports</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -54,7 +58,7 @@ export function PrivacyPage() {
           </div>
 
           {/* Diagnostic Metrics */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Share usage analytics</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -79,14 +83,18 @@ export function PrivacyPage() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Network & Egress Section */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Isolation & egress</h3>
-        <div className="divide-y divide-border-subtle/40">
+      <section aria-labelledby="isolation-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="isolation-heading" className="text-sm font-semibold text-foreground">
+            Isolation & egress
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Sandbox Isolation */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Strict sandbox containment</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -112,7 +120,7 @@ export function PrivacyPage() {
           </div>
 
           {/* Block Tool Network Egress */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Block tool network egress</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -137,7 +145,7 @@ export function PrivacyPage() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -27,11 +27,15 @@ export function GovernancePage() {
       </div>
 
       {/* Autonomy & Approvals Section */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Autonomy & approvals</h3>
-        <div className="divide-y divide-border-subtle/40">
+      <section aria-labelledby="autonomy-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="autonomy-heading" className="text-sm font-semibold text-foreground">
+            Autonomy & approvals
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Autonomy Level */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Agent autonomy level</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -51,7 +55,7 @@ export function GovernancePage() {
           </div>
 
           {/* Confirm File Edits */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Confirm file modifications</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -77,7 +81,7 @@ export function GovernancePage() {
           </div>
 
           {/* Confirm Terminal Commands */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Confirm terminal commands</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -103,7 +107,7 @@ export function GovernancePage() {
           </div>
 
           {/* Confirm Git Push */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
                 Confirm git push & remote publish
@@ -130,14 +134,18 @@ export function GovernancePage() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Sandbox & Boundaries Section */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Sandbox boundaries</h3>
-        <div className="divide-y divide-border-subtle/40">
+      <section aria-labelledby="sandbox-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="sandbox-heading" className="text-sm font-semibold text-foreground">
+            Sandbox boundaries
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Filesystem Boundary */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Filesystem sandbox scope</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -156,7 +164,7 @@ export function GovernancePage() {
           </div>
 
           {/* Block Unsigned Plugins */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Block unsigned plugins</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -182,7 +190,7 @@ export function GovernancePage() {
           </div>
 
           {/* Data Loss Prevention */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
                 Accidental data loss prevention
@@ -210,7 +218,7 @@ export function GovernancePage() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

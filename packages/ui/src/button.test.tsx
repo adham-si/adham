@@ -25,6 +25,23 @@ describe('Button', () => {
     expect(className).toContain('text-action-foreground');
   });
 
+  // regression: bg-danger vs text-danger-foreground is 1.00:1 (identical values) — label invisible
+  it('default: danger background pairs with the surface foreground, never itself', () => {
+    render(<Button variant="danger">Danger</Button>);
+    const { className } = screen.getByRole('button');
+    expect(className).toContain('bg-danger');
+    expect(className).toContain('text-danger-surface');
+    expect(className).not.toContain('text-danger-foreground');
+  });
+
+  it('secondary: rests on the subtle boundary, sharpens only on focus', () => {
+    render(<Button variant="secondary">Secondary</Button>);
+    const { className } = screen.getByRole('button');
+    expect(className).toContain('border-border-subtle');
+    expect(className).not.toContain('hover:border');
+    expect(className).toContain('focus-visible:border-border');
+  });
+
   it('hover: every variant declares a hover background', () => {
     for (const variant of ['primary', 'secondary', 'ghost', 'danger', 'link'] as const) {
       const { container } = render(<Button variant={variant}>Hover</Button>);
@@ -64,6 +81,41 @@ describe('Button', () => {
   it('not loading: omits aria-busy', () => {
     render(<Button>Idle</Button>);
     expect(screen.getByRole('button').hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it('iconOnly: square control that takes its name from aria-label', () => {
+    render(
+      <Button iconOnly size="sm" aria-label="Close">
+        <span data-testid="glyph" />
+      </Button>,
+    );
+    const { className } = screen.getByRole('button', { name: 'Close' });
+    expect(className).toContain('aspect-square');
+    expect(className).toContain('px-0');
+    expect(screen.getByTestId('glyph')).toBeDefined();
+  });
+
+  it('iconOnly + loading: swaps the child for the spinner', () => {
+    const { container } = render(
+      <Button iconOnly loading aria-label="Saving">
+        <span data-testid="glyph" />
+      </Button>,
+    );
+    expect(container.querySelector('svg.animate-spin')).not.toBeNull();
+    expect(screen.queryByTestId('glyph')).toBeNull();
+  });
+
+  it('loading: spinner is decorative, reduced-motion aware, sized with the button', () => {
+    const { container } = render(
+      <Button loading size="lg">
+        Saving
+      </Button>,
+    );
+    const spinner = container.querySelector('svg.animate-spin');
+    expect(spinner?.getAttribute('aria-hidden')).toBe('true');
+    expect(spinner?.getAttribute('class')).toContain('motion-reduce:animate-none');
+    expect(spinner?.getAttribute('class')).toContain('size-icon-lg');
+    expect(screen.getByRole('button', { name: 'Saving' })).toBeDefined();
   });
 
   // --- sizes: min-h + padding, never a fixed height

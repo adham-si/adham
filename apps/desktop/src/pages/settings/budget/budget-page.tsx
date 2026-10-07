@@ -26,11 +26,13 @@ export function BudgetPage() {
       </div>
 
       {/* Spend Guardrails Section */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Spend guardrails</h3>
-        <div className="divide-y divide-border-subtle/40">
+      <div className="space-y-4">
+        <div className="border-b border-border-subtle/40 pb-2">
+          <h3 className="text-sm font-semibold text-foreground">Spend guardrails</h3>
+        </div>
+        <div className="space-y-4">
           {/* Monthly Spend Limit */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Monthly API spend limit</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -51,7 +53,7 @@ export function BudgetPage() {
           </div>
 
           {/* Daily Token Allowance */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Daily token allowance</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -71,7 +73,7 @@ export function BudgetPage() {
           </div>
 
           {/* Alert Threshold */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Warning threshold</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -92,11 +94,13 @@ export function BudgetPage() {
       </div>
 
       {/* Enforcement Actions Section */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Enforcement actions</h3>
-        <div className="divide-y divide-border-subtle/40">
+      <div className="space-y-4">
+        <div className="border-b border-border-subtle/40 pb-2">
+          <h3 className="text-sm font-semibold text-foreground">Enforcement actions</h3>
+        </div>
+        <div className="space-y-4">
           {/* Hard Stop Toggle */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Hard stop at limit</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -122,7 +126,7 @@ export function BudgetPage() {
           </div>
 
           {/* Degrade to Local Ollama Toggle */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
                 Automatic fallback to local Ollama
@@ -150,7 +154,7 @@ export function BudgetPage() {
           </div>
 
           {/* Desktop Notifications Toggle */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Desktop budget alerts</div>
               <div className="text-xs text-foreground-secondary mt-0.5">

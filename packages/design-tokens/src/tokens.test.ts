@@ -48,10 +48,15 @@ describe('parity between tokens.css and the typed mirror', () => {
   });
 
   it('maps every tier-2 name to a Tailwind utility in @theme inline', () => {
+    // Shadow values are not colors: `shadow-floating` maps into the `--shadow-*`
+    // namespace (utility `shadow-floating`), everything else into `--color-*`.
+    // A `--color-shadow-floating` alias would make Tailwind read
+    // `shadow-shadow-floating` as a shadow *color* and render no shadow.
     for (const name of tier2) {
-      expect(inlineTheme, `--color-${name}: var(--${name}) missing from @theme inline`).toContain(
-        `--color-${name}: var(--${name})`,
-      );
+      const declaration = name.startsWith('shadow-')
+        ? `--${name}: var(--${name})`
+        : `--color-${name}: var(--${name})`;
+      expect(inlineTheme, `${declaration} missing from @theme inline`).toContain(declaration);
     }
   });
 

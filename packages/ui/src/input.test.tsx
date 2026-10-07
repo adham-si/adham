@@ -12,16 +12,41 @@ describe('Input', () => {
   });
 
   // --- spec §7: default, hover, focus-visible, disabled, invalid, read-only
-  it('default: surface background and the control boundary token', () => {
+  it('default: quiet boundary; hover leaves the border alone', () => {
     render(<Input />);
     const { className } = screen.getByRole('textbox');
     expect(className).toContain('bg-surface');
-    expect(className).toContain('border-border');
+    expect(className).toContain('border-border-subtle');
+    expect(className).not.toContain('hover:border');
   });
 
-  it('focus-visible: strengthens the boundary with border-strong', () => {
+  it('focus-visible: 2px branded ring drawn over the 1px border', () => {
     render(<Input />);
-    expect(screen.getByRole('textbox').className).toContain('focus-visible:outline-border-strong');
+    const { className } = screen.getByRole('textbox');
+    expect(className).toContain('focus-visible:outline-2');
+    expect(className).toContain('focus-visible:-outline-offset-1');
+    expect(className).toContain('focus-visible:outline-focus');
+  });
+
+  it('click feedback is instant: no transition utilities', () => {
+    render(<Input />);
+    expect(screen.getByRole('textbox').className).not.toContain('transition-');
+  });
+
+  it('vertical breathing room: py-1 so text never touches the border', () => {
+    for (const size of ['sm', 'md', 'lg'] as const) {
+      const { container, unmount } = render(<Input size={size} />);
+      expect(container.querySelector('input')?.className, size).toContain('py-1');
+      unmount();
+    }
+  });
+
+  it('border widths stay 1px', () => {
+    render(<Input invalid />);
+    const { className } = screen.getByRole('textbox');
+    expect(className).toMatch(/(^|\s)border(\s|$)/);
+    expect(className).not.toMatch(/(^|\s)border-[0-9]/);
+    expect(className).not.toMatch(/(^|\s)border-[xytblr]{1,2}-[0-9]/);
   });
 
   it('disabled: sets the native attribute and the disabled surface', () => {
@@ -36,6 +61,7 @@ describe('Input', () => {
     const input = screen.getByRole('textbox');
     expect(input.getAttribute('aria-invalid')).toBe('true');
     expect(input.className).toContain('border-danger');
+    expect(input.className).toContain('focus-visible:outline-danger');
   });
 
   it('not invalid: omits aria-invalid', () => {

@@ -5,5 +5,6 @@ export * from './dialog';
 export * from './input';
 export * from './menu';
 export * from './message-card';
+export * from './select';
 export * from './sidebar-item';
 export * from './textarea';

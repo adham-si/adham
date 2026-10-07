@@ -97,16 +97,17 @@ export function MenuItem({
   );
 }
 
-/** A non-interactive divider between groups of items. */
+/** A non-interactive divider between groups of items. Spacing comes from the
+    popup's gap — no margins of its own. */
 export function MenuSeparator() {
-  return <div role="separator" className="my-1 h-px bg-border-subtle" />;
+  return <div role="separator" className="h-px bg-border-subtle" />;
 }
 
 /** A labelled group of items. The heading is not focusable. */
 export function MenuGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div role="group" aria-label={label}>
-      <div className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-foreground-muted uppercase">
+    <div role="group" aria-label={label} className="flex flex-col gap-1">
+      <div className="px-3 pt-1 text-xs font-semibold tracking-wide text-foreground-muted uppercase">
         {label}
       </div>
       {children}
@@ -236,7 +237,7 @@ export function Menu({ children, label, className, onSelect }: MenuProps) {
         role="menu"
         aria-label={label}
         className={cn(
-          'z-menu min-w-48 rounded-lg border border-border bg-surface-raised p-1 shadow-shadow-floating',
+          'z-menu flex min-w-48 flex-col gap-1 rounded-lg border border-border bg-surface-raised p-1 shadow-floating',
           className,
         )}
       >

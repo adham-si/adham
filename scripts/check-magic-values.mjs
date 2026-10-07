@@ -36,7 +36,7 @@ for (const root of ROOTS) {
 
 if (violations.length === 0) {
   console.log(
-    'Magic-value check passed: no hex literals, arbitrary var() values, bare z-index utilities, or cleared Tailwind defaults.',
+    'Magic-value check passed: no hex literals, arbitrary var() values, bare z-index utilities, non-1px borders, or cleared Tailwind defaults.',
   );
   process.exit(0);
 }

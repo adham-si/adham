@@ -36,12 +36,16 @@ export function InfoPage() {
         </p>
       </div>
 
-      {/* System Details Section (Image 1 style) */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Application details</h3>
-        <div className="divide-y divide-border-subtle/40">
+      {/* System Details Section */}
+      <section aria-labelledby="app-details-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="app-details-heading" className="text-sm font-semibold text-foreground">
+            Application details
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Version */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">App version</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -54,7 +58,7 @@ export function InfoPage() {
           </div>
 
           {/* Build */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Build identifier</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -65,7 +69,7 @@ export function InfoPage() {
           </div>
 
           {/* Runtime Engine */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Runtime architecture</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -76,7 +80,7 @@ export function InfoPage() {
           </div>
 
           {/* Platform */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Host platform</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -86,14 +90,18 @@ export function InfoPage() {
             <span className="text-xs text-foreground-secondary">{sysInfo.platform}</span>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Diagnostics & Updates Section */}
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground pt-2 pb-1">Diagnostics & updates</h3>
-        <div className="divide-y divide-border-subtle/40">
+      <section aria-labelledby="diagnostics-heading" className="space-y-4">
+        <div className="border-b border-border-subtle pb-2.5">
+          <h3 id="diagnostics-heading" className="text-sm font-semibold text-foreground">
+            Diagnostics & updates
+          </h3>
+        </div>
+        <div className="space-y-4">
           {/* Auto-update Toggle */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
                 Check for updates automatically
@@ -121,7 +129,7 @@ export function InfoPage() {
           </div>
 
           {/* Copy Diagnostics Button */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">Copy diagnostic report</div>
               <div className="text-xs text-foreground-secondary mt-0.5">
@@ -133,7 +141,7 @@ export function InfoPage() {
             </Button>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

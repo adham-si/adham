@@ -20,6 +20,9 @@ const CASES = [
   ],
   ['<div className="rounded-[var(--radius-md,8px)]" />', ['arbitrary-var-radius']],
   ['<div className="z-50" />', ['bare-z']],
+  ['<div className="border-2 border-action" />', ['border-width']],
+  ['<div className="border-b-2" />', ['border-width']],
+  ['<div className="border-t-[3px]" />', ['border-width']],
   ['<div className="z-dialog" />', []],
   ['<button className="bg-red-600 text-white" />', ['default-palette']],
   ['<button className="bg-danger text-action-foreground" />', []],
@@ -37,6 +40,9 @@ const CASES = [
   ['<div className="min-h-control-md rounded-md" />', []],
   ['<div className="z-menu z-popover z-toast" />', []],
   ['<div className="border-border-subtle bg-selection" />', []],
+  ['<div className="border border-border-subtle" />', []],
+  ['<div className="border-0 border-border" />', []],
+  ['<div className="focus-visible:outline-2 focus-visible:-outline-offset-1" />', []],
   ["const label = 'Send message #1';", []],
 ];
 

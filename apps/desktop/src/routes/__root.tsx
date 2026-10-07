@@ -1,8 +1,6 @@
 import * as React from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
 import { ThemeProvider } from '@/theme/theme-provider';
-import { ShellLayoutProvider } from '@/widgets/shell/layout-context';
-import { SettingsPage } from '@/pages/settings';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -11,12 +9,7 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <ThemeProvider>
-      <ShellLayoutProvider>
-        <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-          <Outlet />
-          <SettingsPage />
-        </div>
-      </ShellLayoutProvider>
+      <Outlet />
     </ThemeProvider>
   );
 }

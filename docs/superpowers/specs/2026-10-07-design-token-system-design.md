@@ -123,6 +123,8 @@ Neutral surfaces and text — all values below were recomputed (WCAG 2.1 relativ
 
 **Border discipline:** any boundary that identifies an interactive control (input, select, button outline, checkbox) uses `--border` or stronger and must clear 3:1. `--border-subtle` is *exempt* because it only draws visual separation between regions — it must never be the sole indicator of a control's extent.
 
+**Exception (decided 2026-10-07):** a labelled button or field (Input/Textarea) may rest at `--border-subtle` — its label, not the outline alone, identifies the control. Buttons restore `--border` on `focus-visible` only; fields stay quiet on hover, and focus replaces the 1px border with a 2px `--focus` ring (`outline-2`, `-outline-offset-1`). Hover never touches a control border — buttons signal hover through background colour. Border widths are 1px everywhere — `border-2`/`border-4` are forbidden (`check-magic-values`, rule `border-width`).
+
 Disabled — WCAG 1.4.3 exempts disabled controls, so these are informational, not gated:
 
 | Runtime var | Light | Dark |
@@ -190,6 +192,7 @@ The nine states do **not** apply uniformly. Matrix (✓ = required, — = n/a):
 |---|---|---|
 | `Button` | `primary · secondary · ghost · danger · link` × `sm/md/lg` | native `<button>`; `loading` → `aria-busy` |
 | `Input`, `Textarea` | `sm/md/lg`, `invalid`, `read-only` | `<label>`; `aria-invalid` + `aria-describedby` → error text |
+| `Select` | `options`, `value`/`defaultValue`/`onValueChange`, `placeholder`, `indicator`/`indicatorOpen`, `sm/md/lg`, `invalid` | trigger `aria-haspopup="listbox"` + `aria-expanded`; listbox keyboard, focus return |
 | `SidebarItem` | `selected`, `disabled` | `aria-current`; `<a>` or `<button>` |
 | `Menu` | item sets, separators | roving tabindex, arrow keys, `Esc`, focus return |
 | `Dialog` | sizes | focus trap, `Esc`, `role="dialog"`, `aria-modal`, focus return |

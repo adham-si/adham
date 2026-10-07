@@ -12,16 +12,49 @@ describe('Textarea', () => {
     expect(textarea).toHaveProperty('rows', 4);
   });
 
-  it('default: surface background and the control boundary token', () => {
+  it('default: quiet boundary; hover leaves the border alone', () => {
     render(<Textarea />);
     const { className } = screen.getByRole('textbox');
     expect(className).toContain('bg-surface');
-    expect(className).toContain('border-border');
+    expect(className).toContain('border-border-subtle');
+    expect(className).not.toContain('hover:border');
   });
 
-  it('focus-visible: strengthens the boundary with border-strong', () => {
+  it('focus-visible: 2px branded ring drawn over the 1px border', () => {
     render(<Textarea />);
-    expect(screen.getByRole('textbox').className).toContain('focus-visible:outline-border-strong');
+    const { className } = screen.getByRole('textbox');
+    expect(className).toContain('focus-visible:outline-2');
+    expect(className).toContain('focus-visible:-outline-offset-1');
+    expect(className).toContain('focus-visible:outline-focus');
+  });
+
+  it('click feedback is instant: no transition utilities', () => {
+    render(<Textarea />);
+    expect(screen.getByRole('textbox').className).not.toContain('transition-');
+  });
+
+  it('vertical breathing room: py-1 so text never touches the border', () => {
+    for (const size of ['sm', 'md', 'lg'] as const) {
+      const { container, unmount } = render(<Textarea size={size} />);
+      expect(container.querySelector('textarea')?.className, size).toContain('py-1');
+      unmount();
+    }
+  });
+
+  it('resizes vertically only, never horizontally', () => {
+    render(<Textarea />);
+    const { className } = screen.getByRole('textbox');
+    expect(className).toContain('resize-y');
+    expect(className).not.toContain('resize-x');
+    expect(className).not.toMatch(/(^|\s)resize(\s|$)/);
+  });
+
+  it('border widths stay 1px', () => {
+    render(<Textarea invalid />);
+    const { className } = screen.getByRole('textbox');
+    expect(className).toMatch(/(^|\s)border(\s|$)/);
+    expect(className).not.toMatch(/(^|\s)border-[0-9]/);
+    expect(className).not.toMatch(/(^|\s)border-[xytblr]{1,2}-[0-9]/);
   });
 
   it('disabled: sets the native attribute', () => {
@@ -31,8 +64,10 @@ describe('Textarea', () => {
 
   it('invalid: sets aria-invalid and switches the boundary to danger', () => {
     render(<Textarea invalid />);
-    expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
-    expect(screen.getByRole('textbox').className).toContain('border-danger');
+    const textbox = screen.getByRole('textbox');
+    expect(textbox.getAttribute('aria-invalid')).toBe('true');
+    expect(textbox.className).toContain('border-danger');
+    expect(textbox.className).toContain('focus-visible:outline-danger');
   });
 
   it('read-only: sets the native readOnly attribute', () => {

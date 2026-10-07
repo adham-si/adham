@@ -195,6 +195,8 @@
   --z-index-menu: var(--z-menu);
   --z-index-popover: var(--z-popover);
   --z-index-toast: var(--z-toast);
+
+  --shadow-floating: var(--shadow-floating);
 }
 
 @theme inline {
@@ -223,7 +225,6 @@
   --color-selection: var(--selection);
   --color-focus: var(--focus);
   --color-scrim: var(--scrim);
-  --color-shadow-floating: var(--shadow-floating);
   --color-success: var(--success);
   --color-success-surface: var(--success-surface);
   --color-success-foreground: var(--success-foreground);
