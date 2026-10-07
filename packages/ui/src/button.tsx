@@ -1,41 +1,67 @@
-import * as React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import type * as React from 'react';
+import { cn } from './cn';
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
-}
-
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', className = '', children, ...props }, ref) => {
-    const baseStyles =
-      'inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none';
-
-    const sizeStyles = {
-      sm: 'h-8 px-3 text-xs rounded-[var(--radius-sm,4px)]',
-      md: 'h-10 px-4 text-sm rounded-[var(--radius-md,8px)]',
-      lg: 'h-12 px-6 text-base rounded-[var(--radius-lg,12px)]',
-    }[size];
-
-    const variantStyles = {
-      primary:
-        'bg-[var(--color-brand,#2B2BFF)] text-white hover:bg-[var(--color-brand-hover,#1E1EDD)] active:bg-[var(--color-brand-active,#1515B8)] focus-visible:ring-[var(--color-brand,#2B2BFF)]',
-      secondary:
-        'bg-[var(--color-bg-subtle,#F4F4F6)] text-[var(--color-text-primary,#121214)] hover:bg-[var(--color-bg-muted,#EAEAED)] border border-[var(--color-border-subtle,#E2E2E6)]',
-      ghost:
-        'bg-transparent text-[var(--color-text-primary,#121214)] hover:bg-[var(--color-bg-subtle,#F4F4F6)]',
-      danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
-    }[variant];
-
-    return (
-      <button
-        ref={ref}
-        className={`${baseStyles} ${sizeStyles} ${variantStyles} ${className}`.trim()}
-        {...props}
-      >
-        {children}
-      </button>
-    );
+const buttonVariants = cva(
+  'inline-flex items-center justify-center gap-2 rounded-md font-medium select-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:opacity-60',
+  {
+    variants: {
+      variant: {
+        primary: 'bg-action text-action-foreground hover:bg-action-hover active:bg-action-pressed',
+        secondary:
+          'bg-surface-subtle text-foreground border border-border hover:bg-surface-muted active:bg-surface-hover',
+        ghost: 'bg-transparent text-foreground hover:bg-surface-subtle active:bg-surface-muted',
+        danger: 'bg-danger text-danger-foreground hover:bg-danger-hover active:bg-danger-hover',
+        link: 'bg-transparent text-accent underline-offset-4 hover:underline rounded-none px-0',
+      },
+      size: {
+        // min-h, never a fixed h-*: at 200% text the control must grow, not clip.
+        sm: 'min-h-control-sm px-3 text-xs',
+        md: 'min-h-control-md px-4 text-sm',
+        lg: 'min-h-control-lg px-6 text-base',
+      },
+      fullWidth: {
+        true: 'w-full',
+      },
+    },
+    defaultVariants: {
+      variant: 'primary',
+      size: 'md',
+      fullWidth: false,
+    },
   },
 );
 
-Button.displayName = 'Button';
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  /** Shows a busy state: sets aria-busy and blocks activation. */
+  loading?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
+}
+
+export function Button({
+  variant,
+  size,
+  fullWidth,
+  loading = false,
+  className,
+  disabled,
+  children,
+  type = 'button',
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      type={type}
+      aria-busy={loading || undefined}
+      disabled={disabled === true || loading}
+      className={cn(buttonVariants({ variant, size, fullWidth }), className)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+export { buttonVariants };
