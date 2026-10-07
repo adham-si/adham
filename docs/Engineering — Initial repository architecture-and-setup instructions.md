@@ -460,6 +460,8 @@ Do not install the entire future stack on day one. Add a dependency only when th
 
 Build a dedicated component system in `packages/ui`. Start from semantic HTML and browser behavior rather than wrapping a third-party visual system. Adham owns design tokens, variants, motion, density, RTL, and accessibility contracts.
 
+Tokens are three-tier, and only tier 2 is redefined by `.dark`: tier 1 primitives (spacing, radius, control, type, icon, motion, z-index), tier 2 semantic runtime vars (`--background`, `--action`, `--focus`…), tier 3 the `@theme inline` mapping plus the CVA class maps in `packages/ui`. Consumers use semantic utilities only — `bg-surface`, `min-h-control-md`, `z-dialog`, `ps-`/`pe-`/`end-` — never `bg-[var(…)]`, a hex, a bare `z-50`, or a direction-locked inset. `scripts/check-magic-values.mjs` enforces this inside `pnpm check`. Tier-1 scales must be aliased into Tailwind's own namespaces (`--spacing-*`, `--z-index-*`), because Tailwind emits no utility for an unrecognised prefix. Full contract: `docs/Design system — tokens & components.md`.
+
 Simple components—buttons, inputs, badges, separators, cards, and switches—should be implemented directly. Complex interaction components—dialogs, menus, comboboxes, tooltips, drag-and-drop, focus traps, virtual lists, and tree views—must ship only after keyboard, focus, screen-reader, reduced-motion, high-contrast, RTL, and cross-webview tests pass. A small headless utility such as Floating UI may be used for positioning without surrendering Adham’s component design.
 
 ### Hugeicons

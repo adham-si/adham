@@ -187,5 +187,5 @@ Create a crate only when it owns real code. Domain use cases may initially use c
 - [ ]  Create Vite/React 19/strict TypeScript files directly; do not overwrite the tree with a template generator.
 - [ ]  Add TanStack Router with its Vite plugin before React transformation; commit routeTree.gen.ts.
 - [ ]  Add TanStack Query for backend state and scoped query keys.
-- [ ]  Configure Tailwind v4 with a small token set. Reserve #2B2BFF primarily for actions.
+- [x]  Configure Tailwind v4 with a small token set. Reserve #2B2BFF primarily for actions. — **Evidence:** `packages/design-tokens/tokens.css` ships the three-tier set (primitives → semantic → `@theme inline`); `#2B2BFF` is the `--action` colour, with `--brand` reserved for identity. `--color-*: initial` clears Tailwind's default palette so a default cannot leak in. Verified by `packages/design-tokens/src/tokens.test.ts` (parity + WCAG contrast in both themes) and by a compiled build: tier-1 scales are aliased into `--spacing-*` / `--z-index-*`, which is what makes `min-h-control-md`, `size-icon-md` and `z-dialog` real utilities rather than inert variables.
 - [ ]  Implement only bootstrap, creation, session conversation, submit state, and safe storage/error views.
