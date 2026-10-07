@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./apps/desktop/src/*"]
+    }
+  },
+  "include": [
+    "apps/desktop/src/**/*.ts",
+    "apps/desktop/src/**/*.tsx",
+    "packages/design-tokens/src/**/*.ts",
+    "packages/ui/src/**/*.ts",
+    "packages/ui/src/**/*.tsx"
+  ],
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/src-tauri/**", "**/routeTree.gen.ts"]
+}
