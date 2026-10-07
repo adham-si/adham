@@ -209,21 +209,9 @@ export function SettingsPage() {
         </aside>
 
         {/* Right Settings Page Content Pane */}
-        <main className="flex-1 flex flex-col min-w-0 bg-surface overflow-hidden">
-          {/* Top Close Bar */}
-          <div className="flex items-center justify-end border-b border-border-subtle p-2">
-            <button
-              type="button"
-              onClick={closeSettings}
-              aria-label={t('settings.close')}
-              className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-sm"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} />
-            </button>
-          </div>
-
+        <main className="relative flex-1 flex flex-col min-w-0 bg-surface overflow-hidden">
           {/* Active Settings Page View */}
-          <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 pe-12">
             {activeSettingsPage === 'appearance' && <AppearancePage />}
             {activeSettingsPage === 'models' && <ModelsPage />}
             {activeSettingsPage === 'providers' && <ProvidersPage />}
@@ -238,6 +226,18 @@ export function SettingsPage() {
             {activeSettingsPage === 'usage' && <UsagePage />}
             {activeSettingsPage === 'data' && <DataPage />}
             {activeSettingsPage === 'info' && <InfoPage />}
+          </div>
+
+          {/* Top Close Button (floated at top-end, no separator bar, natural DOM stacking) */}
+          <div className="absolute top-3 end-3">
+            <button
+              type="button"
+              onClick={closeSettings}
+              aria-label={t('settings.close')}
+              className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-sm"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} />
+            </button>
           </div>
         </main>
       </div>
