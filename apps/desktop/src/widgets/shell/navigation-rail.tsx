@@ -14,6 +14,7 @@ export function NavigationRail() {
     toggleFocusMode,
     activeRailDestination,
     setActiveRailDestination,
+    openSettings,
   } = useShellLayout();
 
   const handleThemeCycle = () => {
@@ -169,6 +170,7 @@ export function NavigationRail() {
 
         <button
           type="button"
+          onClick={() => openSettings()}
           aria-label={t('rail.settings')}
           title={t('rail.settings')}
           className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

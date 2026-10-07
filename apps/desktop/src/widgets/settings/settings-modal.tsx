@@ -1,0 +1,183 @@
+import * as React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SidebarItem, AdhamIcon } from '@adham/ui';
+import { useShellLayout, type SettingsTab } from '../shell/layout-context';
+import { AppearanceTab, ModelsTab, PrivacyTab, StorageTab, ExtensionsTab } from './tabs';
+
+export function SettingsModal() {
+  const { t } = useTranslation();
+  const { settingsOpen, closeSettings, activeSettingsTab, setActiveSettingsTab } = useShellLayout();
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  // Close on Escape key
+  React.useEffect(() => {
+    if (!settingsOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeSettings();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [settingsOpen, closeSettings]);
+
+  if (!settingsOpen) return null;
+
+  const categories = [
+    {
+      name: t('settings.categories.personal'),
+      tabs: [
+        {
+          id: 'appearance' as SettingsTab,
+          label: t('settings.tabs.appearance'),
+          icon: (
+            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+          ),
+        },
+      ],
+    },
+    {
+      name: t('settings.categories.intelligence'),
+      tabs: [
+        {
+          id: 'models' as SettingsTab,
+          label: t('settings.tabs.models'),
+          icon: <path d="M12 2v20m10-10H2" />,
+        },
+      ],
+    },
+    {
+      name: t('settings.categories.workspace'),
+      tabs: [
+        {
+          id: 'privacy' as SettingsTab,
+          label: t('settings.tabs.privacy'),
+          icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+        },
+        {
+          id: 'storage' as SettingsTab,
+          label: t('settings.tabs.storage'),
+          icon: (
+            <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          ),
+        },
+      ],
+    },
+    {
+      name: t('settings.categories.extensions'),
+      tabs: [
+        {
+          id: 'extensions' as SettingsTab,
+          label: t('settings.tabs.extensions'),
+          icon: <path d="M20 7h-9m9 5H7m13 5H4" />,
+        },
+      ],
+    },
+  ];
+
+  const filteredCategories = categories
+    .map((cat) => ({
+      ...cat,
+      tabs: cat.tabs.filter((tab) => tab.label.toLowerCase().includes(searchQuery.toLowerCase())),
+    }))
+    .filter((cat) => cat.tabs.length > 0);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('settings.title')}
+      className="fixed inset-0 z-dialog flex items-center justify-center p-4"
+    >
+      {/* Scrim backdrop */}
+      <div onClick={closeSettings} className="absolute inset-0 bg-scrim" />
+
+      {/* Centered Modal Frame */}
+      <div className="relative flex flex-col md:flex-row w-full max-w-4xl h-[620px] max-h-[90vh] rounded-xl border border-border bg-surface-raised shadow-floating overflow-hidden">
+        {/* Left Navigation Pane (240px) */}
+        <aside
+          aria-label="Settings Categories"
+          className="flex w-full md:w-60 shrink-0 flex-col border-e border-border-subtle bg-surface-subtle p-3 select-none"
+        >
+          {/* Header & Search */}
+          <div className="mb-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                {t('settings.title')}
+              </span>
+            </div>
+
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('settings.search')}
+                className="w-full min-h-control-sm rounded-md border border-border-subtle bg-surface ps-7 pe-2 text-xs text-foreground placeholder:text-foreground-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              />
+              <span className="absolute start-2 top-2.5 text-foreground-muted pointer-events-none">
+                <AdhamIcon size="sm">
+                  <path d="M21 21l-4.35-4.35" />
+                  <circle cx="11" cy="11" r="7" />
+                </AdhamIcon>
+              </span>
+            </div>
+          </div>
+
+          {/* Grouped Tab List */}
+          <div className="flex-1 space-y-3 overflow-y-auto">
+            {filteredCategories.map((cat) => (
+              <div key={cat.name} className="space-y-1">
+                <div className="ps-2 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                  {cat.name}
+                </div>
+                {cat.tabs.map((tab) => (
+                  <SidebarItem
+                    key={tab.id}
+                    selected={activeSettingsTab === tab.id}
+                    onClick={() => setActiveSettingsTab(tab.id)}
+                    className="w-full justify-start text-xs"
+                  >
+                    <AdhamIcon size="sm">{tab.icon}</AdhamIcon>
+                    <span className="truncate">{tab.label}</span>
+                  </SidebarItem>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer Info */}
+          <div className="border-t border-border-subtle pt-2 text-[10px] text-foreground-muted">
+            Adham Desktop • v0.1.0
+          </div>
+        </aside>
+
+        {/* Right Content Pane */}
+        <main className="flex-1 flex flex-col min-w-0 bg-surface overflow-hidden">
+          {/* Top Close Bar */}
+          <div className="flex items-center justify-end border-b border-border-subtle p-2">
+            <button
+              type="button"
+              onClick={closeSettings}
+              aria-label={t('settings.close')}
+              className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            >
+              <AdhamIcon size="sm">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </AdhamIcon>
+            </button>
+          </div>
+
+          {/* Tab Content Body */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {activeSettingsTab === 'appearance' && <AppearanceTab />}
+            {activeSettingsTab === 'models' && <ModelsTab />}
+            {activeSettingsTab === 'privacy' && <PrivacyTab />}
+            {activeSettingsTab === 'storage' && <StorageTab />}
+            {activeSettingsTab === 'extensions' && <ExtensionsTab />}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
