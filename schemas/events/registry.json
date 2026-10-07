@@ -1,0 +1,29 @@
+{
+  "registryVersion": 1,
+  "events": [
+    {
+      "type": "workspace/created",
+      "version": 1,
+      "scope": "workspace",
+      "schema": "./workspace/created/v1.json"
+    },
+    {
+      "type": "project/created",
+      "version": 1,
+      "scope": "project",
+      "schema": "./project/created/v1.json"
+    },
+    {
+      "type": "session/created",
+      "version": 1,
+      "scope": "session",
+      "schema": "./session/created/v1.json"
+    },
+    {
+      "type": "user/message-submitted",
+      "version": 1,
+      "scope": "session",
+      "schema": "./user/message-submitted/v1.json"
+    }
+  ]
+}
