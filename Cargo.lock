@@ -138,6 +138,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "adham-verify"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-runtime",
+ "adham-tools",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
