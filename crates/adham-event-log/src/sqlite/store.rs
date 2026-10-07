@@ -31,6 +31,18 @@ pub struct AppendEventResult {
     pub checksum: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct CommandReceiptRecord {
+    pub request_id: String,
+    pub command_type: String,
+    pub command_version: i32,
+    pub scope_fingerprint: String,
+    pub request_fingerprint: String,
+    pub correlation_id: String,
+    pub outcome_code: String,
+    pub response_json: Vec<u8>,
+}
+
 impl SqliteEventStore {
     pub fn new(pool: Pool<Sqlite>) -> Self {
         Self { pool }
@@ -40,14 +52,25 @@ impl SqliteEventStore {
         &self.pool
     }
 
-    pub async fn check_receipt(&self, request_id: &RequestId) -> Result<Option<Vec<u8>>, DomainError> {
-        let row = sqlx::query("SELECT response_json FROM command_receipts WHERE request_id = ?")
-            .bind(request_id.to_string())
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DomainError::Storage(e.to_string()))?;
+    pub async fn check_receipt(&self, request_id: &RequestId) -> Result<Option<CommandReceiptRecord>, DomainError> {
+        let row = sqlx::query(
+            "SELECT request_id, command_type, command_version, scope_fingerprint, request_fingerprint, correlation_id, outcome_code, response_json FROM command_receipts WHERE request_id = ?"
+        )
+        .bind(request_id.to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
 
-        Ok(row.map(|r| r.get::<Vec<u8>, _>("response_json")))
+        Ok(row.map(|r| CommandReceiptRecord {
+            request_id: r.get("request_id"),
+            command_type: r.get("command_type"),
+            command_version: r.get("command_version"),
+            scope_fingerprint: r.get("scope_fingerprint"),
+            request_fingerprint: r.get("request_fingerprint"),
+            correlation_id: r.get("correlation_id"),
+            outcome_code: r.get("outcome_code"),
+            response_json: r.get("response_json"),
+        }))
     }
 
     pub async fn put_content(

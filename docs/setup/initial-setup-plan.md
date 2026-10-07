@@ -95,7 +95,55 @@ flowchart TD
 
 ---
 
-### Phase 6: Gate G7 & G8 — Testing & Evidence
-**Status: VERIFIED**
-- `cargo test --workspace`: 35 tests passed (100% pass rate).
-- `node scripts/check-file-size.mjs`: 0 warnings, 0 errors (<300 line policy strictly satisfied).
+### Phase 6: Gate G7 & G8 — Testing, Toolchain Hardening & Native Smoke
+- **Gate G7 (Test Matrix & Quality Guards):** **PASSED**
+  - `cargo test --workspace`: 35 tests passed (100% pass rate: BLAKE3 checksum chaining, SQLite WAL storage, conversation projections, typed IPC contracts).
+  - `node scripts/check-file-size.mjs`: 0 warnings, 0 errors (<300 line policy strictly satisfied across the monorepo).
+  - `pnpm format:check` & `pnpm lint`: 100% clean formatting and zero linter warnings.
+- **Gate G8 (Native Desktop Smoke Test):** **PASSED**
+  - Standardized port `11111` across `vite.config.ts` and `tauri.conf.json`.
+  - Executed `pnpm --filter @adham/desktop tauri dev`.
+  - Verified native binary launch, SQLite migration execution, and active WAL database files in `%LOCALAPPDATA%\Adham\data` (`adham.db`, `adham.db-shm`, `adham.db-wal`). Detailed in [`docs/reports/p0-06-native-smoke.md`](file:///c:/Users/IronMan/Desktop/adham.si/docs/reports/p0-06-native-smoke.md).
+
+---
+
+## 3. Work Distribution & Agent Actions Log
+
+### 3.1 Teammate Baseline Import (`commit 989d166e`)
+The baseline repository scaffolding, P0 specs, Tauri shell, Rust crates, and initial package structure were committed as the teammate baseline (`chore: baseline import of P0 scaffold, specs, and agent config` by Ilyass).
+
+### 3.2 Agent Actions & Toolchain Fixes (Current Session)
+1. **Biome 2.5 Configuration Migration (`biome.json`):**
+   - Removed obsolete `files.ignore` and top-level `organizeImports` rejected by Biome 2.
+   - Configured `files.includes` with negative ignore patterns for generated artifacts (`routeTree.gen.ts`, `contracts-generated`, `src-tauri/gen`).
+   - Enabled `css.parser.tailwindDirectives: true` to support Tailwind v4 `@theme` directives in CSS files.
+   - Verified: `pnpm format:check` runs clean across all workspace files.
+2. **Lint Cleanliness (`oxlint`):**
+   - Resolved unused variable in `scripts/generate-icons.mjs` (fixed CRC32 accumulation) and regenerated icons.
+   - Removed unused `isConvLoading` variable in `apps/desktop/src/routes/index.tsx`.
+   - Verified: `pnpm lint` (`oxlint --deny-warnings .`) passes with 0 errors and 0 warnings.
+3. **TypeScript Monorepo Resolution (`packages/tsconfig/base.json`):**
+   - Made `packages/tsconfig/base.json` self-contained to eliminate broken relative symlink resolution (`../../tsconfig.base.json`) under pnpm's isolated `node_modules` linker.
+4. **Vitest Scope Hardening (`vitest.config.ts`):**
+   - Configured `include: ['{apps,packages}/**/*.{test,spec}.?(c|m)[jt]s?(x)']` and excluded scratch/agent test directories (`.opencode/**`, `.playwright-mcp/**`) from root runner scans.
+5. **Port Alignment & Native Desktop Smoke (Gate G8):**
+   - Unified dev port to `11111` across Vite and Tauri configurations; added `"tauri": "tauri"` script.
+   - Launched native desktop shell via `pnpm --filter @adham/desktop tauri dev`; verified SQLite WAL initialization.
+6. **Backend Verification:**
+   - Ran `cargo test --workspace` — all 35 tests passing (100%).
+
+---
+
+## 4. Teammate Defect Register (Report-Only Findings)
+
+| # | File & Location | Description | Impact | Status |
+|---|---|---|---|---|
+| **F-01** | `apps/desktop/vite.config.ts` & `apps/desktop/src-tauri/tauri.conf.json` | Port mismatch (`5173` vs `1420`). | `tauri dev` failed to connect. | **RESOLVED** (Port `11111` adopted) |
+| **F-02** | `packages/ui/src/button.test.tsx:1` vs `packages/ui/package.json` | Missing test dependency: test imports `@testing-library/react`, but `packages/ui/package.json` declares no dependencies. | Under pnpm isolated linker, `button.test.tsx` fails resolution. | Reported to teammate (owned by Design Token plan Task 3) |
+| **F-03** | `apps/desktop/src/routes/index.tsx:82` | English prose rendered inline without i18n key. | Violates global i18n-from-day-1 rule. | Reported to teammate |
+
+---
+
+## 5. Next Planned Workstream
+- **Design Token System Implementation:** [docs/superpowers/plans/2026-10-07-design-token-system.md](file:///c:/Users/IronMan/Desktop/adham.si/docs/superpowers/plans/2026-10-07-design-token-system.md) (Task 1: Three-tier tokens + typed mirror + parity & contrast tests).
+

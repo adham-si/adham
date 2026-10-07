@@ -16,7 +16,8 @@
       "*.js",
       "*.mjs",
       "!**/routeTree.gen.ts",
-      "!**/contracts-generated/**"
+      "!**/contracts-generated/**",
+      "!**/src-tauri/gen/**"
     ]
   },
   "formatter": {

@@ -138,4 +138,8 @@ Ran `cargo xtask contracts`:
 
 ## 7. Scaffold Gate Sign-Off
 
-All gates G0 through G8 in [`p0-06-gate-register.md`](file:///c:/Users/IronMan/Desktop/adham.si/docs/reports/p0-06-gate-register.md) have been satisfied with verified evidence.
+All gates **G0 through G8** in [`p0-06-gate-register.md`](file:///c:/Users/IronMan/Desktop/adham.si/docs/reports/p0-06-gate-register.md) have been satisfied with verified evidence:
+- **Gates G0–G7:** Passed (contract freeze, dependency pinning, monorepo foundation, vertical slice crates, and test matrix).
+- **Gate G8 (Native Smoke Test):** **PASSED** via `pnpm --filter @adham/desktop tauri dev` on port `11111`. Native window launched, attached Rust backend, and active SQLite WAL database verified in `%LOCALAPPDATA%\Adham\data`. Detailed in [`docs/reports/p0-06-native-smoke.md`](file:///c:/Users/IronMan/Desktop/adham.si/docs/reports/p0-06-native-smoke.md).
+
+

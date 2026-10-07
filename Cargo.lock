@@ -39,6 +39,7 @@ dependencies = [
  "adham-event-log",
  "adham-platform",
  "adham-projections",
+ "blake3",
  "serde",
  "serde_json",
  "sqlx",

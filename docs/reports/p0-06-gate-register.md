@@ -91,5 +91,19 @@
 - **Results:**
   - `cargo test --workspace`: 35 tests passed (100% pass rate).
   - `node scripts/check-file-size.mjs`: 0 warnings, 0 errors (<300 line policy satisfied).
+  - `pnpm format:check`: Biome 2.5 passes across all files.
+  - `pnpm lint`: Oxlint passes with 0 warnings, 0 errors.
   - `.github/workflows/ci.yml`: Commit-SHA pinned GitHub Actions workflow.
 - **Outcome:** **PASSED**
+
+### Gate G8 — Native Tauri smoke test & final evidence
+- **Execution Date:** 2026-10-07
+- **Results:**
+  - Standardized port `11111` across `apps/desktop/vite.config.ts` and `apps/desktop/src-tauri/tauri.conf.json`.
+  - Executed `pnpm --filter @adham/desktop tauri dev`.
+  - Vite dev server connected on `http://localhost:11111/`.
+  - Native binary `adham-desktop.exe` compiled and launched successfully.
+  - Rust backend embedded SQLite migrations executed.
+  - SQLite WAL files verified on disk in `%LOCALAPPDATA%\Adham\data` (`adham.db`, `adham.db-shm`, `adham.db-wal`).
+- **Outcome:** **PASSED**
+

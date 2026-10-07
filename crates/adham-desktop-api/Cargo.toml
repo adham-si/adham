@@ -18,3 +18,5 @@ time = { workspace = true }
 tokio = { workspace = true }
 uuid = { workspace = true }
 ts-rs = { workspace = true }
+blake3 = { workspace = true }
+
