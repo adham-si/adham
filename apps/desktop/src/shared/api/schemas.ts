@@ -64,7 +64,7 @@ export const ConversationMessageDtoSchema = z.object({
 
 export const ConversationPageSchema = z.object({
   items: z.array(ConversationMessageDtoSchema),
-  nextCursor: z.string().nullable().optional(),
+  nextCursor: z.string().nullable(),
   projectionPosition: z.string(),
 });
 
