@@ -1,65 +1,85 @@
 use adham_desktop_api::{
     ApiContext, BootstrapState, CommandContext, CommandEnvelope, CommandResult,
     ConversationPage, CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
-    ProjectSummary, RebuildProjectionsResponse, SessionSummary, StorageStatus,
+    ErrorEnvelope, ProjectSummary, RebuildProjectionsResponse, SessionSummary, StorageStatus,
     SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
 };
 
 #[tauri::command]
-async fn get_bootstrap_state(state: tauri::State<'_, ApiContext>) -> Result<BootstrapState, String> {
-    adham_desktop_api::handle_get_bootstrap_state(&state).await
+async fn get_bootstrap_state(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<BootstrapState, ErrorEnvelope> {
+    adham_desktop_api::handle_get_bootstrap_state(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
-async fn get_storage_status(state: tauri::State<'_, ApiContext>) -> Result<StorageStatus, String> {
-    adham_desktop_api::handle_get_storage_status(&state).await
+async fn get_storage_status(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<StorageStatus, ErrorEnvelope> {
+    adham_desktop_api::handle_get_storage_status(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
 async fn create_workspace(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<CreateWorkspacePayload>,
-) -> Result<CommandResult<WorkspaceSummary>, String> {
-    adham_desktop_api::handle_create_workspace(&state, request).await
+) -> Result<CommandResult<WorkspaceSummary>, ErrorEnvelope> {
+    adham_desktop_api::handle_create_workspace(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
 async fn create_project(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<CreateProjectPayload>,
-) -> Result<CommandResult<ProjectSummary>, String> {
-    adham_desktop_api::handle_create_project(&state, request).await
+) -> Result<CommandResult<ProjectSummary>, ErrorEnvelope> {
+    adham_desktop_api::handle_create_project(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
 async fn create_session(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<CreateSessionPayload>,
-) -> Result<CommandResult<SessionSummary>, String> {
-    adham_desktop_api::handle_create_session(&state, request).await
+) -> Result<CommandResult<SessionSummary>, ErrorEnvelope> {
+    adham_desktop_api::handle_create_session(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
 async fn submit_message(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<SubmitMessagePayload>,
-) -> Result<CommandResult<SubmittedMessage>, String> {
-    adham_desktop_api::handle_submit_message(&state, request).await
+) -> Result<CommandResult<SubmittedMessage>, ErrorEnvelope> {
+    adham_desktop_api::handle_submit_message(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
 async fn get_conversation(
     state: tauri::State<'_, ApiContext>,
     context: CommandContext,
-) -> Result<ConversationPage, String> {
-    adham_desktop_api::handle_get_conversation(&state, context).await
+) -> Result<ConversationPage, ErrorEnvelope> {
+    adham_desktop_api::handle_get_conversation(&state, context)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
 async fn admin_rebuild_projections(
     state: tauri::State<'_, ApiContext>,
-) -> Result<RebuildProjectionsResponse, String> {
-    adham_desktop_api::handle_admin_rebuild_projections(&state).await
+) -> Result<RebuildProjectionsResponse, ErrorEnvelope> {
+    adham_desktop_api::handle_admin_rebuild_projections(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 pub fn run() {

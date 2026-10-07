@@ -149,3 +149,90 @@ pub struct StorageStatus {
 pub struct RebuildProjectionsResponse {
     pub replayed_count: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FieldError {
+    pub field: String,
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ErrorEnvelope {
+    pub protocol_version: u16,
+    pub code: adham_core_types::PublicErrorCode,
+    pub message_key: String,
+    pub retryable: bool,
+    pub correlation_id: String,
+    pub field_errors: Vec<FieldError>,
+    pub retry_after_ms: Option<u32>,
+}
+
+impl ErrorEnvelope {
+    pub fn from_error_str(err: &str) -> Self {
+        use adham_core_types::PublicErrorCode;
+        let (code, msg_key, retryable) = if err.starts_with("INVALID_COMMAND_VERSION") {
+            (
+                PublicErrorCode::InvalidProtocolVersion,
+                "error.invalidProtocolVersion",
+                false,
+            )
+        } else if err.starts_with("VALIDATION_FAILED") {
+            (
+                PublicErrorCode::InvalidRequest,
+                "error.validationFailed",
+                false,
+            )
+        } else if err.starts_with("WORKSPACE_NOT_FOUND") {
+            (
+                PublicErrorCode::WorkspaceNotFound,
+                "error.workspaceNotFound",
+                false,
+            )
+        } else if err.starts_with("PROJECT_NOT_FOUND") {
+            (
+                PublicErrorCode::ProjectNotFound,
+                "error.projectNotFound",
+                false,
+            )
+        } else if err.starts_with("SESSION_NOT_FOUND") {
+            (
+                PublicErrorCode::SessionNotFound,
+                "error.sessionNotFound",
+                false,
+            )
+        } else if err.starts_with("CONTEXT_MISMATCH") {
+            (
+                PublicErrorCode::ContextMismatch,
+                "error.contextMismatch",
+                false,
+            )
+        } else if err.starts_with("REQUEST_ID_CONFLICT") {
+            (
+                PublicErrorCode::RequestIdConflict,
+                "error.requestIdConflict",
+                false,
+            )
+        } else {
+            (
+                PublicErrorCode::InternalError,
+                "error.internalError",
+                true,
+            )
+        };
+
+        Self {
+            protocol_version: 1,
+            code,
+            message_key: msg_key.to_string(),
+            retryable,
+            correlation_id: uuid::Uuid::now_v7().to_string(),
+            field_errors: Vec::new(),
+            retry_after_ms: None,
+        }
+    }
+}
