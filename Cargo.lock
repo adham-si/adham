@@ -94,6 +94,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "adham-provider"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-runtime",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "time",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "adham-runtime"
 version = "0.1.0"
 dependencies = [
