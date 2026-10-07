@@ -1,0 +1,17 @@
+[package]
+name = "adham-projections"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+adham-core-types = { path = "../adham-core-types" }
+adham-event-log = { path = "../adham-event-log" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sqlx = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }

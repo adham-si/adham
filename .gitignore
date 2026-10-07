@@ -1,0 +1,54 @@
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Node & package managers
+node_modules/
+.pnpm-store/
+dist/
+build/
+
+# Local & scratch agent directories
+.playwright-mcp/
+.kilo/worktrees/
+.opencode/node_modules/
+.superpowers/
+scratch/
+
+# Adham application data, runtime databases, WAL & backups
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+backups/
+staging/
+quarantine/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Operating System
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Logs & diagnostics
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

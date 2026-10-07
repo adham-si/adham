@@ -1,0 +1,7 @@
+# Clippy configuration
+avoid-breaking-exported-api = true
+msrv = "1.85.0"
+cognitive-complexity-threshold = 25
+too-many-arguments-threshold = 7
+too-many-lines-threshold = 100
+doc-valid-idents = ["Adham", "Tauri", "SQLite", "WAL", "BLAKE3", "UUIDv7"]

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "share": "disabled",
+  "autoupdate": "notify",
+  "snapshot": true,
+  "instructions": ["AGENTS.md"],
+  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"],
+  "skills": {
+    "paths": [".opencode/skills"]
+  },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+      },
+      "enabled": true
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp"],
+      "enabled": true
+    }
+  },
+  "permission": {
+    "bash": {
+      "git *": "allow",
+      "*": "ask"
+    },
+    "external_directory": {
+      "*": "ask"
+    }
+  },
+  "formatter": true,
+  "lsp": true,
+  "experimental": {
+    "openTelemetry": false
+  },
+  "compaction": {
+    "auto": true
+  },
+  "tool_output": {
+    "max_lines": 2000,
+    "max_bytes": 51200
+  }
+}

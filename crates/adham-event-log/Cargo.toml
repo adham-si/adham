@@ -1,0 +1,17 @@
+[package]
+name = "adham-event-log"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+adham-core-types = { path = "../adham-core-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sqlx = { workspace = true }
+blake3 = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }

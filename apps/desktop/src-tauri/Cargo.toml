@@ -1,0 +1,21 @@
+[package]
+name = "adham-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+adham-core-types = { path = "../../../crates/adham-core-types" }
+adham-desktop-api = { path = "../../../crates/adham-desktop-api" }
+adham-event-log = { path = "../../../crates/adham-event-log" }
+adham-platform = { path = "../../../crates/adham-platform" }
+adham-projections = { path = "../../../crates/adham-projections" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+tauri = { version = "2.0.0", features = [] }
