@@ -14,11 +14,16 @@
 | `SettingsPage` | `apps/desktop/src/pages/settings/settings-page.tsx` | Main settings container presenting pages list via modal overlay (`z-dialog`, backdrop scrim, Esc key dismiss, search filtering) | §1 Modal Structure |
 | `AppearancePage` | `apps/desktop/src/pages/settings/appearance/appearance-page.tsx` | Theme switching (System, Light, Dark) via `useTheme`, dynamic language switcher (EN, AR, ZH-CN, RU) with `dir` RTL mirroring | §14 Appearance & Language |
 | `ModelsPage` | `apps/desktop/src/pages/settings/models/models-page.tsx` | Ollama local engine status, model selection, fallback policy toggle | §7 Providers |
+| `RoutingPage` | `apps/desktop/src/pages/settings/routing/routing-page.tsx` | Deterministic model routing, latency priorities, fallback chain | §10 Routing & Fallbacks |
 | `McpPage` | `apps/desktop/src/pages/settings/mcp/mcp-page.tsx` | MCP server connection governance and tool policies | §10 Extensions & MCP (P0-13) |
 | `SkillsPage` | `apps/desktop/src/pages/settings/skills/skills-page.tsx` | Agent instructional playbooks and discovery roots | §10 Extensions & MCP (P0-13) |
 | `PluginsPage` | `apps/desktop/src/pages/settings/plugins/plugins-page.tsx` | Isolated package trust and lifecycle verification engine | §10 Extensions & MCP (P0-14) |
+| `GovernancePage` | `apps/desktop/src/pages/settings/governance/governance-page.tsx` | Agent autonomy levels (supervised/strict/autonomous), security guardrails | §11 Governance & Policy |
+| `BudgetPage` | `apps/desktop/src/pages/settings/budget/budget-page.tsx` | Token spend allowances, daily/monthly caps, hard limit stop | §13 Budget & Limits |
+| `UsagePage` | `apps/desktop/src/pages/settings/usage/usage-page.tsx` | Prompt/completion token consumption, model utilization metrics | §13 Usage & Analytics |
 | `DataPage` | `apps/desktop/src/pages/settings/data/data-page.tsx` | Local SQLite WAL engine status, schema version, synthetic database metrics | §12 Storage & Backup |
 | `PrivacyPage` | `apps/desktop/src/pages/settings/privacy/privacy-page.tsx` | Local workspace sandbox isolation, zero telemetry policy confirmation | §8 Privacy & Sandboxing |
+| `InfoPage` | `apps/desktop/src/pages/settings/info/info-page.tsx` | Application version, runtime engine, database, diagnostic report export | §1 Diagnostics & Info |
 | Settings State | `apps/desktop/src/widgets/shell/layout-context.tsx` | `settingsOpen`, `activeSettingsPage`, `openSettings(page?)`, `closeSettings()`, `setActiveSettingsPage(page)` | §2 Navigation |
 | Settings Launcher | `apps/desktop/src/widgets/shell/navigation-rail.tsx` | Footer gear icon wired directly to `openSettings()` | §2 Entry Points |
 | Internationalization | `apps/desktop/src/shared/i18n/index.ts` | Complete translation dictionary for all settings labels, descriptions, and categories in EN, AR, ZH-CN, RU | §14 Localization |

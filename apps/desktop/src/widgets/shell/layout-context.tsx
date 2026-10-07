@@ -5,11 +5,16 @@ export type SettingsPageId =
   | 'appearance'
   | 'general'
   | 'models'
+  | 'routing'
   | 'mcp'
   | 'skills'
   | 'plugins'
   | 'data'
   | 'privacy'
+  | 'budget'
+  | 'usage'
+  | 'governance'
+  | 'info'
   | 'storage'
   | 'extensions';
 export type SettingsTab = SettingsPageId;

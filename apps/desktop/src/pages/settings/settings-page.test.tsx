@@ -86,6 +86,31 @@ describe('SettingsPage Component', () => {
     const mcpPageBtn = screen.getByRole('button', { name: /Model Context Protocol/i });
     fireEvent.click(mcpPageBtn);
     expect(screen.getByText('P0-13 Governed')).not.toBeNull();
+
+    // Switch to Routing page
+    const routingPageBtn = screen.getByRole('button', { name: /Routing & Fallbacks/i });
+    fireEvent.click(routingPageBtn);
+    expect(screen.getByText('Deterministic Fallback Chain')).not.toBeNull();
+
+    // Switch to Governance page
+    const govPageBtn = screen.getByRole('button', { name: /Policies & Governance/i });
+    fireEvent.click(govPageBtn);
+    expect(screen.getByText('Mandatory Security Guardrails')).not.toBeNull();
+
+    // Switch to Budget page
+    const budgetPageBtn = screen.getByRole('button', { name: /Budget & Limits/i });
+    fireEvent.click(budgetPageBtn);
+    expect(screen.getByText('Token Allowances')).not.toBeNull();
+
+    // Switch to Usage page
+    const usagePageBtn = screen.getByRole('button', { name: /Usage & Analytics/i });
+    fireEvent.click(usagePageBtn);
+    expect(screen.getByText('Model Utilization')).not.toBeNull();
+
+    // Switch to Info page
+    const infoPageBtn = screen.getByRole('button', { name: /System Info & Diagnostics/i });
+    fireEvent.click(infoPageBtn);
+    expect(screen.getByText('Environment & Engine')).not.toBeNull();
   });
 
   it('filters settings pages list based on search input', () => {

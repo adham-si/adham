@@ -4,11 +4,16 @@ import { SidebarItem, AdhamIcon } from '@adham/ui';
 import { useShellLayout, type SettingsPageId } from '@/widgets/shell/layout-context';
 import { AppearancePage } from './appearance';
 import { ModelsPage } from './models';
+import { RoutingPage } from './routing';
 import { McpPage } from './mcp';
 import { SkillsPage } from './skills';
 import { PluginsPage } from './plugins';
+import { GovernancePage } from './governance';
+import { BudgetPage } from './budget';
+import { UsagePage } from './usage';
 import { DataPage } from './data';
 import { PrivacyPage } from './privacy';
+import { InfoPage } from './info';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -51,6 +56,11 @@ export function SettingsPage() {
           label: t('settings.tabs.models'),
           icon: <path d="M12 2v20m10-10H2" />,
         },
+        {
+          id: 'routing' as SettingsPageId,
+          label: 'Routing & Fallbacks',
+          icon: <path d="M18 6L6 18M6 6l12 12" />,
+        },
       ],
     },
     {
@@ -78,6 +88,26 @@ export function SettingsPage() {
       ],
     },
     {
+      name: 'Governance & Operations',
+      pages: [
+        {
+          id: 'governance' as SettingsPageId,
+          label: 'Policies & Governance',
+          icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+        },
+        {
+          id: 'budget' as SettingsPageId,
+          label: 'Budget & Limits',
+          icon: <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />,
+        },
+        {
+          id: 'usage' as SettingsPageId,
+          label: 'Usage & Analytics',
+          icon: <path d="M18 20V10M12 20V4M6 20v-6" />,
+        },
+      ],
+    },
+    {
       name: t('settings.categories.workspace'),
       pages: [
         {
@@ -90,7 +120,14 @@ export function SettingsPage() {
         {
           id: 'privacy' as SettingsPageId,
           label: t('settings.tabs.privacy'),
-          icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+          icon: <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />,
+        },
+        {
+          id: 'info' as SettingsPageId,
+          label: 'System Info & Diagnostics',
+          icon: (
+            <path d="M12 16v-4m0-4h.01M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z" />
+          ),
         },
       ],
     },
@@ -169,9 +206,12 @@ export function SettingsPage() {
             ))}
           </div>
 
-          {/* Footer Info */}
-          <div className="border-t border-border-subtle pt-2 text-[10px] text-foreground-muted">
-            Adham Desktop • v0.1.0
+          {/* Footer Info button */}
+          <div
+            onClick={() => setActiveSettingsPage('info')}
+            className="cursor-pointer border-t border-border-subtle pt-2 text-[10px] text-foreground-muted hover:text-foreground transition-colors"
+          >
+            Adham Desktop • v0.1.0-alpha
           </div>
         </aside>
 
@@ -195,11 +235,16 @@ export function SettingsPage() {
           <div className="flex-1 overflow-y-auto p-6">
             {activeSettingsPage === 'appearance' && <AppearancePage />}
             {activeSettingsPage === 'models' && <ModelsPage />}
+            {activeSettingsPage === 'routing' && <RoutingPage />}
             {activeSettingsPage === 'mcp' && <McpPage />}
             {activeSettingsPage === 'skills' && <SkillsPage />}
             {activeSettingsPage === 'plugins' && <PluginsPage />}
+            {activeSettingsPage === 'governance' && <GovernancePage />}
+            {activeSettingsPage === 'budget' && <BudgetPage />}
+            {activeSettingsPage === 'usage' && <UsagePage />}
             {activeSettingsPage === 'data' && <DataPage />}
             {activeSettingsPage === 'privacy' && <PrivacyPage />}
+            {activeSettingsPage === 'info' && <InfoPage />}
           </div>
         </main>
       </div>
