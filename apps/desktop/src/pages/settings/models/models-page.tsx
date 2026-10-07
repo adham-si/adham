@@ -54,7 +54,7 @@ export function ModelsPage() {
             <span>Ollama / llama3.2:3b</span>
           </div>
         </div>
-        <p className="text-[11px] text-foreground-muted">
+        <p className="text-xs text-foreground-muted">
           Policy: Work never crosses from local execution to cloud providers without explicit
           approval.
         </p>

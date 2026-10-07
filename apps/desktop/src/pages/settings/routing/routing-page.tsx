@@ -64,7 +64,7 @@ export function RoutingPage() {
               >
                 <div>
                   <div className="text-xs font-semibold text-foreground">{item.label}</div>
-                  <div className="text-[11px] text-foreground-secondary">{item.desc}</div>
+                  <div className="text-xs text-foreground-secondary">{item.desc}</div>
                 </div>
                 <Button
                   size="sm"

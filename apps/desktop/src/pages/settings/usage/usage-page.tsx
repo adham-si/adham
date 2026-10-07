@@ -37,9 +37,9 @@ export function UsagePage() {
             key={m.label}
             className="rounded-lg border border-border-subtle bg-surface-subtle p-3 space-y-1"
           >
-            <span className="text-[11px] font-medium text-foreground-secondary">{m.label}</span>
+            <span className="text-xs font-medium text-foreground-secondary">{m.label}</span>
             <div className="text-base font-bold text-foreground font-mono">{m.value}</div>
-            <div className="text-[10px] text-success font-medium">{m.change}</div>
+            <div className="text-xs text-success font-medium">{m.change}</div>
           </div>
         ))}
       </div>
@@ -57,11 +57,11 @@ export function UsagePage() {
             >
               <div>
                 <span className="font-semibold text-foreground">{row.model}</span>
-                <span className="ms-2 text-foreground-secondary text-[11px]">{row.provider}</span>
+                <span className="ms-2 text-foreground-secondary text-xs">{row.provider}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="font-mono text-foreground-secondary">{row.calls} calls</span>
-                <span className="rounded bg-selection px-1.5 py-0.5 text-[11px] font-medium text-action">
+                <span className="rounded bg-selection px-1.5 py-0.5 text-xs font-medium text-action">
                   {row.percentage}
                 </span>
               </div>

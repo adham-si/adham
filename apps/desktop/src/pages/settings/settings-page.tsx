@@ -62,7 +62,7 @@ export function SettingsPage() {
         {
           id: 'appearance',
           label: 'Appearance',
-          icon: <HugeiconsIcon icon={PreferenceHorizontalIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={PreferenceHorizontalIcon} />,
         },
       ],
     },
@@ -72,17 +72,17 @@ export function SettingsPage() {
         {
           id: 'models',
           label: 'AI Models',
-          icon: <HugeiconsIcon icon={AiMagicIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={AiMagicIcon} />,
         },
         {
           id: 'providers',
           label: 'AI Providers',
-          icon: <HugeiconsIcon icon={AiArtIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={AiArtIcon} />,
         },
         {
           id: 'routing',
           label: 'Routing',
-          icon: <HugeiconsIcon icon={Route01Icon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={Route01Icon} />,
         },
       ],
     },
@@ -92,17 +92,17 @@ export function SettingsPage() {
         {
           id: 'mcp',
           label: 'MCP',
-          icon: <HugeiconsIcon icon={McpServerIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={McpServerIcon} />,
         },
         {
           id: 'skills',
           label: 'Skills',
-          icon: <HugeiconsIcon icon={AiDrawingIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={AiDrawingIcon} />,
         },
         {
           id: 'plugins',
           label: 'Plugins',
-          icon: <HugeiconsIcon icon={PuzzleIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={PuzzleIcon} />,
         },
       ],
     },
@@ -112,17 +112,17 @@ export function SettingsPage() {
         {
           id: 'security',
           label: 'Security',
-          icon: <HugeiconsIcon icon={BrickWallFireIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={BrickWallFireIcon} />,
         },
         {
           id: 'budget',
           label: 'Budget',
-          icon: <HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={Coins01Icon} />,
         },
         {
           id: 'usage',
           label: 'Usage',
-          icon: <HugeiconsIcon icon={ChartAnalysisIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={ChartAnalysisIcon} />,
         },
       ],
     },
@@ -132,12 +132,12 @@ export function SettingsPage() {
         {
           id: 'data',
           label: 'Data',
-          icon: <HugeiconsIcon icon={ServerStack03Icon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={ServerStack03Icon} />,
         },
         {
           id: 'info',
           label: 'About',
-          icon: <HugeiconsIcon icon={CircleQuestionMarkIcon} size={16} strokeWidth={1.5} />,
+          icon: <HugeiconsIcon icon={CircleQuestionMarkIcon} />,
         },
       ],
     },
@@ -179,8 +179,8 @@ export function SettingsPage() {
                 placeholder={t('settings.search')}
                 className="w-full min-h-control-md rounded-md border border-border-subtle bg-surface ps-9 pe-3 text-sm text-foreground placeholder:text-foreground-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               />
-              <span className="pointer-events-none absolute start-3 flex items-center justify-center text-foreground-muted">
-                <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.5} />
+              <span className="pointer-events-none absolute start-3 flex items-center justify-center text-foreground-muted [&_svg]:size-icon-sm">
+                <HugeiconsIcon icon={Search01Icon} />
               </span>
             </div>
           </div>
@@ -189,7 +189,7 @@ export function SettingsPage() {
           <div className="flex-1 space-y-3 overflow-y-auto pe-1">
             {filteredCategories.map((cat) => (
               <div key={cat.name} className="space-y-1">
-                <div className="ps-2 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
                   {cat.name}
                 </div>
                 {cat.pages.map((page) => (
@@ -197,7 +197,7 @@ export function SettingsPage() {
                     key={page.id}
                     selected={activeSettingsPage === page.id}
                     onClick={() => setActiveSettingsPage(page.id)}
-                    className="w-full justify-start text-xs gap-2.5"
+                    className="w-full justify-start [&_svg]:size-icon-sm [&_svg]:shrink-0"
                   >
                     {page.icon}
                     <span className="truncate">{page.label}</span>
@@ -205,14 +205,6 @@ export function SettingsPage() {
                 ))}
               </div>
             ))}
-          </div>
-
-          {/* Footer Info button */}
-          <div
-            onClick={() => setActiveSettingsPage('info')}
-            className="cursor-pointer border-t border-border-subtle pt-2 text-[10px] text-foreground-muted hover:text-foreground transition-colors"
-          >
-            Adham Desktop • v0.1.0-alpha
           </div>
         </aside>
 
@@ -224,9 +216,9 @@ export function SettingsPage() {
               type="button"
               onClick={closeSettings}
               aria-label={t('settings.close')}
-              className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-sm"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
+              <HugeiconsIcon icon={Cancel01Icon} />
             </button>
           </div>
 

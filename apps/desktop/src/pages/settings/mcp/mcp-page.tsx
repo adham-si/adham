@@ -37,9 +37,9 @@ export function McpPage() {
         <div className="rounded border border-border-subtle bg-surface p-3 text-xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-foreground">playwright-mcp</span>
-            <span className="text-success text-[11px] font-medium">Ready</span>
+            <span className="text-success text-xs font-medium">Ready</span>
           </div>
-          <p className="text-foreground-secondary text-[11px]">
+          <p className="text-foreground-secondary text-xs">
             Browser automation server bounded to local scratch directory.
           </p>
         </div>

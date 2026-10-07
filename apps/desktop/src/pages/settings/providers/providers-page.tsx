@@ -56,15 +56,15 @@ export function ProvidersPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-foreground">{p.name}</span>
-                <span className="text-[11px] text-foreground-secondary">({p.type})</span>
+                <span className="text-xs text-foreground-secondary">({p.type})</span>
                 {p.active && (
-                  <span className="flex items-center gap-1 rounded bg-success-surface px-1.5 py-0.5 text-[10px] text-success-foreground font-medium">
+                  <span className="flex items-center gap-1 rounded bg-success-surface px-1.5 py-0.5 text-xs text-success-foreground font-medium">
                     <span className="size-1.5 rounded-full bg-success" />
                     {p.status}
                   </span>
                 )}
               </div>
-              <div className="font-mono text-[11px] text-foreground-muted">{p.endpoint}</div>
+              <div className="font-mono text-xs text-foreground-muted">{p.endpoint}</div>
             </div>
 
             <div>

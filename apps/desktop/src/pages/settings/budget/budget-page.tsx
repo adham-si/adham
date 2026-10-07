@@ -67,7 +67,7 @@ export function BudgetPage() {
         <div className="flex items-center justify-between border-t border-border-subtle pt-3">
           <div>
             <div className="text-xs font-medium text-foreground">Hard Stop at Limit</div>
-            <div className="text-[11px] text-foreground-secondary">
+            <div className="text-xs text-foreground-secondary">
               Halt agent execution immediately when budget is exhausted.
             </div>
           </div>

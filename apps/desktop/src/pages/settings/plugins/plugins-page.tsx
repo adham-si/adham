@@ -39,9 +39,9 @@ export function PluginsPage() {
         <div className="rounded border border-border-subtle bg-surface p-3 text-xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-foreground">adham-core-tools</span>
-            <span className="font-mono text-foreground-muted text-[11px]">v0.1.0</span>
+            <span className="font-mono text-foreground-muted text-xs">v0.1.0</span>
           </div>
-          <p className="text-foreground-secondary text-[11px]">
+          <p className="text-foreground-secondary text-xs">
             Built-in foundational execution tools and workspace bridges.
           </p>
         </div>
