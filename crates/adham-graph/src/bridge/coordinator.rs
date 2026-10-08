@@ -27,6 +27,7 @@ impl SubagentCoordinator {
         }
     }
 
+    #[allow(clippy::field_reassign_with_default)]
     pub async fn execute_next_node<M: ModelPort, V: VerificationPort, C: Clock>(
         &mut self,
         model: M,

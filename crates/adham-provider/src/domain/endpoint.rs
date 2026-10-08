@@ -53,8 +53,7 @@ impl EndpointDescriptor {
     /// and that remote endpoints strictly require HTTPS.
     pub fn validate_url(url: &str) -> Result<(), ProviderError> {
         let lower = url.to_lowercase();
-        if lower.starts_with("http://") {
-            let without_proto = &lower["http://".len()..];
+        if let Some(without_proto) = lower.strip_prefix("http://") {
             let host_part = without_proto.split(['/', ':']).next().unwrap_or("");
             let is_loopback = host_part == "localhost"
                 || host_part == "127.0.0.1"

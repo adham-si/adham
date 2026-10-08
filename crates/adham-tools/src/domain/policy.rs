@@ -20,18 +20,13 @@ pub enum PolicyDecision {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyPreset {
+    #[default]
     Safe,
     Balanced,
     Autonomous,
-}
-
-impl Default for PolicyPreset {
-    fn default() -> Self {
-        Self::Safe
-    }
 }
 
 pub struct PolicyEngine {

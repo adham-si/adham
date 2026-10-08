@@ -24,6 +24,7 @@ impl McpInvocationGate {
     /// Validates an incoming model ToolProposal against the registered MCP tool binding.
     /// Returns Ok(()) if the tool is enabled and matches the schema generation,
     /// or Err(ToolResult) if the invocation is denied or blocked.
+    #[allow(clippy::result_large_err)]
     pub fn validate_invocation(
         gateway: &McpGateway,
         proposal: &ToolProposal,

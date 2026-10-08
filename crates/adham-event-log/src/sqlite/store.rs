@@ -38,6 +38,7 @@ pub struct CommandReceiptRecord {
     pub command_version: i32,
     pub scope_fingerprint: String,
     pub request_fingerprint: String,
+    pub actor_id: String,
     pub correlation_id: String,
     pub outcome_code: String,
     pub response_json: Vec<u8>,
@@ -56,8 +57,11 @@ impl SqliteEventStore {
         &self,
         request_id: &RequestId,
     ) -> Result<Option<CommandReceiptRecord>, DomainError> {
+        // Request-identity boundary is request_id alone. Callers MUST compare
+        // command, version, actor, scope, and payload and return
+        // REQUEST_ID_CONFLICT on any mismatch without mutation or disclosure.
         let row = sqlx::query(
-            "SELECT request_id, command_type, command_version, scope_fingerprint, request_fingerprint, correlation_id, outcome_code, response_json FROM command_receipts WHERE request_id = ?"
+            "SELECT request_id, command_type, command_version, scope_fingerprint, request_fingerprint, actor_id, correlation_id, outcome_code, response_json FROM command_receipts WHERE request_id = ?"
         )
         .bind(request_id.to_string())
         .fetch_optional(&self.pool)
@@ -70,6 +74,11 @@ impl SqliteEventStore {
             command_version: r.get("command_version"),
             scope_fingerprint: r.get("scope_fingerprint"),
             request_fingerprint: r.get("request_fingerprint"),
+            actor_id: r
+                .try_get::<Option<String>, _>("actor_id")
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
             correlation_id: r.get("correlation_id"),
             outcome_code: r.get("outcome_code"),
             response_json: r.get("response_json"),
@@ -78,29 +87,37 @@ impl SqliteEventStore {
 
     pub async fn put_content(
         &self,
+        provider: &dyn super::content_key::ContentKeyProvider,
         content_id: &ContentId,
         kind: &str,
         media_type: &str,
-        encoding: &str,
-        protection: &str,
-        bytes: &[u8],
+        scope: &EventScope,
+        plaintext: &[u8],
     ) -> Result<(), DomainError> {
+        let sealed = super::content_crypto::seal(provider, content_id, kind, scope, plaintext)?;
         let now_us = OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000;
         sqlx::query(
             r#"
             INSERT INTO content_records (
                 content_id, content_kind, media_type, encoding, protection_scheme,
-                protected_bytes, plaintext_size, created_at_us
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                key_reference, nonce, protected_bytes, plaintext_size,
+                installation_id, workspace_id, project_id, session_id, created_at_us
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(content_id.to_string())
         .bind(kind)
         .bind(media_type)
-        .bind(encoding)
-        .bind(protection)
-        .bind(bytes)
-        .bind(bytes.len() as i64)
+        .bind(super::content_crypto::ENCODING_ENCRYPTED)
+        .bind(super::content_crypto::PROTECTION_AEAD_V1)
+        .bind(sealed.key_reference)
+        .bind(sealed.nonce)
+        .bind(sealed.ciphertext)
+        .bind(plaintext.len() as i64)
+        .bind(scope.installation_id.to_string())
+        .bind(scope.workspace_id.map(|id| id.to_string()))
+        .bind(scope.project_id.map(|id| id.to_string()))
+        .bind(scope.session_id.map(|id| id.to_string()))
         .bind(now_us as i64)
         .execute(&self.pool)
         .await
@@ -111,15 +128,62 @@ impl SqliteEventStore {
 
     pub async fn get_content(
         &self,
+        provider: &dyn super::content_key::ContentKeyProvider,
         content_id: &ContentId,
+        expected_scope: &EventScope,
     ) -> Result<Option<Vec<u8>>, DomainError> {
-        let row = sqlx::query("SELECT protected_bytes FROM content_records WHERE content_id = ?")
-            .bind(content_id.to_string())
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DomainError::Storage(e.to_string()))?;
+        let row = sqlx::query(
+            "SELECT content_kind, protection_scheme, key_reference, nonce, protected_bytes FROM content_records WHERE content_id = ?",
+        )
+        .bind(content_id.to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        match row {
+            None => Ok(None),
+            Some(r) => {
+                let kind: String = r.get("content_kind");
+                let protection: String = r.get("protection_scheme");
+                if protection != super::content_crypto::PROTECTION_AEAD_V1 {
+                    return Err(DomainError::Integrity(format!(
+                        "legacy unprotected content rejected: {protection}"
+                    )));
+                }
+                let nonce: Vec<u8> = r.get("nonce");
+                let ciphertext: Vec<u8> = r.get("protected_bytes");
+                let _key_ref: Option<String> = r.try_get("key_reference").ok().flatten();
+                let plain = super::content_crypto::open(
+                    provider,
+                    content_id,
+                    &kind,
+                    expected_scope,
+                    &nonce,
+                    &ciphertext,
+                )?;
+                Ok(Some(plain))
+            }
+        }
+    }
 
-        Ok(row.map(|r| r.get::<Vec<u8>, _>("protected_bytes")))
+    /// Raw ciphertext accessor for tests asserting no cleartext at rest.
+    /// Never returns plaintext.
+    pub async fn get_content_ciphertext(
+        &self,
+        content_id: &ContentId,
+    ) -> Result<Option<(String, Vec<u8>)>, DomainError> {
+        let row = sqlx::query(
+            "SELECT protection_scheme, protected_bytes FROM content_records WHERE content_id = ?",
+        )
+        .bind(content_id.to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(row.map(|r| {
+            (
+                r.get::<String, _>("protection_scheme"),
+                r.get::<Vec<u8>, _>("protected_bytes"),
+            )
+        }))
     }
 
     pub async fn append_event(
@@ -247,6 +311,7 @@ impl SqliteEventStore {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn record_receipt(
         &self,
         request_id: &RequestId,
@@ -254,6 +319,7 @@ impl SqliteEventStore {
         command_version: i32,
         scope_fingerprint: &str,
         request_fingerprint: &str,
+        actor_id: &ActorId,
         correlation_id: &CorrelationId,
         outcome_code: &str,
         response_json: &[u8],
@@ -264,16 +330,17 @@ impl SqliteEventStore {
             r#"
             INSERT INTO command_receipts (
                 request_id, command_type, command_version, scope_fingerprint, request_fingerprint,
-                correlation_id, outcome_code, response_json, first_global_position, last_global_position,
+                actor_id, correlation_id, outcome_code, response_json, first_global_position, last_global_position,
                 committed_at_us
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
         )
         .bind(request_id.to_string())
         .bind(command_type)
         .bind(command_version)
         .bind(scope_fingerprint)
         .bind(request_fingerprint)
+        .bind(actor_id.to_string())
         .bind(correlation_id.to_string())
         .bind(outcome_code)
         .bind(response_json)
@@ -284,6 +351,260 @@ impl SqliteEventStore {
         .await
         .map_err(|e| DomainError::Storage(e.to_string()))?;
 
+        Ok(())
+    }
+}
+
+/// Transaction-aware primitives. The application operation owns the
+/// `Transaction`; handlers must not call `pool.begin()` directly.
+impl SqliteEventStore {
+    pub async fn check_receipt_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        request_id: &RequestId,
+    ) -> Result<Option<CommandReceiptRecord>, DomainError> {
+        let row = sqlx::query(
+            "SELECT request_id, command_type, command_version, scope_fingerprint, request_fingerprint, actor_id, correlation_id, outcome_code, response_json FROM command_receipts WHERE request_id = ?"
+        )
+        .bind(request_id.to_string())
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(row.map(|r| CommandReceiptRecord {
+            request_id: r.get("request_id"),
+            command_type: r.get("command_type"),
+            command_version: r.get("command_version"),
+            scope_fingerprint: r.get("scope_fingerprint"),
+            request_fingerprint: r.get("request_fingerprint"),
+            actor_id: r
+                .try_get::<Option<String>, _>("actor_id")
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+            correlation_id: r.get("correlation_id"),
+            outcome_code: r.get("outcome_code"),
+            response_json: r.get("response_json"),
+        }))
+    }
+
+    pub async fn put_content_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        provider: &dyn super::content_key::ContentKeyProvider,
+        content_id: &ContentId,
+        kind: &str,
+        media_type: &str,
+        scope: &EventScope,
+        plaintext: &[u8],
+    ) -> Result<(), DomainError> {
+        let sealed = super::content_crypto::seal(provider, content_id, kind, scope, plaintext)?;
+        let now_us = OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000;
+        sqlx::query(
+            r#"
+            INSERT INTO content_records (
+                content_id, content_kind, media_type, encoding, protection_scheme,
+                key_reference, nonce, protected_bytes, plaintext_size,
+                installation_id, workspace_id, project_id, session_id, created_at_us
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(content_id.to_string())
+        .bind(kind)
+        .bind(media_type)
+        .bind(super::content_crypto::ENCODING_ENCRYPTED)
+        .bind(super::content_crypto::PROTECTION_AEAD_V1)
+        .bind(sealed.key_reference)
+        .bind(sealed.nonce)
+        .bind(sealed.ciphertext)
+        .bind(plaintext.len() as i64)
+        .bind(scope.installation_id.to_string())
+        .bind(scope.workspace_id.map(|id| id.to_string()))
+        .bind(scope.project_id.map(|id| id.to_string()))
+        .bind(scope.session_id.map(|id| id.to_string()))
+        .bind(now_us as i64)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn get_content_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        provider: &dyn super::content_key::ContentKeyProvider,
+        content_id: &ContentId,
+        expected_scope: &EventScope,
+    ) -> Result<Option<Vec<u8>>, DomainError> {
+        let row = sqlx::query(
+            "SELECT content_kind, protection_scheme, nonce, protected_bytes FROM content_records WHERE content_id = ?",
+        )
+        .bind(content_id.to_string())
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        match row {
+            None => Ok(None),
+            Some(r) => {
+                let kind: String = r.get("content_kind");
+                let protection: String = r.get("protection_scheme");
+                if protection != super::content_crypto::PROTECTION_AEAD_V1 {
+                    return Err(DomainError::Integrity(format!(
+                        "legacy unprotected content rejected: {protection}"
+                    )));
+                }
+                let nonce: Vec<u8> = r.get("nonce");
+                let ciphertext: Vec<u8> = r.get("protected_bytes");
+                let plain = super::content_crypto::open(
+                    provider,
+                    content_id,
+                    &kind,
+                    expected_scope,
+                    &nonce,
+                    &ciphertext,
+                )?;
+                Ok(Some(plain))
+            }
+        }
+    }
+
+    pub async fn append_event_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        req: AppendEventRequest,
+    ) -> Result<AppendEventResult, DomainError> {
+        let stream_row =
+            sqlx::query("SELECT current_sequence, last_checksum FROM streams WHERE stream_id = ?")
+                .bind(&req.stream_id)
+                .fetch_optional(&mut **tx)
+                .await
+                .map_err(|e| DomainError::Storage(e.to_string()))?;
+        let (current_seq, last_checksum): (u64, Option<String>) = match stream_row {
+            Some(row) => (
+                row.get::<i64, _>("current_sequence") as u64,
+                row.get::<Option<String>, _>("last_checksum"),
+            ),
+            None => (0, None),
+        };
+        if current_seq != req.expected_sequence {
+            return Err(DomainError::ConcurrencyConflict(
+                req.stream_id.clone(),
+                req.expected_sequence,
+                current_seq,
+            ));
+        }
+        let new_sequence = current_seq + 1;
+        let event_id = EventId::new_v7();
+        let checksum = ChecksumCalculator::calculate(
+            last_checksum.as_deref(),
+            &req.stream_id,
+            new_sequence,
+            &event_id.to_string(),
+            &req.event_type,
+            req.event_version,
+            &req.payload_json,
+            &req.metadata_json,
+        );
+        let now = OffsetDateTime::now_utc();
+        let now_us = (now.unix_timestamp_nanos() / 1_000) as i64;
+        let insert_res = sqlx::query(
+            r#"
+            INSERT INTO events (
+                event_id, event_type, event_version, stream_id, stream_kind, stream_sequence,
+                installation_id, workspace_id, project_id, session_id,
+                actor_id, actor_kind, request_id, correlation_id, causation_id,
+                occurred_at_us, recorded_at_us, payload_json, metadata_json,
+                previous_checksum, checksum
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(event_id.to_string())
+        .bind(&req.event_type)
+        .bind(req.event_version as i32)
+        .bind(&req.stream_id)
+        .bind(&req.stream_kind)
+        .bind(new_sequence as i64)
+        .bind(req.scope.installation_id.to_string())
+        .bind(req.scope.workspace_id.map(|id| id.to_string()))
+        .bind(req.scope.project_id.map(|id| id.to_string()))
+        .bind(req.scope.session_id.map(|id| id.to_string()))
+        .bind(req.actor.actor_id.to_string())
+        .bind(format!("{:?}", req.actor.kind))
+        .bind(req.request_id.to_string())
+        .bind(req.correlation_id.to_string())
+        .bind(req.causation_id.map(|id| id.to_string()))
+        .bind(now_us)
+        .bind(now_us)
+        .bind(&req.payload_json)
+        .bind(&req.metadata_json)
+        .bind(last_checksum)
+        .bind(&checksum)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        let global_position = insert_res.last_insert_rowid();
+        sqlx::query(
+            r#"
+            INSERT INTO streams (stream_id, stream_kind, current_sequence, last_checksum, last_event_id, updated_at_us)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(stream_id) DO UPDATE SET
+                current_sequence = excluded.current_sequence,
+                last_checksum = excluded.last_checksum,
+                last_event_id = excluded.last_event_id,
+                updated_at_us = excluded.updated_at_us
+            "#,
+        )
+        .bind(&req.stream_id)
+        .bind(&req.stream_kind)
+        .bind(new_sequence as i64)
+        .bind(&checksum)
+        .bind(event_id.to_string())
+        .bind(now_us)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(AppendEventResult {
+            event_id,
+            stream_sequence: new_sequence,
+            global_position,
+            checksum,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn record_receipt_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        request_id: &RequestId,
+        command_type: &str,
+        command_version: i32,
+        scope_fingerprint: &str,
+        request_fingerprint: &str,
+        actor_id: &ActorId,
+        correlation_id: &CorrelationId,
+        outcome_code: &str,
+        response_json: &[u8],
+        global_pos: i64,
+    ) -> Result<(), DomainError> {
+        let now_us = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
+        sqlx::query(
+            r#"
+            INSERT INTO command_receipts (
+                request_id, command_type, command_version, scope_fingerprint, request_fingerprint,
+                actor_id, correlation_id, outcome_code, response_json, first_global_position, last_global_position,
+                committed_at_us
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(request_id.to_string())
+        .bind(command_type)
+        .bind(command_version)
+        .bind(scope_fingerprint)
+        .bind(request_fingerprint)
+        .bind(actor_id.to_string())
+        .bind(correlation_id.to_string())
+        .bind(outcome_code)
+        .bind(response_json)
+        .bind(global_pos)
+        .bind(global_pos)
+        .bind(now_us)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
         Ok(())
     }
 }

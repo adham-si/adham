@@ -78,9 +78,9 @@ fn generate_contracts() -> Result<(), Box<dyn std::error::Error>> {
 
     for id_decl in id_types {
         content.push_str(id_decl);
-        content.push_str("\n");
+        content.push('\n');
     }
-    content.push_str("\n");
+    content.push('\n');
 
     for decl in decls {
         if !decl.starts_with("export") {

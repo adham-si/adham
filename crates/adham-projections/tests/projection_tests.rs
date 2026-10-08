@@ -1,3 +1,5 @@
+// ID newtypes are `Copy`; `.clone()` follows codebase style.
+#![allow(clippy::clone_on_copy)]
 use adham_core_types::*;
 use adham_event_log::{create_sqlite_pool, AppendEventRequest, SqliteEventStore};
 use adham_projections::ConversationProjection;
@@ -21,6 +23,13 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
     let ws_id = WorkspaceId::new_v7();
     let proj_id = ProjectId::new_v7();
     let sess_id = SessionId::new_v7();
+    let provider = adham_event_log::InMemoryProvider::generate();
+    let scope = EventScope {
+        installation_id: inst_id.clone(),
+        workspace_id: Some(ws_id.clone()),
+        project_id: Some(proj_id.clone()),
+        session_id: Some(sess_id.clone()),
+    };
 
     // 1. Submit message 1
     let msg1_id = MessageId::new_v7();
@@ -28,11 +37,11 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
     let msg1_text = b"Hello, Adham system!";
     store
         .put_content(
+            &provider,
             &content1_id,
             "user_text",
             "text/plain",
-            "identity",
-            "none",
+            &scope,
             msg1_text,
         )
         .await
@@ -98,11 +107,11 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
     let msg2_text = b"This is a second prompt.";
     store
         .put_content(
+            &provider,
             &content2_id,
             "user_text",
             "text/plain",
-            "identity",
-            "none",
+            &scope,
             msg2_text,
         )
         .await
@@ -162,9 +171,10 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
     assert_eq!(cp2, Some(evt2.global_position));
 
     // 3. Query projection
-    let messages = ConversationProjection::get_session_messages(&pool, &sess_id)
-        .await
-        .expect("get messages");
+    let messages =
+        ConversationProjection::get_session_messages(&pool, &provider, &inst_id, &sess_id)
+            .await
+            .expect("get messages");
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[0].content, "Hello, Adham system!");
     assert_eq!(messages[1].content, "This is a second prompt.");
@@ -180,9 +190,10 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
         .expect("get checkpoint after rebuild");
     assert_eq!(cp_rebuilt, Some(evt2.global_position));
 
-    let messages_after_rebuild = ConversationProjection::get_session_messages(&pool, &sess_id)
-        .await
-        .expect("get messages after rebuild");
+    let messages_after_rebuild =
+        ConversationProjection::get_session_messages(&pool, &provider, &inst_id, &sess_id)
+            .await
+            .expect("get messages after rebuild");
     assert_eq!(messages_after_rebuild.len(), 2);
     assert_eq!(messages_after_rebuild[0].content, "Hello, Adham system!");
     assert_eq!(

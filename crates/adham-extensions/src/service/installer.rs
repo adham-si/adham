@@ -17,11 +17,18 @@ pub enum InstallError {
 pub struct PluginInstaller;
 
 impl PluginInstaller {
-    /// Simulates/executes inert package installation into the app-owned plugin store.
-    /// Invariants:
-    /// - Strictly zero install/postinstall scripts are executed.
-    /// - Newly installed packages start in InstalledDisabled state.
-    /// - Package root is read-only; instance data directory is partitioned and isolated.
+    /// Domain plan for an inert package installation. NO filesystem effects:
+    /// creates no directories, writes no files, verifies no bytes, executes
+    /// zero scripts. Plugin code execution is deferred until a reviewed
+    /// filesystem-isolation and approval boundary lands; do not wire this
+    /// receipt to any loader, runner, or MCP/tool grant.
+    ///
+    /// Invariants (domain-level only):
+    /// - Newly planned packages are `InstalledDisabled`.
+    /// - Planned roots are strings only, not verified read-only partitions.
+    ///
+    /// Real installation (verified bytes, bounded extraction, atomic
+    /// activation, signature verification) is a separately bounded workstream.
     pub fn install_package(
         raw_manifest_json: &str,
         file_manifest: &[&str],

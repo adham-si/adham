@@ -99,8 +99,11 @@ pub fn run() {
             .expect("Failed to initialize SQLite pool and migrations")
     });
 
-    let installation_id = adham_core_types::InstallationId::new_v7();
-    let api_ctx = ApiContext::new(pool, installation_id);
+    let api_ctx = runtime.block_on(async {
+        adham_desktop_api::ApiContext::load_or_create(pool)
+            .await
+            .expect("Failed to load installation identity")
+    });
 
     tauri::Builder::default()
         .manage(api_ctx)

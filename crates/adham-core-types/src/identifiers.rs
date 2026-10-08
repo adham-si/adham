@@ -25,10 +25,8 @@ macro_rules! define_id {
                 Uuid::parse_str(s).map(Self)
             }
 
-            pub fn from_client_str(s: &str) -> Self {
-                Uuid::parse_str(s)
-                    .map(Self)
-                    .unwrap_or_else(|_| Self::new_v7())
+            pub fn from_client_str(s: &str) -> Result<Self, uuid::Error> {
+                Uuid::parse_str(s).map(Self)
             }
 
             pub fn as_uuid(&self) -> &Uuid {

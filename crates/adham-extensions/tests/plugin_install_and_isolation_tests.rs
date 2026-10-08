@@ -107,3 +107,40 @@ fn test_instance_data_path_containment_and_isolation() {
         Err(PathContainmentError::AbsolutePathForbidden { .. })
     ));
 }
+
+#[test]
+fn test_install_plan_has_no_filesystem_effects_and_no_execution() {
+    // The installer is a domain plan only: it must not create directories,
+    // write files, or wire execution. Real installation with verified bytes,
+    // bounded extraction, and atomic activation is a separate workstream.
+    let dir = std::env::temp_dir().join(format!("adham_plugin_plan_{}", uuid::Uuid::now_v7()));
+    std::fs::create_dir_all(&dir).expect("temp base");
+    let base = dir.to_string_lossy().replace('\\', "/");
+    let before: Vec<_> = std::fs::read_dir(&dir).expect("read").collect();
+
+    let manifest_json = format!(
+        r#"{{
+            "$schema": "{}",
+            "name": "plan-only"
+        }}"#,
+        AGENT_PLUGINS_SCHEMA_V1
+    );
+    let publisher = PublisherIdentity::unverified("pub-plan", "Author");
+    let (receipt, _instance) = PluginInstaller::install_package(
+        &manifest_json,
+        &["plugin.json"],
+        publisher,
+        &base,
+        1700000000,
+    )
+    .expect("plan");
+    assert_eq!(receipt.state, PluginInstallationState::InstalledDisabled);
+
+    let after: Vec<_> = std::fs::read_dir(&dir).expect("read").collect();
+    assert_eq!(
+        before.len(),
+        after.len(),
+        "installer must not touch the filesystem"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}

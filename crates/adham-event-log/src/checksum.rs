@@ -3,6 +3,7 @@ use blake3::Hasher;
 pub struct ChecksumCalculator;
 
 impl ChecksumCalculator {
+    #[allow(clippy::too_many_arguments)]
     pub fn calculate(
         previous_checksum: Option<&str>,
         stream_id: &str,

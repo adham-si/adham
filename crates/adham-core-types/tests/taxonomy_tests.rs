@@ -17,7 +17,7 @@ fn test_serde_roundtrip_all_events() {
 
     let proj = ProjectCreatedV1 {
         project_id: ProjectId::new_v7(),
-        workspace_id: ws.workspace_id.clone(),
+        workspace_id: ws.workspace_id,
         name: "Adham Core".to_string(),
         storage_kind: "isolated".to_string(),
     };
@@ -27,7 +27,7 @@ fn test_serde_roundtrip_all_events() {
 
     let sess = SessionCreatedV1 {
         session_id: SessionId::new_v7(),
-        project_id: proj.project_id.clone(),
+        project_id: proj.project_id,
         title: Some("Taxonomy Discussion".to_string()),
     };
     let sess_json = serde_json::to_string(&sess).expect("serialize sess");

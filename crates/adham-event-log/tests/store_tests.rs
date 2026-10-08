@@ -30,8 +30,8 @@ async fn test_event_store_append_and_concurrency() {
         event_type: "WorkspaceCreated".to_string(),
         event_version: 1,
         scope: EventScope {
-            installation_id: inst_id.clone(),
-            workspace_id: Some(ws_id.clone()),
+            installation_id: inst_id,
+            workspace_id: Some(ws_id),
             project_id: None,
             session_id: None,
         },
@@ -39,8 +39,8 @@ async fn test_event_store_append_and_concurrency() {
             actor_id: ActorId::new_v7(),
             kind: ActorKind::LocalHuman,
         },
-        request_id: req_id.clone(),
-        correlation_id: corr_id.clone(),
+        request_id: req_id,
+        correlation_id: corr_id,
         causation_id: None,
         payload_json: b"{\"name\":\"Test WS\"}".to_vec(),
         metadata_json: b"{}".to_vec(),
@@ -60,7 +60,7 @@ async fn test_event_store_append_and_concurrency() {
         event_version: 1,
         scope: EventScope {
             installation_id: inst_id,
-            workspace_id: Some(ws_id.clone()),
+            workspace_id: Some(ws_id),
             project_id: None,
             session_id: None,
         },
@@ -90,34 +90,97 @@ async fn test_event_store_append_and_concurrency() {
 
 #[tokio::test]
 async fn test_sensitive_content_segregation() {
+    use adham_event_log::{InMemoryProvider, UnavailableKeyProvider};
     let db_path = test_db_path();
     let pool = create_sqlite_pool(&db_path)
         .await
         .expect("create test pool");
     let store = SqliteEventStore::new(pool.clone());
+    let provider = InMemoryProvider::generate();
+
+    let inst = InstallationId::new_v7();
+    let ws = WorkspaceId::new_v7();
+    let scope = EventScope {
+        installation_id: inst,
+        workspace_id: Some(ws),
+        project_id: None,
+        session_id: None,
+    };
 
     let content_id = ContentId::new_v7();
     let payload = b"Super sensitive user prompt";
 
     store
         .put_content(
+            &provider,
             &content_id,
             "user_prompt",
             "text/plain",
-            "identity",
-            "none",
+            &scope,
             payload,
         )
         .await
         .expect("put content");
 
+    // Authenticated round-trip.
     let retrieved = store
-        .get_content(&content_id)
+        .get_content(&provider, &content_id, &scope)
         .await
         .expect("get content")
         .expect("content should exist");
-
     assert_eq!(retrieved, payload);
+
+    // Ciphertext at rest differs from plaintext (and is not mere encoding:
+    // tamper and wrong-scope below prove authentication).
+    let (scheme, at_rest) = store
+        .get_content_ciphertext(&content_id)
+        .await
+        .expect("ciphertext")
+        .expect("row");
+    assert_eq!(scheme, adham_event_log::PROTECTION_AEAD_V1);
+    assert_ne!(at_rest, payload);
+
+    // Tamper rejection: flip a ciphertext byte directly.
+    let mut tampered = at_rest.clone();
+    tampered[0] ^= 0x01;
+    sqlx::query("UPDATE content_records SET protected_bytes = ? WHERE content_id = ?")
+        .bind(&tampered)
+        .bind(content_id.to_string())
+        .execute(&pool)
+        .await
+        .expect("tamper");
+    let err = store
+        .get_content(&provider, &content_id, &scope)
+        .await
+        .expect_err("tamper must fail");
+    assert!(matches!(err, DomainError::Integrity(_)), "got: {err}");
+
+    // Restore, then wrong-scope rejection.
+    sqlx::query("UPDATE content_records SET protected_bytes = ? WHERE content_id = ?")
+        .bind(&at_rest)
+        .bind(content_id.to_string())
+        .execute(&pool)
+        .await
+        .expect("restore");
+    let wrong_scope = EventScope {
+        installation_id: inst,
+        workspace_id: Some(WorkspaceId::new_v7()),
+        project_id: None,
+        session_id: None,
+    };
+    let err = store
+        .get_content(&provider, &content_id, &wrong_scope)
+        .await
+        .expect_err("wrong scope must fail");
+    assert!(matches!(err, DomainError::Integrity(_)), "got: {err}");
+
+    // Unavailable-key behavior: explicit storage error, no fallback.
+    let missing = UnavailableKeyProvider;
+    let err = store
+        .get_content(&missing, &content_id, &scope)
+        .await
+        .expect_err("unavailable key must fail");
+    assert!(matches!(err, DomainError::Storage(_)), "got: {err}");
 
     let _ = std::fs::remove_file(db_path);
 }

@@ -205,19 +205,30 @@ async fn test_content_tombstone_lifecycle() {
     let store = SqliteEventStore::new(pool.clone());
 
     let content_id = ContentId::new_v7();
+    let provider = adham_event_log::InMemoryProvider::generate();
+    let scope = EventScope {
+        installation_id: InstallationId::new_v7(),
+        workspace_id: None,
+        project_id: None,
+        session_id: None,
+    };
     store
         .put_content(
+            &provider,
             &content_id,
             "private_text",
             "text/plain",
-            "identity",
-            "none",
+            &scope,
             b"temporary sensitive data",
         )
         .await
         .expect("put content");
 
-    assert!(store.get_content(&content_id).await.unwrap().is_some());
+    assert!(store
+        .get_content(&provider, &content_id, &scope)
+        .await
+        .unwrap()
+        .is_some());
 
     // Transactionally erase content and create tombstone
     let mut tx = pool.begin().await.expect("begin erase tx");
@@ -238,7 +249,11 @@ async fn test_content_tombstone_lifecycle() {
     tx.commit().await.expect("commit erase tx");
 
     // Verify content erased and tombstone recorded
-    assert!(store.get_content(&content_id).await.unwrap().is_none());
+    assert!(store
+        .get_content(&provider, &content_id, &scope)
+        .await
+        .unwrap()
+        .is_none());
 
     let tombstone_row =
         sqlx::query("SELECT reason_code FROM content_tombstones WHERE content_id = ?")

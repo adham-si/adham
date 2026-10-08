@@ -14,9 +14,14 @@ pub async fn handle_get_conversation(
         .ok_or("sessionId context required")?;
     let session_id = SessionId::from_string(sess_id_str).map_err(|e| e.to_string())?;
 
-    let messages = ConversationProjection::get_session_messages(&ctx.pool, &session_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let messages = ConversationProjection::get_session_messages(
+        &ctx.pool,
+        ctx.content_key.as_ref(),
+        &ctx.installation_id,
+        &session_id,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
     let mut dtos = Vec::with_capacity(messages.len());
     let mut max_pos: i64 = 0;

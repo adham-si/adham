@@ -58,10 +58,28 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Rust typecheck
-        run: cargo check --workspace --all-targets
+        run: cargo check --workspace --all-targets --locked
 
       - name: Rust clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Contracts drift check
+        run: cargo xtask contracts
+
+      - name: Contracts no-diff
+        run: git diff --exit-code -- packages/contracts-generated
 
       - name: Rust tests
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
+
+      - name: P0 repair regression suite
+        run: cargo test -p adham-desktop-api --test p0_repair_regression --locked
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Dependency audit (cargo-deny)
+        run: cargo deny check
+
+      - name: Dependency audit (pnpm)
+        run: pnpm audit --audit-level=high

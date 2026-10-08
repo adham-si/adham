@@ -1,7 +1,7 @@
 use adham_core_types::*;
 use adham_desktop_api::*;
 use adham_event_log::create_sqlite_pool;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub fn test_db_path() -> PathBuf {
     let mut path = std::env::temp_dir();
@@ -9,10 +9,24 @@ pub fn test_db_path() -> PathBuf {
     path
 }
 
-pub async fn setup_ctx(db_path: &PathBuf) -> ApiContext {
+pub async fn setup_ctx(db_path: &Path) -> ApiContext {
     let pool = create_sqlite_pool(db_path).await.expect("create pool");
-    let inst_id = InstallationId::new_v7();
-    ApiContext::new(pool, inst_id)
+    let provider: std::sync::Arc<dyn adham_event_log::ContentKeyProvider> =
+        std::sync::Arc::new(adham_event_log::InMemoryProvider::generate());
+    ApiContext::load_or_create_with_key(pool, provider)
+        .await
+        .expect("load identity")
+}
+
+#[allow(dead_code)]
+pub async fn setup_ctx_with_key(
+    db_path: &Path,
+    provider: std::sync::Arc<dyn adham_event_log::ContentKeyProvider>,
+) -> ApiContext {
+    let pool = create_sqlite_pool(db_path).await.expect("create pool");
+    ApiContext::load_or_create_with_key(pool, provider)
+        .await
+        .expect("load identity")
 }
 
 pub async fn create_test_workspace(ctx: &ApiContext, name: &str) -> String {

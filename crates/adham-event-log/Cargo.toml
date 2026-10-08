@@ -15,3 +15,7 @@ blake3 = { workspace = true }
 time = { workspace = true }
 tokio = { workspace = true }
 uuid = { workspace = true }
+chacha20poly1305 = { workspace = true }
+rand = { workspace = true }
+zeroize = { workspace = true }
+keyring = { workspace = true }

@@ -9,9 +9,10 @@ Project instructions for opencode agents. Keep edits small and local.
 
 ## Repo state
 
-- **Spec-only today.** `docs/` holds the product brief and P0 contracts; there is no app code, root manifest, or lockfile yet. `.opencode/package.json` is local-only (gitignored).
-- **No implementation is authorized.** Do not scaffold, install packages, create crates, or commit work until a human confirms the six decisions in `docs/spec/p0/P0 — Implementation decisions & execution order.md` §5 (license, Node 24 LTS, `ts-rs`, manual Vite + `pnpm tauri init`, backend-owned commands, dependency approval). Never create a placeholder `LICENSE`.
-- The repo has **zero commits** and no root `.gitignore`. Stage paths explicitly — never `git add -A`; `.playwright-mcp/`, `.kilo/worktrees/`, and `.opencode/node_modules` are local scratch.
+- Post-scaffold monorepo: `apps/desktop` (React 19 / Vite UI + `src-tauri` shell), `crates/` (domain, storage, projections, API, extensions, tools, etc.), `packages/` (contracts-generated, UI, design-tokens), root `package.json` (`pnpm@10.33.2`), `Cargo.toml` workspace, committed `pnpm-lock.yaml` + `Cargo.lock`. Inspect live state via `git log --oneline`, `git ls-files apps crates packages`, `cargo metadata --no-deps`. Do not hardcode commit/crate counts into instructions.
+- P0 foundation under repair (atomic writes, AEAD content, scoped idempotency, durable SQLite identity). Until content protection lands on your branch, use disposable synthetic data. Real-data use is technically blocked, not merely discouraged.
+- Prior `docs/reports/p0-06-*` evidence is historical; unsupported conclusions are superseded, not rewritten. New gate claims require fresh revision-tagged logs at the repaired revision.
+- Stage paths explicitly — never `git add -A`; `.playwright-mcp/`, `.kilo/worktrees/`, and `.opencode/node_modules` are local scratch. `.gitignore` covers `target/`, `node_modules/`, `*.db*`, and scratch dirs.
 
 ## Sources of truth
 

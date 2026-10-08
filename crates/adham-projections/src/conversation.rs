@@ -1,3 +1,5 @@
+//! Conversation projection. ID newtypes are `Copy`; `.clone()` follows codebase style.
+#![allow(clippy::clone_on_copy)]
 use adham_core_types::{DomainError, MessageSubmittedV1, SessionId};
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Row, Sqlite};
@@ -16,6 +18,7 @@ pub struct ConversationMessageView {
 pub struct ConversationProjection;
 
 impl ConversationProjection {
+    #[allow(clippy::too_many_arguments)]
     pub async fn insert_message(
         pool: &Pool<Sqlite>,
         message_id: &str,
@@ -75,6 +78,66 @@ impl ConversationProjection {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_message_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        message_id: &str,
+        workspace_id: &str,
+        project_id: &str,
+        session_id: &str,
+        role: &str,
+        content_id: &str,
+        source_event_id: &str,
+        source_global_position: i64,
+        created_at_us: i64,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"
+            INSERT INTO conversation_messages (
+                message_id, workspace_id, project_id, session_id, role,
+                content_id, source_event_id, source_global_position, created_at_us
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(message_id) DO UPDATE SET
+                role = excluded.role,
+                source_event_id = excluded.source_event_id,
+                source_global_position = excluded.source_global_position,
+                created_at_us = excluded.created_at_us
+            "#,
+        )
+        .bind(message_id)
+        .bind(workspace_id)
+        .bind(project_id)
+        .bind(session_id)
+        .bind(role)
+        .bind(content_id)
+        .bind(source_event_id)
+        .bind(source_global_position)
+        .bind(created_at_us)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO projection_checkpoints (
+                projection_name, projection_version, last_global_position, status, error_code, updated_at_us
+            ) VALUES ('conversation_messages', 1, ?, 'active', NULL, ?)
+            ON CONFLICT(projection_name) DO UPDATE SET
+                last_global_position = excluded.last_global_position,
+                status = excluded.status,
+                error_code = excluded.error_code,
+                updated_at_us = excluded.updated_at_us
+            "#,
+        )
+        .bind(source_global_position)
+        .bind(created_at_us)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+
+        Ok(())
+    }
+
     pub async fn get_checkpoint(pool: &Pool<Sqlite>) -> Result<Option<i64>, DomainError> {
         let row = sqlx::query(
             "SELECT last_global_position FROM projection_checkpoints WHERE projection_name = 'conversation_messages'",
@@ -88,11 +151,15 @@ impl ConversationProjection {
 
     pub async fn get_session_messages(
         pool: &Pool<Sqlite>,
+        provider: &dyn adham_event_log::ContentKeyProvider,
+        installation_id: &adham_core_types::InstallationId,
         session_id: &SessionId,
     ) -> Result<Vec<ConversationMessageView>, DomainError> {
         let rows = sqlx::query(
             r#"
-            SELECT cm.message_id, cm.session_id, cm.role, cm.created_at_us, cr.protected_bytes
+            SELECT cm.message_id, cm.workspace_id, cm.project_id, cm.session_id, cm.role,
+                   cm.created_at_us, cm.content_id, cr.content_kind, cr.protection_scheme,
+                   cr.nonce, cr.protected_bytes
             FROM conversation_messages cm
             LEFT JOIN content_records cr ON cm.content_id = cr.content_id
             WHERE cm.session_id = ?
@@ -107,14 +174,47 @@ impl ConversationProjection {
         let mut messages = Vec::with_capacity(rows.len());
         for row in rows {
             let message_id: String = row.get("message_id");
+            let workspace_str: String = row.get("workspace_id");
+            let project_str: String = row.get("project_id");
             let session_id_str: String = row.get("session_id");
             let role: String = row.get("role");
             let created_at_us: i64 = row.get("created_at_us");
-            let bytes_opt: Option<Vec<u8>> = row.get("protected_bytes");
+            let content_id_str: String = row.get("content_id");
 
-            let content = match bytes_opt {
-                Some(b) => String::from_utf8_lossy(&b).to_string(),
-                None => String::new(),
+            let content = match row.try_get::<Option<String>, _>("protection_scheme") {
+                Ok(Some(scheme)) if scheme == adham_event_log::PROTECTION_AEAD_V1 => {
+                    let kind: String = row
+                        .try_get::<Option<String>, _>("content_kind")
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| "user_text".to_string());
+                    let nonce: Vec<u8> = row.get("nonce");
+                    let ciphertext: Vec<u8> = row.get("protected_bytes");
+                    let content_id = adham_core_types::ContentId::from_string(&content_id_str)
+                        .map_err(|e| DomainError::Integrity(e.to_string()))?;
+                    let scope = adham_core_types::EventScope {
+                        installation_id: *installation_id,
+                        workspace_id: adham_core_types::WorkspaceId::from_string(&workspace_str)
+                            .ok(),
+                        project_id: adham_core_types::ProjectId::from_string(&project_str).ok(),
+                        session_id: adham_core_types::SessionId::from_string(&session_id_str).ok(),
+                    };
+                    let cipher = adham_event_log::sqlite::content_crypto::open(
+                        provider,
+                        &content_id,
+                        &kind,
+                        &scope,
+                        &nonce,
+                        &ciphertext,
+                    )?;
+                    String::from_utf8(cipher)
+                        .map_err(|_| DomainError::Integrity("content invalid utf-8".into()))?
+                }
+                _ => {
+                    return Err(DomainError::Integrity(
+                        "legacy unprotected content rejected".into(),
+                    ));
+                }
             };
 
             messages.push(ConversationMessageView {

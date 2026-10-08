@@ -93,10 +93,31 @@ async fn test_scenario_2_restart_and_replay() {
         .await
         .unwrap();
         msg_id = msg.data.message_id;
+        // Persist the content key across simulated restart (production uses
+        // the OS keyring, which survives restart; tests share the provider).
+        std::fs::write(
+            db_path.with_extension("key"),
+            ctx.content_key
+                .content_key()
+                .expect("export key")
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+        )
+        .expect("persist test key");
     } // Pool closed and dropped here
 
-    // Simulate Restart: Reopen database connection
-    let restarted_ctx = setup_ctx(&db_path).await;
+    // Simulate Restart: Reopen database connection with the same key.
+    let key_hex = std::fs::read_to_string(db_path.with_extension("key")).expect("read key");
+    let mut key = [0u8; 32];
+    for (i, chunk) in key_hex.as_bytes().chunks(2).enumerate() {
+        let hi = (chunk[0] as char).to_digit(16).unwrap() as u8;
+        let lo = (chunk[1] as char).to_digit(16).unwrap() as u8;
+        key[i] = (hi << 4) | lo;
+    }
+    let provider: std::sync::Arc<dyn adham_event_log::ContentKeyProvider> =
+        std::sync::Arc::new(adham_event_log::InMemoryProvider::from_key(key));
+    let restarted_ctx = setup_ctx_with_key(&db_path, provider).await;
     let conv = handle_get_conversation(
         &restarted_ctx,
         CommandContext {
