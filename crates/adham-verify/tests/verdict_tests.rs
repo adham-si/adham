@@ -577,16 +577,125 @@ fn test_wrong_candidate_evidence_blocks() {
 }
 
 #[test]
-fn test_empty_contract_characterizes_vacuous_pass() {
-    // Characterization only: a contract with zero mandatory criteria
-    // currently verifies successfully when nothing contradicts it. The
-    // intended policy (forbid empty contracts vs. allow vacuous pass) is
-    // pending audit confirmation; this test pins behavior, not policy.
-    let contract = CompletionContract::new("task-empty", DeliveryMode::ProposalOnly);
-    assert!(contract.mandatory_criteria().next().is_none());
+fn test_blocked_plus_failed_plus_error_preserves_all_diagnostics() {
+    let (contract, deliverable) = setup_base_contract_and_deliverable();
+    let now_ms = 1_000_000;
+
+    // BUILD is blocked (stale evidence); TEST is a different failed check.
+    let executions = vec![
+        CheckExecution::new(
+            CheckId::new(CheckId::BUILD),
+            CheckResultState::Passed,
+            Some("ev-1".to_string()),
+            "Build clean",
+            100,
+        ),
+        CheckExecution::new(
+            CheckId::new(CheckId::TEST),
+            CheckResultState::Failed,
+            None,
+            "1 test failed",
+            200,
+        ),
+    ];
+    let evidences = vec![EvidenceRecord::new(
+        CheckId::new(CheckId::BUILD),
+        &deliverable.content_hash,
+        1,
+        Some(0),
+        "Build success",
+        now_ms - 500_000,
+        60_000,
+    )];
+
+    let findings = vec![Finding::error(
+        CheckId::new(CheckId::BUILD),
+        "E004_MIXED_SIGNALS",
+        "Checker error alongside blocked and failed checks",
+    )];
+    let verdict = evaluate_verdict(
+        &contract,
+        &deliverable,
+        &executions,
+        &evidences,
+        &findings,
+        now_ms,
+    );
+    match &verdict {
+        VerificationVerdict::Blocked {
+            reason,
+            blocked_checks,
+        } => {
+            assert!(
+                blocked_checks.iter().any(|b| b.contains(CheckId::BUILD)),
+                "blocked_checks must keep the blocker, got: {blocked_checks:?}"
+            );
+            assert!(
+                reason.contains(CheckId::TEST),
+                "reason must keep the failed check id, got: {reason}"
+            );
+            assert!(
+                reason.contains("E004_MIXED_SIGNALS"),
+                "reason must keep the error code, got: {reason}"
+            );
+        }
+        other => panic!("Blocked plus failed plus error must stay Blocked, got: {other:?}"),
+    }
+    assert!(!verdict.is_success());
+}
+
+#[test]
+fn test_empty_contract_blocks_in_all_delivery_modes() {
+    // Policy: an empty verification contract cannot establish verified
+    // completion, in any delivery mode. A draft may still be constructed.
+    for mode in [
+        DeliveryMode::ProposalOnly,
+        DeliveryMode::ApplyAndVerify,
+        DeliveryMode::ArtifactOnly,
+    ] {
+        let contract = CompletionContract::new("task-empty", mode);
+        let deliverable = CandidateDeliverable::new_patch(
+            vec!["src/lib.rs".to_string()],
+            "pub fn hello() {}",
+            None,
+        );
+        let now_ms = 1_000_000;
+        let verdict = evaluate_verdict(&contract, &deliverable, &[], &[], &[], now_ms);
+        assert!(
+            matches!(verdict, VerificationVerdict::Blocked { .. }),
+            "empty contract must Block in {mode:?}, got: {verdict:?}"
+        );
+        assert!(!verdict.is_success());
+    }
+}
+
+#[test]
+fn test_mandatory_criterion_without_check_ids_blocks() {
+    let mut contract = CompletionContract::new("task-draft", DeliveryMode::ProposalOnly);
+    contract = contract.with_criterion(AcceptanceCriterion {
+        criterion_id: CriterionId::new("crit-draft"),
+        description: "Draft criterion, checks not yet assigned".to_string(),
+        mandatory: true,
+        check_ids: Vec::new(),
+    });
     let deliverable =
         CandidateDeliverable::new_patch(vec!["src/lib.rs".to_string()], "pub fn hello() {}", None);
     let now_ms = 1_000_000;
-    let verdict = evaluate_verdict(&contract, &deliverable, &[], &[], &[], now_ms);
-    assert_eq!(verdict, VerificationVerdict::Pass);
+
+    let findings = vec![Finding::error(
+        CheckId::new(CheckId::BUILD),
+        "E005_DRAFT_ERROR",
+        "Error alongside an incomplete draft contract",
+    )];
+    let verdict = evaluate_verdict(&contract, &deliverable, &[], &[], &findings, now_ms);
+    match &verdict {
+        VerificationVerdict::Blocked { reason, .. } => {
+            assert!(
+                reason.contains("E005_DRAFT_ERROR"),
+                "reason must preserve co-present error details, got: {reason}"
+            );
+        }
+        other => panic!("criterion without check ids must Block, got: {other:?}"),
+    }
+    assert!(!verdict.is_success());
 }

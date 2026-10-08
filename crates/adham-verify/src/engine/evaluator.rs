@@ -1,5 +1,5 @@
 use crate::domain::check::{CheckExecution, CheckResultState};
-use crate::domain::contract::CompletionContract;
+use crate::domain::contract::{AcceptanceCriterion, CompletionContract};
 use crate::domain::deliverable::CandidateDeliverable;
 use crate::domain::evidence::EvidenceRecord;
 use crate::domain::finding::{Finding, FindingSeverity};
@@ -72,11 +72,46 @@ pub fn evaluate_verdict(
         .map(|f| format!("{}({})", f.code, f.check_id.as_str()))
         .collect();
 
-    // 3. Blocked takes precedence over verdict pass; keeping that precedence
-    // avoids an unrelated lifecycle change. Co-present errors stay visible
-    // in the reason while blocked_checks keeps pure blockers.
+    // 3. An empty verification contract cannot establish verified completion,
+    // in any delivery mode. A draft contract may still be constructed; it
+    // just cannot pass verification.
+    let mandatory: Vec<&AcceptanceCriterion> = contract.mandatory_criteria().collect();
+    let mut contract_gaps: Vec<String> = Vec::new();
+    if mandatory.is_empty() {
+        contract_gaps.push("contract: no mandatory criteria".to_string());
+    } else {
+        for criterion in &mandatory {
+            if criterion.check_ids.is_empty() {
+                contract_gaps.push(format!(
+                    "criterion {}: no check ids",
+                    criterion.criterion_id.0
+                ));
+            }
+        }
+    }
+    if !contract_gaps.is_empty() {
+        let mut reason = "Mandatory contract incomplete".to_string();
+        if !error_details.is_empty() {
+            reason.push_str(&format!("; error findings present: {error_details:?}"));
+        }
+        return VerificationVerdict::Blocked {
+            reason,
+            blocked_checks: contract_gaps,
+        };
+    }
+
+    // 4. Deduplicated failed check IDs, reused by both non-success reasons.
+    failed_checks.sort();
+    failed_checks.dedup();
+
+    // 5. Blocked takes precedence over verdict pass; keeping that precedence
+    // avoids an unrelated lifecycle change. Failed check IDs and co-present
+    // errors stay visible in the reason while blocked_checks keeps blockers.
     if !blocked_checks.is_empty() {
         let mut reason = "Mandatory check blocked, missing, or stale".to_string();
+        if !failed_checks.is_empty() {
+            reason.push_str(&format!("; failed checks: {failed_checks:?}"));
+        }
         if !error_details.is_empty() {
             reason.push_str(&format!("; error findings present: {error_details:?}"));
         }
@@ -86,16 +121,11 @@ pub fn evaluate_verdict(
         };
     }
 
-    // 4. Failed checks and error findings both fail; failed_checks carries
+    // 6. Failed checks and error findings both fail; failed_checks carries
     // the deduplicated union of both check-id sets.
     let has_failed_checks = !failed_checks.is_empty();
     if has_failed_checks || !error_findings.is_empty() {
-        let mut failed: Vec<String> = failed_checks
-            .into_iter()
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-        failed.sort();
+        let mut failed: Vec<String> = failed_checks;
         for f in &error_findings {
             let id = f.check_id.as_str().to_string();
             if !failed.contains(&id) {
