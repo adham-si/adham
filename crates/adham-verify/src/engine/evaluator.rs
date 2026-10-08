@@ -77,7 +77,26 @@ pub fn evaluate_verdict(
         };
     }
 
-    // 4. Evaluate findings / warnings
+    // 4. Error findings can never produce successful verification
+    let error_findings: Vec<&Finding> = findings
+        .iter()
+        .filter(|f| f.severity == FindingSeverity::Error)
+        .collect();
+
+    if !error_findings.is_empty() {
+        return VerificationVerdict::Fail {
+            reason: format!(
+                "Error findings present: {:?}",
+                error_findings.iter().map(|f| &f.code).collect::<Vec<_>>()
+            ),
+            failed_checks: error_findings
+                .iter()
+                .map(|f| f.check_id.as_str().to_string())
+                .collect(),
+        };
+    }
+
+    // 5. Evaluate findings / warnings
     let unpermitted_warnings: Vec<&Finding> = findings
         .iter()
         .filter(|f| {

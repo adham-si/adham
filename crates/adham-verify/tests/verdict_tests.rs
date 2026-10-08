@@ -268,3 +268,66 @@ fn test_permitted_and_unpermitted_warnings() {
     );
     assert!(matches!(v_fail, VerificationVerdict::Fail { .. }));
 }
+
+#[test]
+fn test_error_finding_never_passes() {
+    let (contract, deliverable) = setup_base_contract_and_deliverable();
+    let now_ms = 1_000_000;
+
+    let executions = vec![
+        CheckExecution::new(
+            CheckId::new(CheckId::BUILD),
+            CheckResultState::Passed,
+            Some("ev-1".to_string()),
+            "Build clean",
+            100,
+        ),
+        CheckExecution::new(
+            CheckId::new(CheckId::TEST),
+            CheckResultState::Passed,
+            Some("ev-2".to_string()),
+            "Tests passed",
+            200,
+        ),
+    ];
+
+    let evidences = vec![
+        EvidenceRecord::new(
+            CheckId::new(CheckId::BUILD),
+            &deliverable.content_hash,
+            1,
+            Some(0),
+            "Build success",
+            now_ms,
+            60_000,
+        ),
+        EvidenceRecord::new(
+            CheckId::new(CheckId::TEST),
+            &deliverable.content_hash,
+            1,
+            Some(0),
+            "Test success",
+            now_ms,
+            60_000,
+        ),
+    ];
+
+    let error_finding = Finding::error(
+        CheckId::new(CheckId::BUILD),
+        "E001_VERIFICATION_ERROR",
+        "Checker reported an error",
+    );
+    let verdict = evaluate_verdict(
+        &contract,
+        &deliverable,
+        &executions,
+        &evidences,
+        &[error_finding],
+        now_ms,
+    );
+    assert!(
+        matches!(verdict, VerificationVerdict::Fail { .. }),
+        "Error finding must fail verification, got: {verdict:?}"
+    );
+    assert!(!verdict.is_success());
+}
