@@ -69,6 +69,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "adham-extensions"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-platform",
+ "adham-tools",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "adham-graph"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-runtime",
+ "adham-verify",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "adham-memory"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-platform",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "adham-platform"
 version = "0.1.0"
 dependencies = [
@@ -90,6 +134,65 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "adham-provider"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-runtime",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "time",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "adham-runtime"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "time",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "adham-tools"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-platform",
+ "adham-runtime",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "adham-verify"
+version = "0.1.0"
+dependencies = [
+ "adham-core-types",
+ "adham-runtime",
+ "adham-tools",
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
  "uuid",
 ]
 

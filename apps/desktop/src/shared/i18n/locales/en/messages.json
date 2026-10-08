@@ -1,0 +1,176 @@
+{
+  "appName": "Adham",
+  "tagline": "The only AI application you need",
+  "welcome": "What would you like to work on?",
+  "workspace": "Workspace",
+  "project": "Project",
+  "session": "Session",
+  "compose": {
+    "placeholder": "Type a message or instruction...",
+    "send": "Send",
+    "agent": "Manager Agent",
+    "model": "Auto route",
+    "privacy": "Local",
+    "modes": {
+      "ask": "Ask",
+      "plan": "Plan",
+      "execute": "Execute",
+      "code": "Code"
+    }
+  },
+  "status": {
+    "ready": "Ready",
+    "loading": "Loading...",
+    "error": "An error occurred"
+  },
+  "rail": {
+    "compose": "Compose",
+    "search": "Search",
+    "projects": "Projects",
+    "agents": "Agents",
+    "activity": "Activity",
+    "marketplace": "Marketplace",
+    "settings": "Settings",
+    "toggleSidebar": "Toggle sidebar",
+    "focusMode": "Focus mode",
+    "toggleTheme": "Switch theme"
+  },
+  "sidebar": {
+    "newTask": "New task",
+    "recentSessions": "Sessions",
+    "noSessions": "No sessions yet",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "contextPanel": {
+    "title": "Inspector",
+    "close": "Close panel",
+    "tabs": {
+      "plan": "Plan",
+      "activity": "Activity",
+      "graph": "Task graph",
+      "agents": "Agents",
+      "context": "Context",
+      "artifacts": "Artifacts"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "search": "Search settings",
+    "close": "Close settings",
+    "categories": {
+      "personal": "Personal",
+      "intelligence": "Intelligence",
+      "workspace": "Workspace & Privacy",
+      "extensions": "Extensions"
+    },
+    "tabs": {
+      "appearance": "Appearance & Language",
+      "general": "General",
+      "models": "Models & Providers",
+      "privacy": "Privacy & Data",
+      "storage": "Storage & Backup",
+      "extensions": "Skills, Plugins & MCP"
+    },
+    "appearance": {
+      "title": "Appearance & Language",
+      "desc": "Customize your workspace theme, language, and interface layout.",
+      "theme": "Theme Mode",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System",
+      "language": "Language"
+    },
+    "models": {
+      "title": "Models & Providers",
+      "desc": "Configure approved LLMs, local Ollama endpoints, and fallback policies.",
+      "provider": "Active Provider",
+      "model": "Default Model",
+      "fallback": "Fallback Chain"
+    },
+    "privacy": {
+      "title": "Privacy & Data",
+      "desc": "Manage strict project isolation, sandboxing, and telemetry controls.",
+      "telemetry": "Anonymous Telemetry",
+      "telemetryDesc": "Telemetry is disabled by default. No prompts or code are ever collected.",
+      "sandbox": "Sandbox Isolation"
+    },
+    "storage": {
+      "title": "Storage & Backup",
+      "desc": "Inspect SQLite WAL event log status and platform directories.",
+      "dbLocation": "Database Location",
+      "journalMode": "Journal Mode",
+      "rebuildProjections": "Rebuild Projections"
+    },
+    "extensions": {
+      "title": "Skills, Plugins & MCP",
+      "desc": "Inspect installed extensions, tool policies, and verified package trust.",
+      "plugins": "Agent Plugins",
+      "mcp": "Model Context Protocol",
+      "skills": "Agent Skills"
+    }
+  },
+  "gallery": {
+    "title": "Component Gallery",
+    "note": "Design-system quality surface. Renders every @adham/ui component across variants, sizes, and states.",
+    "buttons": {
+      "title": "Buttons",
+      "primary": "Primary",
+      "secondary": "Secondary",
+      "ghost": "Ghost",
+      "danger": "Danger",
+      "link": "Link",
+      "disabled": "Disabled",
+      "loading": "Loading...",
+      "fullWidth": "Full width"
+    },
+    "forms": {
+      "title": "Inputs & Textareas",
+      "label": "Your name",
+      "invalidLabel": "Email",
+      "error": "Enter a valid email address",
+      "placeholder": "Type something…",
+      "disabled": "Disabled",
+      "readOnly": "Read-only"
+    },
+    "navigation": {
+      "title": "Sidebar items",
+      "inbox": "Inbox",
+      "drafts": "Drafts",
+      "archive": "Archive",
+      "projects": "Projects"
+    },
+    "overlays": {
+      "title": "Menus & Dialogs",
+      "dialogOpen": "Open dialog",
+      "dialogTitle": "Delete project",
+      "dialogDesc": "This removes the project and its sessions. This action cannot be undone.",
+      "dialogConfirm": "Delete",
+      "dialogCancel": "Cancel",
+      "menuOpen": "Open menu",
+      "menuLabel": "Actions",
+      "file": "File",
+      "edit": "Edit",
+      "menuNew": "New",
+      "menuOpenFile": "Open…",
+      "menuSave": "Save",
+      "menuCut": "Cut",
+      "menuCopy": "Copy",
+      "menuPaste": "Paste",
+      "menuDisabled": "Paste as plain text"
+    },
+    "messages": {
+      "title": "Message cards",
+      "user": "Can you plan the release steps and show me a task graph?",
+      "assistant": "Yes — here is the plan. Four tasks, one reviewer, and a verification gate before merge.",
+      "system": "Verification passed: 15 files, 221 tests, no regressions.",
+      "selected": "Selected card",
+      "editable": "Editable card"
+    },
+    "icons": {
+      "title": "Icons",
+      "labelled": "Accessible icon",
+      "mirrored": "Mirrored (RTL)"
+    }
+  }
+}

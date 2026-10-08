@@ -12,6 +12,10 @@ export default defineConfig({
   },
   clearScreen: false,
   server: {
+    // Tauri's devUrl is pinned to 11111, so that is the port `tauri dev` needs.
+    // Verification runs (Task 13) reuse it; `strictPort` makes a collision fail
+    // loudly instead of silently drifting onto another port and leaving the
+    // Tauri window blank.
     port: 11111,
     strictPort: true,
     watch: {

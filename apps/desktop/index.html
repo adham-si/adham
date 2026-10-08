@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Classic, non-deferred, and external on purpose. Tauri ships
+      `script-src 'self'` with no 'unsafe-inline', so an inline script would be
+      blocked; deferring it would let the first paint happen unthemed. This sets
+      className, dir and lang before anything renders.
+    -->
+    <script src="/no-flash-theme.js"></script>
     <title>Adham</title>
   </head>
   <body>
