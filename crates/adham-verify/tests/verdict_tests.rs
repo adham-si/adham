@@ -1,84 +1,27 @@
-use adham_verify::domain::check::{CheckExecution, CheckId, CheckResultState};
+mod common;
+
+use adham_verify::domain::check::CheckId;
 use adham_verify::domain::contract::{
     AcceptanceCriterion, CompletionContract, CriterionId, DeliveryMode,
 };
-use adham_verify::domain::deliverable::CandidateDeliverable;
-use adham_verify::domain::evidence::EvidenceRecord;
 use adham_verify::domain::finding::Finding;
 use adham_verify::domain::verdict::VerificationVerdict;
 use adham_verify::engine::evaluator::evaluate_verdict;
-
-fn setup_base_contract_and_deliverable() -> (CompletionContract, CandidateDeliverable) {
-    let contract = CompletionContract::new("task-123", DeliveryMode::ProposalOnly)
-        .with_criterion(AcceptanceCriterion {
-            criterion_id: CriterionId::new("crit-build"),
-            description: "Must compile cleanly".to_string(),
-            mandatory: true,
-            check_ids: vec![CheckId::BUILD.to_string()],
-        })
-        .with_criterion(AcceptanceCriterion {
-            criterion_id: CriterionId::new("crit-test"),
-            description: "Must pass tests".to_string(),
-            mandatory: true,
-            check_ids: vec![CheckId::TEST.to_string()],
-        });
-
-    let deliverable =
-        CandidateDeliverable::new_patch(vec!["src/lib.rs".to_string()], "pub fn hello() {}", None);
-
-    (contract, deliverable)
-}
+use common::{
+    all_pass_inputs, failed_execution, fresh_evidence, mismatched_evidence, stale_evidence,
+    test_deliverable, NOW_MS,
+};
 
 #[test]
 fn test_deterministic_verdict_all_pass() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Passed,
-            Some("ev-2".to_string()),
-            "Tests 10/10 passed",
-            200,
-        ),
-    ];
-
-    let evidences = vec![
-        EvidenceRecord::new(
-            CheckId::new(CheckId::BUILD),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Build success",
-            now_ms,
-            60_000,
-        ),
-        EvidenceRecord::new(
-            CheckId::new(CheckId::TEST),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Test success",
-            now_ms,
-            60_000,
-        ),
-    ];
-
+    let (contract, deliverable, executions, evidences) = all_pass_inputs();
     let verdict = evaluate_verdict(
         &contract,
         &deliverable,
         &executions,
         &evidences,
         &[],
-        now_ms,
+        NOW_MS,
     );
     assert_eq!(verdict, VerificationVerdict::Pass);
     assert!(verdict.is_success());
@@ -86,34 +29,12 @@ fn test_deterministic_verdict_all_pass() {
 
 #[test]
 fn test_mandatory_check_failure() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Failed,
-            None,
-            "1 test failed",
-            200,
-        ),
-    ];
-
-    let evidences = vec![EvidenceRecord::new(
-        CheckId::new(CheckId::BUILD),
+    let (contract, deliverable, mut executions, _) = all_pass_inputs();
+    executions[1] = failed_execution(CheckId::TEST, "1 test failed");
+    let evidences = vec![fresh_evidence(
+        CheckId::BUILD,
         &deliverable.content_hash,
-        1,
-        Some(0),
         "Build success",
-        now_ms,
-        60_000,
     )];
 
     let verdict = evaluate_verdict(
@@ -122,7 +43,7 @@ fn test_mandatory_check_failure() {
         &executions,
         &evidences,
         &[],
-        now_ms,
+        NOW_MS,
     );
     assert!(matches!(verdict, VerificationVerdict::Fail { .. }));
     assert!(verdict.is_failure());
@@ -130,47 +51,9 @@ fn test_mandatory_check_failure() {
 
 #[test]
 fn test_missing_or_stale_evidence_blocks_completion() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Passed,
-            Some("ev-2".to_string()),
-            "Tests passed",
-            200,
-        ),
-    ];
-
-    // Evidence for test check is stale (recorded 500s ago, TTL 60s)
-    let evidences = vec![
-        EvidenceRecord::new(
-            CheckId::new(CheckId::BUILD),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Build success",
-            now_ms,
-            60_000,
-        ),
-        EvidenceRecord::new(
-            CheckId::new(CheckId::TEST),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Test success",
-            now_ms - 500_000,
-            60_000,
-        ),
-    ];
+    let (contract, deliverable, executions, mut evidences) = all_pass_inputs();
+    // Evidence for test check is stale (recorded 500s ago, TTL 60s).
+    evidences[1] = stale_evidence(CheckId::TEST, &deliverable.content_hash, "Test success");
 
     let verdict = evaluate_verdict(
         &contract,
@@ -178,7 +61,7 @@ fn test_missing_or_stale_evidence_blocks_completion() {
         &executions,
         &evidences,
         &[],
-        now_ms,
+        NOW_MS,
     );
     assert!(matches!(verdict, VerificationVerdict::Blocked { .. }));
     assert!(verdict.is_blocked());
@@ -186,47 +69,8 @@ fn test_missing_or_stale_evidence_blocks_completion() {
 
 #[test]
 fn test_permitted_and_unpermitted_warnings() {
-    let (mut contract, deliverable) = setup_base_contract_and_deliverable();
+    let (mut contract, deliverable, executions, evidences) = all_pass_inputs();
     contract = contract.with_permitted_warning("W001_UNUSED_VAR");
-    let now_ms = 1_000_000;
-
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Passed,
-            Some("ev-2".to_string()),
-            "Tests passed",
-            200,
-        ),
-    ];
-
-    let evidences = vec![
-        EvidenceRecord::new(
-            CheckId::new(CheckId::BUILD),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Build success",
-            now_ms,
-            60_000,
-        ),
-        EvidenceRecord::new(
-            CheckId::new(CheckId::TEST),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Test success",
-            now_ms,
-            60_000,
-        ),
-    ];
 
     // 1. Permitted warning
     let permitted_finding = Finding::warning(
@@ -241,7 +85,7 @@ fn test_permitted_and_unpermitted_warnings() {
         &executions,
         &evidences,
         &[permitted_finding],
-        now_ms,
+        NOW_MS,
     );
     assert!(matches!(
         v_warn,
@@ -264,54 +108,14 @@ fn test_permitted_and_unpermitted_warnings() {
         &executions,
         &evidences,
         &[unpermitted_finding],
-        now_ms,
+        NOW_MS,
     );
     assert!(matches!(v_fail, VerificationVerdict::Fail { .. }));
 }
 
 #[test]
 fn test_error_finding_never_passes() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Passed,
-            Some("ev-2".to_string()),
-            "Tests passed",
-            200,
-        ),
-    ];
-
-    let evidences = vec![
-        EvidenceRecord::new(
-            CheckId::new(CheckId::BUILD),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Build success",
-            now_ms,
-            60_000,
-        ),
-        EvidenceRecord::new(
-            CheckId::new(CheckId::TEST),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Test success",
-            now_ms,
-            60_000,
-        ),
-    ];
-
+    let (contract, deliverable, executions, evidences) = all_pass_inputs();
     let error_finding = Finding::error(
         CheckId::new(CheckId::BUILD),
         "E001_VERIFICATION_ERROR",
@@ -323,7 +127,7 @@ fn test_error_finding_never_passes() {
         &executions,
         &evidences,
         &[error_finding],
-        now_ms,
+        NOW_MS,
     );
     assert!(
         matches!(verdict, VerificationVerdict::Fail { .. }),
@@ -332,55 +136,10 @@ fn test_error_finding_never_passes() {
     assert!(!verdict.is_success());
 }
 
-fn setup_all_pass_inputs(
-    deliverable: &CandidateDeliverable,
-    now_ms: u64,
-) -> (Vec<CheckExecution>, Vec<EvidenceRecord>) {
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Passed,
-            Some("ev-2".to_string()),
-            "Tests passed",
-            200,
-        ),
-    ];
-    let evidences = vec![
-        EvidenceRecord::new(
-            CheckId::new(CheckId::BUILD),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Build success",
-            now_ms,
-            60_000,
-        ),
-        EvidenceRecord::new(
-            CheckId::new(CheckId::TEST),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Test success",
-            now_ms,
-            60_000,
-        ),
-    ];
-    (executions, evidences)
-}
-
 #[test]
 fn test_error_plus_permitted_warning_fails_with_error_diagnostics() {
-    let (mut contract, deliverable) = setup_base_contract_and_deliverable();
+    let (mut contract, deliverable, executions, evidences) = all_pass_inputs();
     contract = contract.with_permitted_warning("W001_UNUSED_VAR");
-    let now_ms = 1_000_000;
-    let (executions, evidences) = setup_all_pass_inputs(&deliverable, now_ms);
 
     let findings = vec![
         Finding::warning(
@@ -401,7 +160,7 @@ fn test_error_plus_permitted_warning_fails_with_error_diagnostics() {
         &executions,
         &evidences,
         &findings,
-        now_ms,
+        NOW_MS,
     );
     match &verdict {
         VerificationVerdict::Fail {
@@ -424,33 +183,12 @@ fn test_error_plus_permitted_warning_fails_with_error_diagnostics() {
 
 #[test]
 fn test_error_plus_failed_mandatory_check_fails_with_both_details() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Failed,
-            None,
-            "1 test failed",
-            200,
-        ),
-    ];
-    let evidences = vec![EvidenceRecord::new(
-        CheckId::new(CheckId::BUILD),
+    let (contract, deliverable, mut executions, _) = all_pass_inputs();
+    executions[1] = failed_execution(CheckId::TEST, "1 test failed");
+    let evidences = vec![fresh_evidence(
+        CheckId::BUILD,
         &deliverable.content_hash,
-        1,
-        Some(0),
         "Build success",
-        now_ms,
-        60_000,
     )];
 
     let findings = vec![Finding::error(
@@ -464,7 +202,7 @@ fn test_error_plus_failed_mandatory_check_fails_with_both_details() {
         &executions,
         &evidences,
         &findings,
-        now_ms,
+        NOW_MS,
     );
     match &verdict {
         VerificationVerdict::Fail {
@@ -491,19 +229,9 @@ fn test_error_plus_failed_mandatory_check_fails_with_both_details() {
 
 #[test]
 fn test_error_plus_blocked_evidence_stays_blocked_with_error_details() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-    let (executions, mut evidences) = setup_all_pass_inputs(&deliverable, now_ms);
+    let (contract, deliverable, executions, mut evidences) = all_pass_inputs();
     // Stale evidence for the test check keeps mandatory verification incomplete.
-    evidences[1] = EvidenceRecord::new(
-        CheckId::new(CheckId::TEST),
-        &deliverable.content_hash,
-        1,
-        Some(0),
-        "Test success",
-        now_ms - 500_000,
-        60_000,
-    );
+    evidences[1] = stale_evidence(CheckId::TEST, &deliverable.content_hash, "Test success");
 
     let findings = vec![Finding::error(
         CheckId::new(CheckId::BUILD),
@@ -516,7 +244,7 @@ fn test_error_plus_blocked_evidence_stays_blocked_with_error_details() {
         &executions,
         &evidences,
         &findings,
-        now_ms,
+        NOW_MS,
     );
     match &verdict {
         VerificationVerdict::Blocked {
@@ -538,74 +266,14 @@ fn test_error_plus_blocked_evidence_stays_blocked_with_error_details() {
 }
 
 #[test]
-fn test_wrong_candidate_evidence_blocks() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-    let (executions, _) = setup_all_pass_inputs(&deliverable, now_ms);
-
-    // Evidence bound to a different candidate hash must not verify this one.
-    let evidences = vec![
-        EvidenceRecord::new(
-            CheckId::new(CheckId::BUILD),
-            "deadbeef-wrong-candidate",
-            1,
-            Some(0),
-            "Build success",
-            now_ms,
-            60_000,
-        ),
-        EvidenceRecord::new(
-            CheckId::new(CheckId::TEST),
-            &deliverable.content_hash,
-            1,
-            Some(0),
-            "Test success",
-            now_ms,
-            60_000,
-        ),
-    ];
-    let verdict = evaluate_verdict(
-        &contract,
-        &deliverable,
-        &executions,
-        &evidences,
-        &[],
-        now_ms,
-    );
-    assert!(matches!(verdict, VerificationVerdict::Blocked { .. }));
-    assert!(!verdict.is_success());
-}
-
-#[test]
 fn test_blocked_plus_failed_plus_error_preserves_all_diagnostics() {
-    let (contract, deliverable) = setup_base_contract_and_deliverable();
-    let now_ms = 1_000_000;
-
+    let (contract, deliverable, mut executions, _) = all_pass_inputs();
     // BUILD is blocked (stale evidence); TEST is a different failed check.
-    let executions = vec![
-        CheckExecution::new(
-            CheckId::new(CheckId::BUILD),
-            CheckResultState::Passed,
-            Some("ev-1".to_string()),
-            "Build clean",
-            100,
-        ),
-        CheckExecution::new(
-            CheckId::new(CheckId::TEST),
-            CheckResultState::Failed,
-            None,
-            "1 test failed",
-            200,
-        ),
-    ];
-    let evidences = vec![EvidenceRecord::new(
-        CheckId::new(CheckId::BUILD),
+    executions[1] = failed_execution(CheckId::TEST, "1 test failed");
+    let evidences = vec![stale_evidence(
+        CheckId::BUILD,
         &deliverable.content_hash,
-        1,
-        Some(0),
         "Build success",
-        now_ms - 500_000,
-        60_000,
     )];
 
     let findings = vec![Finding::error(
@@ -619,7 +287,7 @@ fn test_blocked_plus_failed_plus_error_preserves_all_diagnostics() {
         &executions,
         &evidences,
         &findings,
-        now_ms,
+        NOW_MS,
     );
     match &verdict {
         VerificationVerdict::Blocked {
@@ -645,6 +313,24 @@ fn test_blocked_plus_failed_plus_error_preserves_all_diagnostics() {
 }
 
 #[test]
+fn test_wrong_candidate_evidence_blocks() {
+    let (contract, deliverable, executions, mut evidences) = all_pass_inputs();
+    // Evidence bound to a different candidate hash must not verify this one.
+    evidences[0] = mismatched_evidence(CheckId::BUILD, "Build success");
+
+    let verdict = evaluate_verdict(
+        &contract,
+        &deliverable,
+        &executions,
+        &evidences,
+        &[],
+        NOW_MS,
+    );
+    assert!(matches!(verdict, VerificationVerdict::Blocked { .. }));
+    assert!(!verdict.is_success());
+}
+
+#[test]
 fn test_empty_contract_blocks_in_all_delivery_modes() {
     // Policy: an empty verification contract cannot establish verified
     // completion, in any delivery mode. A draft may still be constructed.
@@ -654,13 +340,8 @@ fn test_empty_contract_blocks_in_all_delivery_modes() {
         DeliveryMode::ArtifactOnly,
     ] {
         let contract = CompletionContract::new("task-empty", mode);
-        let deliverable = CandidateDeliverable::new_patch(
-            vec!["src/lib.rs".to_string()],
-            "pub fn hello() {}",
-            None,
-        );
-        let now_ms = 1_000_000;
-        let verdict = evaluate_verdict(&contract, &deliverable, &[], &[], &[], now_ms);
+        let deliverable = test_deliverable();
+        let verdict = evaluate_verdict(&contract, &deliverable, &[], &[], &[], NOW_MS);
         assert!(
             matches!(verdict, VerificationVerdict::Blocked { .. }),
             "empty contract must Block in {mode:?}, got: {verdict:?}"
@@ -671,23 +352,21 @@ fn test_empty_contract_blocks_in_all_delivery_modes() {
 
 #[test]
 fn test_mandatory_criterion_without_check_ids_blocks() {
-    let mut contract = CompletionContract::new("task-draft", DeliveryMode::ProposalOnly);
-    contract = contract.with_criterion(AcceptanceCriterion {
-        criterion_id: CriterionId::new("crit-draft"),
-        description: "Draft criterion, checks not yet assigned".to_string(),
-        mandatory: true,
-        check_ids: Vec::new(),
-    });
-    let deliverable =
-        CandidateDeliverable::new_patch(vec!["src/lib.rs".to_string()], "pub fn hello() {}", None);
-    let now_ms = 1_000_000;
+    let contract = CompletionContract::new("task-draft", DeliveryMode::ProposalOnly)
+        .with_criterion(AcceptanceCriterion {
+            criterion_id: CriterionId::new("crit-draft"),
+            description: "Draft criterion, checks not yet assigned".to_string(),
+            mandatory: true,
+            check_ids: Vec::new(),
+        });
+    let deliverable = test_deliverable();
 
     let findings = vec![Finding::error(
         CheckId::new(CheckId::BUILD),
         "E005_DRAFT_ERROR",
         "Error alongside an incomplete draft contract",
     )];
-    let verdict = evaluate_verdict(&contract, &deliverable, &[], &[], &findings, now_ms);
+    let verdict = evaluate_verdict(&contract, &deliverable, &[], &[], &findings, NOW_MS);
     match &verdict {
         VerificationVerdict::Blocked { reason, .. } => {
             assert!(
