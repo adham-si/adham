@@ -81,5 +81,11 @@ jobs:
       - name: Dependency audit (cargo-deny)
         run: cargo deny check
 
+      - name: Deny exception record check
+        run: pnpm check:deny-exceptions
+
+      - name: Deny exception record self-test
+        run: pnpm check:deny-exceptions:self-test
+
       - name: Dependency audit (pnpm)
         run: pnpm audit --audit-level=high

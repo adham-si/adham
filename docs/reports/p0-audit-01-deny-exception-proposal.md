@@ -1,7 +1,7 @@
-# P0-AUDIT-01 — Dependency exception proposal: RUSTSEC-2024-0370
+# P0-AUDIT-01 — Dependency exception record: RUSTSEC-2024-0370
 
-Status: PROPOSED, NOT APPLIED. Requires explicit audit-lead approval before
-any `deny.toml` change. `deny.toml` in this tree is unmodified.
+Status: APPROVED AND APPLIED (risk-disposition approval, PR #1 review).
+This is not merge approval or P1 readiness.
 
 ## 1. Advisory record
 
@@ -25,15 +25,39 @@ x86_64-unknown-linux-gnu), so the GTK chain is audited on every runner
 including Windows. Host-only `cargo tree` hides it; deny does not.
 
 Exposure note: `proc-macro-error` is a proc-macro used at build time by
-`glib-macros`. It is not linked into the shipped runtime binary. The risk
-is supply-chain hygiene (an unmaintained build dependency with no future
-fixes), not runtime exploitability.
+`glib-macros`. It is not linked into the shipped runtime binary — but that
+does not mean harmless. Compromised build tooling can affect shipped
+artifacts, which is exactly why this exception is time-limited, tracked,
+and enforced rather than open-ended.
 
-## 3. Full current `cargo deny check` capture (audit branch)
+## 3. Full evidence capture (sanitized)
 
-Exactly one error: `error[unmaintained]` above. `bans ok, licenses ok,
-sources ok`. Remaining output is `warn`-level duplicate-version notices
-(Tauri/sqlx/gtk major-version coexistence), which do not fail the gate.
+- Tested tree: audit branch `audit/p0-audit-01-verification-errors` at the
+  commit carrying this change (see handoff); runner paths below are
+  normalized to `<repo>`.
+- Toolchain: `cargo-deny 0.20.2`.
+- Advisory DB: commit `550efd3d587a29b2e2c2b21b17a440da4fede999`, timestamp
+  `2026-10-08T16:47:14+02:00` (local cache; CI fetches the current DB at run
+  time, so later runs may surface new advisories — none are suppressed by
+  this change).
+- Full `cargo deny check` result before applying the ignore (exit non-zero
+  from the advisories linter only):
+
+```
+error[unmaintained]: proc-macro-error is unmaintained
+  advisory: RUSTSEC-2024-0370 (https://rustsec.org/advisories/RUSTSEC-2024-0370)
+  crate: proc-macro-error v1.0.4 (<repo>/Cargo.lock:226)
+  path: proc-macro-error 1.0.4 <- glib-macros 0.18.5 <- glib 0.18.5
+    <- gtk 0.18.2 <- muda 0.20.0 / tao 0.37.1 / wry 0.57.0
+    <- tauri 2.12.1 <- adham-desktop
+  remediation per advisory: none ("No safe upgrade is available!")
+
+bans ok, licenses ok, sources ok
+```
+
+- After applying the ignore below: `advisories ok, bans ok, licenses ok,
+  sources ok`, exit 0, verified locally. No other advisory, ban, license,
+  or source finding exists in this tree.
 
 ## 4. Narrow-update assessment: none exists
 
@@ -46,27 +70,35 @@ sources ok`. Remaining output is `warn`-level duplicate-version notices
   Adopting it means a Tauri-side migration, which is not a narrow,
   compatible update. No GTK/Tauri migration is started by this task.
 
-## 5. Exception proposal (this advisory ID only)
+## 5. Exception record (this advisory ID only, APPROVED and APPLIED)
 
 - Scope: `RUSTSEC-2024-0370` only. No blanket advisory allowance; the
   `advisories` gate stays enforced for everything else.
-- Owner (to confirm): audit lead.
-- Review date: 2027-01-06 (90 days from 2026-10-08).
-- Upstream tracking: gtk-rs removal complete (0.19+); pending Tauri
-  adoption of gtk-rs 0.19 (upstream issue TBD — to be linked at approval).
+- Owner: ilyass (repository maintainer).
+- Review date: 2027-01-06 (90 days from 2026-10-08). Enforced by
+  `scripts/check-deny-exceptions.mjs`, which fails on or after the deadline
+  unless approval is renewed or the exception and its ignore are removed;
+  wired into `pnpm check` and CI.
+- Upstream tracking: gtk-rs removal complete on the 0.19 line
+  (gtk-rs-core#1288, June 2024 release notes); Tauri adoption of gtk-rs
+  0.19 pending — tracked via PR #1 review threads
+  (https://github.com/adham-si/adham/pull/1#issuecomment-6068235161,
+  https://github.com/adham-si/adham/pull/1#issuecomment-6068792394). No
+  invented upstream issue.
 - Removal condition (any): `proc-macro-error` absent from `Cargo.lock`,
-  Tauri upgrade replacing the gtk 0.18 line, or advisory withdrawal.
-- Snippet to apply ONLY on approval (schema validated locally against
+  Tauri upgrade replacing the gtk 0.18 line, or advisory withdrawal. The
+  validator fails if the locked crate/version drifts, forcing re-scope.
+- Applied snippet in `deny.toml` (schema validated locally against
   cargo-deny 0.20; advisory ignores accept `id` + `reason` only — there is
-  no machine-readable expiry, so the time bound lives in this document
-  and with the owner):
+  no machine-readable expiry, so the time bound lives in
+  `deny-exceptions.json` plus this document and the owner):
 
 ```toml
 [advisories]
 ignore = [
-    { id = "RUSTSEC-2024-0370", reason = "P0-AUDIT-01 time-limited exception, review 2027-01-06 (docs/reports/p0-audit-01-deny-exception-proposal.md)" },
+    { id = "RUSTSEC-2024-0370", reason = "P0-AUDIT-01 time-limited exception, reapproval due 2027-01-06 (deny-exceptions.json)" },
 ]
 ```
 
-- Verification after application: `cargo deny check advisories` must exit
-  0 with no `error[unmaintained]` entry.
+- Verification after application: `cargo deny check advisories` exits 0
+  with no `error[unmaintained]` entry (verified locally).

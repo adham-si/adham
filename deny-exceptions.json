@@ -1,0 +1,17 @@
+{
+  "exceptions": [
+    {
+      "id": "RUSTSEC-2024-0370",
+      "crate": "proc-macro-error",
+      "version": "1.0.4",
+      "owner": "ilyass (repository maintainer)",
+      "deadline": "2027-01-06",
+      "rationale": "Unmaintained (informational, no CVE) build-time proc-macro in the Tauri 2.12 gtk 0.18 tree; no patched version exists and gtk-rs 0.19 adoption requires a Tauri-side migration, which is out of scope for this patch.",
+      "tracking": [
+        "https://rustsec.org/advisories/RUSTSEC-2024-0370",
+        "https://github.com/adham-si/adham/pull/1#issuecomment-6068235161",
+        "https://github.com/adham-si/adham/pull/1#issuecomment-6068792394"
+      ]
+    }
+  ]
+}
