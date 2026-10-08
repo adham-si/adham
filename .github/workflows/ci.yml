@@ -34,7 +34,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@82a92a6e8fbeee08c636ad5c42577177d4b23718 # v2.7.7
+        uses: Swatinem/rust-cache@v2
 
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
