@@ -18,7 +18,7 @@ import {
   CircleQuestionMarkIcon,
   Cancel01Icon,
 } from '@hugeicons/core-free-icons';
-import { useShellLayout, type SettingsPageId } from '@/widgets/shell/layout-context';
+import { useShellLayout, type SettingsPageId } from '@/widgets/shell';
 import { PreferencesPage } from './preferences';
 import { ModelsPage } from './models';
 import { ProvidersPage } from './providers';

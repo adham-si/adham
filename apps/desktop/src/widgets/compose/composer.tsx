@@ -1,115 +1,199 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Textarea, AdhamIcon } from '@adham/ui';
-
-export type ComposeMode = 'ask' | 'plan' | 'execute' | 'code';
+import { ComposeInput } from './compose-input';
+import type { ComposeAttachment } from './compose-context-chips';
+import { ComposeContextChips } from './compose-context-chips';
+import { ComposeActionBar } from './compose-action-bar';
+import { ComposeStatusStrip } from './compose-status-strip';
+import type { ComposeApprovalBarProps } from './compose-approval-bar';
+import { ComposeApprovalBar } from './compose-approval-bar';
+import type { ComposeMode } from './compose-mode-selector';
+import type { ComposeStatus } from './use-compose-state';
+import type { ModelOption } from './compose-model-picker';
+import { DEFAULT_MODELS } from './compose-model-picker';
 
 export interface ComposerProps {
   inputText: string;
   onChangeInput: (text: string) => void;
   onSubmit: () => void;
-  isSubmitting?: boolean;
+  onStop?: (() => void) | undefined;
+  status?: ComposeStatus | undefined;
+  mode?: ComposeMode | undefined;
+  onChangeMode?: ((mode: ComposeMode) => void) | undefined;
+  selectedModelId?: string | undefined;
+  onSelectModel?: ((modelId: string) => void) | undefined;
+  reasoningEffort?: ('low' | 'medium' | 'high') | undefined;
+  onChangeReasoningEffort?: ((effort: 'low' | 'medium' | 'high') => void) | undefined;
+  models?: ModelOption[] | undefined;
+  attachments?: ComposeAttachment[] | undefined;
+  onAddAttachments?: ((attachments: ComposeAttachment[]) => void) | undefined;
+  onRemoveAttachment?: ((id: string) => void) | undefined;
+  approvalRequest?: Omit<ComposeApprovalBarProps, 'className'> | null | undefined;
+  scopeFolder?: string | undefined;
+  scopePolicy?: ('standing-approval' | 'always-ask') | undefined;
+  usedTokens?: number | undefined;
+  maxTokens?: number | undefined;
+  sessionSpend?: string | undefined;
+  spendCap?: string | undefined;
+  onRecallPrevious?: (() => void) | undefined;
+  onRecallNext?: (() => void) | undefined;
+  placeholder?: string | undefined;
+  isCentered?: boolean | undefined;
+  className?: string | undefined;
 }
 
 export function Composer({
   inputText,
   onChangeInput,
   onSubmit,
-  isSubmitting = false,
+  onStop = () => {},
+  status = 'idle',
+  mode = 'plan',
+  onChangeMode = () => {},
+  selectedModelId = DEFAULT_MODELS[0]!.id,
+  onSelectModel = () => {},
+  reasoningEffort = 'medium',
+  onChangeReasoningEffort,
+  models = DEFAULT_MODELS,
+  attachments = [],
+  onAddAttachments = () => {},
+  onRemoveAttachment = () => {},
+  approvalRequest = null,
+  scopeFolder = 'adham.si',
+  scopePolicy = 'always-ask',
+  usedTokens = 14200,
+  maxTokens = 128000,
+  sessionSpend = '$0.00',
+  spendCap = '$2.00',
+  onRecallPrevious,
+  onRecallNext,
+  placeholder,
+  isCentered = false,
+  className = '',
 }: ComposerProps) {
   const { t } = useTranslation();
-  const [mode, setMode] = React.useState<ComposeMode>('plan');
+  const [isDragOver, setIsDragOver] = React.useState(false);
 
-  const modes: Array<{ id: ComposeMode; label: string }> = [
-    { id: 'ask', label: t('compose.modes.ask') },
-    { id: 'plan', label: t('compose.modes.plan') },
-    { id: 'execute', label: t('compose.modes.execute') },
-    { id: 'code', label: t('compose.modes.code') },
-  ];
+  const canSubmit = Boolean(inputText.trim() || attachments.length > 0) && status !== 'error';
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (inputText.trim() && !isSubmitting) {
-        onSubmit();
-      }
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const items: ComposeAttachment[] = Array.from(e.dataTransfer.files).map((f) => ({
+        id: `drop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type: f.type.startsWith('image/') ? 'image' : 'file',
+        name: f.name,
+        size: f.size,
+        file: f,
+      }));
+      onAddAttachments(items);
     }
   };
 
+  const handleAttachPastedBlob = (attachment: ComposeAttachment) => {
+    onAddAttachments([attachment]);
+  };
+
   return (
-    <footer className="border-t border-border-subtle bg-surface p-4">
-      <div className="mx-auto max-w-4xl rounded-xl border border-border-subtle bg-background p-3 shadow-sm focus-within:border-focus">
-        {/* Upper Row: Active Agent & Context */}
-        <div className="mb-2 flex items-center justify-between text-xs text-foreground-secondary">
-          <div className="flex items-center gap-1.5 rounded-md bg-surface-subtle px-2 py-0.5">
-            <AdhamIcon size="sm" className="text-running">
-              <circle cx="12" cy="12" r="4" />
-            </AdhamIcon>
-            <span className="font-medium text-foreground">{t('compose.agent')}</span>
-          </div>
+    <footer
+      className={`w-full transition-all duration-500 ease-in-out ${
+        isCentered ? 'bg-transparent p-0' : 'bg-transparent px-4 pb-4 pt-1'
+      } ${className}`}
+    >
+      {/* Screen reader announcement for streaming state */}
+      <div aria-live="polite" className="sr-only">
+        {status === 'streaming'
+          ? t('compose.srStreaming', 'Agent is streaming response')
+          : status === 'awaiting-approval'
+          ? t('compose.srAwaitingApproval', 'Agent requires approval to proceed')
+          : ''}
+      </div>
 
-          <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] text-foreground-muted">
-            Isolated project sandbox
-          </span>
-        </div>
-
-        {/* Text Input */}
-        <Textarea
-          value={inputText}
-          onChange={(e) => onChangeInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t('compose.placeholder')}
-          rows={3}
-          className="border-none bg-transparent p-1 focus-visible:outline-none focus:ring-0"
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`w-full transition-all duration-500 ease-in-out ${
+          isCentered ? 'max-w-2xl mx-auto shadow-md border-border' : 'shadow-xs border-border-subtle'
+        } rounded-2xl border bg-surface hover:border-border focus-within:border-focus focus-within:ring-1 focus-within:ring-focus ${
+          isDragOver
+            ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20'
+            : ''
+        }`}
+      >
+        {/* Top: Scope & Budget Status Strip */}
+        <ComposeStatusStrip
+          scopeFolder={scopeFolder}
+          scopePolicy={scopePolicy}
+          usedTokens={usedTokens}
+          maxTokens={maxTokens}
+          sessionSpend={sessionSpend}
+          spendCap={spendCap}
+          className="border-b border-border-subtle/60"
         />
 
-        {/* Lower Control Row */}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle">
-          {/* Leading Controls: Mode Chips */}
-          <div className="flex items-center gap-1">
-            {modes.map((m) => {
-              const isActive = mode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setMode(m.id)}
-                  className={`flex min-h-control-sm items-center rounded-md px-2 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                    isActive
-                      ? 'bg-selection font-medium text-action'
-                      : 'text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
+        {/* Docked Inline Approval Bar (if waiting for confirmation) */}
+        {approvalRequest && (
+          <div className="p-2 border-b border-border-subtle/80">
+            <ComposeApprovalBar
+              actionSummary={approvalRequest.actionSummary}
+              onApprove={approvalRequest.onApprove}
+              onDeny={approvalRequest.onDeny}
+              onReviewDiff={approvalRequest.onReviewDiff}
+              riskLevel={approvalRequest.riskLevel}
+            />
           </div>
+        )}
 
-          {/* Trailing Controls: Model Picker, Privacy & Send */}
-          <div className="flex items-center gap-2">
-            <div className="flex min-h-control-sm items-center gap-1 rounded-md bg-surface-subtle px-2 text-xs text-foreground-secondary">
-              <AdhamIcon size="sm" className="text-action">
-                <path d="M12 2v20m10-10H2" />
-              </AdhamIcon>
-              <span>{t('compose.model')}</span>
-            </div>
+        {/* Attached Context Chips (Files, Folders, Pasted Text Blobs) */}
+        <ComposeContextChips
+          attachments={attachments}
+          onRemove={onRemoveAttachment}
+        />
 
-            <div className="flex min-h-control-sm items-center gap-1 rounded-md bg-surface-subtle px-2 text-xs text-foreground-secondary">
-              <span className="size-1.5 rounded-full bg-success" />
-              <span>{t('compose.privacy')}</span>
-            </div>
+        {/* RTL-aware Textarea */}
+        <ComposeInput
+          value={inputText}
+          onChange={onChangeInput}
+          onSubmit={onSubmit}
+          onRecallPrevious={onRecallPrevious}
+          onRecallNext={onRecallNext}
+          onAttachPastedBlob={handleAttachPastedBlob}
+          placeholder={placeholder}
+          disabled={status === 'sending' || status === 'streaming'}
+        />
 
-            <Button
-              type="button"
-              size="sm"
-              disabled={!inputText.trim() || isSubmitting}
-              onClick={onSubmit}
-            >
-              {isSubmitting ? t('status.loading') : t('compose.send')}
-            </Button>
-          </div>
-        </div>
+        {/* Bottom Control Bar: Attachments, Modes, Model & Privacy, Send/Stop */}
+        <ComposeActionBar
+          mode={mode}
+          onChangeMode={onChangeMode}
+          selectedModelId={selectedModelId}
+          onSelectModel={onSelectModel}
+          reasoningEffort={reasoningEffort}
+          onChangeReasoningEffort={onChangeReasoningEffort}
+          models={models}
+          onAddAttachments={onAddAttachments}
+          status={status}
+          canSubmit={canSubmit}
+          onSubmit={onSubmit}
+          onStop={onStop}
+        />
       </div>
     </footer>
   );

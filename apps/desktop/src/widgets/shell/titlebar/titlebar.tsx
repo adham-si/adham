@@ -1,7 +1,11 @@
 import * as React from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { LayoutAlignLeftIcon } from '@hugeicons/core-free-icons';
+import {
+  LayoutAlignLeftIcon,
+  LayoutAlignBottomIcon,
+  LayoutAlignRightIcon,
+} from '@hugeicons/core-free-icons';
 import {
   MenuRoot,
   MenuTrigger,
@@ -25,10 +29,19 @@ export interface TitlebarProps extends React.HTMLAttributes<HTMLElement> {
  * - Navigation rail toggle button (<HugeiconsIcon icon={LayoutAlignLeftIcon} />) side by side
  * - No app name or title text
  * - Draggable middle region with data-tauri-drag-region and double-click maximize/restore
- * - Top-right: Minimize, Maximize / Restore, and Close controls
+ * - Top-right: Layout toggles (primary sidebar, panel, secondary sidebar), vertical separator, and window action controls
  */
 export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarProps) {
-  const { navRailOpen, toggleNavRail } = useShellLayout();
+  const {
+    navRailOpen,
+    toggleNavRail,
+    sidebarOpen,
+    toggleSidebar,
+    panelOpen,
+    togglePanel,
+    secondarySidebarOpen,
+    toggleSecondarySidebar,
+  } = useShellLayout();
   const [isMaximized, setIsMaximized] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
 
@@ -109,7 +122,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
       data-tauri-drag-region
       onDoubleClick={handleToggleMaximize}
       aria-label="Application Titlebar"
-      className={`relative z-menu flex h-10 min-h-10 max-h-10 w-full shrink-0 items-center justify-between border-b border-border-subtle bg-surface select-none ${className}`}
+      className={`relative z-menu flex h-10 min-h-10 max-h-10 w-full shrink-0 items-center justify-between bg-background select-none ${className}`}
       {...props}
     >
       {/* Top-Left: NavRail toggle and Chrome tab-search style actions menu button */}
@@ -172,8 +185,67 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
         className="flex h-full flex-1 cursor-default items-center justify-center"
       />
 
-      {/* Top-Right: Window Controls (Minimize, Maximize / Restore, Close) */}
+      {/* Top-Right: Layout toggles, vertical separator, and window controls */}
       <div className="flex h-full items-center">
+        {/* Layout controls */}
+        <div className="flex items-center gap-1">
+          {/* Primary sidebar toggle */}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={sidebarOpen ? 'Hide primary sidebar' : 'Show primary sidebar'}
+            aria-pressed={sidebarOpen}
+            title={sidebarOpen ? 'Hide primary sidebar' : 'Show primary sidebar'}
+            className={cn(
+              buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
+              'cursor-default select-none [&_svg]:size-icon-sm',
+              !sidebarOpen && 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+            )}
+          >
+            <HugeiconsIcon icon={LayoutAlignLeftIcon} />
+          </button>
+
+          {/* Panel toggle */}
+          <button
+            type="button"
+            onClick={togglePanel}
+            aria-label={panelOpen ? 'Hide panel' : 'Show panel'}
+            aria-pressed={panelOpen}
+            title={panelOpen ? 'Hide panel' : 'Show panel'}
+            className={cn(
+              buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
+              'cursor-default select-none [&_svg]:size-icon-sm',
+              !panelOpen && 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+            )}
+          >
+            <HugeiconsIcon icon={LayoutAlignBottomIcon} />
+          </button>
+
+          {/* Secondary sidebar toggle */}
+          <button
+            type="button"
+            onClick={toggleSecondarySidebar}
+            aria-label={secondarySidebarOpen ? 'Hide secondary sidebar' : 'Show secondary sidebar'}
+            aria-pressed={secondarySidebarOpen}
+            title={secondarySidebarOpen ? 'Hide secondary sidebar' : 'Show secondary sidebar'}
+            className={cn(
+              buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
+              'cursor-default select-none [&_svg]:size-icon-sm',
+              !secondarySidebarOpen && 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+            )}
+          >
+            <HugeiconsIcon icon={LayoutAlignRightIcon} />
+          </button>
+        </div>
+
+        {/* Separator vertical line */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          className="mx-2 h-4 w-px bg-border-subtle"
+        />
+
+        {/* Window Controls (Minimize, Maximize / Restore, Close) */}
         {/* Minimize */}
         <button
           type="button"

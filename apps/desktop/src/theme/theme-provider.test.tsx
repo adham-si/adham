@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useTheme } from './use-theme';
@@ -45,6 +45,7 @@ describe('ThemeProvider', () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
+    cleanup();
     window.localStorage.clear();
     document.documentElement.classList.remove('dark');
     setSystemPrefersDark(false);

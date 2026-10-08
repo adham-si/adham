@@ -1,11 +1,12 @@
 import * as axeCore from 'axe-core';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import '@/shared/i18n';
 import { GalleryPage } from '@/routes/gallery';
 
 describe('Component gallery', () => {
   beforeEach(() => {
+    cleanup();
     document.title = 'Component Gallery';
   });
 

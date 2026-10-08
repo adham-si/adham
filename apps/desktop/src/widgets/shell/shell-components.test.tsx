@@ -8,7 +8,6 @@ import {
   useShellLayout,
   SHELL_DIMENSIONS,
 } from './context';
-import { Header, HeaderHeading, HeaderToolbar } from './header';
 import { NavRail } from './nav-rail';
 import { Titlebar } from './titlebar';
 import { Sidebar } from './sidebar';
@@ -44,65 +43,19 @@ describe('Shell Layout Modular Components', () => {
     });
   });
 
-  describe('Header Components', () => {
-    it('renders Header, HeaderHeading, and HeaderToolbar', () => {
-      render(
-        <TestWrapper>
-          <Header data-testid="app-header">
-            <HeaderHeading
-              title="Adham Shell"
-              subtitle="v1.0"
-              showSidebarToggle
-            />
-            <HeaderToolbar showFocusToggle showPanelToggle showSettingsToggle />
-          </Header>
-        </TestWrapper>,
-      );
-
-      const headerEl = screen.getByTestId('app-header');
-      expect(headerEl).not.toBeNull();
-      expect(headerEl.className).toContain('h-10');
-
-      expect(screen.getByText('Adham Shell')).not.toBeNull();
-      expect(screen.getByText('v1.0')).not.toBeNull();
-      expect(screen.getByRole('button', { name: /Focus mode/i })).not.toBeNull();
-      expect(screen.getByRole('button', { name: /Context panel/i })).not.toBeNull();
-    });
-
-    it('renders breadcrumbs when provided to HeaderHeading', () => {
-      let clickedPath = '';
-      const breadcrumbs = [
-        { label: 'Workspaces', onClick: () => { clickedPath = 'workspaces'; } },
-        { label: 'Personal Project' },
-      ];
-
-      render(
-        <TestWrapper>
-          <Header>
-            <HeaderHeading breadcrumbs={breadcrumbs} />
-          </Header>
-        </TestWrapper>,
-      );
-
-      const wsBtn = screen.getByRole('button', { name: 'Workspaces' });
-      fireEvent.click(wsBtn);
-      expect(clickedPath).toBe('workspaces');
-      expect(screen.getByText('Personal Project')).not.toBeNull();
-    });
-  });
-
   describe('NavRail Component', () => {
     it('renders 40px width rail and responds to actions', () => {
       render(
         <TestWrapper>
-          <NavRail showIcons />
+          <NavRail />
         </TestWrapper>,
       );
 
       const rail = screen.getByLabelText('Navigation Rail');
       expect(rail).not.toBeNull();
       expect(rail.style.width).toBe('40px');
-      expect(screen.getByRole('button', { name: 'Compose' })).not.toBeNull();
+      expect(screen.getByRole('button', { name: 'Workspace' })).not.toBeNull();
+      expect(screen.getByRole('button', { name: 'Settings' })).not.toBeNull();
     });
   });
 
@@ -266,6 +219,45 @@ describe('Shell Layout Modular Components', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Show navigation rail' }));
       expect(screen.getByTestId('slot-rail')).not.toBeNull();
       expect(screen.getByRole('button', { name: 'Hide navigation rail' })).not.toBeNull();
+    });
+
+    it('toggles primary sidebar, panel, and secondary sidebar via Titlebar layout buttons', () => {
+      render(
+        <TestWrapper>
+          <Shell
+            data-testid="app-shell"
+            titlebar={<Titlebar />}
+            primarySidebar={<div data-testid="slot-primary">Primary Content</div>}
+            secondarySidebar={<div data-testid="slot-secondary">Secondary Content</div>}
+            panel={<div data-testid="slot-panel">Panel Content</div>}
+          >
+            <div>Main View</div>
+          </Shell>
+        </TestWrapper>,
+      );
+
+      // Verify toggles and separator rendered
+      const primaryBtn = screen.getByRole('button', { name: 'Hide primary sidebar' });
+      const panelBtn = screen.getByRole('button', { name: 'Hide panel' });
+      const secondaryBtn = screen.getByRole('button', { name: 'Hide secondary sidebar' });
+      expect(primaryBtn).not.toBeNull();
+      expect(panelBtn).not.toBeNull();
+      expect(secondaryBtn).not.toBeNull();
+
+      // Toggle primary sidebar
+      fireEvent.click(primaryBtn);
+      expect(screen.queryByTestId('slot-primary')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Show primary sidebar' })).not.toBeNull();
+
+      // Toggle panel
+      fireEvent.click(panelBtn);
+      expect(screen.queryByTestId('slot-panel')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Show panel' })).not.toBeNull();
+
+      // Toggle secondary sidebar
+      fireEvent.click(secondaryBtn);
+      expect(screen.queryByTestId('slot-secondary')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Show secondary sidebar' })).not.toBeNull();
     });
   });
 });

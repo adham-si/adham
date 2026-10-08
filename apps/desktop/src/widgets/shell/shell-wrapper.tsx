@@ -34,13 +34,18 @@ function ShellInner({
   innerRef,
   ...props
 }: ShellProps & { innerRef?: React.ForwardedRef<HTMLDivElement> }) {
-  const { navRailOpen } = useShellLayout();
+  const {
+    navRailOpen,
+    sidebarOpen,
+    secondarySidebarOpen,
+    panelOpen,
+  } = useShellLayout();
   const isFullWidthHeader = config?.headerPosition === 'full-width';
 
   const navRailNode = navRail && navRailOpen ? navRail : null;
   const sidebarNode = sidebar ? sidebar : null;
 
-  const primarySidebarNode = primarySidebar ? (
+  const primarySidebarNode = primarySidebar && sidebarOpen ? (
     <aside
       aria-label="Primary Sidebar"
       className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
@@ -50,7 +55,7 @@ function ShellInner({
     </aside>
   ) : null;
 
-  const secondarySidebarNode = secondarySidebar ? (
+  const secondarySidebarNode = secondarySidebar && secondarySidebarOpen ? (
     <aside
       aria-label="Secondary Sidebar"
       className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
@@ -69,14 +74,14 @@ function ShellInner({
     </header>
   ) : null;
 
-  const panelNode = panel ? panel : null;
+  const panelNode = panel && panelOpen ? panel : null;
 
   if (isFullWidthHeader) {
     return (
       <div
         ref={innerRef}
-        style={{ background: 'red', ...props.style }}
-        className={`flex h-screen w-screen flex-col overflow-hidden text-foreground ${className}`}
+        style={props.style}
+        className={`flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground ${className}`}
         {...props}
       >
         {titlebar}
@@ -102,8 +107,8 @@ function ShellInner({
   return (
     <div
       ref={innerRef}
-      style={{ background: 'red', ...props.style }}
-      className={`flex h-screen w-screen flex-col overflow-hidden text-foreground ${className}`}
+      style={props.style}
+      className={`flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground ${className}`}
       {...props}
     >
       {titlebar}

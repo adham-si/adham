@@ -1,9 +1,9 @@
 import * as React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ThemeProvider } from '@/theme/theme-provider';
 import '@/shared/i18n';
-import { ShellLayoutProvider, useShellLayout } from '@/widgets/shell/layout-context';
+import { ShellLayoutProvider, useShellLayout } from '@/widgets/shell';
 import { SettingsPage } from './settings-page';
 
 function TestSettingsWrapper({ children }: { children: React.ReactNode }) {
@@ -19,6 +19,7 @@ function TestSettingsWrapper({ children }: { children: React.ReactNode }) {
 
 describe('SettingsPage Component', () => {
   beforeEach(() => {
+    cleanup();
     localStorage.clear();
   });
 

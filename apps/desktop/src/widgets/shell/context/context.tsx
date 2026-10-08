@@ -452,9 +452,8 @@ export function Context({ children }: { children?: React.ReactNode }) {
     <ShellLayoutContext value={value}>
       <div
         data-testid="shell-context-holder"
-        className="flex flex-1 flex-col rounded-xl overflow-hidden"
+        className="flex flex-1 flex-col rounded-xl overflow-hidden border border-border-subtle bg-surface"
         style={{
-          background: 'green',
           borderRadius: 'var(--radius-xl)',
           minHeight: 0,
         }}
