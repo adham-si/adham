@@ -62,6 +62,9 @@ export function isValidDeadline(value) {
  * UTC. Returns an array of failure messages (empty means pass).
  */
 export function validateExceptions({ records, denyText, lockPackages, today }) {
+  if (typeof today !== 'string' || !isValidDeadline(today)) {
+    return [`today must be a valid YYYY-MM-DD date, got ${JSON.stringify(today)}`];
+  }
   const failures = [];
   if (!Array.isArray(records)) {
     return ['deny-exceptions.json must contain an "exceptions" array'];

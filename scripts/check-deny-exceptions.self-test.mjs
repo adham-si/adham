@@ -146,5 +146,20 @@ total++;
   }
 }
 
+// Injected today is helper input and must be validated like any other:
+// empty, malformed and impossible dates fail instead of comparing wrong.
+for (const badToday of ['', 'not-a-date', '2026-02-30']) {
+  total++;
+  const count = (await run({ today: badToday })).length;
+  if (count >= 1) {
+    console.log(`  ok   malformed injected today fails (${JSON.stringify(badToday)})`);
+  } else {
+    failures++;
+    console.error(
+      `  FAIL malformed injected today fails (${JSON.stringify(badToday)}): validation passed`,
+    );
+  }
+}
+
 console.log(`\n${total - failures}/${total} cases passed.`);
 process.exit(failures > 0 ? 1 : 0);
