@@ -24,67 +24,6 @@ confidence-threshold = 0.8
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
-# Accepted duplicate versions. Each pin is exact so that a future version
-# bump re-surfaces as a warning for review. All pairs below are forced by
-# incompatible majors across the Tauri 2 and sqlx dependency trees and
-# cannot be unified without upstream changes.
-skip = [
-    { name = "base64", version = "=0.21.7" },
-    { name = "base64", version = "=0.22.1" },
-    { name = "base64", version = "=0.23.1" },
-    { name = "bitflags", version = "=1.3.2" },
-    { name = "bitflags", version = "=2.13.2" },
-    { name = "cpufeatures", version = "=0.2.17" },
-    { name = "cpufeatures", version = "=0.3.1" },
-    { name = "foldhash", version = "=0.1.5" },
-    { name = "foldhash", version = "=0.2.0" },
-    { name = "getrandom", version = "=0.2.17" },
-    { name = "getrandom", version = "=0.3.4" },
-    { name = "getrandom", version = "=0.4.3" },
-    { name = "hashbrown", version = "=0.12.3" },
-    { name = "hashbrown", version = "=0.15.5" },
-    { name = "hashbrown", version = "=0.17.1" },
-    { name = "heck", version = "=0.4.1" },
-    { name = "heck", version = "=0.5.0" },
-    { name = "indexmap", version = "=1.9.3" },
-    { name = "indexmap", version = "=2.14.2" },
-    { name = "miniz_oxide", version = "=0.8.9" },
-    { name = "miniz_oxide", version = "=0.9.1" },
-    { name = "png", version = "=0.17.16" },
-    { name = "png", version = "=0.18.1" },
-    { name = "proc-macro-crate", version = "=1.3.1" },
-    { name = "proc-macro-crate", version = "=2.0.2" },
-    { name = "serde_spanned", version = "=0.6.9" },
-    { name = "serde_spanned", version = "=1.1.1" },
-    { name = "syn", version = "=1.0.109" },
-    { name = "syn", version = "=2.0.119" },
-    { name = "syn", version = "=3.0.6" },
-    { name = "thiserror", version = "=1.0.69" },
-    { name = "thiserror", version = "=2.0.21" },
-    { name = "miniz_oxide", version = "=0.8.9" },
-    { name = "miniz_oxide", version = "=0.9.1" },
-    { name = "png", version = "=0.17.16" },
-    { name = "png", version = "=0.18.1" },
-    { name = "proc-macro-crate", version = "=1.3.1" },
-    { name = "proc-macro-crate", version = "=2.0.2" },
-    { name = "serde_spanned", version = "=0.6.9" },
-    { name = "serde_spanned", version = "=1.1.1" },
-    { name = "syn", version = "=1.0.109" },
-    { name = "syn", version = "=2.0.119" },
-    { name = "syn", version = "=3.0.6" },
-    { name = "thiserror", version = "=1.0.69" },
-    { name = "thiserror", version = "=2.0.21" },
-    { name = "thiserror-impl", version = "=1.0.69" },
-    { name = "thiserror-impl", version = "=2.0.21" },
-    { name = "toml", version = "=0.8.2" },
-    { name = "toml", version = "=1.1.6" },
-    { name = "toml_datetime", version = "=0.6.3" },
-    { name = "toml_datetime", version = "=1.1.1" },
-    { name = "toml_edit", version = "=0.19.15" },
-    { name = "toml_edit", version = "=0.20.2" },
-    { name = "winnow", version = "=0.5.40" },
-    { name = "winnow", version = "=1.0.4" },
-]
 
 [sources]
 unknown-registry = "warn"

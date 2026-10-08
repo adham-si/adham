@@ -30,10 +30,10 @@ const RECORD = {
   tracking: ['https://rustsec.org/advisories/RUSTSEC-2024-0370'],
 };
 
-function run({ records = [RECORD], deny = DENY, lock = LOCK, today = '2026-10-08' } = {}) {
+async function run({ records = [RECORD], deny = DENY, lock = LOCK, today = '2026-10-08' } = {}) {
   return validateExceptions({
     records,
-    ignoreIds: parseAdvisoryIgnoreIds(deny),
+    denyText: deny,
     lockPackages: parseLockPackages(lock),
     today,
   });
@@ -55,8 +55,10 @@ const CASES = [
 ];
 
 let failures = 0;
+let total = 0;
 for (const [name, mustPass, options] of CASES.map(([n, e, o]) => [n, e === 0, o])) {
-  const count = run(options ?? {}).length;
+  total++;
+  const count = (await run(options ?? {})).length;
   const ok = mustPass ? count === 0 : count >= 1;
   if (ok) {
     console.log(`  ok   ${name}`);
@@ -71,7 +73,78 @@ for (const [name, mustPass, options] of CASES.map(([n, e, o]) => [n, e === 0, o]
 assert.equal(isValidDeadline('2027-01-06'), true);
 assert.equal(isValidDeadline('2027-13-01'), false);
 assert.equal(isValidDeadline('not-a-date'), false);
+total++;
 console.log('  ok   deadline format validation');
 
-console.log(`\n${CASES.length + 1 - failures}/${CASES.length + 1} cases passed.`);
+// --- ignore extraction must read real TOML, not regex text -------------
+const EXTRACTION_CASES = [
+  [
+    'single-quoted id counts as an ignore',
+    "[advisories]\nignore = [{ id = 'RUSTSEC-2024-0370', reason = 'test' }]\n",
+    ['RUSTSEC-2024-0370'],
+  ],
+  [
+    'comment after section header still counts ignores',
+    '[advisories] # valid TOML comment\nignore = [{ id = "RUSTSEC-2024-0370", reason = "test" }]\n',
+    ['RUSTSEC-2024-0370'],
+  ],
+  [
+    'commented-out entry does not count',
+    '[advisories]\n# ignore = [{ id = "RUSTSEC-2024-0370", reason = "test" }]\n',
+    [],
+  ],
+  [
+    'inline single-line array counts',
+    '[advisories]\nignore = [{ id = "RUSTSEC-2024-0370", reason = "test" }]\n',
+    ['RUSTSEC-2024-0370'],
+  ],
+];
+
+for (const [name, denyText, expected] of EXTRACTION_CASES) {
+  total++;
+  let actual;
+  try {
+    actual = parseAdvisoryIgnoreIds(denyText);
+  } catch (error) {
+    failures++;
+    console.error(`  FAIL ${name}: extraction threw: ${error.message}`);
+    continue;
+  }
+  try {
+    assert.deepEqual(actual, expected);
+    console.log(`  ok   ${name}`);
+  } catch {
+    failures++;
+    console.error(
+      `  FAIL ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+    );
+  }
+}
+
+// Malformed TOML must fail closed, never read as "no ignores".
+total++;
+try {
+  parseAdvisoryIgnoreIds('[advisories]\nignore = [{ id = "RUSTSEC-2024-0370" \n');
+  failures++;
+  console.error('  FAIL malformed config fails closed: extraction succeeded');
+} catch {
+  console.log('  ok   malformed config fails closed');
+}
+
+// An approved version coexisting with an unapproved one must fail: the
+// deny ignore is advisory-ID-wide, so presence of 1.0.4 proves nothing.
+total++;
+{
+  const both =
+    '[[package]]\nname = "proc-macro-error"\nversion = "1.0.4"\n[[package]]\nname = "proc-macro-error"\nversion = "1.0.5"\n';
+  const count = (await run({ lock: both })).length;
+  if (count >= 1) {
+    console.log('  ok   coexisting unapproved version fails');
+  } else {
+    failures++;
+    console.error('  FAIL coexisting unapproved version fails: validation passed');
+  }
+}
+
+console.log(`\n${total - failures}/${total} cases passed.`);
 process.exit(failures > 0 ? 1 : 0);

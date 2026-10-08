@@ -3,6 +3,7 @@
 // deny-exceptions.json, deny.toml and Cargo.lock; the self-test exercises
 // them with fixtures and injected dates. Run: node
 // scripts/check-deny-exceptions.self-test.mjs
+import { parse as parseToml } from 'smol-toml';
 
 const ADVISORY_ID_PATTERN = /^RUSTSEC-\d{4}-\d+$/;
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -22,21 +23,27 @@ export function parseLockPackages(lockText) {
   return packages;
 }
 
-/** Extract advisory `ignore` IDs from the `[advisories]` section of deny.toml. */
+/** Extract advisory `ignore` IDs by parsing real TOML. Throws on malformed
+ * or unsupported config so callers fail closed instead of reading zero
+ * ignores. Commented-out entries never count: the parser drops comments,
+ * and single-quoted strings parse as strings. */
 export function parseAdvisoryIgnoreIds(denyText) {
-  const lines = denyText.split('\n');
-  const start = lines.findIndex((line) => line.trim() === '[advisories]');
-  if (start === -1) return [];
-  const section = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^\s*\[.*\]\s*$/.test(line)) break;
-    section.push(line);
+  let document;
+  try {
+    document = parseToml(denyText);
+  } catch (error) {
+    throw new Error(`deny.toml is not parseable TOML: ${error.message}`);
   }
-  const ids = [];
-  for (const match of section.join('\n').matchAll(/id\s*=\s*"([^"]+)"/g)) {
-    ids.push(match[1]);
+  const ignore = document?.advisories?.ignore ?? [];
+  if (!Array.isArray(ignore)) {
+    throw new Error('[advisories].ignore must be an array of tables');
   }
-  return ids;
+  return ignore.map((entry, index) => {
+    if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || entry.id === '') {
+      throw new Error(`[advisories].ignore[${index}] must be a table with a non-empty string id`);
+    }
+    return entry.id;
+  });
 }
 
 export function isValidDeadline(value) {
@@ -51,13 +58,20 @@ export function isValidDeadline(value) {
 /**
  * Validate exception records against deny.toml ignores, the lockfile and the
  * deadline. `today` is an explicit YYYY-MM-DD string so tests can inject
- * before/on/after-deadline dates. Returns an array of failure messages
- * (empty means pass).
+ * before/on/after-deadline dates; the enforcement CLI always passes actual
+ * UTC. Returns an array of failure messages (empty means pass).
  */
-export function validateExceptions({ records, ignoreIds, lockPackages, today }) {
+export function validateExceptions({ records, denyText, lockPackages, today }) {
   const failures = [];
   if (!Array.isArray(records)) {
     return ['deny-exceptions.json must contain an "exceptions" array'];
+  }
+
+  let ignoreIds;
+  try {
+    ignoreIds = parseAdvisoryIgnoreIds(denyText);
+  } catch (error) {
+    return [`deny.toml unreadable, failing closed: ${error.message}`];
   }
 
   const seen = new Set();
@@ -98,10 +112,12 @@ export function validateExceptions({ records, ignoreIds, lockPackages, today }) 
       const locked = lockPackages.get(record.crate);
       if (!locked) {
         fail(`crate ${record.crate} is not in Cargo.lock: remove the exception and its ignore`);
-      } else if (!locked.has(record.version)) {
+      } else if (locked.size !== 1 || !locked.has(record.version)) {
+        // The deny ignore is advisory-ID-wide: the approved version being
+        // present proves nothing while unapproved versions coexist.
         fail(
-          `version ${record.version} of ${record.crate} is not locked ` +
-            `(locked: ${[...locked].join(', ')}): re-scope or remove the exception`,
+          `only version ${record.version} of ${record.crate} is approved, ` +
+            `but Cargo.lock contains: ${[...locked].join(', ')}`,
         );
       }
     }
