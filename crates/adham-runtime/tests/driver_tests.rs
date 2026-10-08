@@ -134,6 +134,37 @@ async fn test_driver_budget_exhaustion() {
     assert_eq!(result.block_reason, Some(BlockReason::BudgetExhausted));
 }
 
+#[tokio::test]
+async fn test_driver_blocked_verdict_never_completes() {
+    let model = FakeModelAdapter::with_default_response("Attempt awaiting checks");
+    let verifier = FakeVerificationAdapter::new(VerificationVerdict::Blocked(
+        "Mandatory check blocked".to_string(),
+    ));
+    let clock = MockClock::new(1000);
+    let driver = AgentDriver::new(model, verifier, clock);
+
+    let mut state = RunState::new_queued(sample_identity());
+    let budget = RunBudget::default();
+    let mut usage = BudgetUsage::default();
+    let contract = CompletionContract {
+        task_id: "task-1".to_string(),
+        required_evidence_count: 1,
+    };
+
+    let result = driver
+        .run_step(&mut state, &budget, &mut usage, &contract, "Build widget")
+        .await
+        .expect("step execution");
+
+    assert_eq!(result.lifecycle, RunLifecycle::Blocked);
+    assert_eq!(result.block_reason, Some(BlockReason::VerificationRequired));
+    assert_ne!(result.terminal_outcome, Some(TerminalOutcome::Completed));
+    assert_ne!(
+        result.terminal_outcome,
+        Some(TerminalOutcome::CompletedWithWarnings)
+    );
+}
+
 #[test]
 fn test_checkpoint_create_and_restore() {
     let identity = sample_identity();

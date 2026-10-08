@@ -29,3 +29,8 @@ wildcards = "allow"
 unknown-registry = "warn"
 unknown-git = "warn"
 allow-git = []
+
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "P0-AUDIT-01 time-limited exception, reapproval due 2027-01-06 (deny-exceptions.json)" },
+]
