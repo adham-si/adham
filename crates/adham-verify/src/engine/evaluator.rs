@@ -61,38 +61,58 @@ pub fn evaluate_verdict(
         }
     }
 
-    // 2. Blocked takes precedence over verdict pass
-    if !blocked_checks.is_empty() {
-        return VerificationVerdict::Blocked {
-            reason: "Mandatory check blocked, missing, or stale".to_string(),
-            blocked_checks,
-        };
-    }
-
-    // 3. Failed checks
-    if !failed_checks.is_empty() {
-        return VerificationVerdict::Fail {
-            reason: "One or more mandatory checks failed".to_string(),
-            failed_checks,
-        };
-    }
-
-    // 4. Error findings can never produce successful verification
+    // 2. Collect error findings before choosing the verdict so their
+    // diagnostics survive every non-success outcome.
     let error_findings: Vec<&Finding> = findings
         .iter()
         .filter(|f| f.severity == FindingSeverity::Error)
         .collect();
+    let error_details: Vec<String> = error_findings
+        .iter()
+        .map(|f| format!("{}({})", f.code, f.check_id.as_str()))
+        .collect();
 
-    if !error_findings.is_empty() {
+    // 3. Blocked takes precedence over verdict pass; keeping that precedence
+    // avoids an unrelated lifecycle change. Co-present errors stay visible
+    // in the reason while blocked_checks keeps pure blockers.
+    if !blocked_checks.is_empty() {
+        let mut reason = "Mandatory check blocked, missing, or stale".to_string();
+        if !error_details.is_empty() {
+            reason.push_str(&format!("; error findings present: {error_details:?}"));
+        }
+        return VerificationVerdict::Blocked {
+            reason,
+            blocked_checks,
+        };
+    }
+
+    // 4. Failed checks and error findings both fail; failed_checks carries
+    // the deduplicated union of both check-id sets.
+    let has_failed_checks = !failed_checks.is_empty();
+    if has_failed_checks || !error_findings.is_empty() {
+        let mut failed: Vec<String> = failed_checks
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        failed.sort();
+        for f in &error_findings {
+            let id = f.check_id.as_str().to_string();
+            if !failed.contains(&id) {
+                failed.push(id);
+            }
+        }
+        let mut reason = if has_failed_checks {
+            "One or more mandatory checks failed".to_string()
+        } else {
+            "Error findings present".to_string()
+        };
+        if !error_details.is_empty() {
+            reason.push_str(&format!("; error findings present: {error_details:?}"));
+        }
         return VerificationVerdict::Fail {
-            reason: format!(
-                "Error findings present: {:?}",
-                error_findings.iter().map(|f| &f.code).collect::<Vec<_>>()
-            ),
-            failed_checks: error_findings
-                .iter()
-                .map(|f| f.check_id.as_str().to_string())
-                .collect(),
+            reason,
+            failed_checks: failed,
         };
     }
 
