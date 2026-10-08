@@ -121,8 +121,8 @@ export function Composer({
         {status === 'streaming'
           ? t('compose.srStreaming', 'Agent is streaming response')
           : status === 'awaiting-approval'
-          ? t('compose.srAwaitingApproval', 'Agent requires approval to proceed')
-          : ''}
+            ? t('compose.srAwaitingApproval', 'Agent requires approval to proceed')
+            : ''}
       </div>
 
       <div
@@ -130,11 +130,9 @@ export function Composer({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`w-full transition-all duration-500 ease-in-out ${
-          isCentered ? 'max-w-2xl mx-auto shadow-md border-border' : 'shadow-xs border-border-subtle'
+          isCentered ? 'max-w-2xl mx-auto border-border' : 'border-border-subtle'
         } rounded-2xl border bg-surface hover:border-border focus-within:border-focus focus-within:ring-1 focus-within:ring-focus ${
-          isDragOver
-            ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20'
-            : ''
+          isDragOver ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20' : ''
         }`}
       >
         {/* Top: Scope & Budget Status Strip */}
@@ -162,10 +160,7 @@ export function Composer({
         )}
 
         {/* Attached Context Chips (Files, Folders, Pasted Text Blobs) */}
-        <ComposeContextChips
-          attachments={attachments}
-          onRemove={onRemoveAttachment}
-        />
+        <ComposeContextChips attachments={attachments} onRemove={onRemoveAttachment} />
 
         {/* RTL-aware Textarea */}
         <ComposeInput

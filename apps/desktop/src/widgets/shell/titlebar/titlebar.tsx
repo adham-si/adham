@@ -199,7 +199,8 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
               'cursor-default select-none [&_svg]:size-icon-sm',
-              !sidebarOpen && 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              !sidebarOpen &&
+                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
             )}
           >
             <HugeiconsIcon icon={LayoutAlignLeftIcon} />
@@ -215,7 +216,8 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
               'cursor-default select-none [&_svg]:size-icon-sm',
-              !panelOpen && 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              !panelOpen &&
+                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
             )}
           >
             <HugeiconsIcon icon={LayoutAlignBottomIcon} />
@@ -231,7 +233,8 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
               'cursor-default select-none [&_svg]:size-icon-sm',
-              !secondarySidebarOpen && 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              !secondarySidebarOpen &&
+                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
             )}
           >
             <HugeiconsIcon icon={LayoutAlignRightIcon} />

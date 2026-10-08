@@ -10,6 +10,7 @@ export interface SelectOption {
 }
 
 const INDICATOR_ICON = {
+  xs: '[&_svg]:size-icon-sm',
   sm: '[&_svg]:size-icon-sm',
   md: '[&_svg]:size-icon-md',
   lg: '[&_svg]:size-icon-lg',
@@ -19,8 +20,10 @@ const optionClasses =
   'flex w-full shrink-0 items-center gap-2 rounded-sm text-start text-foreground hover:bg-surface-hover focus-visible:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:text-foreground-disabled aria-selected:bg-selection aria-selected:font-medium';
 
 // Option text tracks the trigger size: an sm trigger (12px) must not open a
-// 14px-text popup. All pairs are spacing/typography tokens.
+// 14px-text popup. All pairs are spacing/typography tokens. xs shares the
+// sm icon scale (see Button) and tightens padding to its px-2.5 py-0.5 trigger.
 const OPTION_TEXT = {
+  xs: 'px-2.5 py-0.5 text-xs',
   sm: 'px-3 py-1 text-xs',
   md: 'px-3 py-2 text-sm',
   lg: 'px-4 py-2 text-base',
@@ -256,7 +259,7 @@ export function Select({
             aria-label={selected?.label ?? placeholder}
             onKeyDown={onListKeyDown}
             className={cn(
-              'flex max-h-64 flex-col gap-1 overflow-y-auto rounded-lg border border-border-subtle bg-surface-raised p-1 shadow-floating',
+              'flex max-h-64 flex-col gap-1 overflow-y-auto rounded-lg border border-border-subtle bg-surface-raised p-1',
               listboxClassName,
             )}
           >

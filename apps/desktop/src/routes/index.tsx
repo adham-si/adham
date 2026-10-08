@@ -27,21 +27,9 @@ interface ChatMessage {
 
 function IndexComponent() {
   const [sessionId] = React.useState('session-default');
-  const {
-    draft,
-    setDraft,
-    commitPrompt,
-    recallPrevious,
-    recallNext,
-  } = useDrafts({ sessionId });
+  const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({ sessionId });
 
-  const {
-    status,
-    send,
-    startStreaming,
-    requireApproval,
-    stop,
-  } = useComposeState('idle');
+  const { status, send, startStreaming, requireApproval, stop } = useComposeState('idle');
 
   const [mode, setMode] = React.useState<ComposeMode>('plan');
   const [selectedModelId, setSelectedModelId] = React.useState('local:qwen2.5-coder:32b');
@@ -160,9 +148,7 @@ function IndexComponent() {
           {/* Conversation Timeline (smoothly expands when messages exist) */}
           <div
             className={`flex flex-col overflow-y-auto transition-all duration-500 ease-in-out ${
-              isEmpty
-                ? 'max-h-0 flex-0 opacity-0 pointer-events-none'
-                : 'flex-1 opacity-100'
+              isEmpty ? 'max-h-0 flex-0 opacity-0 pointer-events-none' : 'flex-1 opacity-100'
             }`}
           >
             <div className="flex w-full flex-1 flex-col gap-4 p-4">

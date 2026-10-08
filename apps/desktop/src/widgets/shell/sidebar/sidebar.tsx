@@ -40,9 +40,7 @@ export function Sidebar({
   ...props
 }: SidebarProps) {
   const { sidebarOpen, secondarySidebarOpen } = useShellLayout();
-  const [internalWidth, setInternalWidth] = React.useState<number>(
-    () => width ?? minWidth,
-  );
+  const [internalWidth, setInternalWidth] = React.useState<number>(() => width ?? minWidth);
   const isResizingRef = React.useRef(false);
 
   const currentWidth = width ?? internalWidth;

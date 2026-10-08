@@ -113,7 +113,7 @@ export function ComposeModelPicker({
         aria-label={`Select model. Current model is ${selectedModel.name}, ${
           isLocal ? 'running locally' : 'cloud provider'
         }`}
-        className="group flex min-h-7 items-center gap-1.5 rounded-lg border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
+        className="group flex min-h-control-xs items-center gap-1.5 rounded-lg border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
       >
         {/* Model Name */}
         <span className="font-medium text-foreground">{selectedModel.name}</span>
@@ -121,16 +121,15 @@ export function ComposeModelPicker({
         {/* Data Boundary Badge */}
         <span
           className={`flex items-center gap-1 rounded-sm px-1.5 py-0.2 text-[10px] font-semibold uppercase tracking-wider ${
-            isLocal
-              ? 'bg-success/15 text-success'
-              : 'bg-action/15 text-action'
+            isLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
           }`}
-          title={isLocal ? 'Zero data leaves this machine' : `Outbound request to ${selectedModel.provider}`}
+          title={
+            isLocal
+              ? 'Zero data leaves this machine'
+              : `Outbound request to ${selectedModel.provider}`
+          }
         >
-          <HugeiconsIcon
-            icon={isLocal ? CpuIcon : AiCloud01Icon}
-            className="size-3"
-          />
+          <HugeiconsIcon icon={isLocal ? CpuIcon : AiCloud01Icon} className="size-3" />
           <span>{isLocal ? 'Local' : selectedModel.provider}</span>
         </span>
 
@@ -152,7 +151,7 @@ export function ComposeModelPicker({
         <div
           role="listbox"
           aria-label="Available models"
-          className="absolute bottom-full mb-1.5 end-0 z-50 w-72 rounded-xl border border-border-subtle bg-surface p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute bottom-full mb-1.5 end-0 z-popover w-72 rounded-xl border border-border-subtle bg-surface p-1.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           <div className="px-2 py-1 text-[11px] font-semibold text-foreground-muted">
             {t('compose.modelsHeading', 'Models & Privacy Boundary')}
@@ -191,9 +190,7 @@ export function ComposeModelPicker({
                       <span className="truncate text-xs font-medium">{model.name}</span>
                       <span
                         className={`rounded px-1 py-0.2 text-[9px] font-semibold uppercase ${
-                          modelLocal
-                            ? 'bg-success/15 text-success'
-                            : 'bg-action/15 text-action'
+                          modelLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
                         }`}
                       >
                         {modelLocal ? 'Local' : 'Cloud'}

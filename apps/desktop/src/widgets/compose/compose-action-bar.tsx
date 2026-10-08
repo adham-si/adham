@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  ArrowUp01Icon,
-} from '@hugeicons/core-free-icons';
+import { ArrowUp01Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@adham/ui';
 import type { ComposeMode } from './compose-mode-selector';
 import { ComposeModeSelector } from './compose-mode-selector';
 import type { ModelOption } from './compose-model-picker';
@@ -54,16 +53,9 @@ export function ComposeActionBar({
     >
       {/* Leading controls: Attachment trigger + Mode Selector */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <ComposeAttachmentMenu
-          onAddAttachments={onAddAttachments}
-          disabled={isRunning}
-        />
+        <ComposeAttachmentMenu onAddAttachments={onAddAttachments} disabled={isRunning} />
 
-        <ComposeModeSelector
-          mode={mode}
-          onChangeMode={onChangeMode}
-          disabled={isRunning}
-        />
+        <ComposeModeSelector mode={mode} onChangeMode={onChangeMode} disabled={isRunning} />
       </div>
 
       {/* Trailing controls: Model Picker (with Data-boundary badge) + Send/Stop Morph Button */}
@@ -79,27 +71,29 @@ export function ComposeActionBar({
 
         {/* Morphing Send / Stop Button */}
         {isRunning ? (
-          <button
-            type="button"
+          <Button
+            size="xs"
+            variant="danger"
+            iconOnly
             onClick={onStop}
             aria-label={t('compose.stop', 'Stop generation')}
             title={t('compose.stop', 'Stop generation')}
-            className="flex size-7 items-center justify-center rounded-lg bg-danger text-danger-foreground transition-all duration-150 hover:opacity-90 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
           >
             {/* Square Stop Glyphs */}
             <span className="size-2.5 rounded-xs bg-current" />
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button
+            size="xs"
+            variant="primary"
+            iconOnly
             disabled={!canSubmit}
             onClick={onSubmit}
             aria-label={t('compose.send', 'Send instruction')}
             title={t('compose.send', 'Send instruction')}
-            className="flex size-7 items-center justify-center rounded-lg bg-action text-action-foreground transition-all duration-150 hover:bg-action-hover active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
           >
             <HugeiconsIcon icon={ArrowUp01Icon} className="size-4 stroke-[2.5]" />
-          </button>
+          </Button>
         )}
       </div>
     </div>

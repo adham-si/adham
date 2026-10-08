@@ -33,9 +33,8 @@ export const defaultResources = {
 };
 
 // Initial language detection
-const detectedLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ar')
-  ? 'ar'
-  : DEFAULT_LANGUAGE;
+const detectedLang =
+  typeof navigator !== 'undefined' && navigator.language.startsWith('ar') ? 'ar' : DEFAULT_LANGUAGE;
 
 i18n.use(initReactI18next).init({
   resources: defaultResources,

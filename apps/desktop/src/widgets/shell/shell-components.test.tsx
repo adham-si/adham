@@ -3,18 +3,13 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ThemeProvider } from '@/theme/theme-provider';
 import '@/shared/i18n';
-import {
-  ShellLayoutProvider,
-  useShellLayout,
-  SHELL_DIMENSIONS,
-} from './context';
+import { ShellLayoutProvider, useShellLayout, SHELL_DIMENSIONS } from './context';
 import { NavRail } from './nav-rail';
 import { Titlebar } from './titlebar';
 import { Sidebar } from './sidebar';
-import { PrimarySidebar } from './primary-sidebar';
 import { SecondarySidebar } from './secondary-sidebar';
 import { Panel } from './panel';
-import { AppLayout, ShellWrapper, Shell } from './shell-wrapper';
+import { AppLayout, Shell } from './shell-wrapper';
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -261,4 +256,3 @@ describe('Shell Layout Modular Components', () => {
     });
   });
 });
-

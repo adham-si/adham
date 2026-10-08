@@ -105,21 +105,13 @@ describe('RTL and ComposeInput', () => {
     const handleSubmit = vi.fn();
 
     const { rerender } = render(
-      <ComposeInput
-        value="Hello"
-        onChange={handleChange}
-        onSubmit={handleSubmit}
-      />
+      <ComposeInput value="Hello" onChange={handleChange} onSubmit={handleSubmit} />,
     );
     const textarea = screen.getByRole('textbox', { name: /composer input/i });
     expect(textarea.getAttribute('dir')).toBe('ltr');
 
     rerender(
-      <ComposeInput
-        value="أهلاً بك في أدهم"
-        onChange={handleChange}
-        onSubmit={handleSubmit}
-      />
+      <ComposeInput value="أهلاً بك في أدهم" onChange={handleChange} onSubmit={handleSubmit} />,
     );
     expect(textarea.getAttribute('dir')).toBe('rtl');
   });
@@ -127,11 +119,7 @@ describe('RTL and ComposeInput', () => {
   it('submits on Enter but not on Shift+Enter', () => {
     const handleSubmit = vi.fn();
     render(
-      <ComposeInput
-        value="Build this component"
-        onChange={vi.fn()}
-        onSubmit={handleSubmit}
-      />
+      <ComposeInput value="Build this component" onChange={vi.fn()} onSubmit={handleSubmit} />,
     );
     const textarea = screen.getByRole('textbox', { name: /composer input/i });
 
@@ -152,7 +140,7 @@ describe('RTL and ComposeInput', () => {
         onChange={vi.fn()}
         onSubmit={vi.fn()}
         onAttachPastedBlob={handleAttachBlob}
-      />
+      />,
     );
     const textarea = screen.getByRole('textbox', { name: /composer input/i });
     const largeText = 'A'.repeat(2500);
@@ -167,7 +155,7 @@ describe('RTL and ComposeInput', () => {
       expect.objectContaining({
         type: 'pasted-text',
         charCount: 2500,
-      })
+      }),
     );
   });
 });
@@ -182,7 +170,7 @@ describe('ComposeContextChips', () => {
           { id: '2', type: 'folder', name: 'src/widgets' },
         ]}
         onRemove={handleRemove}
-      />
+      />,
     );
 
     expect(screen.getByText('src/main.rs')).toBeDefined();
@@ -198,10 +186,7 @@ describe('ComposeModelPicker with Data Boundary Badge', () => {
   it('displays local boundary badge and switches models', () => {
     const handleSelect = vi.fn();
     render(
-      <ComposeModelPicker
-        selectedModelId="local:qwen2.5-coder:32b"
-        onSelectModel={handleSelect}
-      />
+      <ComposeModelPicker selectedModelId="local:qwen2.5-coder:32b" onSelectModel={handleSelect} />,
     );
 
     // Check boundary badge
@@ -230,7 +215,7 @@ describe('ComposeStatusStrip', () => {
         maxTokens={128000}
         sessionSpend="$0.12"
         spendCap="$5.00"
-      />
+      />,
     );
 
     expect(screen.getByText('my-project')).toBeDefined();
@@ -253,7 +238,7 @@ describe('ComposeApprovalBar', () => {
         onDeny={handleDeny}
         onReviewDiff={handleReview}
         riskLevel="medium"
-      />
+      />,
     );
 
     expect(screen.getByText('git checkout -b new-branch')).toBeDefined();
@@ -282,7 +267,7 @@ describe('Unified Composer Component', () => {
         onSubmit={handleSubmit}
         onStop={handleStop}
         status="idle"
-      />
+      />,
     );
 
     // In idle state with text, Send button is present
@@ -297,7 +282,7 @@ describe('Unified Composer Component', () => {
         onSubmit={handleSubmit}
         onStop={handleStop}
         status="streaming"
-      />
+      />,
     );
 
     const stopButton = screen.getByRole('button', { name: /Stop generation/i });

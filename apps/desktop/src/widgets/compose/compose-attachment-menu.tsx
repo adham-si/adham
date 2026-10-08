@@ -7,6 +7,7 @@ import {
   Folder01Icon,
   File01Icon,
 } from '@hugeicons/core-free-icons';
+import { Button } from '@adham/ui';
 import type { ComposeAttachment } from './compose-context-chips';
 
 export interface ComposeAttachmentMenuProps {
@@ -89,25 +90,27 @@ export function ComposeAttachmentMenu({
       />
 
       {/* Trigger Button */}
-      <button
+      <Button
         type="button"
+        size="xs"
+        variant="ghost"
+        iconOnly
         disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={t('compose.attach', 'Attach files, images or folders')}
         title={t('compose.attach', 'Attach files, images or folders')}
-        className="flex size-7 items-center justify-center rounded-lg text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
       >
         <HugeiconsIcon icon={Attachment01Icon} className="size-4" />
-      </button>
+      </Button>
 
       {/* Dropdown Menu */}
       {isOpen && (
         <div
           role="menu"
           aria-label="Attachment options"
-          className="absolute bottom-full mb-1.5 start-0 z-50 min-w-44 rounded-xl border border-border-subtle bg-surface p-1 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute bottom-full mb-1.5 start-0 z-menu min-w-44 rounded-xl border border-border-subtle bg-surface p-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           <button
             type="button"
@@ -129,9 +132,7 @@ export function ComposeAttachmentMenu({
             <div className="flex flex-col text-start">
               <span>{t('compose.attachImage', 'Attach Image')}</span>
               {!supportsVision && (
-                <span className="text-[10px] text-warning">
-                  Active model has no vision
-                </span>
+                <span className="text-[10px] text-warning">Active model has no vision</span>
               )}
             </div>
           </button>

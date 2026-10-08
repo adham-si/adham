@@ -11,10 +11,30 @@ export interface ComposeModeSelectorProps {
 }
 
 const MODES: Array<{ id: ComposeMode; labelKey: string; defaultLabel: string; hint: string }> = [
-  { id: 'ask', labelKey: 'compose.modes.ask', defaultLabel: 'Ask', hint: 'Read-only answers and guidance' },
-  { id: 'plan', labelKey: 'compose.modes.plan', defaultLabel: 'Plan', hint: 'Structured plan before execution' },
-  { id: 'execute', labelKey: 'compose.modes.execute', defaultLabel: 'Execute', hint: 'Direct agent actions & tools' },
-  { id: 'code', labelKey: 'compose.modes.code', defaultLabel: 'Code', hint: 'Software development focus' },
+  {
+    id: 'ask',
+    labelKey: 'compose.modes.ask',
+    defaultLabel: 'Ask',
+    hint: 'Read-only answers and guidance',
+  },
+  {
+    id: 'plan',
+    labelKey: 'compose.modes.plan',
+    defaultLabel: 'Plan',
+    hint: 'Structured plan before execution',
+  },
+  {
+    id: 'execute',
+    labelKey: 'compose.modes.execute',
+    defaultLabel: 'Execute',
+    hint: 'Direct agent actions & tools',
+  },
+  {
+    id: 'code',
+    labelKey: 'compose.modes.code',
+    defaultLabel: 'Code',
+    hint: 'Software development focus',
+  },
 ];
 
 export function ComposeModeSelector({
@@ -44,7 +64,7 @@ export function ComposeModeSelector({
             title={item.hint}
             className={`flex min-h-6 items-center rounded-md px-2 py-0.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50 ${
               isSelected
-                ? 'bg-selection text-action shadow-xs'
+                ? 'bg-selection text-action'
                 : 'text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
             }`}
           >

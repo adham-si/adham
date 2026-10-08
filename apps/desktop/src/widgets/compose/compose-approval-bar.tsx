@@ -1,12 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Alert02Icon,
-  Tick01Icon,
-  Cancel01Icon,
-  ViewIcon,
-} from '@hugeicons/core-free-icons';
+import { Alert02Icon, Tick01Icon, Cancel01Icon, ViewIcon } from '@hugeicons/core-free-icons';
 
 export interface ComposeApprovalBarProps {
   actionSummary: string;
@@ -46,8 +41,8 @@ export function ComposeApprovalBar({
                 riskLevel === 'high'
                   ? 'bg-danger/20 text-danger'
                   : riskLevel === 'medium'
-                  ? 'bg-warning/20 text-warning'
-                  : 'bg-surface-subtle text-foreground-secondary'
+                    ? 'bg-warning/20 text-warning'
+                    : 'bg-surface-subtle text-foreground-secondary'
               }`}
             >
               {riskLevel} risk

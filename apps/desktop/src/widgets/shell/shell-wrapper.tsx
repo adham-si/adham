@@ -34,36 +34,33 @@ function ShellInner({
   innerRef,
   ...props
 }: ShellProps & { innerRef?: React.ForwardedRef<HTMLDivElement> }) {
-  const {
-    navRailOpen,
-    sidebarOpen,
-    secondarySidebarOpen,
-    panelOpen,
-  } = useShellLayout();
+  const { navRailOpen, sidebarOpen, secondarySidebarOpen, panelOpen } = useShellLayout();
   const isFullWidthHeader = config?.headerPosition === 'full-width';
 
   const navRailNode = navRail && navRailOpen ? navRail : null;
   const sidebarNode = sidebar ? sidebar : null;
 
-  const primarySidebarNode = primarySidebar && sidebarOpen ? (
-    <aside
-      aria-label="Primary Sidebar"
-      className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
-      style={{ minWidth: '272px', maxWidth: '600px' }}
-    >
-      {primarySidebar}
-    </aside>
-  ) : null;
+  const primarySidebarNode =
+    primarySidebar && sidebarOpen ? (
+      <aside
+        aria-label="Primary Sidebar"
+        className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
+        style={{ minWidth: '272px', maxWidth: '600px' }}
+      >
+        {primarySidebar}
+      </aside>
+    ) : null;
 
-  const secondarySidebarNode = secondarySidebar && secondarySidebarOpen ? (
-    <aside
-      aria-label="Secondary Sidebar"
-      className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
-      style={{ minWidth: '272px', maxWidth: '600px' }}
-    >
-      {secondarySidebar}
-    </aside>
-  ) : null;
+  const secondarySidebarNode =
+    secondarySidebar && secondarySidebarOpen ? (
+      <aside
+        aria-label="Secondary Sidebar"
+        className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
+        style={{ minWidth: '272px', maxWidth: '600px' }}
+      >
+        {secondarySidebar}
+      </aside>
+    ) : null;
 
   const headerNode = header ? (
     <header
@@ -86,17 +83,12 @@ function ShellInner({
       >
         {titlebar}
         {headerNode}
-        <div
-          className="flex flex-1 min-h-0 overflow-hidden"
-          style={{ padding: '4px', gap: '4px' }}
-        >
+        <div className="flex flex-1 min-h-0 overflow-hidden" style={{ padding: '4px', gap: '4px' }}>
           {navRailNode}
           {sidebarNode}
           {primarySidebarNode}
           {secondarySidebarNode}
-          <main className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
-            {children}
-          </main>
+          <main className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">{children}</main>
           {panelNode}
         </div>
         {overlays}
@@ -112,19 +104,14 @@ function ShellInner({
       {...props}
     >
       {titlebar}
-      <div
-        className="flex flex-1 min-h-0 overflow-hidden"
-        style={{ padding: '4px', gap: '4px' }}
-      >
+      <div className="flex flex-1 min-h-0 overflow-hidden" style={{ padding: '4px', gap: '4px' }}>
         {navRailNode}
         {sidebarNode}
         {primarySidebarNode}
         {secondarySidebarNode}
         <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
           {headerNode}
-          <main className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
-            {children}
-          </main>
+          <main className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">{children}</main>
         </div>
         {panelNode}
       </div>

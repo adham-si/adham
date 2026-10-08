@@ -67,9 +67,7 @@ export function ComposeContextChips({
             </span>
 
             {item.size ? (
-              <span className="text-[10px] text-foreground-muted">
-                {formatBytes(item.size)}
-              </span>
+              <span className="text-[10px] text-foreground-muted">{formatBytes(item.size)}</span>
             ) : item.charCount ? (
               <span className="text-[10px] text-foreground-muted">
                 {(item.charCount / 1000).toFixed(1)}k chars

@@ -1,11 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Folder01Icon,
-  Shield01Icon,
-  ChartHistogramIcon,
-} from '@hugeicons/core-free-icons';
+import { Folder01Icon, Shield01Icon, ChartHistogramIcon } from '@hugeicons/core-free-icons';
 
 export interface ComposeStatusStripProps {
   scopeFolder?: string;
@@ -81,7 +77,11 @@ export function ComposeStatusStrip({
           <div className="h-1.5 w-12 rounded-full bg-surface-subtle overflow-hidden border border-border-subtle">
             <div
               className={`h-full rounded-full transition-all ${
-                tokenPercentage > 85 ? 'bg-danger' : tokenPercentage > 60 ? 'bg-warning' : 'bg-action'
+                tokenPercentage > 85
+                  ? 'bg-danger'
+                  : tokenPercentage > 60
+                    ? 'bg-warning'
+                    : 'bg-action'
               }`}
               style={{ width: `${tokenPercentage}%` }}
             />

@@ -89,7 +89,10 @@ export function ComposeInput({
       return;
     }
 
-    if (e.key === 'ArrowDown' && (!value.trim() || e.currentTarget.selectionStart === value.length)) {
+    if (
+      e.key === 'ArrowDown' &&
+      (!value.trim() || e.currentTarget.selectionStart === value.length)
+    ) {
       if (onRecallNext) {
         e.preventDefault();
         onRecallNext();
@@ -108,7 +111,10 @@ export function ComposeInput({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        placeholder={placeholder ?? t('compose.placeholder', 'Ask anything, draft a plan, or direct an agent...')}
+        placeholder={
+          placeholder ??
+          t('compose.placeholder', 'Ask anything, draft a plan, or direct an agent...')
+        }
         rows={minRows}
         aria-label={t('compose.inputLabel', 'Message composer input')}
         className={`w-full resize-none border-none bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-0 disabled:opacity-50 ${
