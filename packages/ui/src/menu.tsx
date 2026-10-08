@@ -237,7 +237,7 @@ export function Menu({ children, label, className, onSelect }: MenuProps) {
         role="menu"
         aria-label={label}
         className={cn(
-          'z-menu flex min-w-48 flex-col gap-1 rounded-lg border border-border bg-surface-raised p-1 shadow-floating',
+          'z-menu flex min-w-48 flex-col gap-1 rounded-lg border border-border bg-surface-raised p-1',
           className,
         )}
       >

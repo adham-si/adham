@@ -134,6 +134,7 @@ describe('Input', () => {
   });
 
   it.each([
+    ['xs', 'min-h-control-xs'],
     ['sm', 'min-h-control-sm'],
     ['md', 'min-h-control-md'],
     ['lg', 'min-h-control-lg'],
@@ -143,7 +144,7 @@ describe('Input', () => {
   });
 
   it('never fixes a height', () => {
-    for (const size of ['sm', 'md', 'lg'] as const) {
+    for (const size of ['xs', 'sm', 'md', 'lg'] as const) {
       const { container } = render(<Input size={size} />);
       const className = container.querySelector('input')?.className ?? '';
       expect(className, size).not.toMatch(/(^|\s)h-\d/);

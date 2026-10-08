@@ -16,12 +16,13 @@ const buttonVariants = cva(
       },
       size: {
         // min-h, never a fixed h-*: at 200% text the control must grow, not clip.
+        xs: 'min-h-control-xs px-2.5 text-xs',
         sm: 'min-h-control-sm px-3 text-xs',
         md: 'min-h-control-md px-4 text-sm',
         lg: 'min-h-control-lg px-6 text-base',
       },
       // `iconOnly`: square icon-only control. The size axis still sets the hit
-      // target (32/36/40); callers must pass an accessible name (aria-label).
+      // target (28/32/36/40); callers must pass an accessible name (aria-label).
       // After `size` on purpose: px-0 must win over the size padding in twMerge.
       iconOnly: {
         true: 'aspect-square px-0',
@@ -51,8 +52,13 @@ export interface ButtonProps
  * Decorative busy indicator. Stroke is `currentColor`, so the spinner inherits
  * whichever text token the variant already uses — no colour of its own.
  */
-function BusySpinner({ size }: { size: 'sm' | 'md' | 'lg' | null | undefined }) {
-  const iconSize = size === 'sm' ? 'size-icon-sm' : size === 'lg' ? 'size-icon-lg' : 'size-icon-md';
+function BusySpinner({ size }: { size: 'xs' | 'sm' | 'md' | 'lg' | null | undefined }) {
+  const iconSize =
+    size === 'xs' || size === 'sm'
+      ? 'size-icon-sm'
+      : size === 'lg'
+        ? 'size-icon-lg'
+        : 'size-icon-md';
   return (
     <svg
       aria-hidden="true"

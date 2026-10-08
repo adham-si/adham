@@ -9,8 +9,8 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * which is the exact failure `cn()` is here to prevent.
  */
 const NAMED_SCALES = {
-  'min-h': ['control-sm', 'control-md', 'control-lg'],
-  'min-w': ['control-sm', 'control-md', 'control-lg'],
+  'min-h': ['control-xs', 'control-sm', 'control-md', 'control-lg'],
+  'min-w': ['control-xs', 'control-sm', 'control-md', 'control-lg'],
   size: ['icon-sm', 'icon-md', 'icon-lg'],
   z: ['dialog', 'menu', 'popover', 'toast'],
 } as const;

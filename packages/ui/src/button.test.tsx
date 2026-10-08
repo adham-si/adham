@@ -120,6 +120,7 @@ describe('Button', () => {
 
   // --- sizes: min-h + padding, never a fixed height
   it.each([
+    ['xs', 'min-h-control-xs'],
     ['sm', 'min-h-control-sm'],
     ['md', 'min-h-control-md'],
     ['lg', 'min-h-control-lg'],
@@ -128,7 +129,7 @@ describe('Button', () => {
     expect(screen.getByRole('button').className).toContain(expected);
   });
 
-  it.each(['sm', 'md', 'lg'] as const)('size %s never fixes a height', (size) => {
+  it.each(['xs', 'sm', 'md', 'lg'] as const)('size %s never fixes a height', (size) => {
     render(<Button size={size}>Sized</Button>);
     const { className } = screen.getByRole('button');
     expect(className).not.toMatch(/(^|\s)h-\d/);
@@ -136,7 +137,7 @@ describe('Button', () => {
   });
 
   it('every size keeps rounded-md', () => {
-    for (const size of ['sm', 'md', 'lg'] as const) {
+    for (const size of ['xs', 'sm', 'md', 'lg'] as const) {
       const { container } = render(<Button size={size}>Rounded</Button>);
       expect(container.querySelector('button')?.className).toContain('rounded-md');
     }

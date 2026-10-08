@@ -22,7 +22,7 @@ function focusableWithin(container: HTMLElement): HTMLElement[] {
 }
 
 const dialogVariants = cva(
-  'relative w-full max-w-lg rounded-lg border border-border bg-surface-raised p-6 shadow-floating',
+  'relative w-full max-w-lg rounded-lg border border-border bg-surface-raised p-6',
   {
     variants: {
       size: {

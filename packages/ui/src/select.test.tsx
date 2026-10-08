@@ -172,6 +172,7 @@ describe('Select', () => {
   });
 
   it.each([
+    ['xs', 'min-h-control-xs'],
     ['sm', 'min-h-control-sm'],
     ['md', 'min-h-control-md'],
     ['lg', 'min-h-control-lg'],
@@ -191,14 +192,13 @@ describe('Select', () => {
     expect(className).toContain('focus-visible:outline-focus');
   });
 
-  it('popup: quiet 1px subtle border with a real floating shadow', async () => {
+  it('popup: quiet 1px subtle border without shadows', async () => {
     const user = userEvent.setup();
     renderSelect();
     await user.click(screen.getByRole('button', { name: 'Select a workspace' }));
     const { className } = screen.getByRole('listbox');
     expect(className).toContain('border-border-subtle');
-    expect(className).toContain('shadow-floating');
-    expect(className).not.toContain('shadow-shadow-floating');
+    expect(className).not.toContain('shadow');
   });
 
   it('popup rows breathe: 4px gap like nav lists, options never compress', async () => {

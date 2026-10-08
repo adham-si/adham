@@ -93,6 +93,7 @@ describe('Textarea', () => {
   });
 
   it.each([
+    ['xs', 'min-h-control-xs'],
     ['sm', 'min-h-control-sm'],
     ['md', 'min-h-control-md'],
     ['lg', 'min-h-control-lg'],
