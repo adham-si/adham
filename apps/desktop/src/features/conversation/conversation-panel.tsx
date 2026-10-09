@@ -1,8 +1,10 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageCard } from '@adham/ui';
 import {
   Composer,
   EmptyWelcome,
+  migratePendingDraft,
   useDrafts,
   type ComposeAttachment,
   type ComposeMode,
@@ -31,6 +33,7 @@ export interface ConversationPanelProps {
  * rendered unavailable instead of faked.
  */
 export function ConversationPanel({ backend = adhamClient }: ConversationPanelProps) {
+  const { t } = useTranslation();
   const conv = useConversation({ backend });
   const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({
     sessionId: conv.sessionId ?? PENDING_DRAFT_BUCKET,
@@ -47,14 +50,11 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
 
   // Drop the transient pre-bootstrap bucket residue once the backend session
-  // is known. Draft text itself lives in state and is unaffected.
+  // is known. Draft text itself lives in state and is unaffected; migration
+  // persists it under the session key so reloads and remounts keep it.
   React.useEffect(() => {
     if (!conv.sessionId) return;
-    try {
-      localStorage.removeItem(`adham:compose:draft:${PENDING_DRAFT_BUCKET}`);
-    } catch {
-      // ignore
-    }
+    migratePendingDraft(conv.sessionId);
   }, [conv.sessionId]);
 
   const handleSubmit = React.useCallback(async () => {
@@ -114,22 +114,41 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
 
       {/* Status and availability notices */}
       <div aria-live="polite">
-        {conv.status === 'bootstrapping' && <p>Starting conversation…</p>}
-        {conv.status === 'submitting' && <p>Saving message…</p>}
+        {conv.status === 'bootstrapping' && (
+          <p>{t('conversation.starting', 'Starting conversation…')}</p>
+        )}
+        {conv.status === 'submitting' && <p>{t('conversation.saving', 'Saving message…')}</p>}
         {conv.error && (
           <div role="alert">
             <p>{conv.error}</p>
-            <p>If this message may not have saved, reload history before resending.</p>
+            <p>
+              {t(
+                'conversation.uncertainHint',
+                'If this message may not have saved, reload history before resending.',
+              )}
+            </p>
             <button type="button" onClick={() => void conv.reload()}>
-              Reload history
+              {t('conversation.reloadHistory', 'Reload history')}
             </button>
           </div>
         )}
         {executionUnavailable && (
-          <p>Execution is unavailable in this build. Messages are saved as text only.</p>
+          <p>
+            {t(
+              'conversation.executionUnavailable',
+              'Execution is unavailable in this build. Messages are saved as text only.',
+            )}
+          </p>
         )}
-        {stopNotice && <p>Stop is unavailable: there is no running operation to cancel.</p>}
-        {notice && <p>{notice}</p>}
+        {stopNotice && (
+          <p>
+            {t(
+              'conversation.stopUnavailable',
+              'Stop is unavailable: there is no running operation to cancel.',
+            )}
+          </p>
+        )}
+        <p>{notice}</p>
       </div>
 
       {/* Composer: smoothly glides from center to bottom */}
@@ -157,8 +176,6 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
           onAddAttachments={(next) => setAttachments((prev) => [...prev, ...next])}
           onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
           approvalRequest={null}
-          scopeFolder="adham.si"
-          scopePolicy="always-ask"
           onRecallPrevious={() => {
             recallPrevious();
           }}

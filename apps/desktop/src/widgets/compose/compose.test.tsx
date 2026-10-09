@@ -9,6 +9,7 @@ import {
   ComposeModelPicker,
   ComposeStatusStrip,
   ComposeApprovalBar,
+  migratePendingDraft,
   useComposeState,
   useDrafts,
 } from './index';
@@ -90,6 +91,34 @@ describe('useDrafts', () => {
       expect(recalled).toBe('My draft query');
     });
     expect(result.current.draft).toBe('My draft query');
+  });
+
+  it('restores a draft persisted under its session key on remount', () => {
+    localStorage.setItem('adham:compose:draft:session-9', 'Restored words');
+    const { result, unmount } = renderHook(() => useDrafts({ sessionId: 'session-9' }));
+    expect(result.current.draft).toBe('Restored words');
+    unmount();
+  });
+});
+
+describe('migratePendingDraft', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('moves pre-bootstrap text into the resolved session bucket', () => {
+    localStorage.setItem('adham:compose:draft:pending', 'Early thought');
+    migratePendingDraft('sess-1');
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('Early thought');
+    expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
+  });
+
+  it('never overwrites a session bucket that already has text', () => {
+    localStorage.setItem('adham:compose:draft:pending', 'Early thought');
+    localStorage.setItem('adham:compose:draft:sess-1', 'Newer edit');
+    migratePendingDraft('sess-1');
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('Newer edit');
+    expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
   });
 });
 
@@ -222,6 +251,15 @@ describe('ComposeStatusStrip', () => {
     expect(screen.getByText(/Standing Approval/i)).toBeDefined();
     expect(screen.getByText(/16.0k \/ 128k/i)).toBeDefined();
     expect(screen.getByText('$0.12')).toBeDefined();
+  });
+
+  it('renders unknown instead of invented telemetry when nothing is reported', () => {
+    const { container } = render(<ComposeStatusStrip />);
+
+    expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
+    expect(container.textContent).not.toMatch(/12\.4k \/ 128k/);
+    expect(container.textContent).not.toMatch(/\$0\.00/);
+    expect(container.textContent).not.toMatch(/adham\.si/);
   });
 });
 

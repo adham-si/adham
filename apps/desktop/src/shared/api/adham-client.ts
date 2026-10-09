@@ -65,12 +65,14 @@ export interface AdhamClient {
     workspaceId: string,
     projectId: string,
     payload: { title: string | null },
+    options?: { requestId?: string },
   ): Promise<SessionSummary>;
   submitMessage(
     workspaceId: string,
     projectId: string,
     sessionId: string,
     payload: { text: string },
+    options?: { requestId?: string },
   ): Promise<SubmittedMessage>;
   getConversation(
     workspaceId: string,
@@ -90,10 +92,11 @@ export class AdhamApiClient implements AdhamClient {
       projectId: null,
       sessionId: null,
     },
+    requestId: string = generateRequestId(),
   ): CommandEnvelope<T> {
     return {
       protocolVersion: 1,
-      requestId: generateRequestId(),
+      requestId,
       context,
       payload,
     };
@@ -135,12 +138,17 @@ export class AdhamApiClient implements AdhamClient {
     workspaceId: string,
     projectId: string,
     payload: { title: string | null },
+    options?: { requestId?: string },
   ): Promise<SessionSummary> {
-    const envelope = this.wrapCommand(payload, {
-      workspaceId,
-      projectId,
-      sessionId: null,
-    });
+    const envelope = this.wrapCommand(
+      payload,
+      {
+        workspaceId,
+        projectId,
+        sessionId: null,
+      },
+      options?.requestId,
+    );
     const result = await invoke<CommandResult<SessionSummary>>('create_session', {
       request: envelope,
     });
@@ -152,12 +160,17 @@ export class AdhamApiClient implements AdhamClient {
     projectId: string,
     sessionId: string,
     payload: { text: string },
+    options?: { requestId?: string },
   ): Promise<SubmittedMessage> {
-    const envelope = this.wrapCommand(payload, {
-      workspaceId,
-      projectId,
-      sessionId,
-    });
+    const envelope = this.wrapCommand(
+      payload,
+      {
+        workspaceId,
+        projectId,
+        sessionId,
+      },
+      options?.requestId,
+    );
     const result = await invoke<CommandResult<SubmittedMessage>>('submit_message', {
       request: envelope,
     });

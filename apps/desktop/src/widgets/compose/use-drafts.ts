@@ -3,6 +3,26 @@ import * as React from 'react';
 const DRAFT_PREFIX = 'adham:compose:draft:';
 const HISTORY_PREFIX = 'adham:compose:history:';
 
+/**
+ * Carry pre-bootstrap draft text into the resolved session bucket. Draft
+ * state lives in React state and survives, but a reload or remount reads
+ * only the session bucket — without migration that text would be lost.
+ * Never overwrites a bucket that already has text.
+ */
+export function migratePendingDraft(nextSessionId: string): void {
+  try {
+    const pendingKey = `${DRAFT_PREFIX}pending`;
+    const targetKey = `${DRAFT_PREFIX}${nextSessionId}`;
+    const pending = localStorage.getItem(pendingKey);
+    if (pending && !localStorage.getItem(targetKey)) {
+      localStorage.setItem(targetKey, pending);
+    }
+    localStorage.removeItem(pendingKey);
+  } catch {
+    // ignore: migration is best-effort, in-memory text is unaffected
+  }
+}
+
 export interface UseDraftsOptions {
   sessionId?: string;
   maxHistory?: number;

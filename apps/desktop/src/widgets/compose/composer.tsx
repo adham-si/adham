@@ -29,12 +29,12 @@ export interface ComposerProps {
   onAddAttachments?: ((attachments: ComposeAttachment[]) => void) | undefined;
   onRemoveAttachment?: ((id: string) => void) | undefined;
   approvalRequest?: Omit<ComposeApprovalBarProps, 'className'> | null | undefined;
-  scopeFolder?: string | undefined;
-  scopePolicy?: ('standing-approval' | 'always-ask') | undefined;
-  usedTokens?: number | undefined;
-  maxTokens?: number | undefined;
-  sessionSpend?: string | undefined;
-  spendCap?: string | undefined;
+  scopeFolder?: string | null | undefined;
+  scopePolicy?: ('standing-approval' | 'always-ask') | null | undefined;
+  usedTokens?: number | null | undefined;
+  maxTokens?: number | null | undefined;
+  sessionSpend?: string | null | undefined;
+  spendCap?: string | null | undefined;
   onRecallPrevious?: (() => void) | undefined;
   onRecallNext?: (() => void) | undefined;
   placeholder?: string | undefined;
@@ -59,12 +59,12 @@ export function Composer({
   onAddAttachments = () => {},
   onRemoveAttachment = () => {},
   approvalRequest = null,
-  scopeFolder = 'adham.si',
-  scopePolicy = 'always-ask',
-  usedTokens = 14200,
-  maxTokens = 128000,
-  sessionSpend = '$0.00',
-  spendCap = '$2.00',
+  scopeFolder = null,
+  scopePolicy = null,
+  usedTokens = null,
+  maxTokens = null,
+  sessionSpend = null,
+  spendCap = null,
   onRecallPrevious,
   onRecallNext,
   placeholder,

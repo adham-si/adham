@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConversationPanel } from './conversation-panel';
+
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
 function fakeBackend() {
   return {
@@ -49,6 +54,17 @@ describe('ConversationPanel', () => {
     expect(screen.queryByText(/Verified sandbox execution/i)).toBeNull();
   });
 
+  it('renders telemetry as unknown and discloses the model gap in production', async () => {
+    const backend = fakeBackend();
+    render(<ConversationPanel backend={backend} />);
+    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+
+    expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/model selection is not applied/i)).toBeDefined();
+    expect(screen.queryByText(/12\.4k \/ 128k/)).toBeNull();
+    expect(screen.queryByText(/adham\.si/)).toBeNull();
+  });
+
   it('submits text and shows the backend-issued message while clearing the draft', async () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
@@ -88,6 +104,7 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(screen.getByText(/IPC offline/i)).toBeDefined());
     expect(box.value).toBe('unsaved words');
     expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /reload history/i })).toBeDefined();
   });
 
   it('marks execution unavailable in execute mode without any approval flow', async () => {
@@ -188,5 +205,6 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
 
     expect(box.value).toBe('early thought');
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
   });
 });
