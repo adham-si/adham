@@ -4,7 +4,6 @@ import { MessageCard } from '@adham/ui';
 import {
   Composer,
   EmptyWelcome,
-  migratePendingDraft,
   useDrafts,
   type ComposeAttachment,
   type ComposeMode,
@@ -48,14 +47,6 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
   const [stopNotice, setStopNotice] = React.useState(false);
 
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
-
-  // Drop the transient pre-bootstrap bucket residue once the backend session
-  // is known. Draft text itself lives in state and is unaffected; migration
-  // persists it under the session key so reloads and remounts keep it.
-  React.useEffect(() => {
-    if (!conv.sessionId) return;
-    migratePendingDraft(conv.sessionId);
-  }, [conv.sessionId]);
 
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();

@@ -1,5 +1,5 @@
 use adham_core_types::{ActorId, DomainError, InstallationId, ProjectId, WorkspaceId};
-use sqlx::{Pool, Row, Sqlite};
+use sqlx::{Pool, Row, Sqlite, Transaction};
 use time::OffsetDateTime;
 
 /// Authoritative installation + local-actor record.
@@ -147,22 +147,55 @@ async fn read_installation(pool: &Pool<Sqlite>) -> Result<Option<InstallationRec
     }
 }
 
-/// Record an explicitly authorized active scope. Called by creation
-/// commands after their transaction commits — never mined from history.
-pub async fn set_active_scope(
-    pool: &Pool<Sqlite>,
+async fn update_active_scope(
+    executor: &mut sqlx::SqliteConnection,
     workspace_id: Option<&WorkspaceId>,
     project_id: Option<&ProjectId>,
 ) -> Result<(), DomainError> {
     let now_us = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
-    sqlx::query(
+    let res = sqlx::query(
         "UPDATE installation SET active_workspace_id = ?, active_project_id = ?, updated_at_us = ? WHERE id = 1",
     )
     .bind(workspace_id.map(|w| w.to_string()))
     .bind(project_id.map(|p| p.to_string()))
     .bind(now_us)
-    .execute(pool)
+    .execute(executor)
     .await
     .map_err(|e| DomainError::Storage(e.to_string()))?;
+    if res.rows_affected() != 1 {
+        return Err(DomainError::Integrity(format!(
+            "installation selection update affected {} rows, expected exactly 1",
+            res.rows_affected()
+        )));
+    }
     Ok(())
+}
+
+/// Record an explicitly authorized active scope inside an open unit of
+/// work. Creation commands call this in the same transaction as their
+/// event + receipt so selection commits atomically with creation and can
+/// never replay as a new selection command. Exactly one installation row
+/// must be affected; zero rows is an integrity error, never silent
+/// success.
+pub async fn set_active_scope_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    workspace_id: Option<&WorkspaceId>,
+    project_id: Option<&ProjectId>,
+) -> Result<(), DomainError> {
+    update_active_scope(tx, workspace_id, project_id).await
+}
+
+/// Record an explicitly authorized active scope outside a creation
+/// transaction. Never mined from history. Exactly one installation row
+/// must be affected.
+pub async fn set_active_scope(
+    pool: &Pool<Sqlite>,
+    workspace_id: Option<&WorkspaceId>,
+    project_id: Option<&ProjectId>,
+) -> Result<(), DomainError> {
+    let mut conn = pool
+        .acquire()
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+    update_active_scope(&mut conn, workspace_id, project_id).await
 }

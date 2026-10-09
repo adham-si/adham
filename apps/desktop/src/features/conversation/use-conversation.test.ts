@@ -333,6 +333,209 @@ describe('useConversation request identity', () => {
     expect(ids).toHaveLength(2);
     expect(ids[0]).not.toBe(ids[1]);
   });
+
+  it('preserves the request identity for a coded storage-unavailable rejection', async () => {
+    const backend = fakeBackend();
+    const stored = new Map<string, unknown>();
+    let loseNext = true;
+    backend.submitMessage.mockImplementation(
+      async (
+        _ws: string,
+        _proj: string,
+        _sess: string,
+        payload: { text: string },
+        options?: { requestId?: string },
+      ) => {
+        const id = options?.requestId ?? 'missing-id';
+        if (stored.has(id)) return stored.get(id);
+        const saved = {
+          messageId: `msg-${id.slice(0, 8)}`,
+          sessionId: 'sess-1',
+          text: payload.text,
+          createdAt: '2026-10-09T00:00:01Z',
+          streamSequence: '1',
+          projectionPosition: '1',
+        };
+        stored.set(id, saved);
+        if (loseNext) {
+          loseNext = false;
+          // A coded storage failure is not proof of rollback.
+          throw {
+            protocolVersion: 1,
+            code: 'STORAGE_UNAVAILABLE',
+            messageKey: 'error.storageUnavailable',
+            retryable: true,
+            correlationId: 'corr-1',
+            fieldErrors: [],
+          };
+        }
+        return saved;
+      },
+    );
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let first: unknown;
+    await act(async () => {
+      first = await result.current.submit('hi');
+    });
+    expect(first).toEqual(expect.objectContaining({ ok: false, uncertain: true }));
+
+    let second: unknown;
+    await act(async () => {
+      second = await result.current.submit('hi');
+    });
+    expect(second).toEqual({ ok: true });
+
+    const ids = submitIds(backend);
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBe(ids[1]);
+    expect(stored.size).toBe(1);
+    expect(result.current.messages).toHaveLength(1);
+  });
+
+  it('yields one message when a lost acknowledgement is resent after remount', async () => {
+    const backend = fakeBackend();
+    const stored = new Map<string, unknown>();
+    let loseNext = true;
+    backend.submitMessage.mockImplementation(
+      async (
+        _ws: string,
+        _proj: string,
+        _sess: string,
+        payload: { text: string },
+        options?: { requestId?: string },
+      ) => {
+        const id = options?.requestId ?? 'missing-id';
+        if (stored.has(id)) return stored.get(id);
+        const saved = {
+          messageId: `msg-${id.slice(0, 8)}`,
+          sessionId: 'sess-1',
+          text: payload.text,
+          createdAt: '2026-10-09T00:00:01Z',
+          streamSequence: '1',
+          projectionPosition: '1',
+        };
+        stored.set(id, saved);
+        if (loseNext) {
+          loseNext = false;
+          throw new Error('connection lost after commit');
+        }
+        return saved;
+      },
+    );
+    const first = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(first.result.current.status).toBe('ready'));
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await first.result.current.submit('hi');
+    });
+    expect(outcome).toEqual(expect.objectContaining({ ok: false, uncertain: true }));
+    first.unmount();
+
+    const second = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(second.result.current.status).toBe('ready'));
+    await act(async () => {
+      outcome = await second.result.current.submit('hi');
+    });
+    expect(outcome).toEqual({ ok: true });
+
+    const ids = submitIds(backend);
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBe(ids[1]);
+    expect(stored.size).toBe(1);
+  });
+
+  it('blocks a different-text send while a previous write is unresolved', async () => {
+    const backend = fakeBackend();
+    backend.submitMessage.mockRejectedValueOnce(new Error('IPC offline'));
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => {
+      await result.current.submit('first words');
+    });
+    expect(result.current.status).toBe('error');
+
+    backend.submitMessage.mockClear();
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('different words');
+    });
+    expect(outcome).toEqual(
+      expect.objectContaining({
+        ok: false,
+        uncertain: true,
+        error: expect.stringMatching(/unknown save status/i),
+      }),
+    );
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not transfer an uncertain write identity to another session', async () => {
+    const backend = fakeBackend();
+    backend.submitMessage.mockRejectedValueOnce(new Error('IPC offline'));
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => {
+      await result.current.submit('hi');
+    });
+    expect(result.current.status).toBe('error');
+
+    await act(async () => {
+      await result.current.openSession('sess-2');
+    });
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-2'));
+
+    await act(async () => {
+      await result.current.submit('hi');
+    });
+    const ids = submitIds(backend);
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+
+  it('rejects an overlapping submit at the controller boundary', async () => {
+    const backend = fakeBackend();
+    let resolveFirst!: (value: unknown) => void;
+    backend.submitMessage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let first: Promise<unknown>;
+    let second: Promise<unknown>;
+    let firstOutcome: unknown;
+    let secondOutcome: unknown;
+    await act(async () => {
+      first = result.current.submit('one');
+      second = result.current.submit('two');
+      resolveFirst({
+        messageId: 'msg-1',
+        sessionId: 'sess-1',
+        text: 'one',
+        createdAt: '2026-10-09T00:00:01Z',
+        streamSequence: '1',
+        projectionPosition: '1',
+      });
+      firstOutcome = await first;
+      secondOutcome = await second;
+    });
+
+    expect(firstOutcome).toEqual({ ok: true });
+    expect(secondOutcome).toEqual({
+      ok: false,
+      uncertain: false,
+      error: 'A message is already being saved.',
+    });
+    expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useConversation session reuse', () => {
@@ -356,16 +559,70 @@ describe('useConversation session reuse', () => {
     expect(second.result.current.sessionId).toBe('sess-1');
   });
 
-  it('discards an unverifiable cached session and creates deliberately', async () => {
+  it('retains the cached session across a transient history outage', async () => {
     const backend = fakeBackend();
     const first = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(first.result.current.status).toBe('ready'));
     first.unmount();
 
-    backend.getConversation.mockRejectedValueOnce(new Error('gone'));
+    // A history failure is an outage, never evidence the session is gone.
+    backend.getConversation.mockRejectedValueOnce(new Error('storage briefly unavailable'));
+    const second = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(second.result.current.status).toBe('error'));
+
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '1',
+    });
+    await act(async () => {
+      await second.result.current.retry();
+    });
+
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(second.result.current.status).toBe('ready'));
+    expect(second.result.current.sessionId).toBe('sess-1');
+  });
+
+  it('creates no extra session when history fails after a successful create', async () => {
+    const backend = fakeBackend();
+    backend.getConversation.mockRejectedValueOnce(new Error('history outage'));
+    const first = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(first.result.current.status).toBe('error'));
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '1',
+    });
+    const second = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(second.result.current.status).toBe('ready'));
+
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(second.result.current.sessionId).toBe('sess-1');
+  });
+
+  it('does not resume a cached session after the selection changes', async () => {
+    const backend = fakeBackend();
+    const first = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(first.result.current.status).toBe('ready'));
+    expect(first.result.current.sessionId).toBe('sess-1');
+    first.unmount();
+
+    // The user selected another project; the cached session belongs to the
+    // old scope and must not be silently resumed.
+    backend.getBootstrapState.mockResolvedValue({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: 'proj-2',
+    });
     backend.createSession.mockResolvedValueOnce({
       sessionId: 'sess-2',
-      projectId: 'proj-1',
+      projectId: 'proj-2',
       title: null,
       createdAt: '2026-10-09T00:00:05Z',
     });
@@ -374,6 +631,11 @@ describe('useConversation session reuse', () => {
 
     expect(backend.createSession).toHaveBeenCalledTimes(2);
     expect(second.result.current.sessionId).toBe('sess-2');
+    expect(second.result.current.context).toEqual({
+      workspaceId: 'ws-1',
+      projectId: 'proj-2',
+      sessionId: 'sess-2',
+    });
   });
 
   it('retries an uncertain creation with the same request identity', async () => {
@@ -515,6 +777,33 @@ describe('useConversation read ordering', () => {
     });
 
     expect(result.current.messages).toEqual([expect.objectContaining({ id: 'msg-second' })]);
+  });
+
+  it('refuses to submit into the previous context after a failed switch', async () => {
+    const backend = fakeBackend();
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBe('sess-1');
+
+    backend.getConversation.mockRejectedValueOnce(new Error('gone'));
+    await act(async () => {
+      await result.current.openSession('sess-2');
+    });
+    expect(result.current.status).toBe('error');
+
+    backend.submitMessage.mockClear();
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hello');
+    });
+    expect(outcome).toEqual(
+      expect.objectContaining({
+        ok: false,
+        uncertain: false,
+        error: expect.stringMatching(/switch/i),
+      }),
+    );
+    expect(backend.submitMessage).not.toHaveBeenCalled();
   });
 
   it('retries the requested session after a failed switch', async () => {

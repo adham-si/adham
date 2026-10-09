@@ -207,4 +207,30 @@ describe('ConversationPanel', () => {
     expect(box.value).toBe('early thought');
     expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
   });
+
+  it('restores text typed before bootstrap across unmount and remount', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    // Bootstrap never resolves during the first mount.
+    backend.getBootstrapState.mockImplementationOnce(() => new Promise(() => {}));
+    const first = render(<ConversationPanel backend={backend} />);
+
+    const box = screen.getByRole('textbox', {
+      name: /composer input/i,
+    }) as HTMLTextAreaElement;
+    await user.type(box, 'early thought');
+    first.unmount();
+
+    const secondBackend = fakeBackend();
+    render(<ConversationPanel backend={secondBackend} />);
+    const restored = screen.getByRole('textbox', {
+      name: /composer input/i,
+    }) as HTMLTextAreaElement;
+    // Restored from the pending bucket on mount, and kept once the
+    // resolved session adopts it.
+    expect(restored.value).toBe('early thought');
+    await waitFor(() => expect(secondBackend.createSession).toHaveBeenCalled());
+    expect(restored.value).toBe('early thought');
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
+  });
 });

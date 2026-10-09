@@ -15,5 +15,6 @@ pub use fingerprint::{request_fingerprint, scope_fingerprint};
 pub use health::{StorageHealthReport, verify_storage_health};
 pub use identity::{
     InstallationInit, InstallationRecord, load_or_create_installation, set_active_scope,
+    set_active_scope_tx,
 };
 pub use store::{AppendEventRequest, AppendEventResult, CommandReceiptRecord, SqliteEventStore};

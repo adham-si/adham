@@ -12,9 +12,16 @@ export type ConversationStatus = 'bootstrapping' | 'ready' | 'submitting' | 'err
 
 export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain: boolean };
 
-export interface UncertainWrite {
+/// A frozen logical command whose outcome is unknown. Carries the full
+/// scope plus payload and request identity so retries and remounts replay
+/// the exact command instead of minting a duplicate under another text or
+/// scope. Persisted in sessionStorage until resolved.
+export interface PendingSend {
   requestId: string;
   text: string;
+  workspaceId: string;
+  projectId: string;
+  sessionId: string;
 }
 
 /// Backend capability report. Execution, streaming, and stop have no
@@ -74,16 +81,48 @@ export interface ConversationBackend {
   ): Promise<ConversationSnapshot>;
 }
 
-/// A backend envelope rejection (structured error with a code) is a
-/// definite answer: the command was not applied. Anything else thrown —
-/// dropped IPC, transport failure — leaves the outcome unknown.
-export function isBackendRejection(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    !(err instanceof Error) &&
-    typeof (err as { code?: unknown }).code === 'string'
-  );
+/// Codes the backend provably emits before any effect is applied.
+/// STORAGE_UNAVAILABLE and unknown errors are NOT proof of rollback —
+/// commit-failure handling returns storage failures when commit certainty
+/// or receipt reads are unavailable. Only whitelisted pre-effect
+/// rejections are definite; unknowns retain the logical command identity.
+const PRE_EFFECT_REJECTION_CODES = new Set([
+  'VALIDATION_FAILED',
+  'INVALID_COMMAND_VERSION',
+  'REQUEST_ID_CONFLICT',
+  'CONTEXT_MISMATCH',
+  'SESSION_NOT_FOUND',
+  'PROJECT_NOT_FOUND',
+  'WORKSPACE_NOT_FOUND',
+]);
+
+/// Un-prefixed validation strings the handlers emit before any effect.
+const PRE_EFFECT_REJECTION_MESSAGES = new Set([
+  'workspaceId context required',
+  'projectId context required',
+  'sessionId context required',
+]);
+
+function stringIsPreEffectRejection(err: string): boolean {
+  if (PRE_EFFECT_REJECTION_MESSAGES.has(err)) return true;
+  const colon = err.indexOf(':');
+  if (colon <= 0) return false;
+  return PRE_EFFECT_REJECTION_CODES.has(err.slice(0, colon));
+}
+
+/// A definite pre-effect rejection: the command provably was not applied,
+/// so its logical identity is spent. Everything else — storage
+/// unavailable, repair required, unknown codes, transport failures —
+/// leaves the outcome unknown and the identity must be retained.
+export function isDefinitePreEffectRejection(err: unknown): boolean {
+  if (typeof err === 'string') return stringIsPreEffectRejection(err);
+  if (typeof err === 'object' && err !== null && !(err instanceof Error)) {
+    const code = (err as { code?: unknown }).code;
+    if (typeof code === 'string' && PRE_EFFECT_REJECTION_CODES.has(code)) return true;
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && PRE_EFFECT_REJECTION_MESSAGES.has(message)) return true;
+  }
+  return false;
 }
 
 function rejectionMessage(err: unknown): string {
@@ -185,12 +224,53 @@ function readCreateIntent(workspaceId: string, projectId: string): CreateIntent 
   }
 }
 
+const PENDING_SEND_KEY = 'adham:compose:pending-send';
+
+function readPendingSend(): PendingSend | null {
+  const raw = readStorage(PENDING_SEND_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PendingSend>;
+    if (
+      typeof parsed.requestId === 'string' &&
+      typeof parsed.text === 'string' &&
+      typeof parsed.workspaceId === 'string' &&
+      typeof parsed.projectId === 'string' &&
+      typeof parsed.sessionId === 'string'
+    ) {
+      return parsed as PendingSend;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingSend(record: PendingSend): void {
+  writeStorage(PENDING_SEND_KEY, JSON.stringify(record));
+}
+
+function removePendingSend(): void {
+  removeStorage(PENDING_SEND_KEY);
+}
+
+function sameScope(
+  a: { workspaceId: string; projectId: string; sessionId: string },
+  b: { workspaceId: string; projectId: string; sessionId: string },
+): boolean {
+  return (
+    a.workspaceId === b.workspaceId && a.projectId === b.projectId && a.sessionId === b.sessionId
+  );
+}
+
 export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [status, setStatus] = React.useState<ConversationStatus>('bootstrapping');
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [context, setContext] = React.useState<ConversationContext | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [uncertainWrite, setUncertainWrite] = React.useState<UncertainWrite | null>(null);
+  // Hydrated from sessionStorage so a remount never loses the frozen
+  // logical command of an unresolved write.
+  const [pendingSend, setPendingSend] = React.useState<PendingSend | null>(() => readPendingSend());
 
   const mountedRef = React.useRef(true);
   const bootPromiseRef = React.useRef<Promise<ConversationContext | null> | null>(null);
@@ -206,6 +286,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // only superseded by a newer request. Retries and reloads target the
   // requested session, never silently the previous one.
   const requestedRef = React.useRef<ConversationContext | null>(null);
+  // Frozen-command ordering: a reload may only resolve a pending send
+  // when no newer pending send was recorded while the reload was in
+  // flight.
+  const pendingSeqRef = React.useRef(0);
+  // Controller-boundary submit guard: overlapping submits are rejected
+  // before any dispatch, not merely hidden by a later busy render.
+  const submitInFlightRef = React.useRef(false);
 
   React.useEffect(() => {
     mountedRef.current = true;
@@ -267,40 +354,57 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         loadSeqRef.current += 1;
         return { loadSeq: loadSeqRef.current, mutationSeq: mutationSeqRef.current };
       };
-      // 1. Resume a cached session after verifying it still loads. This
-      // makes remounts safe: no second session is created for the same UI.
+      const superseded = (seq: { loadSeq: number; mutationSeq: number }) =>
+        !mountedRef.current ||
+        generationRef.current !== generation ||
+        loadSeqRef.current !== seq.loadSeq ||
+        mutationSeqRef.current !== seq.mutationSeq;
+      // 1. Trusted selection: the bootstrap snapshot is the authority for
+      //    the active workspace/project. A cached session may only be
+      //    resumed when it still belongs to that selection, so a stale
+      //    cache can never bypass a newer choice.
+      let snapshot: BootstrapSnapshot;
+      try {
+        snapshot = await backend.getBootstrapState();
+      } catch (err) {
+        if (mountedRef.current && generationRef.current === generation) {
+          fail(
+            `${err instanceof Error ? err.message : 'Bootstrap state failed to load.'} Retry once connectivity returns.`,
+          );
+        }
+        return null;
+      }
+      if (!snapshot.isInitialized || !snapshot.activeWorkspaceId || !snapshot.activeProjectId) {
+        if (mountedRef.current && generationRef.current === generation) {
+          fail('No provisioned workspace or project. Create one before chatting.');
+        }
+        return null;
+      }
+      const ws = snapshot.activeWorkspaceId;
+      const proj = snapshot.activeProjectId;
+      // 2. Resume a cached session only within the trusted selection. A
+      //    history failure is an outage, never evidence the session is
+      //    gone: the cache and session identity are retained and nothing
+      //    is recreated.
       const cached = readSessionCache();
-      if (cached) {
+      if (cached && cached.workspaceId === ws && cached.projectId === proj) {
         const seq = freshSeq();
         if (await loadHistory(cached, generation, seq.loadSeq, seq.mutationSeq)) {
           createdRef.current = cached;
           writeStorage(SESSION_CACHE_KEY, JSON.stringify(cached));
           return cached;
         }
-        // A superseded verification must not fall through to creation.
-        if (
-          !mountedRef.current ||
-          generationRef.current !== generation ||
-          loadSeqRef.current !== seq.loadSeq ||
-          mutationSeqRef.current !== seq.mutationSeq
-        ) {
-          return null;
-        }
+        if (superseded(seq)) return null;
+        fail('Saved conversation could not be loaded. Retry once connectivity returns.');
+        return null;
+      }
+      if (cached) {
         removeStorage(SESSION_CACHE_KEY);
       }
-      // 2. Deliberate creation with a stable request identity persisted
+      // 3. Deliberate creation with a stable request identity persisted
       // across remounts and retries, so an uncertain creation never forks
       // a duplicate session: the backend receipt replays the original.
       try {
-        const snapshot = await backend.getBootstrapState();
-        if (!snapshot.isInitialized || !snapshot.activeWorkspaceId || !snapshot.activeProjectId) {
-          if (mountedRef.current && generationRef.current === generation) {
-            fail('No provisioned workspace or project. Create one before chatting.');
-          }
-          return null;
-        }
-        const ws = snapshot.activeWorkspaceId;
-        const proj = snapshot.activeProjectId;
         let intent = readCreateIntent(ws, proj);
         if (!intent) {
           intent = { requestId: crypto.randomUUID(), workspaceId: ws, projectId: proj };
@@ -317,9 +421,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             },
           );
         } catch (err) {
-          // Definite rejections will fail identically on retry; only
-          // uncertain (possibly committed) creations keep their identity.
-          if (isBackendRejection(err)) removeStorage(CREATE_INTENT_KEY);
+          // Only proven pre-effect rejections clear the identity; unknown
+          // or storage errors may have committed and must retry with the
+          // same request identity.
+          if (isDefinitePreEffectRejection(err)) removeStorage(CREATE_INTENT_KEY);
           throw err;
         }
         const ctx: ConversationContext = {
@@ -327,19 +432,20 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           projectId: proj,
           sessionId: session.sessionId,
         };
-        // In-memory creation record: retries within this mount resume it
-        // without creating again. The sessionStorage cache is written only
-        // after a verified history load below.
+        // Durable identity first: the backend has issued the session, so
+        // the cache is written before history verification and the create
+        // intent is cleared only once the cache holds the identity. A
+        // history outage after a successful create can then never cause a
+        // second creation on remount.
         createdRef.current = ctx;
+        writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx));
         removeStorage(CREATE_INTENT_KEY);
         const seq = freshSeq();
-        if (await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq)) {
-          writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx));
-        }
+        await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq);
         return ctx;
       } catch (err) {
         if (mountedRef.current && generationRef.current === generation) {
-          if (isBackendRejection(err)) {
+          if (isDefinitePreEffectRejection(err)) {
             fail(rejectionMessage(err));
           } else {
             fail(
@@ -361,7 +467,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// Reload history without submitting or creating anything. Targets the
   /// requested session when a switch is pending, so a failed switch
   /// followed by reload retries the requested target. Used to verify
-  /// uncertain writes instead of blindly resubmitting them.
+  /// uncertain writes instead of blindly resubmitting them: a successful
+  /// reload resolves the frozen pending send for this scope, because the
+  /// backend returns the full session history in one page — presence
+  /// proves the write landed, absence proves it did not.
   const reload = React.useCallback(async () => {
     const ctx = requestedRef.current ?? context ?? createdRef.current;
     if (!ctx) {
@@ -371,7 +480,20 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     setStatus('bootstrapping');
     setError(null);
     loadSeqRef.current += 1;
-    await loadHistory(ctx, generationRef.current, loadSeqRef.current, mutationSeqRef.current);
+    const pendingSeq = pendingSeqRef.current;
+    const loaded = await loadHistory(
+      ctx,
+      generationRef.current,
+      loadSeqRef.current,
+      mutationSeqRef.current,
+    );
+    if (loaded && pendingSeq === pendingSeqRef.current) {
+      const pending = readPendingSend();
+      if (pending && sameScope(pending, ctx)) {
+        removePendingSend();
+        setPendingSend(null);
+      }
+    }
   }, [backend, bootstrap, context, loadHistory]);
   /// Retry after a failed start without creating a second session: a
   /// created session is resumed and only its history reloads. Prefers the
@@ -425,20 +547,71 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     async (text: string): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed) return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+      // Controller-boundary guard: overlapping submits are rejected before
+      // any dispatch, not merely hidden by a later busy render.
+      if (submitInFlightRef.current) {
+        return { ok: false, error: 'A message is already being saved.', uncertain: false };
+      }
+      // A requested session switch that has not resolved must never fall
+      // back to the previous context for sending.
+      if (requestedRef.current && requestedRef.current.sessionId !== context?.sessionId) {
+        return {
+          ok: false,
+          error: 'Session switch has not completed. Retry the switch before sending.',
+          uncertain: false,
+        };
+      }
       let ctx = context;
       if (!ctx) {
         setStatus('bootstrapping');
         ctx = await bootstrap();
         if (!ctx) return { ok: false, error: 'Conversation is not ready.', uncertain: false };
+        if (requestedRef.current && requestedRef.current.sessionId !== ctx.sessionId) {
+          return {
+            ok: false,
+            error: 'Session switch has not completed. Retry the switch before sending.',
+            uncertain: false,
+          };
+        }
       }
-      // Same text as an unresolved uncertain write is the same logical
-      // command: reuse its exact request identity so the backend receipt
-      // replays the original instead of storing a duplicate.
-      const requestId =
-        uncertainWrite?.text === trimmed ? uncertainWrite.requestId : crypto.randomUUID();
+      // Frozen logical command: an unresolved uncertain write keeps its
+      // exact identity and scope until a reload verifies it. The same
+      // text in the same scope reuses that identity so the backend
+      // receipt replays the original; any other text in the same scope is
+      // blocked so it can never steal or replace the identity. A pending
+      // write from another session is left untouched and never transfers
+      // its identity across scopes.
+      const pending = readPendingSend();
+      let requestId: string;
+      if (pending && sameScope(pending, ctx)) {
+        if (pending.text !== trimmed) {
+          const message =
+            'A previous message has an unknown save status. Reload history or resend it before sending another message.';
+          setError(message);
+          setStatus('error');
+          return { ok: false, error: message, uncertain: true };
+        }
+        requestId = pending.requestId;
+      } else {
+        requestId = crypto.randomUUID();
+      }
       const generation = generationRef.current;
+      submitInFlightRef.current = true;
       setStatus('submitting');
       setError(null);
+      const freezeRecord = (): PendingSend => {
+        const record: PendingSend = {
+          requestId,
+          text: trimmed,
+          workspaceId: ctx.workspaceId,
+          projectId: ctx.projectId,
+          sessionId: ctx.sessionId,
+        };
+        writePendingSend(record);
+        pendingSeqRef.current += 1;
+        setPendingSend(record);
+        return record;
+      };
       try {
         const submitted = await backend.submitMessage(
           ctx.workspaceId,
@@ -457,27 +630,41 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setMessages((prev) =>
           prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming],
         );
-        setUncertainWrite((prev) => (prev?.requestId === requestId ? null : prev));
+        if (readPendingSend()?.requestId === requestId) removePendingSend();
+        setPendingSend((prev) => (prev?.requestId === requestId ? null : prev));
         setStatus('ready');
         return { ok: true };
       } catch (err) {
+        const definite = isDefinitePreEffectRejection(err);
         if (!mountedRef.current || generationRef.current !== generation) {
+          // The command was already dispatched to the previous scope; an
+          // unknown outcome must still freeze its identity for that scope.
+          if (!definite) freezeRecord();
           return { ok: false, error: 'Session changed while sending.', uncertain: false };
         }
-        if (isBackendRejection(err)) {
+        if (definite) {
+          // Proven pre-effect: nothing was stored, the logical identity is
+          // spent, and a future send mints a fresh one.
+          if (readPendingSend()?.requestId === requestId) removePendingSend();
+          setPendingSend((prev) => (prev?.requestId === requestId ? null : prev));
           const message = rejectionMessage(err);
           setError(message);
           setStatus('error');
           return { ok: false, error: message, uncertain: false };
         }
+        // Unknown outcome: freeze the full logical command so retries and
+        // remounts replay it instead of minting a duplicate under another
+        // text or scope.
+        freezeRecord();
         const message = err instanceof Error ? err.message : 'Message was not saved.';
-        setUncertainWrite({ requestId, text: trimmed });
         setError(`${message} Save status is unknown. Reload history before resending.`);
         setStatus('error');
         return { ok: false, error: message, uncertain: true };
+      } finally {
+        submitInFlightRef.current = false;
       }
     },
-    [backend, bootstrap, context, uncertainWrite],
+    [backend, bootstrap, context],
   );
 
   return {
@@ -486,7 +673,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     context,
     sessionId: context?.sessionId ?? null,
     error,
-    uncertainWrite,
+    pendingSend,
     submit,
     retry,
     reload,
