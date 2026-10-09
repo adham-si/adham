@@ -1,10 +1,14 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';
 import { fakeBackend, submitIds } from './conversation-test-utils';
 
 beforeEach(() => {
   sessionStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('useConversation request identity', () => {
@@ -335,7 +339,7 @@ describe('useConversation request identity', () => {
     expect(sessionStorage.getItem('adham:compose:pending-send')).toBeNull();
   });
 
-  it('reload retains the request identity when the pending save is absent from history', async () => {
+  it('reload keeps the request identity and resurfaces the unresolved save', async () => {
     const backend = fakeBackend();
     const stored = new Map<string, unknown>();
     let loseNext = true;
@@ -405,9 +409,36 @@ describe('useConversation request identity', () => {
     expect(stored.size).toBe(1);
   });
 
-  it('reload clears the request identity only when history contains the pending save', async () => {
+  it('reload never clears the request identity, even when history shows the same text', async () => {
     const backend = fakeBackend();
-    backend.submitMessage.mockRejectedValueOnce(new Error('IPC offline'));
+    const stored = new Map<string, unknown>();
+    let loseNext = true;
+    backend.submitMessage.mockImplementation(
+      async (
+        _ws: string,
+        _proj: string,
+        _sess: string,
+        payload: { text: string },
+        options?: { requestId?: string },
+      ) => {
+        const id = options?.requestId ?? 'missing-id';
+        if (stored.has(id)) return stored.get(id);
+        const saved = {
+          messageId: `msg-${id.slice(0, 8)}`,
+          sessionId: 'sess-1',
+          text: payload.text,
+          createdAt: '2026-10-09T00:00:01Z',
+          streamSequence: '1',
+          projectionPosition: '1',
+        };
+        stored.set(id, saved);
+        if (loseNext) {
+          loseNext = false;
+          throw new Error('connection lost after commit');
+        }
+        return saved;
+      },
+    );
     const { result } = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
@@ -415,15 +446,18 @@ describe('useConversation request identity', () => {
       await result.current.submit('hi');
     });
     expect(result.current.status).toBe('error');
+    const frozenId = submitIds(backend)[0];
 
+    // An OLDER message with the same text is not proof of the same save.
+    // Reload must not clear the identity on a text match.
     backend.getConversation.mockResolvedValueOnce({
       items: [
         {
-          messageId: 'msg-landed',
+          messageId: 'msg-old',
           role: 'user',
           text: 'hi',
-          createdAt: '2026-10-09T00:00:03Z',
-          sourceEventId: 'evt-landed',
+          createdAt: '2026-10-08T00:00:00Z',
+          sourceEventId: 'evt-old',
         },
       ],
       nextCursor: null,
@@ -432,16 +466,76 @@ describe('useConversation request identity', () => {
     await act(async () => {
       await result.current.reload();
     });
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    expect(sessionStorage.getItem('adham:compose:pending-send')).toBeNull();
+    expect(result.current.status).toBe('error');
+    expect(
+      (
+        JSON.parse(sessionStorage.getItem('adham:compose:pending-send') ?? 'null') as {
+          requestId?: string;
+        } | null
+      )?.requestId,
+    ).toBe(frozenId);
 
-    // Identity was resolved: the next send mints a fresh one.
+    // Only the receipt replay for that exact request resolves it.
+    let outcome: unknown;
     await act(async () => {
-      await result.current.submit('next');
+      outcome = await result.current.submit('hi');
     });
+    expect(outcome).toEqual({ ok: true });
     const ids = submitIds(backend);
     expect(ids).toHaveLength(2);
-    expect(ids[0]).not.toBe(ids[1]);
+    expect(ids[0]).toBe(ids[1]);
+    expect(stored.size).toBe(1);
+    expect(sessionStorage.getItem('adham:compose:pending-send')).toBeNull();
+  });
+
+  it('blocks dispatch when the identity record cannot be written', async () => {
+    const backend = fakeBackend();
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('quota exceeded');
+    });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hi');
+    });
+
+    expect(outcome).toEqual({
+      ok: false,
+      uncertain: false,
+      error: expect.stringMatching(/identity could not be recorded/i),
+    });
+    // No dispatch without a durable identity.
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('adham:compose:pending-send')).toBeNull();
+    setItemSpy.mockRestore();
+  });
+
+  it('serializes concurrent submits that both wait on bootstrap', async () => {
+    const backend = fakeBackend();
+    const { result } = renderHook(() => useConversation({ backend }));
+
+    // Both submits arrive before the context exists.
+    let first: Promise<unknown>;
+    let second: Promise<unknown>;
+    let firstOutcome: unknown;
+    let secondOutcome: unknown;
+    await act(async () => {
+      first = result.current.submit('one');
+      second = result.current.submit('two');
+      firstOutcome = await first;
+      secondOutcome = await second;
+    });
+
+    expect(firstOutcome).toEqual({ ok: true });
+    expect(secondOutcome).toEqual({
+      ok: false,
+      uncertain: false,
+      error: 'A message is already being saved.',
+    });
+    expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an overlapping submit at the controller boundary', async () => {

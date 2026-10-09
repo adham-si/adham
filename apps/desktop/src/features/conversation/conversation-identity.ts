@@ -81,11 +81,16 @@ export function readStorage(key: string): string | null {
   }
 }
 
-export function writeStorage(key: string, value: string): void {
+/// Returns false when the write could not be persisted. Callers that
+/// freeze a logical command BEFORE dispatch must treat false as a hard
+/// block: dispatching without a durable identity reopens the duplicate
+/// window this record exists to close.
+export function writeStorage(key: string, value: string): boolean {
   try {
     sessionStorage.setItem(key, value);
+    return true;
   } catch {
-    // ignore: caching is best-effort, correctness never depends on it
+    return false;
   }
 }
 
@@ -169,8 +174,10 @@ export function readPendingSend(): PendingSend | null {
   }
 }
 
-export function writePendingSend(record: PendingSend): void {
-  writeStorage(PENDING_SEND_KEY, JSON.stringify(record));
+/// Returns false when the frozen record could not be persisted — the
+/// caller must NOT dispatch in that case.
+export function writePendingSend(record: PendingSend): boolean {
+  return writeStorage(PENDING_SEND_KEY, JSON.stringify(record));
 }
 
 export function removePendingSend(): void {

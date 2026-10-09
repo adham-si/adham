@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import * as React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';
@@ -7,6 +7,10 @@ import { fakeBackend } from './conversation-test-utils';
 
 beforeEach(() => {
   sessionStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('useConversation submit', () => {
@@ -318,6 +322,54 @@ describe('useConversation session reuse', () => {
     expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/i);
     expect(ids[0]).toBe(ids[1]);
     await waitFor(() => expect(result.current.status).toBe('ready'));
+  });
+
+  it('does not create a session when the create intent cannot be recorded', async () => {
+    const backend = fakeBackend();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('quota exceeded');
+    });
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+
+    // Dispatch blocked: no session without a durable creation identity.
+    expect(backend.createSession).not.toHaveBeenCalled();
+    expect(result.current.sessionId).toBeNull();
+    expect(result.current.error).toMatch(/identity could not be recorded/i);
+  });
+
+  it('retains the create intent when the session cache write fails', async () => {
+    const backend = fakeBackend();
+    const originalSetItem = Storage.prototype.setItem;
+    let failCache = true;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
+      if (key === 'adham:compose:session' && failCache) {
+        failCache = false;
+        throw new Error('quota exceeded');
+      }
+      originalSetItem.call(this, key, value);
+    });
+
+    const first = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(first.result.current.status).toBe('ready'));
+    // Cache write failed, so the intent must have survived.
+    expect(sessionStorage.getItem('adham:compose:session')).toBeNull();
+    expect(sessionStorage.getItem('adham:compose:create-intent')).not.toBeNull();
+    first.unmount();
+
+    // The remount replays creation with the SAME request identity, so the
+    // backend receipt cannot fork a duplicate session.
+    const second = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(second.result.current.status).toBe('ready'));
+    expect(backend.createSession).toHaveBeenCalledTimes(2);
+    const ids = creationIds(backend);
+    expect(ids[0]).toBe(ids[1]);
+    expect(sessionStorage.getItem('adham:compose:session')).not.toBeNull();
+    expect(sessionStorage.getItem('adham:compose:create-intent')).toBeNull();
   });
 
   it('resolves a submit started before unmount without applying state', async () => {
