@@ -187,13 +187,14 @@ impl TaskGraph {
 
     fn is_transition_allowed(from: NodeLifecycle, to: NodeLifecycle) -> bool {
         use NodeLifecycle::*;
+        // Completed/Failed assert execution happened, so they require
+        // Running (dispatch + delegation evidence). Ready may only take
+        // non-execution outcomes (Running dispatch, Canceled, Skipped).
         matches!(
             (from, to),
             (Pending, Ready)
                 | (Pending, Skipped)
                 | (Ready, Running)
-                | (Ready, Completed)
-                | (Ready, Failed)
                 | (Ready, Canceled)
                 | (Ready, Skipped)
                 | (Running, Completed)

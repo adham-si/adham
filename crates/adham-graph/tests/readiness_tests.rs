@@ -1,7 +1,9 @@
 use adham_graph::domain::edge::EdgeDefinition;
 use adham_graph::domain::graph::{GraphError, TaskGraph};
 use adham_graph::domain::node::{NodeDefinition, NodeId, NodeKind, NodeLifecycle, NodeState};
-use adham_graph::engine::scheduler::{advance_graph_state, mark_node_completed, mark_node_failed};
+use adham_graph::engine::scheduler::{
+    advance_graph_state, mark_node_completed, mark_node_failed, mark_node_running,
+};
 
 #[test]
 fn test_topological_readiness_and_completion_cascade() {
@@ -33,7 +35,9 @@ fn test_topological_readiness_and_completion_cascade() {
         NodeLifecycle::Pending
     );
 
-    // 2. Mark root completed -> child becomes ready
+    // 2. Dispatch root (Ready -> Running) then complete -> child is ready.
+    // Completion requires Running: outcomes cannot skip dispatch.
+    mark_node_running(&mut graph, &NodeId::new("root"), "del-root".to_string()).unwrap();
     mark_node_completed(
         &mut graph,
         &NodeId::new("root"),
@@ -63,7 +67,8 @@ fn test_failure_cascades_to_skipped_for_dependent_nodes() {
 
     let _ = advance_graph_state(&mut graph);
 
-    // Fail node A -> node B is skipped
+    // Fail node A (via Running dispatch) -> node B is skipped
+    mark_node_running(&mut graph, &NodeId::new("a"), "del-a".to_string()).unwrap();
     mark_node_failed(&mut graph, &NodeId::new("a"), "Failed check".to_string()).unwrap();
     let ready = advance_graph_state(&mut graph).unwrap();
     assert!(ready.is_empty());
