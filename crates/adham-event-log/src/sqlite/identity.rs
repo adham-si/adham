@@ -1,4 +1,4 @@
-use adham_core_types::{ActorId, DomainError, InstallationId};
+use adham_core_types::{ActorId, DomainError, InstallationId, ProjectId, WorkspaceId};
 use sqlx::{Pool, Row, Sqlite};
 use time::OffsetDateTime;
 
@@ -7,10 +7,16 @@ use time::OffsetDateTime;
 /// Single-row `installation(id=1)` table. No file fallback: two authorities can
 /// disagree and silently fork identities after corruption. Missing or corrupt
 /// rows are explicit errors, never silent regeneration.
+///
+/// The active workspace/project is explicit authorized selection: creation
+/// commands record it here, and bootstrap reads it. History is never mined
+/// for an active scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstallationRecord {
     pub installation_id: InstallationId,
     pub actor_id: ActorId,
+    pub active_workspace_id: Option<WorkspaceId>,
+    pub active_project_id: Option<ProjectId>,
 }
 
 /// Result of loading or creating the installation record.
@@ -99,10 +105,12 @@ async fn has_surviving_state(pool: &Pool<Sqlite>) -> Result<bool, DomainError> {
 }
 
 async fn read_installation(pool: &Pool<Sqlite>) -> Result<Option<InstallationRecord>, DomainError> {
-    let row = sqlx::query("SELECT installation_id, actor_id FROM installation WHERE id = 1")
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| DomainError::Storage(e.to_string()))?;
+    let row = sqlx::query(
+        "SELECT installation_id, actor_id, active_workspace_id, active_project_id FROM installation WHERE id = 1",
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| DomainError::Storage(e.to_string()))?;
     match row {
         None => Ok(None),
         Some(r) => {
@@ -113,10 +121,48 @@ async fn read_installation(pool: &Pool<Sqlite>) -> Result<Option<InstallationRec
             })?;
             let actor_id = ActorId::from_string(&actor_str)
                 .map_err(|e| DomainError::Integrity(format!("corrupt actor_id in store: {e}")))?;
+            let active_workspace_id: Option<String> = r.get("active_workspace_id");
+            let active_project_id: Option<String> = r.get("active_project_id");
+            let active_workspace_id = active_workspace_id
+                .map(|s| {
+                    WorkspaceId::from_string(&s).map_err(|e| {
+                        DomainError::Integrity(format!("corrupt active_workspace_id: {e}"))
+                    })
+                })
+                .transpose()?;
+            let active_project_id = active_project_id
+                .map(|s| {
+                    ProjectId::from_string(&s).map_err(|e| {
+                        DomainError::Integrity(format!("corrupt active_project_id: {e}"))
+                    })
+                })
+                .transpose()?;
             Ok(Some(InstallationRecord {
                 installation_id,
                 actor_id,
+                active_workspace_id,
+                active_project_id,
             }))
         }
     }
+}
+
+/// Record an explicitly authorized active scope. Called by creation
+/// commands after their transaction commits — never mined from history.
+pub async fn set_active_scope(
+    pool: &Pool<Sqlite>,
+    workspace_id: Option<&WorkspaceId>,
+    project_id: Option<&ProjectId>,
+) -> Result<(), DomainError> {
+    let now_us = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
+    sqlx::query(
+        "UPDATE installation SET active_workspace_id = ?, active_project_id = ?, updated_at_us = ? WHERE id = 1",
+    )
+    .bind(workspace_id.map(|w| w.to_string()))
+    .bind(project_id.map(|p| p.to_string()))
+    .bind(now_us)
+    .execute(pool)
+    .await
+    .map_err(|e| DomainError::Storage(e.to_string()))?;
+    Ok(())
 }

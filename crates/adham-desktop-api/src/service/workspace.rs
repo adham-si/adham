@@ -4,7 +4,7 @@ use super::common::conflict_msg;
 use crate::dtos::*;
 use crate::handlers::ApiContext;
 use adham_core_types::*;
-use adham_event_log::{AppendEventRequest, SqliteEventStore};
+use adham_event_log::{set_active_scope, AppendEventRequest, SqliteEventStore};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
@@ -76,7 +76,14 @@ pub async fn create_workspace(
             .await
             .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         if matches {
-            return replay(env.request_id, receipt);
+            let out = replay(env.request_id, receipt)?;
+            let ws = WorkspaceId::from_string(&out.data.workspace_id).map_err(|e| e.to_string())?;
+            // Converge selection: the first execution may have committed
+            // before recording it.
+            set_active_scope(&ctx.pool, Some(&ws), None)
+                .await
+                .map_err(|e| e.to_string())?;
+            return Ok(out);
         }
         return Err(conflict_msg());
     }
@@ -159,13 +166,25 @@ pub async fn create_workspace(
                     && receipt.request_fingerprint == request_fp
                     && receipt.scope_fingerprint == scope_fp;
                 if matches {
-                    return replay(env.request_id, receipt);
+                    let out = replay(env.request_id, receipt)?;
+                    let ws = WorkspaceId::from_string(&out.data.workspace_id)
+                        .map_err(|e| e.to_string())?;
+                    set_active_scope(&ctx.pool, Some(&ws), None)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    return Ok(out);
                 }
                 return Err(conflict_msg());
             }
             _ => return Err(format!("STORAGE_UNAVAILABLE: commit failed: {e}")),
         }
     }
+    // Explicit authorized selection: creating a workspace makes it active
+    // and clears any project selection from another workspace. Recorded
+    // after commit; a failure here surfaces so retry converges via replay.
+    set_active_scope(&ctx.pool, Some(&workspace_id), None)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(CommandResult {
         protocol_version: 1,
         request_id: env.request_id,
@@ -229,7 +248,13 @@ pub async fn create_project(
             .await
             .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         if matches {
-            return replay_project(env.request_id, receipt);
+            let out = replay_project(env.request_id, receipt)?;
+            let ws = WorkspaceId::from_string(&out.data.workspace_id).map_err(|e| e.to_string())?;
+            let proj = ProjectId::from_string(&out.data.project_id).map_err(|e| e.to_string())?;
+            set_active_scope(&ctx.pool, Some(&ws), Some(&proj))
+                .await
+                .map_err(|e| e.to_string())?;
+            return Ok(out);
         }
         return Err(conflict_msg());
     }
@@ -310,13 +335,26 @@ pub async fn create_project(
                     && receipt.request_fingerprint == request_fp
                     && receipt.scope_fingerprint == scope_fp;
                 if matches {
-                    return replay_project(env.request_id, receipt);
+                    let out = replay_project(env.request_id, receipt)?;
+                    let ws = WorkspaceId::from_string(&out.data.workspace_id)
+                        .map_err(|e| e.to_string())?;
+                    let proj =
+                        ProjectId::from_string(&out.data.project_id).map_err(|e| e.to_string())?;
+                    set_active_scope(&ctx.pool, Some(&ws), Some(&proj))
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    return Ok(out);
                 }
                 return Err(conflict_msg());
             }
             _ => return Err(format!("STORAGE_UNAVAILABLE: commit failed: {e}")),
         }
     }
+    // Explicit authorized selection: the created project becomes active in
+    // its workspace. Recorded after commit; failures surface for retry.
+    set_active_scope(&ctx.pool, Some(&ws_id), Some(&project_id))
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(CommandResult {
         protocol_version: 1,
         request_id: env.request_id,

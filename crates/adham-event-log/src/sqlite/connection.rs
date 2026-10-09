@@ -25,11 +25,28 @@ pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Er
     info!("Running embedded SQLite database schema initialization...");
     pool.execute(SCHEMA_SQL).await?;
     pool.execute(INSTALLATION_SQL).await?;
+    ensure_installation_scope_columns(&pool).await?;
     ensure_receipt_actor_column(&pool).await?;
     ensure_content_scope_columns(&pool).await?;
     info!("Database schema initialized successfully.");
 
     Ok(pool)
+}
+
+async fn ensure_installation_scope_columns(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
+    let cols: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM pragma_table_info('installation')")
+            .fetch_all(pool)
+            .await?;
+    if !cols.iter().any(|c| c == "active_workspace_id") {
+        pool.execute("ALTER TABLE installation ADD COLUMN active_workspace_id TEXT")
+            .await?;
+    }
+    if !cols.iter().any(|c| c == "active_project_id") {
+        pool.execute("ALTER TABLE installation ADD COLUMN active_project_id TEXT")
+            .await?;
+    }
+    Ok(())
 }
 
 async fn ensure_receipt_actor_column(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
