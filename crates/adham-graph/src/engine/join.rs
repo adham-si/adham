@@ -3,13 +3,13 @@ use crate::domain::node::NodeId;
 
 pub fn collect_incoming_artifacts(graph: &TaskGraph, node_id: &NodeId) -> Vec<String> {
     graph
-        .edges
+        .edges()
         .iter()
         .filter(|e| &e.to_node == node_id)
         .filter_map(|e| {
             graph
                 .get_node(&e.from_node)
-                .and_then(|n| n.output_artifact_ref.clone())
+                .and_then(|n| n.output_artifact_ref().map(str::to_string))
         })
         .collect()
 }

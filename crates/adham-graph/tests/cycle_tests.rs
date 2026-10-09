@@ -64,11 +64,16 @@ fn test_cyclic_edge_addition_fails() {
         .is_ok());
 
     // Adding reverse edge n2 -> n1 causes a cycle
+    let snapshot = graph.clone();
     let err = graph
         .add_edge(EdgeDefinition::prerequisite("n2", "n1"))
         .unwrap_err();
 
     assert!(matches!(err, GraphError::CycleDetected(_)));
+    assert_eq!(
+        graph, snapshot,
+        "rejected cyclic edge must leave the graph unchanged"
+    );
 }
 
 #[test]

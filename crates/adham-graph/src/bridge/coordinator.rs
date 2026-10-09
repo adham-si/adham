@@ -34,12 +34,12 @@ impl SubagentCoordinator {
         verifier: V,
         clock: C,
     ) -> Result<Option<NodeId>, String> {
-        advance_graph_state(&mut self.graph);
+        advance_graph_state(&mut self.graph).map_err(|e| e.to_string())?;
         let ready_node = self
             .graph
-            .nodes
+            .nodes()
             .iter()
-            .find(|n| n.lifecycle == NodeLifecycle::Ready)
+            .find(|n| n.lifecycle() == NodeLifecycle::Ready)
             .map(|n| n.definition.node_id.clone());
 
         let Some(node_id) = ready_node else {
@@ -58,7 +58,7 @@ impl SubagentCoordinator {
         let context_shard = assemble_context_shard(&objective, &artifacts);
 
         let delegation_id = format!("del-{}", Uuid::now_v7());
-        mark_node_running(&mut self.graph, &node_id, delegation_id);
+        mark_node_running(&mut self.graph, &node_id, delegation_id).map_err(|e| e.to_string())?;
 
         let driver = AgentDriver::new(model, verifier, clock);
 
@@ -92,21 +92,24 @@ impl SubagentCoordinator {
                 {
                     let artifact_text =
                         format!("Artifact produced by {}: Completed", node_id.as_str());
-                    mark_node_completed(&mut self.graph, &node_id, Some(artifact_text));
+                    mark_node_completed(&mut self.graph, &node_id, Some(artifact_text))
+                        .map_err(|e| e.to_string())?;
                 } else {
                     mark_node_failed(
                         &mut self.graph,
                         &node_id,
                         format!("Child run ended in state: {:?}", run_result.lifecycle),
-                    );
+                    )
+                    .map_err(|e| e.to_string())?;
                 }
             }
             Err(e) => {
-                mark_node_failed(&mut self.graph, &node_id, e.to_string());
+                mark_node_failed(&mut self.graph, &node_id, e.to_string())
+                    .map_err(|err| err.to_string())?;
             }
         }
 
-        advance_graph_state(&mut self.graph);
+        advance_graph_state(&mut self.graph).map_err(|e| e.to_string())?;
         Ok(Some(node_id))
     }
 }
