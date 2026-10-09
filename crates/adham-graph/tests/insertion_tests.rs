@@ -1,5 +1,6 @@
+use adham_graph::domain::edge::EdgeDefinition;
 use adham_graph::domain::graph::{GraphError, TaskGraph};
-use adham_graph::domain::node::{NodeDefinition, NodeKind, NodeState};
+use adham_graph::domain::node::{NodeDefinition, NodeId, NodeKind, NodeState};
 
 // Normal insertion accepts a fresh Pending node; anything stateful must
 // come through the validated loading boundary. Rejected insertion leaves
@@ -55,4 +56,88 @@ fn test_pre_completed_insertion_is_rejected_without_mutation() {
         "unexpected error: {err:?}"
     );
     assert_eq!(graph, snapshot);
+}
+
+fn two_roots() -> TaskGraph {
+    let mut graph = TaskGraph::new("run-topo");
+    graph.add_node(pending("a")).unwrap();
+    graph.add_node(pending("b")).unwrap();
+    graph
+}
+
+#[test]
+fn test_edge_to_ready_target_with_pending_prerequisite_is_rejected_without_mutation() {
+    let mut graph = two_roots();
+    graph.admit_ready(&NodeId::new("b")).unwrap();
+    let snapshot = graph.clone();
+    let err = graph
+        .add_edge(EdgeDefinition::prerequisite("a", "b"))
+        .unwrap_err();
+    assert!(
+        matches!(err, GraphError::InvalidGraph(_)),
+        "unexpected error: {err:?}"
+    );
+    assert_eq!(graph, snapshot);
+}
+
+#[test]
+fn test_edge_to_running_target_with_pending_prerequisite_is_rejected_without_mutation() {
+    let mut graph = two_roots();
+    graph.admit_ready(&NodeId::new("b")).unwrap();
+    graph
+        .dispatch(&NodeId::new("b"), "del-b".to_string())
+        .unwrap();
+    let snapshot = graph.clone();
+    let err = graph
+        .add_edge(EdgeDefinition::prerequisite("a", "b"))
+        .unwrap_err();
+    assert!(
+        matches!(err, GraphError::InvalidGraph(_)),
+        "unexpected error: {err:?}"
+    );
+    assert_eq!(graph, snapshot);
+}
+
+#[test]
+fn test_edge_to_completed_target_with_pending_prerequisite_is_rejected_without_mutation() {
+    let mut graph = two_roots();
+    graph.admit_ready(&NodeId::new("b")).unwrap();
+    graph
+        .dispatch(&NodeId::new("b"), "del-b".to_string())
+        .unwrap();
+    graph
+        .complete(&NodeId::new("b"), Some("artifact-b".to_string()))
+        .unwrap();
+    let snapshot = graph.clone();
+    let err = graph
+        .add_edge(EdgeDefinition::prerequisite("a", "b"))
+        .unwrap_err();
+    assert!(
+        matches!(err, GraphError::InvalidGraph(_)),
+        "unexpected error: {err:?}"
+    );
+    assert_eq!(graph, snapshot);
+}
+
+#[test]
+fn test_edge_between_completed_nodes_is_accepted_and_reloads() {
+    use adham_graph::domain::loading::UncheckedTaskGraph;
+    let mut graph = two_roots();
+    for id in ["a", "b"] {
+        graph.admit_ready(&NodeId::new(id)).unwrap();
+        graph
+            .dispatch(&NodeId::new(id), format!("del-{id}"))
+            .unwrap();
+        graph
+            .complete(&NodeId::new(id), Some(format!("artifact-{id}")))
+            .unwrap();
+    }
+    graph
+        .add_edge(EdgeDefinition::prerequisite("a", "b"))
+        .unwrap();
+    graph.validate_loaded().unwrap();
+    let json = serde_json::to_value(&graph).unwrap();
+    let dto: UncheckedTaskGraph = serde_json::from_value(json).unwrap();
+    let reloaded = TaskGraph::try_from(dto).unwrap();
+    assert_eq!(graph, reloaded);
 }

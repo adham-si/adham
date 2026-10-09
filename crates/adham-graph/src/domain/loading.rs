@@ -7,7 +7,7 @@
 
 use super::edge::EdgeDefinition;
 use super::graph::{GraphError, GraphId, TaskGraph};
-use super::node::{NodeLifecycle, NodeState};
+use super::node::{has_text, NodeId, NodeLifecycle, NodeState};
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -36,8 +36,19 @@ impl TaskGraph {
     /// IDs, unknown endpoints, node-state coherence, then acyclicity.
     /// Pure: never mutates.
     pub fn validate_loaded(&self) -> Result<(), GraphError> {
+        Self::validate_loaded_with(self.nodes(), self.edges())
+    }
+
+    /// Full proposed-graph validation shared by restoration and edge
+    /// insertion: a candidate edge must keep the whole graph loadable.
+    /// Pure: never mutates.
+    pub(crate) fn validate_loaded_with(
+        nodes: &[NodeState],
+        edges: &[EdgeDefinition],
+    ) -> Result<(), GraphError> {
+        let has_node = |id: &NodeId| nodes.iter().any(|n| &n.definition.node_id == id);
         let mut seen = HashSet::new();
-        for node in self.nodes() {
+        for node in nodes {
             if !seen.insert(node.definition.node_id.as_str()) {
                 return Err(GraphError::DuplicateNodeId(
                     node.definition.node_id.0.clone(),
@@ -47,14 +58,14 @@ impl TaskGraph {
 
         // Endpoint checks run before the acyclic check so a missing node is
         // reported as such instead of a spurious cycle.
-        for edge in self.edges() {
-            if !self.has_node(&edge.from_node) {
+        for edge in edges {
+            if !has_node(&edge.from_node) {
                 return Err(GraphError::UnknownUpstream {
                     node: edge.to_node.0.clone(),
                     upstream: edge.from_node.0.clone(),
                 });
             }
-            if !self.has_node(&edge.to_node) {
+            if !has_node(&edge.to_node) {
                 return Err(GraphError::InvalidGraph(format!(
                     "edge {} references unknown node {}",
                     edge.edge_id.0, edge.to_node.0
@@ -62,15 +73,15 @@ impl TaskGraph {
             }
         }
 
-        for node in self.nodes() {
+        for node in nodes {
             Self::validate_node_state(node)?;
         }
 
-        for node in self.nodes() {
-            Self::validate_admission(node, self)?;
+        for node in nodes {
+            Self::validate_admission(node, nodes, edges)?;
         }
 
-        self.validate_acyclic()
+        Self::validate_acyclic_with(nodes, edges.iter())
     }
 
     /// Admission consistency: local state coherence, not proof of real
@@ -78,15 +89,23 @@ impl TaskGraph {
     /// nodes (Completed/Failed/Canceled) cannot have unsatisfied
     /// prerequisites — scheduling ignores already-Ready nodes and the
     /// coordinator dispatches them, so an unadmitted Ready would execute
-    /// without its dependencies. Completed retains dispatch evidence
-    /// (delegation); Failed retains its reason (delegation optional: an
-    /// admission revoked before dispatch never ran). Skipped keeps a
-    /// failed/canceled/skipped upstream witness.
-    fn validate_admission(node: &NodeState, graph: &TaskGraph) -> Result<(), GraphError> {
+    /// without its dependencies. Dispatch metadata itself (non-empty
+    /// delegation/reason) is enforced by node-state coherence; this
+    /// function covers topology relationships only.
+    fn validate_admission(
+        node: &NodeState,
+        nodes: &[NodeState],
+        edges: &[EdgeDefinition],
+    ) -> Result<(), GraphError> {
         use NodeLifecycle::*;
         let id = &node.definition.node_id;
-        let incoming: Vec<&super::edge::EdgeDefinition> =
-            graph.edges().iter().filter(|e| &e.to_node == id).collect();
+        let node_lifecycle = |wanted: &NodeId| {
+            nodes
+                .iter()
+                .find(|n| &n.definition.node_id == wanted)
+                .map(|n| n.lifecycle())
+        };
+        let incoming: Vec<&EdgeDefinition> = edges.iter().filter(|e| &e.to_node == id).collect();
         let invalid = |why: String| {
             GraphError::InvalidGraph(format!("node {} in {:?}: {why}", id.0, node.lifecycle()))
         };
@@ -95,9 +114,7 @@ impl TaskGraph {
             Ready | Running | Completed | Failed | Canceled => {
                 for edge in &incoming {
                     let upstream = edge.from_node.clone();
-                    let state = graph
-                        .get_node(&edge.from_node)
-                        .map(|n| n.lifecycle())
+                    let state = node_lifecycle(&edge.from_node)
                         .ok_or_else(|| invalid(format!("unknown upstream {}", upstream.0)))?;
                     if state != Completed {
                         return Err(invalid(format!(
@@ -105,11 +122,6 @@ impl TaskGraph {
                             upstream.0
                         )));
                     }
-                }
-                if node.lifecycle() == Completed && node.delegation_id().is_none() {
-                    return Err(invalid(
-                        "completed nodes must retain dispatch delegation".to_string(),
-                    ));
                 }
                 Ok(())
             }
@@ -120,9 +132,8 @@ impl TaskGraph {
                     ));
                 }
                 let witnessed = incoming.iter().any(|edge| {
-                    graph
-                        .get_node(&edge.from_node)
-                        .is_some_and(|n| matches!(n.lifecycle(), Failed | Canceled | Skipped))
+                    node_lifecycle(&edge.from_node)
+                        .is_some_and(|s| matches!(s, Failed | Canceled | Skipped))
                 });
                 if !witnessed {
                     return Err(invalid(
@@ -155,7 +166,7 @@ impl TaskGraph {
                 }
             }
             Running => {
-                if node.delegation_id().is_none() {
+                if !has_text(node.delegation_id()) {
                     return Err(invalid("running nodes require a delegation id"));
                 }
                 if node.output_artifact_ref().is_some() {
@@ -166,12 +177,18 @@ impl TaskGraph {
                 }
             }
             Completed => {
+                if !has_text(node.delegation_id()) {
+                    return Err(invalid("completed nodes must retain dispatch delegation"));
+                }
                 if node.failure_reason().is_some() {
                     return Err(invalid("completed nodes must not carry a failure reason"));
                 }
             }
             Failed => {
-                if node.failure_reason().is_none() {
+                if !has_text(node.delegation_id()) {
+                    return Err(invalid("failed nodes must retain dispatch delegation"));
+                }
+                if !has_text(node.failure_reason()) {
                     return Err(invalid("failed nodes require a failure reason"));
                 }
                 if node.output_artifact_ref().is_some() {
@@ -184,7 +201,7 @@ impl TaskGraph {
                 }
             }
             Skipped => {
-                if node.failure_reason().is_none() {
+                if !has_text(node.failure_reason()) {
                     return Err(invalid("skipped nodes require a failure reason"));
                 }
                 if node.output_artifact_ref().is_some() {

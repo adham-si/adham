@@ -181,6 +181,100 @@ fn test_self_loop_is_rejected() {
 }
 
 #[test]
+fn test_failed_with_reason_but_no_delegation_is_rejected() {
+    // Running-only failure contract: a Failed node must retain dispatch
+    // delegation. There is no pre-dispatch failure mode.
+    let mut node = node_json("a", "failed");
+    node["failure_reason"] = serde_json::json!("bad evidence");
+    let json = serde_json::json!({
+        "graph_id": "g1", "parent_run_id": "run-1",
+        "nodes": [node],
+        "edges": []
+    });
+    let err = load(json).unwrap_err();
+    assert!(
+        matches!(err, GraphError::InvalidGraph(_)),
+        "unexpected error: {err:?}"
+    );
+}
+
+#[test]
+fn test_empty_delegation_is_rejected_wherever_delegation_is_required() {
+    // Same predicate as the dispatch operation: presence is not validity.
+    for lifecycle in ["running", "completed"] {
+        let mut node = node_json("a", lifecycle);
+        node["delegation_id"] = serde_json::json!("");
+        if lifecycle == "completed" {
+            node["output_artifact_ref"] = serde_json::json!("artifact-1");
+        }
+        let json = serde_json::json!({
+            "graph_id": "g1", "parent_run_id": "run-1",
+            "nodes": [node],
+            "edges": []
+        });
+        let err = load(json).unwrap_err();
+        assert!(
+            matches!(err, GraphError::InvalidGraph(_)),
+            "unexpected error for {lifecycle}: {err:?}"
+        );
+    }
+}
+
+#[test]
+fn test_empty_reason_is_rejected_wherever_reason_is_required() {
+    for (lifecycle, witness) in [("failed", false), ("skipped", true)] {
+        let mut node = node_json("a", lifecycle);
+        node["failure_reason"] = serde_json::json!("");
+        if lifecycle == "failed" {
+            node["delegation_id"] = serde_json::json!("del-1");
+        }
+        let mut nodes = vec![node];
+        let mut edges = vec![];
+        if witness {
+            nodes.push(node_json("w", "failed"));
+            nodes[1]["failure_reason"] = serde_json::json!("boom");
+            nodes[1]["delegation_id"] = serde_json::json!("del-w");
+            edges.push(edge_json("e1", "w", "a"));
+        }
+        let json = serde_json::json!({
+            "graph_id": "g1", "parent_run_id": "run-1",
+            "nodes": nodes,
+            "edges": edges
+        });
+        let err = load(json).unwrap_err();
+        assert!(
+            matches!(err, GraphError::InvalidGraph(_)),
+            "unexpected error for {lifecycle}: {err:?}"
+        );
+    }
+}
+
+#[test]
+fn test_dispatched_failure_survives_validated_reload() {
+    use adham_graph::domain::node::{NodeDefinition, NodeId, NodeKind, NodeState};
+    let mut graph = TaskGraph::new("run-fail");
+    graph
+        .add_node(NodeState::new(NodeDefinition::new(
+            "a",
+            NodeKind::Research,
+            "A",
+            "",
+        )))
+        .unwrap();
+    graph.admit_ready(&NodeId::new("a")).unwrap();
+    graph
+        .dispatch(&NodeId::new("a"), "del-1".to_string())
+        .unwrap();
+    graph
+        .fail(&NodeId::new("a"), "bad evidence".to_string())
+        .unwrap();
+    let json = serde_json::to_value(&graph).unwrap();
+    let dto: UncheckedTaskGraph = serde_json::from_value(json).unwrap();
+    let reloaded = TaskGraph::try_from(dto).unwrap();
+    assert_eq!(graph, reloaded);
+}
+
+#[test]
 fn test_failed_without_reason_is_rejected() {
     let json = serde_json::json!({
         "graph_id": "g1", "parent_run_id": "run-1",

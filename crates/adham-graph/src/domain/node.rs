@@ -135,3 +135,10 @@ impl NodeState {
         self.failure_reason = reason;
     }
 }
+
+/// Shared metadata predicate: required delegation/reason fields must be
+/// present AND non-empty. Operations and restoration use this same
+/// predicate, so presence alone never counts as validity.
+pub(crate) fn has_text(value: Option<&str>) -> bool {
+    value.is_some_and(|v| !v.is_empty())
+}

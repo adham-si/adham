@@ -1,5 +1,5 @@
 use crate::domain::edge::EdgeDefinition;
-use crate::domain::node::{NodeId, NodeLifecycle, NodeState};
+use crate::domain::node::{has_text, NodeId, NodeLifecycle, NodeState};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
@@ -108,9 +108,13 @@ impl TaskGraph {
         if !self.has_node(&edge.to_node) {
             return Err(GraphError::NodeNotFound(edge.to_node.0));
         }
-        // Validate the candidate before mutating: a rejected edge must
-        // leave the graph identical to its pre-operation state.
-        Self::validate_acyclic_with(&self.nodes, self.edges.iter().chain([&edge]))?;
+        // Validate the full proposed graph before committing: a new edge
+        // must not cycle and must keep every node loadable (admitted
+        // targets keep completed prerequisites). A rejected edge leaves
+        // the graph identical to its pre-operation state.
+        let mut candidate = self.edges.clone();
+        candidate.push(edge.clone());
+        Self::validate_loaded_with(&self.nodes, &candidate)?;
         self.edges.push(edge);
         Ok(())
     }
@@ -201,7 +205,9 @@ impl TaskGraph {
     ) -> Result<(), GraphError> {
         let delegation_id = delegation_id.into();
         let from = self.node_lifecycle(id)?;
-        if delegation_id.is_empty() || !Self::is_transition_allowed(from, NodeLifecycle::Running) {
+        if !has_text(Some(delegation_id.as_str()))
+            || !Self::is_transition_allowed(from, NodeLifecycle::Running)
+        {
             return Err(GraphError::IllegalTransition {
                 node: id.0.clone(),
                 from,
@@ -238,12 +244,15 @@ impl TaskGraph {
         Ok(())
     }
 
-    /// Record a failure with its reason. Revoking admission (Ready) carries
-    /// no execution claim; failing a Running node ends its dispatch.
+    /// Record a failure of a dispatched (Running) node with its reason.
+    /// Running-only by contract: there is no pre-dispatch failure mode,
+    /// so an outcome for work that never ran cannot be recorded.
     pub fn fail(&mut self, id: &NodeId, reason: impl Into<String>) -> Result<(), GraphError> {
         let reason = reason.into();
         let from = self.node_lifecycle(id)?;
-        if reason.is_empty() || !Self::is_transition_allowed(from, NodeLifecycle::Failed) {
+        if !has_text(Some(reason.as_str()))
+            || !Self::is_transition_allowed(from, NodeLifecycle::Failed)
+        {
             return Err(GraphError::IllegalTransition {
                 node: id.0.clone(),
                 from,
@@ -277,7 +286,9 @@ impl TaskGraph {
     pub fn skip(&mut self, id: &NodeId, reason: impl Into<String>) -> Result<(), GraphError> {
         let reason = reason.into();
         let from = self.node_lifecycle(id)?;
-        if reason.is_empty() || !Self::is_transition_allowed(from, NodeLifecycle::Skipped) {
+        if !has_text(Some(reason.as_str()))
+            || !Self::is_transition_allowed(from, NodeLifecycle::Skipped)
+        {
             return Err(GraphError::IllegalTransition {
                 node: id.0.clone(),
                 from,
@@ -346,7 +357,7 @@ impl TaskGraph {
         Self::validate_acyclic_with(&self.nodes, self.edges.iter())
     }
 
-    fn validate_acyclic_with<'a>(
+    pub(crate) fn validate_acyclic_with<'a>(
         nodes: &'a [NodeState],
         edges: impl Iterator<Item = &'a EdgeDefinition>,
     ) -> Result<(), GraphError> {
