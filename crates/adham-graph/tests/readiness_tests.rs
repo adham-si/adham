@@ -1,5 +1,5 @@
 use adham_graph::domain::edge::EdgeDefinition;
-use adham_graph::domain::graph::TaskGraph;
+use adham_graph::domain::graph::{GraphError, TaskGraph};
 use adham_graph::domain::node::{NodeDefinition, NodeId, NodeKind, NodeLifecycle, NodeState};
 use adham_graph::engine::scheduler::{advance_graph_state, mark_node_completed, mark_node_failed};
 
@@ -22,7 +22,7 @@ fn test_topological_readiness_and_completion_cascade() {
         .unwrap();
 
     // 1. Initial advance -> root is ready, child is pending
-    let ready = advance_graph_state(&mut graph);
+    let ready = advance_graph_state(&mut graph).unwrap();
     assert_eq!(ready, vec![NodeId::new("root")]);
     assert_eq!(
         graph.get_node(&NodeId::new("root")).unwrap().lifecycle,
@@ -38,8 +38,9 @@ fn test_topological_readiness_and_completion_cascade() {
         &mut graph,
         &NodeId::new("root"),
         Some("Root artifact".to_string()),
-    );
-    let next_ready = advance_graph_state(&mut graph);
+    )
+    .unwrap();
+    let next_ready = advance_graph_state(&mut graph).unwrap();
     assert_eq!(next_ready, vec![NodeId::new("child")]);
     assert_eq!(
         graph.get_node(&NodeId::new("child")).unwrap().lifecycle,
@@ -63,11 +64,44 @@ fn test_failure_cascades_to_skipped_for_dependent_nodes() {
     let _ = advance_graph_state(&mut graph);
 
     // Fail node A -> node B is skipped
-    mark_node_failed(&mut graph, &NodeId::new("a"), "Failed check".to_string());
-    let ready = advance_graph_state(&mut graph);
+    mark_node_failed(&mut graph, &NodeId::new("a"), "Failed check".to_string()).unwrap();
+    let ready = advance_graph_state(&mut graph).unwrap();
     assert!(ready.is_empty());
     assert_eq!(
         graph.get_node(&NodeId::new("b")).unwrap().lifecycle,
         NodeLifecycle::Skipped
+    );
+}
+
+#[test]
+fn test_unknown_upstream_is_invalid_graph_and_preserves_state() {
+    // A graph whose edge references a missing upstream node is structurally
+    // invalid: loading must reject it before scheduling ever runs. The
+    // scheduling-level defense is probed by the in-crate
+    // `rejected_schedule_leaves_graph_unchanged` unit test, since no
+    // validated API can construct such a graph.
+    use adham_graph::domain::loading::UncheckedTaskGraph;
+    let json = serde_json::json!({
+        "graph_id": "g1",
+        "parent_run_id": "run-x",
+        "nodes": [
+            {"definition": {"node_id": "lonely", "kind": "research", "title": "L",
+                            "objective": "", "allocated_tokens": 1, "allocated_steps": 1},
+             "lifecycle": "pending", "delegation_id": null,
+             "output_artifact_ref": null, "failure_reason": null}
+        ],
+        "edges": [
+            {"edge_id": "e1", "from_node": "ghost", "to_node": "lonely",
+             "kind": "prerequisite"}
+        ]
+    });
+    let dto: UncheckedTaskGraph = serde_json::from_value(json).unwrap();
+    let err = TaskGraph::try_from(dto).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            GraphError::UnknownUpstream { .. } | GraphError::InvalidGraph(_)
+        ),
+        "unexpected error: {err:?}"
     );
 }

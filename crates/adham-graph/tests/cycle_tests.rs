@@ -30,12 +30,16 @@ fn test_acyclic_dag_construction_succeeds() {
     graph.add_node(n3).unwrap();
 
     // Linear DAG: n1 -> n2 -> n3
-    assert!(graph
-        .add_edge(EdgeDefinition::prerequisite("n1", "n2"))
-        .is_ok());
-    assert!(graph
-        .add_edge(EdgeDefinition::prerequisite("n2", "n3"))
-        .is_ok());
+    assert!(
+        graph
+            .add_edge(EdgeDefinition::prerequisite("n1", "n2"))
+            .is_ok()
+    );
+    assert!(
+        graph
+            .add_edge(EdgeDefinition::prerequisite("n2", "n3"))
+            .is_ok()
+    );
     assert!(graph.validate_acyclic().is_ok());
 }
 
@@ -59,16 +63,23 @@ fn test_cyclic_edge_addition_fails() {
     graph.add_node(n1).unwrap();
     graph.add_node(n2).unwrap();
 
-    assert!(graph
-        .add_edge(EdgeDefinition::prerequisite("n1", "n2"))
-        .is_ok());
+    assert!(
+        graph
+            .add_edge(EdgeDefinition::prerequisite("n1", "n2"))
+            .is_ok()
+    );
 
     // Adding reverse edge n2 -> n1 causes a cycle
+    let snapshot = graph.clone();
     let err = graph
         .add_edge(EdgeDefinition::prerequisite("n2", "n1"))
         .unwrap_err();
 
     assert!(matches!(err, GraphError::CycleDetected(_)));
+    assert_eq!(
+        graph, snapshot,
+        "rejected cyclic edge must leave the graph unchanged"
+    );
 }
 
 #[test]

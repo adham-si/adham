@@ -3,7 +3,7 @@ use crate::domain::node::NodeId;
 
 pub fn collect_incoming_artifacts(graph: &TaskGraph, node_id: &NodeId) -> Vec<String> {
     graph
-        .edges
+        .edges()
         .iter()
         .filter(|e| &e.to_node == node_id)
         .filter_map(|e| {
