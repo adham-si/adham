@@ -1,5 +1,22 @@
 import * as React from 'react';
 import type { ConversationMessageDto } from '@/shared/api/adham-client';
+import {
+  CREATE_INTENT_KEY,
+  SESSION_CACHE_KEY,
+  isDefinitePreEffectRejection,
+  readCreateIntent,
+  readPendingSend,
+  readSessionCache,
+  rejectionMessage,
+  removePendingSend,
+  removeStorage,
+  sameScope,
+  type PendingSend,
+  writePendingSend,
+  writeStorage,
+} from './conversation-identity';
+
+export type { PendingSend } from './conversation-identity';
 
 export interface UiMessage {
   id: string;
@@ -11,18 +28,6 @@ export interface UiMessage {
 export type ConversationStatus = 'bootstrapping' | 'ready' | 'submitting' | 'error';
 
 export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain: boolean };
-
-/// A frozen logical command whose outcome is unknown. Carries the full
-/// scope plus payload and request identity so retries and remounts replay
-/// the exact command instead of minting a duplicate under another text or
-/// scope. Persisted in sessionStorage until resolved.
-export interface PendingSend {
-  requestId: string;
-  text: string;
-  workspaceId: string;
-  projectId: string;
-  sessionId: string;
-}
 
 /// Backend capability report. Execution, streaming, and stop have no
 /// backend command, so the UI must render them unavailable — never simulate
@@ -81,62 +86,6 @@ export interface ConversationBackend {
   ): Promise<ConversationSnapshot>;
 }
 
-/// Codes the backend provably emits before any effect is applied.
-/// STORAGE_UNAVAILABLE and unknown errors are NOT proof of rollback —
-/// commit-failure handling returns storage failures when commit certainty
-/// or receipt reads are unavailable. Only whitelisted pre-effect
-/// rejections are definite; unknowns retain the logical command identity.
-const PRE_EFFECT_REJECTION_CODES = new Set([
-  'VALIDATION_FAILED',
-  'INVALID_COMMAND_VERSION',
-  'REQUEST_ID_CONFLICT',
-  'CONTEXT_MISMATCH',
-  'SESSION_NOT_FOUND',
-  'PROJECT_NOT_FOUND',
-  'WORKSPACE_NOT_FOUND',
-]);
-
-/// Un-prefixed validation strings the handlers emit before any effect.
-const PRE_EFFECT_REJECTION_MESSAGES = new Set([
-  'workspaceId context required',
-  'projectId context required',
-  'sessionId context required',
-]);
-
-function stringIsPreEffectRejection(err: string): boolean {
-  if (PRE_EFFECT_REJECTION_MESSAGES.has(err)) return true;
-  const colon = err.indexOf(':');
-  if (colon <= 0) return false;
-  return PRE_EFFECT_REJECTION_CODES.has(err.slice(0, colon));
-}
-
-/// A definite pre-effect rejection: the command provably was not applied,
-/// so its logical identity is spent. Everything else — storage
-/// unavailable, repair required, unknown codes, transport failures —
-/// leaves the outcome unknown and the identity must be retained.
-export function isDefinitePreEffectRejection(err: unknown): boolean {
-  if (typeof err === 'string') return stringIsPreEffectRejection(err);
-  if (typeof err === 'object' && err !== null && !(err instanceof Error)) {
-    const code = (err as { code?: unknown }).code;
-    if (typeof code === 'string' && PRE_EFFECT_REJECTION_CODES.has(code)) return true;
-    const message = (err as { message?: unknown }).message;
-    if (typeof message === 'string' && PRE_EFFECT_REJECTION_MESSAGES.has(message)) return true;
-  }
-  return false;
-}
-
-function rejectionMessage(err: unknown): string {
-  if (
-    typeof err === 'object' &&
-    err !== null &&
-    typeof (err as { message?: unknown }).message === 'string'
-  ) {
-    return (err as { message: string }).message;
-  }
-  if (err instanceof Error) return err.message;
-  return 'Message was not saved.';
-}
-
 function toUiMessage(dto: {
   messageId: string;
   role?: string;
@@ -149,118 +98,6 @@ function toUiMessage(dto: {
     text: dto.text,
     createdAt: dto.createdAt,
   };
-}
-
-const SESSION_CACHE_KEY = 'adham:compose:session';
-const CREATE_INTENT_KEY = 'adham:compose:create-intent';
-
-function readStorage(key: string): string | null {
-  try {
-    return sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(key: string, value: string): void {
-  try {
-    sessionStorage.setItem(key, value);
-  } catch {
-    // ignore: caching is best-effort, correctness never depends on it
-  }
-}
-
-function removeStorage(key: string): void {
-  try {
-    sessionStorage.removeItem(key);
-  } catch {
-    // ignore
-  }
-}
-
-function readSessionCache(): ConversationContext | null {
-  const raw = readStorage(SESSION_CACHE_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<ConversationContext>;
-    if (
-      typeof parsed.workspaceId === 'string' &&
-      typeof parsed.projectId === 'string' &&
-      typeof parsed.sessionId === 'string'
-    ) {
-      return {
-        workspaceId: parsed.workspaceId,
-        projectId: parsed.projectId,
-        sessionId: parsed.sessionId,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-interface CreateIntent {
-  requestId: string;
-  workspaceId: string;
-  projectId: string;
-}
-
-function readCreateIntent(workspaceId: string, projectId: string): CreateIntent | null {
-  const raw = readStorage(CREATE_INTENT_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<CreateIntent>;
-    if (
-      typeof parsed.requestId === 'string' &&
-      parsed.workspaceId === workspaceId &&
-      parsed.projectId === projectId
-    ) {
-      return { requestId: parsed.requestId, workspaceId, projectId };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-const PENDING_SEND_KEY = 'adham:compose:pending-send';
-
-function readPendingSend(): PendingSend | null {
-  const raw = readStorage(PENDING_SEND_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<PendingSend>;
-    if (
-      typeof parsed.requestId === 'string' &&
-      typeof parsed.text === 'string' &&
-      typeof parsed.workspaceId === 'string' &&
-      typeof parsed.projectId === 'string' &&
-      typeof parsed.sessionId === 'string'
-    ) {
-      return parsed as PendingSend;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writePendingSend(record: PendingSend): void {
-  writeStorage(PENDING_SEND_KEY, JSON.stringify(record));
-}
-
-function removePendingSend(): void {
-  removeStorage(PENDING_SEND_KEY);
-}
-
-function sameScope(
-  a: { workspaceId: string; projectId: string; sessionId: string },
-  b: { workspaceId: string; projectId: string; sessionId: string },
-): boolean {
-  return (
-    a.workspaceId === b.workspaceId && a.projectId === b.projectId && a.sessionId === b.sessionId
-  );
 }
 
 export function useConversation({ backend }: { backend: ConversationBackend }) {
