@@ -50,7 +50,7 @@ async fn test_subagent_coordinator_executes_pipeline_to_completion() {
             .graph
             .get_node(&NodeId::new("research"))
             .unwrap()
-            .lifecycle,
+            .lifecycle(),
         NodeLifecycle::Completed
     );
 
@@ -70,7 +70,7 @@ async fn test_subagent_coordinator_executes_pipeline_to_completion() {
             .graph
             .get_node(&NodeId::new("code"))
             .unwrap()
-            .lifecycle,
+            .lifecycle(),
         NodeLifecycle::Completed
     );
 

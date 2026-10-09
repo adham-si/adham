@@ -79,6 +79,10 @@ impl TaskGraph {
         Ok(graph)
     }
 
+    /// Validated insertion: accepts only fresh Pending nodes (the
+    /// `NodeState::new` creation command). Stateful nodes are restored
+    /// through the loading boundary, never inserted. Rejected insertion
+    /// leaves the graph unchanged.
     pub fn add_node(&mut self, node: NodeState) -> Result<(), GraphError> {
         if self
             .nodes
@@ -86,6 +90,12 @@ impl TaskGraph {
             .any(|n| n.definition.node_id == node.definition.node_id)
         {
             return Err(GraphError::DuplicateNodeId(node.definition.node_id.0));
+        }
+        if !node.is_fresh_pending() {
+            return Err(GraphError::InvalidGraph(format!(
+                "node {} must be inserted fresh Pending with empty side fields",
+                node.definition.node_id.0
+            )));
         }
         self.nodes.push(node);
         Ok(())
@@ -131,49 +141,178 @@ impl TaskGraph {
         self.nodes.iter().find(|n| &n.definition.node_id == id)
     }
 
-    /// Narrow crate-internal side-field setters. Lifecycle itself can only
-    /// change through [`TaskGraph::transition_node`]; these helpers cannot
-    /// alter lifecycle, reopen terminals, or create nodes.
+    /// Private mutable lookup. Only the atomic operations below may mutate
+    /// through it; there is no public or crate-visible mutable node path.
     fn find_node_mut(&mut self, id: &NodeId) -> Option<&mut NodeState> {
         self.nodes.iter_mut().find(|n| &n.definition.node_id == id)
     }
 
-    pub(crate) fn set_delegation_id(&mut self, id: &NodeId, delegation_id: String) -> bool {
-        let Some(node) = self.find_node_mut(id) else {
-            return false;
-        };
-        node.delegation_id = Some(delegation_id);
-        true
+    fn node_lifecycle(&self, id: &NodeId) -> Result<NodeLifecycle, GraphError> {
+        self.get_node(id)
+            .map(|n| n.lifecycle())
+            .ok_or_else(|| GraphError::UnknownNode(id.0.clone()))
     }
 
-    pub(crate) fn set_output_artifact(
+    /// Atomic domain operations. Each validates the full candidate
+    /// (transition pair, required metadata, admission prerequisites)
+    /// before applying anything, so every Ok leaves a valid graph and
+    /// every Err leaves the entire graph unchanged. The raw enum-pair
+    /// primitive is private: there is no externally callable lifecycle
+    /// shortcut, and no externally callable completion shortcut.
+    /// Admit a Pending node with completed prerequisites (or none) to Ready.
+    pub fn admit_ready(&mut self, id: &NodeId) -> Result<(), GraphError> {
+        let from = self.node_lifecycle(id)?;
+        if from != NodeLifecycle::Pending {
+            return Err(GraphError::IllegalTransition {
+                node: id.0.clone(),
+                from,
+                to: NodeLifecycle::Ready,
+            });
+        }
+        for edge in self
+            .edges
+            .iter()
+            .filter(|e| &e.to_node == id)
+            .cloned()
+            .collect::<Vec<_>>()
+        {
+            let upstream =
+                self.get_node(&edge.from_node)
+                    .ok_or_else(|| GraphError::UnknownUpstream {
+                        node: id.0.clone(),
+                        upstream: edge.from_node.0.clone(),
+                    })?;
+            if upstream.lifecycle() != NodeLifecycle::Completed {
+                return Err(GraphError::IllegalTransition {
+                    node: id.0.clone(),
+                    from,
+                    to: NodeLifecycle::Ready,
+                });
+            }
+        }
+        self.transition_to(id, NodeLifecycle::Ready)
+    }
+
+    /// Dispatch a Ready node to Running, recording its delegation evidence.
+    pub fn dispatch(
+        &mut self,
+        id: &NodeId,
+        delegation_id: impl Into<String>,
+    ) -> Result<(), GraphError> {
+        let delegation_id = delegation_id.into();
+        let from = self.node_lifecycle(id)?;
+        if delegation_id.is_empty() || !Self::is_transition_allowed(from, NodeLifecycle::Running) {
+            return Err(GraphError::IllegalTransition {
+                node: id.0.clone(),
+                from,
+                to: NodeLifecycle::Running,
+            });
+        }
+        self.transition_to(id, NodeLifecycle::Running)?;
+        let node = self
+            .find_node_mut(id)
+            .expect("dispatch validated node presence");
+        node.set_delegation_id(Some(delegation_id));
+        Ok(())
+    }
+
+    /// Record an execution outcome for a dispatched (Running) node.
+    pub fn complete(
         &mut self,
         id: &NodeId,
         artifact_ref: Option<String>,
-    ) -> bool {
-        let Some(node) = self.find_node_mut(id) else {
-            return false;
-        };
-        node.output_artifact_ref = artifact_ref;
-        true
+    ) -> Result<(), GraphError> {
+        let from = self.node_lifecycle(id)?;
+        if !Self::is_transition_allowed(from, NodeLifecycle::Completed) {
+            return Err(GraphError::IllegalTransition {
+                node: id.0.clone(),
+                from,
+                to: NodeLifecycle::Completed,
+            });
+        }
+        self.transition_to(id, NodeLifecycle::Completed)?;
+        let node = self
+            .find_node_mut(id)
+            .expect("complete validated node presence");
+        node.set_output_artifact_ref(artifact_ref);
+        Ok(())
     }
 
-    pub(crate) fn set_failure_reason(&mut self, id: &NodeId, reason: String) -> bool {
-        let Some(node) = self.find_node_mut(id) else {
-            return false;
-        };
-        node.failure_reason = Some(reason);
-        true
+    /// Record a failure with its reason. Revoking admission (Ready) carries
+    /// no execution claim; failing a Running node ends its dispatch.
+    pub fn fail(&mut self, id: &NodeId, reason: impl Into<String>) -> Result<(), GraphError> {
+        let reason = reason.into();
+        let from = self.node_lifecycle(id)?;
+        if reason.is_empty() || !Self::is_transition_allowed(from, NodeLifecycle::Failed) {
+            return Err(GraphError::IllegalTransition {
+                node: id.0.clone(),
+                from,
+                to: NodeLifecycle::Failed,
+            });
+        }
+        self.transition_to(id, NodeLifecycle::Failed)?;
+        let node = self
+            .find_node_mut(id)
+            .expect("fail validated node presence");
+        node.set_failure_reason(Some(reason));
+        Ok(())
     }
 
-    /// Validated lifecycle transition. Unknown nodes and illegal moves
-    /// (including any move out of a terminal state or a same-state repeat)
-    /// return a typed error and leave the graph unchanged.
-    pub fn transition_node(&mut self, id: &NodeId, to: NodeLifecycle) -> Result<(), GraphError> {
+    /// Cancel admitted or dispatched work. Carries no execution claim.
+    pub fn cancel(&mut self, id: &NodeId) -> Result<(), GraphError> {
+        let from = self.node_lifecycle(id)?;
+        if !Self::is_transition_allowed(from, NodeLifecycle::Canceled) {
+            return Err(GraphError::IllegalTransition {
+                node: id.0.clone(),
+                from,
+                to: NodeLifecycle::Canceled,
+            });
+        }
+        self.transition_to(id, NodeLifecycle::Canceled)
+    }
+
+    /// Skip a Pending node blocked by failed prerequisites, recording why.
+    /// Requires a failed, canceled, or skipped upstream witness so a
+    /// successful skip always keeps a valid graph.
+    pub fn skip(&mut self, id: &NodeId, reason: impl Into<String>) -> Result<(), GraphError> {
+        let reason = reason.into();
+        let from = self.node_lifecycle(id)?;
+        if reason.is_empty() || !Self::is_transition_allowed(from, NodeLifecycle::Skipped) {
+            return Err(GraphError::IllegalTransition {
+                node: id.0.clone(),
+                from,
+                to: NodeLifecycle::Skipped,
+            });
+        }
+        let witnessed = self.edges.iter().filter(|e| &e.to_node == id).any(|e| {
+            self.get_node(&e.from_node).is_some_and(|n| {
+                matches!(
+                    n.lifecycle(),
+                    NodeLifecycle::Failed | NodeLifecycle::Canceled | NodeLifecycle::Skipped
+                )
+            })
+        });
+        if !witnessed {
+            return Err(GraphError::IllegalTransition {
+                node: id.0.clone(),
+                from,
+                to: NodeLifecycle::Skipped,
+            });
+        }
+        self.transition_to(id, NodeLifecycle::Skipped)?;
+        let node = self
+            .find_node_mut(id)
+            .expect("skip validated node presence");
+        node.set_failure_reason(Some(reason));
+        Ok(())
+    }
+
+    /// Private enum-pair primitive used by the atomic operations above.
+    fn transition_to(&mut self, id: &NodeId, to: NodeLifecycle) -> Result<(), GraphError> {
         let node = self
             .find_node_mut(id)
             .ok_or_else(|| GraphError::UnknownNode(id.0.clone()))?;
-        let from = node.lifecycle;
+        let from = node.lifecycle();
         if !Self::is_transition_allowed(from, to) {
             return Err(GraphError::IllegalTransition {
                 node: id.0.clone(),
@@ -181,7 +320,7 @@ impl TaskGraph {
                 to,
             });
         }
-        node.lifecycle = to;
+        node.set_lifecycle(to);
         Ok(())
     }
 
@@ -265,13 +404,13 @@ impl TaskGraph {
             && self
                 .nodes
                 .iter()
-                .all(|n| n.lifecycle == NodeLifecycle::Completed)
+                .all(|n| n.lifecycle() == NodeLifecycle::Completed)
     }
 
     pub fn has_any_failed(&self) -> bool {
         self.nodes
             .iter()
-            .any(|n| n.lifecycle == NodeLifecycle::Failed)
+            .any(|n| n.lifecycle() == NodeLifecycle::Failed)
     }
 }
 

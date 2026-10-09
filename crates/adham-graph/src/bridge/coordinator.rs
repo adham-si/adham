@@ -39,7 +39,7 @@ impl SubagentCoordinator {
             .graph
             .nodes()
             .iter()
-            .find(|n| n.lifecycle == NodeLifecycle::Ready)
+            .find(|n| n.lifecycle() == NodeLifecycle::Ready)
             .map(|n| n.definition.node_id.clone());
 
         let Some(node_id) = ready_node else {

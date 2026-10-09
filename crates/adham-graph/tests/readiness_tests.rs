@@ -27,11 +27,11 @@ fn test_topological_readiness_and_completion_cascade() {
     let ready = advance_graph_state(&mut graph).unwrap();
     assert_eq!(ready, vec![NodeId::new("root")]);
     assert_eq!(
-        graph.get_node(&NodeId::new("root")).unwrap().lifecycle,
+        graph.get_node(&NodeId::new("root")).unwrap().lifecycle(),
         NodeLifecycle::Ready
     );
     assert_eq!(
-        graph.get_node(&NodeId::new("child")).unwrap().lifecycle,
+        graph.get_node(&NodeId::new("child")).unwrap().lifecycle(),
         NodeLifecycle::Pending
     );
 
@@ -47,7 +47,7 @@ fn test_topological_readiness_and_completion_cascade() {
     let next_ready = advance_graph_state(&mut graph).unwrap();
     assert_eq!(next_ready, vec![NodeId::new("child")]);
     assert_eq!(
-        graph.get_node(&NodeId::new("child")).unwrap().lifecycle,
+        graph.get_node(&NodeId::new("child")).unwrap().lifecycle(),
         NodeLifecycle::Ready
     );
 }
@@ -73,7 +73,7 @@ fn test_failure_cascades_to_skipped_for_dependent_nodes() {
     let ready = advance_graph_state(&mut graph).unwrap();
     assert!(ready.is_empty());
     assert_eq!(
-        graph.get_node(&NodeId::new("b")).unwrap().lifecycle,
+        graph.get_node(&NodeId::new("b")).unwrap().lifecycle(),
         NodeLifecycle::Skipped
     );
 }

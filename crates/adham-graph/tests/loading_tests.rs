@@ -36,6 +36,81 @@ fn test_valid_loaded_graph_is_accepted() {
 }
 
 #[test]
+fn test_ready_with_pending_prerequisite_is_rejected() {
+    // Admission consistency: a Ready node must have completed
+    // prerequisites, otherwise scheduling would ignore it and the
+    // coordinator would dispatch unadmitted work.
+    let json = serde_json::json!({
+        "graph_id": "g1", "parent_run_id": "run-1",
+        "nodes": [node_json("a", "pending"), node_json("b", "ready")],
+        "edges": [edge_json("e1", "a", "b")]
+    });
+    let err = load(json).unwrap_err();
+    assert!(
+        matches!(err, GraphError::InvalidGraph(_)),
+        "unexpected error: {err:?}"
+    );
+}
+
+#[test]
+fn test_completed_without_delegation_is_rejected() {
+    // Dispatch metadata is retained: Completed implies dispatched.
+    let mut node = node_json("a", "completed");
+    node["output_artifact_ref"] = serde_json::json!("artifact-1");
+    let json = serde_json::json!({
+        "graph_id": "g1", "parent_run_id": "run-1",
+        "nodes": [node],
+        "edges": []
+    });
+    let err = load(json).unwrap_err();
+    assert!(
+        matches!(err, GraphError::InvalidGraph(_)),
+        "unexpected error: {err:?}"
+    );
+}
+
+#[test]
+fn test_successful_command_graph_survives_validated_reload() {
+    // Round-trip: a graph built only through validated commands must
+    // serialize and reload cleanly.
+    use adham_graph::domain::edge::EdgeDefinition;
+    use adham_graph::domain::node::{NodeDefinition, NodeId, NodeKind, NodeState};
+    let mut graph = TaskGraph::new("run-rt");
+    graph
+        .add_node(NodeState::new(NodeDefinition::new(
+            "a",
+            NodeKind::Research,
+            "A",
+            "",
+        )))
+        .unwrap();
+    graph
+        .add_node(NodeState::new(NodeDefinition::new(
+            "b",
+            NodeKind::CodingProposal,
+            "B",
+            "",
+        )))
+        .unwrap();
+    graph
+        .add_edge(EdgeDefinition::prerequisite("a", "b"))
+        .unwrap();
+    graph.admit_ready(&NodeId::new("a")).unwrap();
+    graph
+        .dispatch(&NodeId::new("a"), "del-1".to_string())
+        .unwrap();
+    graph
+        .complete(&NodeId::new("a"), Some("artifact-1".to_string()))
+        .unwrap();
+    graph.admit_ready(&NodeId::new("b")).unwrap();
+
+    let json = serde_json::to_value(&graph).unwrap();
+    let dto: UncheckedTaskGraph = serde_json::from_value(json).unwrap();
+    let reloaded = TaskGraph::try_from(dto).unwrap();
+    assert_eq!(graph, reloaded);
+}
+
+#[test]
 fn test_duplicate_node_ids_are_rejected() {
     let mut json = valid_two_node();
     json["nodes"]

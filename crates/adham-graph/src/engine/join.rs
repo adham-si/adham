@@ -9,7 +9,7 @@ pub fn collect_incoming_artifacts(graph: &TaskGraph, node_id: &NodeId) -> Vec<St
         .filter_map(|e| {
             graph
                 .get_node(&e.from_node)
-                .and_then(|n| n.output_artifact_ref.clone())
+                .and_then(|n| n.output_artifact_ref().map(str::to_string))
         })
         .collect()
 }

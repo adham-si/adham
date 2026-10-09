@@ -17,7 +17,7 @@ pub fn advance_graph_state(graph: &mut TaskGraph) -> Result<Vec<NodeId>, GraphEr
     let mut nodes_to_skip = Vec::new();
 
     for node in graph.nodes() {
-        if node.lifecycle != NodeLifecycle::Pending {
+        if node.lifecycle() != NodeLifecycle::Pending {
             continue;
         }
 
@@ -46,7 +46,7 @@ pub fn advance_graph_state(graph: &mut TaskGraph) -> Result<Vec<NodeId>, GraphEr
                         node: node_id.0.clone(),
                         upstream: edge.from_node.0.clone(),
                     })?;
-            match upstream.lifecycle {
+            match upstream.lifecycle() {
                 NodeLifecycle::Completed => {}
                 NodeLifecycle::Failed | NodeLifecycle::Canceled | NodeLifecycle::Skipped => {
                     any_failed = true;
@@ -66,35 +66,33 @@ pub fn advance_graph_state(graph: &mut TaskGraph) -> Result<Vec<NodeId>, GraphEr
         }
     }
 
-    // Phase 3: apply via validated transitions. These cannot fail: every
-    // target was observed Pending in phase 2 on the same unmutated graph.
+    // Phase 3: apply via atomic domain operations. These cannot fail: every
+    // target was observed Pending in phase 2 on the same unmutated graph,
+    // and prerequisites cannot regress while only Pending nodes change.
     for id in &nodes_to_skip {
         graph
-            .transition_node(id, NodeLifecycle::Skipped)
+            .skip(id, "Prerequisite dependency failed or canceled".to_string())
             .map_err(|e| GraphError::InvalidGraph(format!("scheduling transition failed: {e}")))?;
-        assert!(
-            graph.set_failure_reason(id, "Prerequisite dependency failed or canceled".to_string())
-        );
     }
 
     for id in &newly_ready {
         graph
-            .transition_node(id, NodeLifecycle::Ready)
+            .admit_ready(id)
             .map_err(|e| GraphError::InvalidGraph(format!("scheduling transition failed: {e}")))?;
     }
 
     Ok(newly_ready)
 }
 
+/// Engine wrappers over the atomic domain operations. Admission,
+/// metadata, and prerequisite checks live in the domain; these preserve
+/// the engine call shape used by the coordinator.
 pub fn mark_node_running(
     graph: &mut TaskGraph,
     node_id: &NodeId,
     delegation_id: String,
 ) -> Result<(), GraphError> {
-    graph.transition_node(node_id, NodeLifecycle::Running)?;
-    // Membership was validated by transition_node; the node must exist.
-    assert!(graph.set_delegation_id(node_id, delegation_id));
-    Ok(())
+    graph.dispatch(node_id, delegation_id)
 }
 
 pub fn mark_node_completed(
@@ -102,9 +100,7 @@ pub fn mark_node_completed(
     node_id: &NodeId,
     artifact_ref: Option<String>,
 ) -> Result<(), GraphError> {
-    graph.transition_node(node_id, NodeLifecycle::Completed)?;
-    assert!(graph.set_output_artifact(node_id, artifact_ref));
-    Ok(())
+    graph.complete(node_id, artifact_ref)
 }
 
 pub fn mark_node_failed(
@@ -112,7 +108,5 @@ pub fn mark_node_failed(
     node_id: &NodeId,
     reason: String,
 ) -> Result<(), GraphError> {
-    graph.transition_node(node_id, NodeLifecycle::Failed)?;
-    assert!(graph.set_failure_reason(node_id, reason));
-    Ok(())
+    graph.fail(node_id, reason)
 }
