@@ -4,6 +4,7 @@ use adham_desktop_api::{
     PlatformInfo, ProjectSummary, RebuildProjectionsResponse, SessionSummary, StorageStatus,
     SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
 };
+#[cfg(target_os = "macos")]
 use tauri::Manager;
 
 #[tauri::command]
@@ -140,11 +141,11 @@ pub fn run() {
 
             Ok(())
         })
-        .on_window_event(|window, event| {
+        .on_window_event(|_window, _event| {
             #[cfg(target_os = "macos")]
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = _event {
                 api.prevent_close();
-                let _ = window.hide();
+                let _ = _window.hide();
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -163,10 +164,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|app_handle, event| {
+    app.run(|_app_handle, _event| {
         #[cfg(target_os = "macos")]
-        if let tauri::RunEvent::Reopen { .. } = event {
-            if let Some(window) = app_handle.get_webview_window("main") {
+        if let tauri::RunEvent::Reopen { .. } = _event {
+            if let Some(window) = _app_handle.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
