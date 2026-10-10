@@ -64,10 +64,7 @@ pub async fn list_workspaces(ctx: &ApiContext) -> Result<WorkspaceList, String> 
 
 /// Projects strictly inside one workspace, in creation order. The workspace
 /// must exist; an unknown workspace is rejected, never silently empty.
-pub async fn list_projects(
-    ctx: &ApiContext,
-    workspace_id: &str,
-) -> Result<ProjectList, String> {
+pub async fn list_projects(ctx: &ApiContext, workspace_id: &str) -> Result<ProjectList, String> {
     let ws_id = WorkspaceId::from_string(workspace_id)
         .map_err(|_| "VALIDATION_FAILED: workspace_id must be UUID".to_string())?;
     let ws_stream = format!("workspace:{ws_id}");
