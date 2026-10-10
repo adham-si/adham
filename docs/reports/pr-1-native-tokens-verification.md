@@ -137,7 +137,7 @@ test result: ok across all workspace crates (core-types, runtime, verify, projec
 3. **Rust & Tauri Host Status:**
    - `cargo check --workspace`: Passed.
    - `cargo test --workspace`: Passed.
-4. **Manual Native Verification Checklist (Host: macOS arm64, Head: `6d87a48`):**
+4. **Manual Native Verification Checklist (Host: macOS arm64, Head: current):**
 
 | Check | Expected Result | Status | Notes |
 |---|---|---|---|
@@ -145,8 +145,26 @@ test result: ok across all workspace crates (core-types, runtime, verify, projec
 | Cold restart in dark mode | Initial paint uses dark tokens without light-theme flash | **PENDING** | Manual verification via `tauri dev` |
 | Buttons & inputs | Preserves radius (`6px`), padding, heights (`32/36/40px`), and focus ring | **PENDING** | Manual verification via `tauri dev` |
 | Dialogs & menus | Proper z-index stacking (`400/500`) and floating box-shadow | **PENDING** | Manual verification via `tauri dev` |
-| Arabic / RTL layout | Correct alignment, text direction, and logical margins/padding | **PENDING** | Manual verification via `tauri dev` |
+| Arabic / RTL layout | Correct alignment, text direction, and logical margins/padding | **PASS** | Verified via live `i18n` runtime activation (`i18n.language = 'ar'`, `html.lang = 'ar'`, `html.dir = 'rtl'`) and side-by-side native window captures |
 | Reduced motion | Token-controlled animations/transitions disabled (`0ms`) | **PENDING** | Media query override verified in tokens test; runtime visual pending |
-| Forced colors / High contrast | Controls, borders, and focus rings remain distinct | **PENDING** | System palette overrides verified in tokens test; runtime visual pending |
+| Forced colors / High contrast | Controls, borders, and focus rings remain distinct | **NOT TESTED** | CSS `forced-colors` is unavailable in macOS native WebKit webview |
 
-*Notice: Per project review policy, visual acceptance checks are explicitly tracked as pending manual confirmation. None are marked passed without live screen verification.*
+5. **Attached Visual Artifacts (1280 × 840 Viewport, Synthetic Canary Data):**
+   - English / LTR baseline: [`docs/reports/screenshots/pr1-viewport-ltr-en.png`](file:///Users/ilyassmotya/software/00.devlab/adham-desktop/docs/reports/screenshots/pr1-viewport-ltr-en.png)
+   - Arabic / RTL localization: [`docs/reports/screenshots/pr1-viewport-rtl-ar.png`](file:///Users/ilyassmotya/software/00.devlab/adham-desktop/docs/reports/screenshots/pr1-viewport-rtl-ar.png)
+
+---
+
+## 7. Baseline Defect Segregation (Pre-Migration `237720e` vs PR #6)
+
+Investigation of visual anomalies visible during the native check confirmed they are pre-existing defects present prior to PR #6:
+
+1. **Visible Raw Translation Keys (`compose.newSession`, `compose.emptyHistory`):**
+   - In `apps/desktop/src/widgets/shell/primary-sidebar/primary-sidebar.tsx`, lines 126, 129, and 158 call `t('compose.newSession')` and `t('compose.emptyHistory')`.
+   - In `locales/en/messages.json` and `locales/ar/messages.json`, these keys are defined under `"sidebar"` as `"newTask"` and `"noSessions"`.
+   - Inspection of baseline commit `237720e` confirms this mismatch was present before PR #6 was branched. It is a pre-existing localization defect, not introduced by token separation.
+2. **Inspector Activity Feed (`Session created Now`, `SQLite WAL checkpoint verified 1 min ago`):**
+   - In `apps/desktop/src/widgets/shell/panel/panel.tsx`, lines 248–260 render hardcoded static JSX markup without backend event subscriptions or IPC queries.
+   - Inspection of baseline commit `237720e` confirms this static mock was present in the baseline.
+3. **Scope Discipline:**
+   - Both items are documented as pre-existing defects to be resolved in their owning functional areas and are excluded from PR #6 scope.
