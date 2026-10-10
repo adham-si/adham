@@ -42,6 +42,15 @@ pub struct BootstrapState {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
+pub struct PlatformInfo {
+    pub os: String,
+    pub arch: String,
+    pub has_native_titlebar_controls: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct CreateWorkspacePayload {
     pub name: String,
     pub kind: String,

@@ -22,6 +22,12 @@ export const BootstrapStateSchema = z.object({
   activeProjectId: z.string().nullable(),
 });
 
+export const PlatformInfoSchema = z.object({
+  os: z.string(),
+  arch: z.string(),
+  hasNativeTitlebarControls: z.boolean(),
+});
+
 export const WorkspaceSummarySchema = z.object({
   workspaceId: z.string(),
   name: z.string(),
