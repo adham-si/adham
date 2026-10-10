@@ -29,6 +29,17 @@ function fakeProvisioning() {
   };
 }
 
+function publicEnvelope(code: string, messageKey: string, retryable: boolean) {
+  return {
+    protocolVersion: 1,
+    code,
+    messageKey,
+    retryable,
+    correlationId: 'corr-1',
+    fieldErrors: [],
+  };
+}
+
 function requestIds(
   backend: ReturnType<typeof fakeProvisioning>,
   method: 'createWorkspace' | 'createProject',
@@ -63,7 +74,7 @@ describe('useProvisioning', () => {
     expect(readWorkspaceIntent()).toBeNull();
   });
 
-  it('reuses the same request ID on uncertain retry and blocks a renamed fork', async () => {
+  it('blocks a renamed fork while the first intent is unresolved', async () => {
     const backend = fakeProvisioning();
     backend.createWorkspace.mockRejectedValueOnce(new Error('transport lost'));
     const { result } = renderHook(() => useProvisioning({ backend }));
@@ -72,7 +83,55 @@ describe('useProvisioning', () => {
       first = await result.current.createWorkspace('WS');
     });
     expect(first.ok).toBe(false);
-    // Same name retries with the identical frozen identity.
+    expect(first.uncertain).toBe(true);
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    // A different name while the first outcome is unknown is blocked
+    // without dispatch: no extra backend call.
+    let blocked!: { ok: boolean; uncertain?: boolean };
+    await act(async () => {
+      blocked = await result.current.createWorkspace('Other');
+    });
+    expect(blocked.ok).toBe(false);
+    expect(blocked.uncertain).toBe(true);
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    // Retrying the original input reuses the identical frozen identity.
+    backend.createWorkspace.mockResolvedValueOnce({
+      workspaceId: 'ws-1',
+      name: 'WS',
+      kind: 'personal',
+      preferredLanguage: 'en',
+      createdAt: '2026-10-09T00:00:00Z',
+    });
+    let retried!: { ok: boolean };
+    await act(async () => {
+      retried = await result.current.createWorkspace('WS');
+    });
+    expect(retried.ok).toBe(true);
+    const ids = requestIds(backend, 'createWorkspace');
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(ids[0]).toBe(ids[1]);
+    expect(readWorkspaceIntent()).toBeNull();
+  });
+
+  it('clears the intent on a Rust-serialized InvalidRequest and allows correction', async () => {
+    const backend = fakeProvisioning();
+    // Shape-faithful Rust ErrorEnvelope: serde camelCase + PublicErrorCode
+    // variant name (no rename_all), as produced by from_error_str for a
+    // 121-scalar name.
+    backend.createWorkspace.mockRejectedValueOnce(
+      publicEnvelope('InvalidRequest', 'error.validationFailed', false),
+    );
+    const { result } = renderHook(() => useProvisioning({ backend }));
+    let outcome!: { ok: boolean; uncertain?: boolean; error?: string };
+    await act(async () => {
+      outcome = await result.current.createWorkspace('n'.repeat(121));
+    });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.uncertain).toBe(false);
+    expect(String(outcome.error)).toMatch(/invalid|correct/i);
+    expect(readWorkspaceIntent()).toBeNull();
+    // A corrected name dispatches a NEW intent instead of staying frozen.
     backend.createWorkspace.mockResolvedValueOnce({
       workspaceId: 'ws-1',
       name: 'WS',
@@ -85,31 +144,78 @@ describe('useProvisioning', () => {
     });
     const ids = requestIds(backend, 'createWorkspace');
     expect(ids).toHaveLength(2);
-    expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/i);
-    expect(ids[0]).toBe(ids[1]);
-    // A different name while the first outcome is unknown is blocked.
-    backend.createWorkspace.mockRejectedValueOnce(new Error('transport lost'));
-    let blocked!: { ok: boolean };
-    await act(async () => {
-      blocked = await result.current.createWorkspace('Other');
-    });
-    expect(blocked.ok).toBe(false);
-    expect(backend.createWorkspace).toHaveBeenCalledTimes(3);
+    expect(ids[0]).not.toBe(ids[1]);
   });
 
-  it('clears the intent on definite rejection and reports the message', async () => {
+  it('retains the intent on public storage/unknown envelopes', async () => {
     const backend = fakeProvisioning();
-    backend.createWorkspace.mockRejectedValueOnce({
-      code: 'VALIDATION_FAILED',
-      message: 'VALIDATION_FAILED: unsupported workspace kind',
-    });
+    backend.createWorkspace.mockRejectedValueOnce(
+      publicEnvelope('StorageUnavailable', 'error.storageUnavailable', true),
+    );
     const { result } = renderHook(() => useProvisioning({ backend }));
-    let outcome!: { ok: boolean; uncertain?: boolean };
+    let first!: { ok: boolean; uncertain?: boolean };
+    await act(async () => {
+      first = await result.current.createWorkspace('WS');
+    });
+    expect(first.ok).toBe(false);
+    expect(first.uncertain).toBe(true);
+    expect(readWorkspaceIntent()).not.toBeNull();
+    backend.createWorkspace.mockResolvedValueOnce({
+      workspaceId: 'ws-1',
+      name: 'WS',
+      kind: 'personal',
+      preferredLanguage: 'en',
+      createdAt: '2026-10-09T00:00:00Z',
+    });
+    await act(async () => {
+      await result.current.createWorkspace('WS');
+    });
+    const ids = requestIds(backend, 'createWorkspace');
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBe(ids[1]);
+  });
+
+  it('blocks dispatch when the intent record cannot be written', async () => {
+    const backend = fakeProvisioning();
+    const { result } = renderHook(() => useProvisioning({ backend }));
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('quota exceeded');
+    });
+    let outcome!: { ok: boolean; uncertain?: boolean; error?: string };
     await act(async () => {
       outcome = await result.current.createWorkspace('WS');
     });
     expect(outcome.ok).toBe(false);
     expect(outcome.uncertain).toBe(false);
+    expect(String(outcome.error)).toMatch(/identity could not be recorded/i);
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+    expect(readWorkspaceIntent()).toBeNull();
+    setItemSpy.mockRestore();
+  });
+
+  it('reuses the frozen identity across remount', async () => {
+    const backend = fakeProvisioning();
+    backend.createWorkspace.mockRejectedValueOnce(new Error('transport lost'));
+    const first = renderHook(() => useProvisioning({ backend }));
+    await act(async () => {
+      await first.result.current.createWorkspace('WS');
+    });
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    first.unmount();
+    backend.createWorkspace.mockResolvedValueOnce({
+      workspaceId: 'ws-1',
+      name: 'WS',
+      kind: 'personal',
+      preferredLanguage: 'en',
+      createdAt: '2026-10-09T00:00:00Z',
+    });
+    const second = renderHook(() => useProvisioning({ backend }));
+    await act(async () => {
+      await second.result.current.createWorkspace('WS');
+    });
+    const ids = requestIds(backend, 'createWorkspace');
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBe(ids[1]);
     expect(readWorkspaceIntent()).toBeNull();
   });
 
@@ -130,6 +236,59 @@ describe('useProvisioning', () => {
       { name: 'Proj', storageKind: 'isolated' },
       { requestId: expect.any(String) },
     );
+  });
+
+  it('resumes a failed project in the same workspace without recreating it', async () => {
+    const backend = fakeProvisioning();
+    backend.createProject.mockRejectedValueOnce(new Error('transport lost'));
+    const { result } = renderHook(() => useProvisioning({ backend }));
+    await act(async () => {
+      await result.current.createWorkspace('WS');
+    });
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    let failed!: { ok: boolean; uncertain?: boolean };
+    await act(async () => {
+      failed = await result.current.createProject('Proj', 'ws-1');
+    });
+    expect(failed.ok).toBe(false);
+    expect(failed.uncertain).toBe(true);
+    // A frozen project intent must not transfer into another workspace.
+    let cross!: { ok: boolean };
+    await act(async () => {
+      cross = await result.current.createProject('Proj', 'ws-other');
+    });
+    expect(cross.ok).toBe(false);
+    expect(backend.createProject).toHaveBeenCalledTimes(1);
+    backend.createProject.mockResolvedValueOnce({
+      projectId: 'proj-1',
+      workspaceId: 'ws-1',
+      name: 'Proj',
+      storageKind: 'isolated',
+      createdAt: '2026-10-09T00:00:01Z',
+    });
+    await act(async () => {
+      await result.current.createProject('Proj', 'ws-1');
+    });
+    const projIds = requestIds(backend, 'createProject');
+    expect(projIds).toHaveLength(2);
+    expect(projIds[0]).toBe(projIds[1]);
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('still treats legacy handler strings as definite', async () => {
+    const backend = fakeProvisioning();
+    backend.createWorkspace.mockRejectedValueOnce({
+      code: 'VALIDATION_FAILED',
+      message: 'VALIDATION_FAILED: unsupported workspace kind',
+    });
+    const { result } = renderHook(() => useProvisioning({ backend }));
+    let outcome!: { ok: boolean; uncertain?: boolean };
+    await act(async () => {
+      outcome = await result.current.createWorkspace('WS');
+    });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.uncertain).toBe(false);
+    expect(readWorkspaceIntent()).toBeNull();
   });
 });
 
@@ -211,5 +370,83 @@ describe('provisioning journey', () => {
     await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
     expect(screen.queryByText(/create your project/i)).toBeNull();
     expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds the confirmed workspace while bootstrap loads and dispatches once', async () => {
+    const user = userEvent.setup();
+    const backend = journeyBackend();
+    let resolveRefresh!: (value: unknown) => void;
+    backend.getBootstrapState
+      .mockReset()
+      .mockResolvedValueOnce({
+        isInitialized: false,
+        activeWorkspaceId: null,
+        activeProjectId: null,
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = resolve as (value: unknown) => void;
+          }),
+      )
+      .mockResolvedValue({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: 'proj-9',
+      });
+    render(<ConversationPanel backend={backend} provisioning={backend} />);
+
+    await screen.findByText(/create your workspace/i);
+    await user.type(screen.getByLabelText(/workspace name/i), 'WS');
+    await user.click(screen.getByRole('button', { name: /create workspace/i }));
+    await waitFor(() => expect(backend.createWorkspace).toHaveBeenCalledTimes(1));
+    // Held disabled while the authoritative read is in flight.
+    const held = screen.getByRole('button', { name: /create workspace/i }) as HTMLButtonElement;
+    expect(held.disabled).toBe(true);
+    await user.click(held);
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveRefresh({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: null,
+      });
+    });
+    await screen.findByText(/create your project/i);
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries the read after a post-creation bootstrap failure without recreating', async () => {
+    const user = userEvent.setup();
+    const backend = journeyBackend();
+    backend.getBootstrapState
+      .mockReset()
+      .mockResolvedValueOnce({
+        isInitialized: false,
+        activeWorkspaceId: null,
+        activeProjectId: null,
+      })
+      .mockRejectedValueOnce(new Error('read outage'))
+      .mockResolvedValue({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: null,
+      });
+    render(<ConversationPanel backend={backend} provisioning={backend} />);
+
+    await screen.findByText(/create your workspace/i);
+    await user.type(screen.getByLabelText(/workspace name/i), 'WS');
+    await user.click(screen.getByRole('button', { name: /create workspace/i }));
+    await waitFor(() => expect(backend.createWorkspace).toHaveBeenCalledTimes(1));
+    // Read failure after a committed creation: read-only retry, no creation.
+    await screen.findByRole('button', { name: /retry loading/i });
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    expect(backend.createProject).not.toHaveBeenCalled();
+    const readsBefore = backend.getBootstrapState.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: /retry loading/i }));
+    await screen.findByText(/create your project/i);
+    expect(backend.getBootstrapState.mock.calls.length).toBeGreaterThan(readsBefore);
+    expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    expect(backend.createProject).not.toHaveBeenCalled();
   });
 });

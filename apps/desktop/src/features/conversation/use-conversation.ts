@@ -331,8 +331,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
 
   /// Re-run bootstrap after out-of-band provisioning (workspace/project
   /// creation): drops the settled run so the fresh snapshot drives scope.
+  /// Sets a transitioning status so the old creation form cannot dispatch
+  /// again while the authoritative read is in flight. A read failure retries
+  /// the read, never a fresh creation.
   const refreshScope = React.useCallback(() => {
     bootPromiseRef.current = null;
+    setStatus('bootstrapping');
+    setError(null);
     void bootstrap();
   }, [bootstrap]);
 
