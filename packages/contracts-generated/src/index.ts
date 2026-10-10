@@ -35,6 +35,8 @@ export type CommandContext = { workspaceId: string | null, projectId: string | n
 
 export type BootstrapState = { isInitialized: boolean, activeWorkspaceId: string | null, activeProjectId: string | null, };
 
+export type PlatformInfo = { os: string, arch: string, hasNativeTitlebarControls: boolean, };
+
 export type CreateWorkspacePayload = { name: string, kind: string, preferredLanguage: string, };
 
 export type WorkspaceSummary = { workspaceId: string, name: string, kind: string, preferredLanguage: string, createdAt: string, };
