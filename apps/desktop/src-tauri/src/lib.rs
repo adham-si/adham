@@ -1,8 +1,8 @@
 use adham_desktop_api::{
     ApiContext, BootstrapState, CommandContext, CommandEnvelope, CommandResult, ConversationPage,
     CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope,
-    ProjectSummary, RebuildProjectionsResponse, SessionSummary, StorageStatus,
-    SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
+    ProjectSummary, RebuildProjectionsResponse, SelectProjectPayload, SessionSummary,
+    StorageStatus, SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
 };
 
 #[tauri::command]
@@ -39,6 +39,35 @@ async fn create_project(
     request: CommandEnvelope<CreateProjectPayload>,
 ) -> Result<CommandResult<ProjectSummary>, ErrorEnvelope> {
     adham_desktop_api::handle_create_project(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_workspaces(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<Vec<WorkspaceSummary>, ErrorEnvelope> {
+    adham_desktop_api::handle_list_workspaces(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_projects(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+) -> Result<Vec<ProjectSummary>, ErrorEnvelope> {
+    adham_desktop_api::handle_list_projects(&state, context)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn select_project(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SelectProjectPayload>,
+) -> Result<CommandResult<BootstrapState>, ErrorEnvelope> {
+    adham_desktop_api::handle_select_project(&state, request)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -113,6 +142,9 @@ pub fn run() {
             get_storage_status,
             create_workspace,
             create_project,
+            list_workspaces,
+            list_projects,
+            select_project,
             create_session,
             submit_message,
             get_conversation,

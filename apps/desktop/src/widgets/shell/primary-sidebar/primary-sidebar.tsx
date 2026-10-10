@@ -17,6 +17,12 @@ export interface PrimarySidebarProps {
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: () => void;
   className?: string;
+  /**
+   * Deliberate scope-selection UI (workspace/project discovery). When
+   * provided it replaces the static workspace/project labels, which remain
+   * as the unconfigured fallback.
+   */
+  selectionMenu?: React.ReactNode;
 }
 
 /**
@@ -31,6 +37,7 @@ export function PrimarySidebar({
   onSelectSession,
   onNewSession,
   className = '',
+  selectionMenu,
 }: PrimarySidebarProps) {
   const { t } = useTranslation();
   const { sidebarOpen, sidebarWidth, setSidebarWidth } = useShellLayout();
@@ -95,27 +102,33 @@ export function PrimarySidebar({
     >
       {/* Workspace Switcher & Context Header */}
       <div className="flex flex-col gap-1 border-b border-border-subtle p-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <span className="flex size-5 shrink-0 items-center justify-center rounded bg-selection font-bold text-xs text-action">
-              W
-            </span>
-            <span className="truncate text-xs font-semibold text-foreground">{workspaceName}</span>
-          </div>
-          <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] text-foreground-muted">
-            {t('compose.privacy')}
-          </span>
-        </div>
+        {selectionMenu ?? (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded bg-selection font-bold text-xs text-action">
+                  W
+                </span>
+                <span className="truncate text-xs font-semibold text-foreground">
+                  {workspaceName}
+                </span>
+              </div>
+              <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] text-foreground-muted">
+                {t('compose.privacy')}
+              </span>
+            </div>
 
-        {/* Current Project & New Action */}
-        <div className="flex items-center justify-between gap-1">
-          <div className="flex items-center gap-1.5 overflow-hidden text-xs text-foreground-secondary">
-            <AdhamIcon size="sm" label={t('project')}>
-              <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </AdhamIcon>
-            <span className="truncate">{projectName}</span>
-          </div>
-        </div>
+            {/* Current Project & New Action */}
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1.5 overflow-hidden text-xs text-foreground-secondary">
+                <AdhamIcon size="sm" label={t('project')}>
+                  <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </AdhamIcon>
+                <span className="truncate">{projectName}</span>
+              </div>
+            </div>
+          </>
+        )}
 
         <Button
           variant="secondary"

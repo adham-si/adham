@@ -294,37 +294,74 @@ describe('useProvisioning', () => {
 
 describe('provisioning journey', () => {
   function journeyBackend() {
-    return {
-      getBootstrapState: vi
-        .fn()
-        .mockResolvedValueOnce({
-          isInitialized: false,
-          activeWorkspaceId: null,
-          activeProjectId: null,
-        })
-        .mockResolvedValueOnce({
-          isInitialized: true,
-          activeWorkspaceId: 'ws-9',
-          activeProjectId: null,
-        })
-        .mockResolvedValue({
-          isInitialized: true,
-          activeWorkspaceId: 'ws-9',
-          activeProjectId: 'proj-9',
-        }),
-      createWorkspace: vi.fn().mockResolvedValue({
-        workspaceId: 'ws-9',
-        name: 'WS',
-        kind: 'personal',
-        preferredLanguage: 'en',
-        createdAt: '2026-10-09T00:00:00Z',
+    const state = {
+      wsCreated: false,
+      projWs: null as string | null,
+      activeWs: null as string | null,
+      activeProj: null as string | null,
+      failRefreshOnce: false,
+      delayRefresh: null as Promise<unknown> | null,
+    };
+    const bootstrapNow = () =>
+      state.activeWs == null
+        ? { isInitialized: false, activeWorkspaceId: null, activeProjectId: null }
+        : state.activeProj == null
+          ? { isInitialized: true, activeWorkspaceId: state.activeWs, activeProjectId: null }
+          : {
+              isInitialized: true,
+              activeWorkspaceId: state.activeWs,
+              activeProjectId: state.activeProj,
+            };
+    const wsSummary = {
+      workspaceId: 'ws-9',
+      name: 'WS',
+      kind: 'personal',
+      preferredLanguage: 'en',
+      createdAt: '2026-10-09T00:00:00Z',
+    };
+    const projSummary = {
+      projectId: 'proj-9',
+      workspaceId: 'ws-9',
+      name: 'Proj',
+      storageKind: 'isolated',
+      createdAt: '2026-10-09T00:00:01Z',
+    };
+    const backend = {
+      getBootstrapState: vi.fn(async () => {
+        if (state.failRefreshOnce) {
+          state.failRefreshOnce = false;
+          throw new Error('read outage');
+        }
+        if (state.delayRefresh) {
+          const pending = state.delayRefresh;
+          state.delayRefresh = null;
+          await pending;
+        }
+        return bootstrapNow();
       }),
-      createProject: vi.fn().mockResolvedValue({
-        projectId: 'proj-9',
-        workspaceId: 'ws-9',
-        name: 'Proj',
-        storageKind: 'isolated',
-        createdAt: '2026-10-09T00:00:01Z',
+      createWorkspace: vi.fn(async () => {
+        state.wsCreated = true;
+        state.activeWs = 'ws-9';
+        return wsSummary;
+      }),
+      createProject: vi.fn(async (wsId: string) => {
+        state.projWs = wsId;
+        state.activeWs = wsId;
+        state.activeProj = 'proj-9';
+        return { ...projSummary, workspaceId: wsId };
+      }),
+      listWorkspaces: vi.fn(async () => (state.wsCreated ? [wsSummary] : [])),
+      listProjects: vi.fn(async (wsId: string) =>
+        state.projWs === wsId ? [{ ...projSummary, workspaceId: wsId }] : [],
+      ),
+      selectProject: vi.fn(async (wsId: string, payload: { projectId: string }) => {
+        state.activeWs = wsId;
+        state.activeProj = payload.projectId;
+        return {
+          isInitialized: true,
+          activeWorkspaceId: wsId,
+          activeProjectId: payload.projectId,
+        };
       }),
       createSession: vi.fn().mockResolvedValue({
         sessionId: 'sess-9',
@@ -339,12 +376,19 @@ describe('provisioning journey', () => {
         projectionPosition: '0',
       }),
     };
+    return { backend, state };
+  }
+
+  function renderPanel(backend: ReturnType<typeof journeyBackend>['backend']) {
+    return render(
+      <ConversationPanel backend={backend} provisioning={backend} selection={backend} />,
+    );
   }
 
   it('fresh UI creates workspace then project and reaches the conversation', async () => {
     const user = userEvent.setup();
-    const backend = journeyBackend();
-    render(<ConversationPanel backend={backend} provisioning={backend} />);
+    const { backend } = journeyBackend();
+    renderPanel(backend);
 
     await screen.findByText(/create your workspace/i);
     const wsBox = screen.getByLabelText(/workspace name/i);
@@ -370,33 +414,19 @@ describe('provisioning journey', () => {
     await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
     expect(screen.queryByText(/create your project/i)).toBeNull();
     expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
+    expect(backend.selectProject).not.toHaveBeenCalled();
   });
 
   it('holds the confirmed workspace while bootstrap loads and dispatches once', async () => {
     const user = userEvent.setup();
-    const backend = journeyBackend();
-    let resolveRefresh!: (value: unknown) => void;
-    backend.getBootstrapState
-      .mockReset()
-      .mockResolvedValueOnce({
-        isInitialized: false,
-        activeWorkspaceId: null,
-        activeProjectId: null,
-      })
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveRefresh = resolve as (value: unknown) => void;
-          }),
-      )
-      .mockResolvedValue({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: 'proj-9',
-      });
-    render(<ConversationPanel backend={backend} provisioning={backend} />);
+    const { backend, state } = journeyBackend();
+    renderPanel(backend);
 
     await screen.findByText(/create your workspace/i);
+    let resolveRefresh!: (value: unknown) => void;
+    state.delayRefresh = new Promise((resolve) => {
+      resolveRefresh = resolve as (value: unknown) => void;
+    });
     await user.type(screen.getByLabelText(/workspace name/i), 'WS');
     await user.click(screen.getByRole('button', { name: /create workspace/i }));
     await waitFor(() => expect(backend.createWorkspace).toHaveBeenCalledTimes(1));
@@ -406,11 +436,7 @@ describe('provisioning journey', () => {
     await user.click(held);
     expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
     await act(async () => {
-      resolveRefresh({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: null,
-      });
+      resolveRefresh(undefined);
     });
     await screen.findByText(/create your project/i);
     expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
@@ -418,23 +444,11 @@ describe('provisioning journey', () => {
 
   it('retries the read after a post-creation bootstrap failure without recreating', async () => {
     const user = userEvent.setup();
-    const backend = journeyBackend();
-    backend.getBootstrapState
-      .mockReset()
-      .mockResolvedValueOnce({
-        isInitialized: false,
-        activeWorkspaceId: null,
-        activeProjectId: null,
-      })
-      .mockRejectedValueOnce(new Error('read outage'))
-      .mockResolvedValue({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: null,
-      });
-    render(<ConversationPanel backend={backend} provisioning={backend} />);
+    const { backend, state } = journeyBackend();
+    renderPanel(backend);
 
     await screen.findByText(/create your workspace/i);
+    state.failRefreshOnce = true;
     await user.type(screen.getByLabelText(/workspace name/i), 'WS');
     await user.click(screen.getByRole('button', { name: /create workspace/i }));
     await waitFor(() => expect(backend.createWorkspace).toHaveBeenCalledTimes(1));
@@ -452,29 +466,16 @@ describe('provisioning journey', () => {
 
   it('holds the confirmed project while bootstrap loads and dispatches once', async () => {
     const user = userEvent.setup();
-    const backend = journeyBackend();
-    let resolveRefresh!: (value: unknown) => void;
-    backend.getBootstrapState
-      .mockReset()
-      .mockResolvedValueOnce({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: null,
-      })
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveRefresh = resolve as (value: unknown) => void;
-          }),
-      )
-      .mockResolvedValue({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: 'proj-9',
-      });
-    render(<ConversationPanel backend={backend} provisioning={backend} />);
+    const { backend, state } = journeyBackend();
+    state.wsCreated = true;
+    state.activeWs = 'ws-9';
+    renderPanel(backend);
 
     await screen.findByText(/create your project/i);
+    let resolveRefresh!: (value: unknown) => void;
+    state.delayRefresh = new Promise((resolve) => {
+      resolveRefresh = resolve as (value: unknown) => void;
+    });
     await user.type(screen.getByLabelText(/project name/i), 'Proj');
     await user.click(screen.getByRole('button', { name: /create project/i }));
     await waitFor(() => expect(backend.createProject).toHaveBeenCalledTimes(1));
@@ -489,11 +490,7 @@ describe('provisioning journey', () => {
     await user.click(held);
     expect(backend.createProject).toHaveBeenCalledTimes(1);
     await act(async () => {
-      resolveRefresh({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: 'proj-9',
-      });
+      resolveRefresh(undefined);
     });
     await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
     expect(backend.createProject).toHaveBeenCalledTimes(1);
@@ -502,23 +499,13 @@ describe('provisioning journey', () => {
 
   it('retries the read after a post-project bootstrap failure without recreating', async () => {
     const user = userEvent.setup();
-    const backend = journeyBackend();
-    backend.getBootstrapState
-      .mockReset()
-      .mockResolvedValueOnce({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: null,
-      })
-      .mockRejectedValueOnce(new Error('read outage'))
-      .mockResolvedValue({
-        isInitialized: true,
-        activeWorkspaceId: 'ws-9',
-        activeProjectId: 'proj-9',
-      });
-    render(<ConversationPanel backend={backend} provisioning={backend} />);
+    const { backend, state } = journeyBackend();
+    state.wsCreated = true;
+    state.activeWs = 'ws-9';
+    renderPanel(backend);
 
     await screen.findByText(/create your project/i);
+    state.failRefreshOnce = true;
     await user.type(screen.getByLabelText(/project name/i), 'Proj');
     await user.click(screen.getByRole('button', { name: /create project/i }));
     await waitFor(() => expect(backend.createProject).toHaveBeenCalledTimes(1));

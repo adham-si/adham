@@ -11,6 +11,9 @@ import {
 import { adhamClient } from '@/shared/api/adham-client';
 import { useConversation, type ConversationBackend } from './use-conversation';
 import { useProvisioning, type ProvisioningBackend } from './use-provisioning';
+import { useSelection, type SelectionBackend } from '../workspace-selection/use-selection';
+import { WorkspaceSelection } from '../workspace-selection/workspace-selection';
+import { announceScopeChanged, SCOPE_CHANGED_EVENT } from './conversation-identity';
 import { ProvisioningForm } from './provisioning-form';
 import { submissionNotice } from './submission-notice';
 
@@ -27,6 +30,8 @@ export interface ConversationPanelProps {
   backend?: ConversationBackend;
   /** Injectable provisioning backend for tests; defaults to the real client. */
   provisioning?: ProvisioningBackend;
+  /** Injectable selection backend for tests; defaults to the real client. */
+  selection?: SelectionBackend;
 }
 
 /**
@@ -35,19 +40,24 @@ export interface ConversationPanelProps {
  * text. Execution, approval, and stop have no backend command and are
  * rendered unavailable instead of faked.
  */
-export function ConversationPanel({ backend = adhamClient, provisioning }: ConversationPanelProps) {
+export function ConversationPanel({
+  backend = adhamClient,
+  provisioning,
+  selection,
+}: ConversationPanelProps) {
   const { t } = useTranslation();
   const conv = useConversation({ backend });
   const prov = useProvisioning({ backend: provisioning });
   const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
-  /// Committed creation awaiting authoritative bootstrap. Holds the old
-  /// step disabled so a second click cannot mint a second workspace/project
-  /// while the read is in flight. Cleared only when bootstrap advances;
-  /// a read failure keeps it and shows a read-only retry (never a fresh
-  /// creation).
-  const [provisionTransition, setProvisionTransition] = React.useState<
-    'workspace' | 'project' | null
-  >(null);
+  /// Committed creation or selection awaiting authoritative bootstrap.
+  /// Holds the confirmed step disabled so a second action cannot fork a
+  /// duplicate while the read is in flight. Cleared only when bootstrap
+  /// advances; a read failure keeps it and shows a read-only retry (never
+  /// a fresh creation or reselection).
+  const [provisionTransition, setProvisionTransition] = React.useState<{
+    step: 'workspace' | 'project';
+    origin: 'created' | 'selected';
+  } | null>(null);
   const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({
     sessionId: conv.sessionId ?? PENDING_DRAFT_BUCKET,
   });
@@ -61,16 +71,34 @@ export function ConversationPanel({ backend = adhamClient, provisioning }: Conve
   const [stopNotice, setStopNotice] = React.useState(false);
 
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
+  const refreshScope = conv.refreshScope;
+  const sel = useSelection({ backend: selection, enabled: needsProvisioning });
+
+  // A confirmed scope change (creation or selection, from any surface)
+  // advances through the authoritative bootstrap. The announced step is
+  // held until bootstrap moves past it; a read failure keeps the hold for
+  // a read-only retry that never recreates or reselects.
+  React.useEffect(() => {
+    const onScopeChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ step?: unknown; origin?: unknown }>).detail;
+      setProvisionTransition({
+        step: detail?.step === 'workspace' ? ('workspace' as const) : ('project' as const),
+        origin: detail?.origin === 'created' ? ('created' as const) : ('selected' as const),
+      });
+      refreshScope();
+    };
+    window.addEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
+    return () => window.removeEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
+  }, [refreshScope]);
 
   const handleProvision = React.useCallback(
     async (name: string) => {
       if (prov.working || provisionTransition) return;
       if (conv.status === 'needs-workspace') {
         const outcome = await prov.createWorkspace(name);
-        if (outcome.ok) {
-          setProvisionTransition('workspace');
-          conv.refreshScope();
-        }
+        // The announcement carries the confirmed step and triggers the
+        // single authoritative refresh; failures stay local.
+        if (outcome.ok) announceScopeChanged('workspace', 'created');
       } else if (conv.status === 'needs-project') {
         // Authoritative selection only: never prefer a stale local ID and
         // never transfer a frozen project intent into another scope (the
@@ -78,29 +106,37 @@ export function ConversationPanel({ backend = adhamClient, provisioning }: Conve
         const wsId = conv.activeWorkspaceId;
         if (!wsId) return;
         const outcome = await prov.createProject(name, wsId);
-        if (outcome.ok) {
-          setProvisionTransition('project');
-          conv.refreshScope();
-        }
+        if (outcome.ok) announceScopeChanged('project', 'created');
       }
     },
     [conv, prov, provisionTransition],
+  );
+
+  const handleSelect = React.useCallback(
+    async (workspaceId: string, projectId: string) => {
+      if (sel.working || provisionTransition) return;
+      // Success announces; the subscription above holds the transition and
+      // refreshes authoritative scope. Failures stay local: no event, no
+      // fallback into another scope.
+      await sel.select(workspaceId, projectId);
+    },
+    [sel, provisionTransition],
   );
 
   // Release the hold only when authoritative bootstrap advances past the
   // confirmed step. A read failure (error) keeps the hold for a read-only
   // retry; it never re-enables the old creation action.
   React.useEffect(() => {
-    if (provisionTransition === 'workspace' && conv.status !== 'needs-workspace') {
+    if (provisionTransition?.step === 'workspace' && conv.status !== 'needs-workspace') {
       if (conv.status === 'needs-project' || conv.status === 'ready') {
         setProvisionTransition(null);
       }
-    } else if (provisionTransition === 'project' && conv.status === 'ready') {
+    } else if (provisionTransition?.step === 'project' && conv.status === 'ready') {
       setProvisionTransition(null);
     }
   }, [conv.status, provisionTransition]);
 
-  const formWorking = prov.working || provisionTransition !== null;
+  const formWorking = prov.working || sel.working || provisionTransition !== null;
 
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
@@ -136,7 +172,7 @@ export function ConversationPanel({ backend = adhamClient, provisioning }: Conve
       <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
           <p role="alert" className="text-sm">
-            {conv.error ?? t('provision.refreshFailed', 'Workspace was created. Reload failed.')}
+            {conv.error ?? t('provision.refreshFailed', 'Change saved. Reload failed.')}
           </p>
           <button type="button" onClick={() => conv.refreshScope()} className="text-sm underline">
             {t('provision.retryLoad', 'Retry loading')}
@@ -151,7 +187,80 @@ export function ConversationPanel({ backend = adhamClient, provisioning }: Conve
         ? 'workspace'
         : conv.status === 'needs-project'
           ? 'project'
-          : (provisionTransition ?? 'workspace');
+          : (provisionTransition?.step ?? 'workspace');
+    // A held transition keeps its own confirmed UI disabled: creation holds
+    // its form, selection holds its (disabled) list. No step switch happens
+    // until authoritative bootstrap advances.
+    if (provisionTransition) {
+      if (provisionTransition.origin === 'selected') {
+        return (
+          <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+            <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+              <WorkspaceSelection
+                key={step}
+                workspaces={sel.workspaces}
+                projectsBy={sel.projectsBy}
+                activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
+                activeProjectId={sel.activeProjectId}
+                loading={false}
+                listError={null}
+                disabled
+                selectError={null}
+                onSelect={() => {}}
+              />
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+          <ProvisioningForm
+            key={provisionTransition.step}
+            step={provisionTransition.step}
+            working
+            error={prov.error}
+            onSubmit={() => {}}
+          />
+        </div>
+      );
+    }
+    // Existing records are offered for selection first; provisioning owns
+    // only the genuinely empty step — never automatic recreation. The check
+    // is per step: a workspace without projects still provisions its project.
+    const stepHasRecords =
+      conv.status === 'needs-workspace'
+        ? sel.workspaces.length > 0
+        : (sel.projectsBy[conv.activeWorkspaceId ?? ''] ?? []).length > 0;
+    if (sel.loading && !sel.loaded) {
+      return (
+        <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+          <p>{t('loading', 'Loading…')}</p>
+        </div>
+      );
+    }
+    // A failed first load offers a read-only retry — never the creation
+    // form, which would invite duplicate creation for existing records.
+    if (stepHasRecords || (sel.listError && !sel.loaded)) {
+      return (
+        <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+          <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+            <WorkspaceSelection
+              key={step}
+              workspaces={sel.workspaces}
+              projectsBy={sel.projectsBy}
+              activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
+              activeProjectId={sel.activeProjectId}
+              loading={sel.loading}
+              listError={sel.listError}
+              disabled={formWorking}
+              selectError={sel.error}
+              onSelect={(wsId, projId) => void handleSelect(wsId, projId)}
+              onRetryLists={() => void sel.refresh()}
+            />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
         <ProvisioningForm

@@ -278,3 +278,64 @@ export const readProjectIntent = (): ProvisionIntent | null =>
 export const writeProjectIntent = (intent: ProvisionIntent): boolean =>
   writeProvisionIntent(PROVISION_PROJ_KEY, intent);
 export const clearProjectIntent = (): void => removeStorage(PROVISION_PROJ_KEY);
+
+/// Window event announcing a confirmed scope change (creation or
+/// selection). Carries the confirmed step so the conversation surface can
+/// hold exactly that step until authoritative bootstrap advances. The
+/// conversation surface refreshes its scope on it and selection lists
+/// re-read on it. Failures never dispatch it.
+export const SCOPE_CHANGED_EVENT = 'adham:scope-changed';
+
+export function announceScopeChanged(
+  step: 'workspace' | 'project' = 'project',
+  origin: 'created' | 'selected' = 'selected',
+): void {
+  try {
+    window.dispatchEvent(new CustomEvent(SCOPE_CHANGED_EVENT, { detail: { step, origin } }));
+  } catch {
+    // ignore
+  }
+}
+
+/// Frozen selection intent: one unresolved selection at a time. A different
+/// scope is blocked (not dispatched) while one is frozen; the same scope
+/// retries with the frozen identity so a delayed original replays instead
+/// of forking. Mounts and reloads never auto-replay it — only an explicit
+/// same-scope retry dispatches.
+export interface SelectIntent {
+  requestId: string;
+  workspaceId: string;
+  projectId: string;
+}
+
+const SELECT_INTENT_KEY = 'adham:select:intent';
+
+export function readSelectIntent(): SelectIntent | null {
+  const raw = readStorage(SELECT_INTENT_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<SelectIntent>;
+    if (
+      typeof parsed.requestId === 'string' &&
+      typeof parsed.workspaceId === 'string' &&
+      typeof parsed.projectId === 'string'
+    ) {
+      return {
+        requestId: parsed.requestId,
+        workspaceId: parsed.workspaceId,
+        projectId: parsed.projectId,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeSelectIntent(intent: SelectIntent): boolean {
+  return writeStorage(SELECT_INTENT_KEY, JSON.stringify(intent));
+}
+
+export function clearSelectIntent(): void {
+  removeStorage(SELECT_INTENT_KEY);
+}

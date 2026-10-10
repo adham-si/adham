@@ -7,6 +7,7 @@ import type {
   ConversationMessageDto,
   ConversationPage,
   ProjectSummary,
+  SelectProjectPayload,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -65,6 +66,13 @@ export interface AdhamClient {
     payload: { name: string; storageKind: string },
     options?: { requestId?: string },
   ): Promise<ProjectSummary>;
+  listWorkspaces(): Promise<WorkspaceSummary[]>;
+  listProjects(workspaceId: string): Promise<ProjectSummary[]>;
+  selectProject(
+    workspaceId: string,
+    payload: SelectProjectPayload,
+    options?: { requestId?: string },
+  ): Promise<BootstrapState>;
   createSession(
     workspaceId: string,
     projectId: string,
@@ -144,6 +152,42 @@ export class AdhamApiClient implements AdhamClient {
       request: envelope,
     });
     return ProjectSummarySchema.parse(result.data);
+  }
+
+  async listWorkspaces(): Promise<WorkspaceSummary[]> {
+    const raw = await invoke('list_workspaces');
+    return WorkspaceSummarySchema.array().parse(raw);
+  }
+
+  async listProjects(workspaceId: string): Promise<ProjectSummary[]> {
+    const raw = await invoke('list_projects', {
+      context: {
+        workspaceId,
+        projectId: null,
+        sessionId: null,
+      },
+    });
+    return ProjectSummarySchema.array().parse(raw);
+  }
+
+  async selectProject(
+    workspaceId: string,
+    payload: SelectProjectPayload,
+    options?: { requestId?: string },
+  ): Promise<BootstrapState> {
+    const envelope = this.wrapCommand(
+      payload,
+      {
+        workspaceId,
+        projectId: null,
+        sessionId: null,
+      },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<BootstrapState>>('select_project', {
+      request: envelope,
+    });
+    return BootstrapStateSchema.parse(result.data);
   }
 
   async createSession(

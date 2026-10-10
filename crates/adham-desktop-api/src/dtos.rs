@@ -78,6 +78,16 @@ pub struct ProjectSummary {
     pub created_at: String,
 }
 
+/// Selection target. The owning workspace travels in the command context
+/// (like `create_project`); no creation command or receipt replay may
+/// substitute for this explicit selection.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SelectProjectPayload {
+    pub project_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
