@@ -4,15 +4,15 @@ import { SCALES, SEMANTIC_VARS } from './index';
 
 const baseUrl = import.meta.url;
 const css = readFileSync(new URL('../tokens.css', baseUrl), 'utf8');
+const bridgeCss = readFileSync(new URL('../tailwind-bridge.css', baseUrl), 'utf8');
 
 /**
  * Tier 2 is defined structurally, not by prefix guessing: a semantic runtime var
  * is one declared in the theme block — the `:root` carrying `color-scheme: light`
- * or the `.dark` carrying `color-scheme: dark`. Tier-1 scales live in `@theme`,
- * and the `--spacing-*` / `--z-index-*` aliases in `@theme inline` are tier-1 too,
- * so a prefix list would misclassify them the moment the scales grow. Anchoring on
- * `color-scheme` also skips the `:root` blocks nested in the reduced-motion and
- * forced-colors media queries.
+ * or the `.dark` carrying `color-scheme: dark`. Tier-1 scales live in `:root`
+ * without `color-scheme`, and the `--spacing-*` / `--z-index-*` aliases live in
+ * `tailwind-bridge.css` (`@theme inline`), so anchoring on `color-scheme` correctly
+ * identifies tier-2 runtime vars and skips the reduced-motion and forced-colors media queries.
  */
 function themeBlockVars(scheme: 'light' | 'dark'): Set<string> {
   const selector = scheme === 'light' ? ':root' : '\\.dark';
@@ -29,8 +29,8 @@ function themeBlockVars(scheme: 'light' | 'dark'): Set<string> {
 
 const tier2 = new Set([...themeBlockVars('light'), ...themeBlockVars('dark')]);
 
-/** Every `@theme inline` block concatenated — there is more than one. */
-const inlineTheme = [...css.matchAll(/@theme inline\s*{([^}]*)}/g)]
+/** Every `@theme inline` block concatenated from the temporary Tailwind bridge. */
+const inlineTheme = [...bridgeCss.matchAll(/@theme inline\s*{([^}]*)}/g)]
   .map((block) => block[1] ?? '')
   .join('\n');
 
@@ -47,6 +47,25 @@ describe('parity between tokens.css and the typed mirror', () => {
     }
   });
 
+  it('keeps tokens.css free of Tailwind directives', () => {
+    expect(css).not.toContain('@theme');
+    expect(css).not.toContain('@custom-variant');
+  });
+
+  it('declares tier-1 base scales in native :root', () => {
+    expect(css).toContain('--space-1: 4px;');
+    expect(css).toContain('--radius-md: 6px;');
+    expect(css).toContain('--control-md: 36px;');
+    expect(css).toContain('--z-dialog: 400;');
+  });
+
+  it('uses class-based dark mode, not prefers-color-scheme (spec D2)', () => {
+    expect(css).not.toContain('prefers-color-scheme');
+    expect(css).toMatch(/\.dark\s*{/);
+  });
+});
+
+describe('tailwind bridge mappings', () => {
   it('maps every tier-2 name to a Tailwind utility in @theme inline', () => {
     // Shadow values are not colors: `shadow-floating` maps into the `--shadow-*`
     // namespace (utility `shadow-floating`), everything else into `--color-*`.
@@ -81,16 +100,11 @@ describe('parity between tokens.css and the typed mirror', () => {
     }
   });
 
-  it('declares @theme inline after the --color-* reset', () => {
-    const reset = css.indexOf('--color-*: initial');
-    const inline = css.indexOf('@theme inline');
-    expect(reset, '--color-*: initial reset missing').toBeGreaterThan(-1);
-    expect(inline, '@theme inline block missing').toBeGreaterThan(reset);
-  });
-
-  it('uses class-based dark mode, not prefers-color-scheme (spec D2)', () => {
-    expect(css).not.toContain('prefers-color-scheme');
-    expect(css).toMatch(/\.dark\s*{/);
+  it('declares @theme inline after the --color-* reset in bridge', () => {
+    const reset = bridgeCss.indexOf('--color-*: initial');
+    const inline = bridgeCss.indexOf('@theme inline');
+    expect(reset, '--color-*: initial reset missing in bridge').toBeGreaterThan(-1);
+    expect(inline, '@theme inline block missing in bridge').toBeGreaterThan(reset);
   });
 });
 

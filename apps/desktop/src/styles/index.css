@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@adham/design-tokens/tokens.css";
+@import "@adham/design-tokens/tailwind-bridge.css";
 
 /*
   Tailwind v4 only auto-detects sources under the directory holding this file.

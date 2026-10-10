@@ -1,6 +1,4 @@
-@theme {
-  --color-*: initial;
-
+:root {
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -45,8 +43,6 @@
   --z-popover: 500;
   --z-toast: 700;
 }
-
-@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   color-scheme: light;
@@ -175,70 +171,4 @@
     --focus: Highlight;
     --selection: Highlight;
   }
-}
-
-/* Tier-1 scales that are not `--color-*` still need a Tailwind namespace to
-   generate utilities. `--control-md` alone produces nothing: Tailwind only
-   generates `min-h-*`, `size-*`, `z-*` etc. from `--spacing-*`, `--z-index-*`
-   and their peers. Mapping the tier-1 values into those namespaces is what
-   makes `min-h-control-md`, `size-icon-md` and `z-dialog` real utilities. */
-@theme inline {
-  --spacing-control-sm: var(--control-sm);
-  --spacing-control-md: var(--control-md);
-  --spacing-control-lg: var(--control-lg);
-
-  --spacing-icon-sm: var(--icon-sm);
-  --spacing-icon-md: var(--icon-md);
-  --spacing-icon-lg: var(--icon-lg);
-
-  --z-index-dialog: var(--z-dialog);
-  --z-index-menu: var(--z-menu);
-  --z-index-popover: var(--z-popover);
-  --z-index-toast: var(--z-toast);
-
-  --shadow-floating: var(--shadow-floating);
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-subtle: var(--surface-subtle);
-  --color-surface-muted: var(--surface-muted);
-  --color-surface-hover: var(--surface-hover);
-  --color-foreground: var(--foreground);
-  --color-foreground-secondary: var(--foreground-secondary);
-  --color-foreground-muted: var(--foreground-muted);
-  --color-foreground-disabled: var(--foreground-disabled);
-  --color-surface-disabled: var(--surface-disabled);
-  --color-border-subtle: var(--border-subtle);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-border-interactive: var(--border-interactive);
-  --color-brand: var(--brand);
-  --color-action: var(--action);
-  --color-action-hover: var(--action-hover);
-  --color-action-pressed: var(--action-pressed);
-  --color-action-foreground: var(--action-foreground);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-selection: var(--selection);
-  --color-focus: var(--focus);
-  --color-scrim: var(--scrim);
-  --color-success: var(--success);
-  --color-success-surface: var(--success-surface);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-surface: var(--warning-surface);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-danger: var(--danger);
-  --color-danger-hover: var(--danger-hover);
-  --color-danger-surface: var(--danger-surface);
-  --color-danger-foreground: var(--danger-foreground);
-  --color-info: var(--info);
-  --color-info-surface: var(--info-surface);
-  --color-info-foreground: var(--info-foreground);
-  --color-running: var(--running);
-  --color-running-surface: var(--running-surface);
-  --color-running-foreground: var(--running-foreground);
 }
