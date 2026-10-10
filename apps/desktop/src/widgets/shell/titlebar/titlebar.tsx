@@ -126,8 +126,6 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
 
   return (
     <header
-      data-tauri-drag-region
-      onDoubleClick={handleToggleMaximize}
       aria-label="Application Titlebar"
       className={cn(
         'relative z-menu flex h-10 min-h-10 max-h-10 w-full shrink-0 items-center justify-between bg-background select-none',
@@ -195,6 +193,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
       {/* Middle: Draggable Region (No app name or title text) */}
       <div
         data-tauri-drag-region
+        onDoubleClick={handleToggleMaximize}
         className="flex h-full flex-1 cursor-default items-center justify-center"
       />
 

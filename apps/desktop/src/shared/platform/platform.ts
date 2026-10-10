@@ -1,52 +1,28 @@
 import * as React from 'react';
-import type { PlatformInfo, PlatformLayoutConfig, PlatformOs } from './types';
+import { adhamClient } from '@/shared/api/adham-client';
+import type { PlatformInfo, PlatformLayoutConfig, PlatformOs, PlatformStatus } from './types';
 
 let testPlatformOverride: PlatformOs | null = null;
+let testArchOverride: string | null = null;
 
 /**
  * Configure a test override for platform detection.
- * Pass `null` to reset to ambient environment detection.
+ * Pass `null` to reset to ambient/backend detection.
  */
-export function setPlatformForTesting(override: PlatformOs | null): void {
+export function setPlatformForTesting(override: PlatformOs | null, arch: string = 'x86_64'): void {
   testPlatformOverride = override;
-}
-
-/**
- * Detect host OS platform from ambient runtime environment (navigator/environment).
- * This is the centralized location where ambient platform properties are evaluated.
- */
-function detectHostOs(): PlatformOs {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return 'unknown';
-  }
-
-  // Modern Client Hints platform if available
-  const navAny = navigator as unknown as { userAgentData?: { platform?: string } };
-  const platformHint = navAny.userAgentData?.platform?.toLowerCase();
-  if (platformHint) {
-    if (platformHint.includes('mac')) return 'macos';
-    if (platformHint.includes('win')) return 'windows';
-    if (platformHint.includes('linux')) return 'linux';
-  }
-
-  // Fallback to navigator.platform / navigator.userAgent
-  const navPlatform = (navigator.platform || '').toLowerCase();
-  if (navPlatform.includes('mac')) return 'macos';
-  if (navPlatform.includes('win')) return 'windows';
-  if (navPlatform.includes('linux')) return 'linux';
-
-  const userAgent = (navigator.userAgent || '').toLowerCase();
-  if (userAgent.includes('macintosh') || userAgent.includes('mac os')) return 'macos';
-  if (userAgent.includes('windows')) return 'windows';
-  if (userAgent.includes('linux')) return 'linux';
-
-  return 'unknown';
+  testArchOverride = override ? arch : null;
+  cachedPlatformInfo = override ? createPlatformInfo(override, arch, 'resolved') : null;
 }
 
 export function getLayoutConfig(os: PlatformOs): PlatformLayoutConfig {
   const isMac = os === 'macos';
+  const isWindows = os === 'windows';
+  const isLinux = os === 'linux';
+
   return {
-    showCustomCaptionControls: !isMac,
+    // Explicitly false for 'unknown' or during initial loading: NO Windows captions by default!
+    showCustomCaptionControls: isWindows || isLinux,
     hasNativeTitlebarControls: isMac,
     // 80px (pl-20) physical left clearance ensures macOS traffic lights never collide in either LTR or RTL
     trafficLightClearanceClass: isMac ? 'pl-20' : '',
@@ -56,22 +32,121 @@ export function getLayoutConfig(os: PlatformOs): PlatformLayoutConfig {
   };
 }
 
-/**
- * Resolve the current platform information.
- */
-export function resolvePlatform(override?: PlatformOs | null): PlatformInfo {
-  const os = override ?? testPlatformOverride ?? detectHostOs();
+export function createPlatformInfo(
+  os: PlatformOs,
+  arch: string = '',
+  status: PlatformStatus = 'resolved',
+  error?: Error | null,
+): PlatformInfo {
   return {
     os,
+    arch,
+    status,
     isMac: os === 'macos',
     isWindows: os === 'windows',
     isLinux: os === 'linux',
     layout: getLayoutConfig(os),
+    error: error ?? null,
   };
+}
+
+let cachedPlatformInfo: PlatformInfo | null = null;
+
+/**
+ * Resolve the current platform information synchronously.
+ * If not yet resolved via IPC and no override is present, returns an 'unknown' loading state.
+ */
+export function resolvePlatform(override?: PlatformOs | null): PlatformInfo {
+  if (override !== undefined && override !== null) {
+    return createPlatformInfo(override, testArchOverride ?? 'x86_64', 'resolved');
+  }
+  if (testPlatformOverride) {
+    return createPlatformInfo(testPlatformOverride, testArchOverride ?? 'x86_64', 'resolved');
+  }
+  if (cachedPlatformInfo) {
+    return cachedPlatformInfo;
+  }
+  // Initial fallback before IPC resolution: 'unknown' in 'loading' state
+  // Notice layout has showCustomCaptionControls: false — NO Windows-caption default!
+  return createPlatformInfo('unknown', '', 'loading');
 }
 
 export function getPlatform(): PlatformInfo {
   return resolvePlatform();
+}
+
+export const PlatformContext = React.createContext<PlatformInfo | null>(null);
+
+export function PlatformProvider({ children }: { children: React.ReactNode }) {
+  const [platformState, setPlatformState] = React.useState<PlatformInfo>(() => {
+    if (testPlatformOverride) {
+      return createPlatformInfo(testPlatformOverride, testArchOverride ?? 'x86_64', 'resolved');
+    }
+    return cachedPlatformInfo ?? createPlatformInfo('unknown', '', 'loading');
+  });
+
+  React.useEffect(() => {
+    if (testPlatformOverride) {
+      const state = createPlatformInfo(
+        testPlatformOverride,
+        testArchOverride ?? 'x86_64',
+        'resolved',
+      );
+      cachedPlatformInfo = state;
+      setPlatformState(state);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadPlatform() {
+      try {
+        const raw = await adhamClient.getPlatformInfo();
+        if (!isMounted) return;
+
+        const os: PlatformOs =
+          raw.os === 'macos'
+            ? 'macos'
+            : raw.os === 'windows'
+              ? 'windows'
+              : raw.os === 'linux'
+                ? 'linux'
+                : 'unknown';
+
+        const state = createPlatformInfo(os, raw.arch, 'resolved');
+        cachedPlatformInfo = state;
+        setPlatformState(state);
+      } catch (err) {
+        if (!isMounted) return;
+        // In case of error, set error state with unknown platform
+        // showCustomCaptionControls remains false!
+        const state = createPlatformInfo(
+          'unknown',
+          '',
+          'error',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+        cachedPlatformInfo = state;
+        setPlatformState(state);
+      }
+    }
+
+    loadPlatform();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return React.createElement(PlatformContext.Provider, { value: platformState }, children);
+}
+
+export function usePlatform(): PlatformInfo {
+  const context = React.useContext(PlatformContext);
+  if (context) {
+    return context;
+  }
+  return getPlatform();
 }
 
 export function isMac(): boolean {
@@ -84,11 +159,4 @@ export function isWindows(): boolean {
 
 export function isLinux(): boolean {
   return getPlatform().isLinux;
-}
-
-/**
- * React hook for consuming platform configuration.
- */
-export function usePlatform(): PlatformInfo {
-  return React.useMemo(() => getPlatform(), []);
 }

@@ -1,9 +1,10 @@
 export type PlatformOs = 'macos' | 'windows' | 'linux' | 'unknown';
+export type PlatformStatus = 'loading' | 'resolved' | 'error';
 
 export interface PlatformLayoutConfig {
   /**
    * Whether to show custom HTML window caption controls (minimize, maximize, close).
-   * True on Windows/Linux; false on macOS where native traffic lights are used.
+   * True ONLY on confirmed Windows or Linux; false on macOS and strictly false when unknown/loading.
    */
   showCustomCaptionControls: boolean;
   /**
@@ -28,8 +29,11 @@ export interface PlatformLayoutConfig {
 
 export interface PlatformInfo {
   os: PlatformOs;
+  arch: string;
+  status: PlatformStatus;
   isMac: boolean;
   isWindows: boolean;
   isLinux: boolean;
   layout: PlatformLayoutConfig;
+  error?: Error | null;
 }

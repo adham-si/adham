@@ -1,21 +1,22 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
-import { getPlatform } from '@/shared/platform';
+import { usePlatform } from '@/shared/platform';
 
 export function InfoPage() {
   const { t } = useTranslation();
   const [copied, setCopied] = React.useState(false);
   const [autoUpdate, setAutoUpdate] = React.useState(true);
 
-  const currentPlatform = getPlatform();
-  const platformLabel = currentPlatform.isMac
+  const currentPlatform = usePlatform();
+  const osLabel = currentPlatform.isMac
     ? 'macOS (Darwin)'
     : currentPlatform.isWindows
-      ? 'Windows x86_64'
+      ? 'Windows'
       : currentPlatform.isLinux
         ? 'Linux'
         : 'Unknown Platform';
+  const platformLabel = currentPlatform.arch ? `${osLabel} (${currentPlatform.arch})` : osLabel;
 
   const sysInfo = {
     version: '0.1.0-alpha',
@@ -23,6 +24,7 @@ export function InfoPage() {
     engine: 'Tauri v2 + Rust Core',
     database: 'SQLite v3.45 (WAL Mode)',
     platform: platformLabel,
+    arch: currentPlatform.arch || 'unknown',
     license: 'Dual MIT / Apache-2.0',
   };
 

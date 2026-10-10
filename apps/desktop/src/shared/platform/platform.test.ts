@@ -79,6 +79,30 @@ describe('Platform Abstraction Layer', () => {
       expect(info.layout.modifierKey).toBe('ctrl');
       expect(info.layout.modifierSymbol).toBe('Ctrl');
     });
+
+    it('correctly configures unknown platform without defaulting to Windows captions', () => {
+      setPlatformForTesting('unknown');
+      const info = getPlatform();
+
+      expect(info.os).toBe('unknown');
+      expect(info.isMac).toBe(false);
+      expect(info.isWindows).toBe(false);
+      expect(info.isLinux).toBe(false);
+
+      // Unknown platform must NOT show custom caption controls
+      expect(info.layout.hasNativeTitlebarControls).toBe(false);
+      expect(info.layout.showCustomCaptionControls).toBe(false);
+      expect(info.layout.trafficLightClearanceClass).toBe('');
+      expect(info.layout.titlebarStartPaddingClass).toBe('ps-2');
+    });
+
+    it('retains backend architecture when set', () => {
+      setPlatformForTesting('macos', 'aarch64');
+      const info = getPlatform();
+
+      expect(info.os).toBe('macos');
+      expect(info.arch).toBe('aarch64');
+    });
   });
 
   describe('resolvePlatform override parameter', () => {
@@ -90,6 +114,9 @@ describe('Platform Abstraction Layer', () => {
       const winInfo = resolvePlatform('windows');
       expect(winInfo.isWindows).toBe(true);
       expect(winInfo.layout.showCustomCaptionControls).toBe(true);
+
+      const unknownInfo = resolvePlatform('unknown');
+      expect(unknownInfo.layout.showCustomCaptionControls).toBe(false);
     });
   });
 
@@ -108,6 +135,13 @@ describe('Platform Abstraction Layer', () => {
       expect(config.hasNativeTitlebarControls).toBe(false);
       expect(config.trafficLightClearanceClass).toBe('');
       expect(config.titlebarStartPaddingClass).toBe('ps-2');
+    });
+
+    it('suppresses custom window controls for unknown platform', () => {
+      const config = getLayoutConfig('unknown');
+      expect(config.showCustomCaptionControls).toBe(false);
+      expect(config.hasNativeTitlebarControls).toBe(false);
+      expect(config.trafficLightClearanceClass).toBe('');
     });
   });
 });

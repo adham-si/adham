@@ -144,4 +144,47 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       expect(container.querySelector('.ps-20')).toBeNull();
     });
   });
+
+  describe('Unknown Platform Chrome Behavior', () => {
+    beforeEach(() => {
+      setPlatformForTesting('unknown');
+    });
+
+    it('does not default to Windows caption controls on unknown platform', () => {
+      render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      // Custom caption buttons must NOT be rendered for unknown platform
+      expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Maximize' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+      expect(screen.queryByRole('separator')).toBeNull();
+
+      // Layout controls remain functional
+      expect(screen.getByRole('button', { name: /primary sidebar/i })).not.toBeNull();
+    });
+  });
+
+  describe('Draggable Middle Region Scoping', () => {
+    it('restricts drag region attribute to the middle container rather than entire header', () => {
+      const { container } = render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const header = container.querySelector('header');
+      expect(header).not.toBeNull();
+      // Header itself must NOT have data-tauri-drag-region attribute
+      expect(header?.hasAttribute('data-tauri-drag-region')).toBe(false);
+
+      // Drag region is scoped to the middle flexible spacer
+      const dragRegion = container.querySelector('div[data-tauri-drag-region]');
+      expect(dragRegion).not.toBeNull();
+      expect(dragRegion?.classList.contains('flex-1')).toBe(true);
+    });
+  });
 });
