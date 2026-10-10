@@ -53,44 +53,64 @@ impl OsKeyringProvider {
 
     /// First-time key initialization. Creates the key only when absent and
     /// verifies persistence with a fresh-Entry read-back before admitting it;
-    /// never overwrites an existing credential.
+    /// never overwrites an existing credential. Transient key material is
+    /// zeroized on every path, including failures.
     pub fn initialize_content_key(&self) -> Result<[u8; 32], DomainError> {
         let entry = keyring::Entry::new(&self.service, &self.account)
             .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
         match entry.get_password() {
-            Ok(hex) => parse_key_hex(&hex).ok_or_else(|| {
-                DomainError::Integrity("corrupt content key in credential store".into())
-            }),
+            Ok(hex) => {
+                let key = parse_key_hex(&hex);
+                let mut hex = hex;
+                hex.zeroize();
+                key.ok_or_else(|| {
+                    DomainError::Integrity("corrupt content key in credential store".into())
+                })
+            }
             Err(keyring::Error::NoEntry) => {
                 let mut key = [0u8; 32];
                 rand::rngs::OsRng.fill_bytes(&mut key);
                 let mut hex = hex_encode(&key);
                 key.zeroize();
-                entry
+                let created = entry
                     .set_password(&hex)
-                    .map_err(|e| DomainError::Storage(format!("keyring store failed: {e}")))?;
-                // Read-back verify with a fresh Entry: catches stores that
-                // accept writes but do not persist them.
-                let verify = keyring::Entry::new(&self.service, &self.account)
-                    .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
-                let verified = match verify.get_password() {
-                    Ok(stored) if stored == hex => parse_key_hex(&hex).ok_or_else(|| {
-                        DomainError::Integrity("key encode failed".into())
-                    }),
-                    Ok(_) => Err(DomainError::Storage(
-                        "content key read-back mismatch after create; store did not persist the written key".into(),
-                    )),
-                    Err(keyring::Error::NoEntry) => Err(DomainError::Storage(
-                        "content key missing after create; store did not persist the written key".into(),
-                    )),
-                    Err(e) => Err(DomainError::Storage(format!(
-                        "keyring verify read failed: {e}"
-                    ))),
+                    .map_err(|e| DomainError::Storage(format!("keyring store failed: {e}")));
+                let verified = match created {
+                    Ok(()) => self.verify_new_credential(&hex),
+                    Err(e) => Err(e),
                 };
                 hex.zeroize();
                 verified
             }
             Err(e) => Err(DomainError::Storage(format!("keyring read failed: {e}"))),
+        }
+    }
+
+    /// Read-back verify with a fresh Entry: catches stores that accept
+    /// writes but do not persist them.
+    fn verify_new_credential(&self, hex: &str) -> Result<[u8; 32], DomainError> {
+        let verify = keyring::Entry::new(&self.service, &self.account)
+            .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
+        match verify.get_password() {
+            Ok(stored) => {
+                let matches = stored == hex;
+                let mut stored = stored;
+                stored.zeroize();
+                if matches {
+                    parse_key_hex(hex)
+                        .ok_or_else(|| DomainError::Integrity("key encode failed".into()))
+                } else {
+                    Err(DomainError::Storage(
+                        "content key read-back mismatch after create; store did not persist the written key".into(),
+                    ))
+                }
+            }
+            Err(keyring::Error::NoEntry) => Err(DomainError::Storage(
+                "content key missing after create; store did not persist the written key".into(),
+            )),
+            Err(e) => Err(DomainError::Storage(format!(
+                "keyring verify read failed: {e}"
+            ))),
         }
     }
 }
@@ -101,9 +121,14 @@ impl ContentKeyProvider for OsKeyringProvider {
         let entry = keyring::Entry::new(&self.service, &self.account)
             .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
         match entry.get_password() {
-            Ok(hex) => parse_key_hex(&hex).ok_or_else(|| {
-                DomainError::Integrity("corrupt content key in credential store".into())
-            }),
+            Ok(hex) => {
+                let key = parse_key_hex(&hex);
+                let mut hex = hex;
+                hex.zeroize();
+                key.ok_or_else(|| {
+                    DomainError::Integrity("corrupt content key in credential store".into())
+                })
+            }
             Err(keyring::Error::NoEntry) => Err(DomainError::Storage(
                 "content key missing from credential store; automatic (re)creation is disabled"
                     .into(),

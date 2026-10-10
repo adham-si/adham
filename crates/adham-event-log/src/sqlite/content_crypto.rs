@@ -1,6 +1,7 @@
 use adham_core_types::{ContentId, DomainError, EventScope};
 use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
 use rand::RngCore;
+use zeroize::Zeroize;
 
 use super::content_key::ContentKeyProvider;
 
@@ -59,9 +60,10 @@ pub fn seal(
     scope: &EventScope,
     plaintext: &[u8],
 ) -> Result<SealedContent, DomainError> {
-    let key_bytes = provider.content_key()?;
+    let mut key_bytes = provider.content_key()?;
     let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes)
         .map_err(|e| DomainError::Integrity(format!("key init failed: {e}")))?;
+    key_bytes.zeroize();
     let mut nonce_bytes = [0u8; 24];
     rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
     let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
@@ -88,9 +90,10 @@ pub fn open(
     nonce: &[u8],
     ciphertext: &[u8],
 ) -> Result<Vec<u8>, DomainError> {
-    let key_bytes = provider.content_key()?;
+    let mut key_bytes = provider.content_key()?;
     let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes)
         .map_err(|e| DomainError::Integrity(format!("key init failed: {e}")))?;
+    key_bytes.zeroize();
     let nonce = chacha20poly1305::XNonce::from_slice(nonce);
     let ad = associated_data(content_id, kind, scope);
     let payload = chacha20poly1305::aead::Payload {

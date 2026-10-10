@@ -13,6 +13,11 @@ use adham_event_log::{ContentKeyProvider, OsKeyringProvider};
 
 const SERVICE: &str = "adham-audit04-lifecycle-test";
 
+/// Comparison fingerprint for assertions; raw key bytes are never printed.
+fn fp(key: &[u8; 32]) -> String {
+    blake3::hash(key).to_hex().to_string()
+}
+
 fn provider_for(test: &str) -> (OsKeyringProvider, String) {
     let account = format!("{test}-{}", uuid::Uuid::now_v7());
     (OsKeyringProvider::new(SERVICE, &account), account)
@@ -39,13 +44,21 @@ fn initialize_creates_once_reads_stable_and_never_overwrites() {
     let key1 = provider.initialize_content_key().expect("first init");
 
     let key_again = provider.initialize_content_key().expect("second init");
-    assert_eq!(key1, key_again, "initialize must never rotate the key");
+    assert_eq!(
+        fp(&key1),
+        fp(&key_again),
+        "initialize must never rotate the key"
+    );
 
     let fresh = OsKeyringProvider::new(SERVICE, &account);
     let read1 = fresh.content_key().expect("read 1");
     let read2 = fresh.content_key().expect("read 2");
-    assert_eq!(read1, read2, "reads must be stable across calls/instances");
-    assert_eq!(read1, key1);
+    assert_eq!(
+        fp(&read1),
+        fp(&read2),
+        "reads must be stable across calls/instances"
+    );
+    assert_eq!(fp(&read1), fp(&key1));
 
     delete_credential(&account);
 }

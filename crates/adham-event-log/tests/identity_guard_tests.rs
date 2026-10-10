@@ -11,34 +11,74 @@ fn test_db_path() -> PathBuf {
     path
 }
 
-async fn insert_orphan_content_record(pool: &sqlx::Pool<sqlx::Sqlite>) {
-    sqlx::query(
-        "INSERT INTO content_records
-         (content_id, content_kind, media_type, encoding, protection_scheme,
-          protected_bytes, plaintext_size, created_at_us)
-         VALUES ('orphan-1', 'message', 'text/plain', 'encrypted',
-                 'aead-xchacha20poly1305-v1', x'00', 0, 0)",
-    )
-    .execute(pool)
-    .await
-    .expect("insert orphan content");
+async fn insert_surviving_row(pool: &sqlx::Pool<sqlx::Sqlite>, table: &str) {
+    let sql = match table {
+        "events" => {
+            "INSERT INTO events
+             (event_id, event_type, event_version, stream_id, stream_kind,
+              stream_sequence, installation_id, actor_id, actor_kind, request_id,
+              correlation_id, occurred_at_us, recorded_at_us, payload_json,
+              metadata_json, checksum)
+             VALUES ('evt-orphan-1', 'WorkspaceCreated', 1, 'workspace:orphan',
+                     'workspace', 1, 'inst-orphan', 'actor-orphan', 'local_human',
+                     'req-orphan', 'corr-orphan', 0, 0, x'7b7d', x'7b7d', 'chk1')"
+        }
+        "streams" => {
+            "INSERT INTO streams
+             (stream_id, stream_kind, current_sequence, updated_at_us)
+             VALUES ('workspace:orphan', 'workspace', 1, 0)"
+        }
+        "command_receipts" => {
+            "INSERT INTO command_receipts
+             (request_id, command_type, command_version, scope_fingerprint,
+              request_fingerprint, correlation_id, outcome_code, response_json,
+              committed_at_us)
+             VALUES ('req-orphan', 'CreateWorkspace', 1, 'sf', 'rf',
+                     'corr-orphan', 'ok', x'7b7d', 0)"
+        }
+        "content_records" => {
+            "INSERT INTO content_records
+             (content_id, content_kind, media_type, encoding, protection_scheme,
+              protected_bytes, plaintext_size, created_at_us)
+             VALUES ('orphan-1', 'message', 'text/plain', 'encrypted',
+                     'aead-xchacha20poly1305-v1', x'00', 0, 0)"
+        }
+        "content_tombstones" => {
+            "INSERT INTO content_tombstones
+             (content_id, erased_at_us, reason_code)
+             VALUES ('orphan-1', 0, 'user_request')"
+        }
+        "projection_checkpoints" => {
+            "INSERT INTO projection_checkpoints
+             (projection_name, projection_version, last_global_position,
+              status, updated_at_us)
+             VALUES ('orphan-projection', 1, 1, 'ok', 0)"
+        }
+        "conversation_messages" => {
+            "INSERT INTO conversation_messages
+             (message_id, workspace_id, project_id, session_id, role,
+              content_id, source_event_id, source_global_position,
+              created_at_us)
+             VALUES ('msg-orphan-1', 'ws-1', 'proj-1', 'sess-1', 'user',
+                     'orphan-1', 'evt-orphan-1', 1, 0)"
+        }
+        other => panic!("unknown surviving-state table: {other}"),
+    };
+    sqlx::query(sql)
+        .execute(pool)
+        .await
+        .unwrap_or_else(|e| panic!("insert into {table}: {e}"));
 }
 
-async fn insert_orphan_event(pool: &sqlx::Pool<sqlx::Sqlite>) {
-    sqlx::query(
-        "INSERT INTO events
-         (event_id, event_type, event_version, stream_id, stream_kind,
-          stream_sequence, installation_id, actor_id, actor_kind, request_id,
-          correlation_id, occurred_at_us, recorded_at_us, payload_json,
-          metadata_json, checksum)
-         VALUES ('evt-orphan-1', 'WorkspaceCreated', 1, 'workspace:orphan',
-                 'workspace', 1, 'inst-orphan', 'actor-orphan', 'local_human',
-                 'req-orphan', 'corr-orphan', 0, 0, x'7b7d', x'7b7d', 'chk1')",
-    )
-    .execute(pool)
-    .await
-    .expect("insert orphan event");
-}
+const SURVIVING_STATE_TABLES: &[&str] = &[
+    "events",
+    "streams",
+    "command_receipts",
+    "content_records",
+    "content_tombstones",
+    "projection_checkpoints",
+    "conversation_messages",
+];
 
 #[tokio::test]
 async fn fresh_db_single_creation_then_reopen() {
@@ -57,44 +97,34 @@ async fn fresh_db_single_creation_then_reopen() {
 }
 
 #[tokio::test]
-async fn orphan_content_blocks_regeneration() {
-    let db = test_db_path();
-    let pool = create_sqlite_pool(&db).await.expect("pool");
-    insert_orphan_content_record(&pool).await;
+async fn any_surviving_state_blocks_regeneration() {
+    for table in SURVIVING_STATE_TABLES {
+        let db = test_db_path();
+        let pool = create_sqlite_pool(&db).await.expect("pool");
+        insert_surviving_row(&pool, table).await;
 
-    let err = load_or_create_installation(&pool)
-        .await
-        .expect_err("orphan content must block regeneration");
-    match &err {
-        DomainError::Integrity(msg) => {
-            assert!(msg.contains("refusing to regenerate identity"), "{msg}");
+        let err = load_or_create_installation(&pool)
+            .await
+            .expect_err("surviving state must block regeneration");
+        match &err {
+            DomainError::Integrity(msg) => {
+                assert!(
+                    msg.contains("refusing to regenerate identity"),
+                    "{table}: {msg}"
+                );
+            }
+            other => panic!("{table}: expected Integrity, got {other:?}"),
         }
-        other => panic!("expected Integrity, got {other:?}"),
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM installation")
+            .fetch_one(&pool)
+            .await
+            .expect("count");
+        assert_eq!(
+            count, 0,
+            "{table}: guard must fire before any identity INSERT"
+        );
     }
-
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM installation")
-        .fetch_one(&pool)
-        .await
-        .expect("count");
-    assert_eq!(count, 0, "guard must fire before any identity INSERT");
-}
-
-#[tokio::test]
-async fn orphan_event_blocks_regeneration() {
-    let db = test_db_path();
-    let pool = create_sqlite_pool(&db).await.expect("pool");
-    insert_orphan_event(&pool).await;
-
-    let err = load_or_create_installation(&pool)
-        .await
-        .expect_err("orphan event must block regeneration");
-    assert!(matches!(err, DomainError::Integrity(_)), "{err:?}");
-
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM installation")
-        .fetch_one(&pool)
-        .await
-        .expect("count");
-    assert_eq!(count, 0);
 }
 
 #[tokio::test]
@@ -104,11 +134,13 @@ async fn existing_installation_survives_orphan_check() {
     let first = load_or_create_installation(&pool)
         .await
         .expect("first init");
-    insert_orphan_event(&pool).await;
+    for table in SURVIVING_STATE_TABLES {
+        insert_surviving_row(&pool, table).await;
+    }
 
     let second = load_or_create_installation(&pool)
         .await
-        .expect("existing row must load even with content present");
+        .expect("existing row must load even with surviving state present");
     assert!(!second.created);
     assert_eq!(first.record.installation_id, second.record.installation_id);
 }

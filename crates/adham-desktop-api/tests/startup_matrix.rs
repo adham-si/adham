@@ -22,6 +22,11 @@ fn delete_credential(installation_id: &str) {
     }
 }
 
+/// Comparison fingerprint for assertions; raw key bytes are never printed.
+fn fp(key: &[u8; 32]) -> String {
+    blake3::hash(key).to_hex().to_string()
+}
+
 #[tokio::test]
 async fn fresh_startup_initializes_key_and_reopen_is_stable() {
     let db = test_db_path();
@@ -33,7 +38,7 @@ async fn fresh_startup_initializes_key_and_reopen_is_stable() {
     let account = ctx.installation_id.to_string();
     let key_first = ctx.content_key.content_key().expect("fresh key read");
     let key_second = ctx.content_key.content_key().expect("fresh key reread");
-    assert_eq!(key_first, key_second);
+    assert_eq!(fp(&key_first), fp(&key_second));
 
     let ctx2 = ApiContext::load_or_create(pool)
         .await
@@ -41,7 +46,7 @@ async fn fresh_startup_initializes_key_and_reopen_is_stable() {
     assert_eq!(ctx.installation_id, ctx2.installation_id);
     assert_eq!(ctx.actor_id, ctx2.actor_id);
     let key_reopen = ctx2.content_key.content_key().expect("reopen key read");
-    assert_eq!(key_first, key_reopen, "key must survive restart");
+    assert_eq!(fp(&key_first), fp(&key_reopen), "key must survive restart");
 
     delete_credential(&account);
 }

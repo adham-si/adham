@@ -35,12 +35,13 @@ pub async fn load_or_create_installation(
         });
     }
 
-    // Guardrail: a missing installation row under existing events/content
-    // means identity was lost under live data. Never regenerate identity
-    // (and thereby encryption keys) in that state — report integrity loss.
-    if has_orphaned_content(pool).await? {
+    // Guardrail: a missing installation row under surviving data (events,
+    // streams, receipts, content, tombstones, projections) means identity
+    // was lost under live data. Never regenerate identity (and thereby
+    // encryption keys) in that state — report integrity loss.
+    if has_surviving_state(pool).await? {
         return Err(DomainError::Integrity(
-            "installation record missing but events/content exist; refusing to regenerate identity or encryption keys".into(),
+            "installation record missing but surviving application state exists; refusing to regenerate identity or encryption keys".into(),
         ));
     }
 
@@ -71,21 +72,30 @@ pub async fn load_or_create_installation(
     })
 }
 
-/// True when authoritative events or sealed content exist without an
-/// installation record (identity lost under live data).
-async fn has_orphaned_content(pool: &Pool<Sqlite>) -> Result<bool, DomainError> {
-    let events: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM events")
-        .fetch_one(pool)
-        .await
-        .map_err(|e| DomainError::Storage(e.to_string()))?;
-    if events > 0 {
-        return Ok(true);
+/// True when any surviving application state exists without an installation
+/// record (identity lost under live data). Covers every authoritative table:
+/// events, stream tracking, idempotency receipts, sealed content, erasure
+/// tombstones, projections, and projected messages.
+async fn has_surviving_state(pool: &Pool<Sqlite>) -> Result<bool, DomainError> {
+    const TABLES: &[&str] = &[
+        "events",
+        "streams",
+        "command_receipts",
+        "content_records",
+        "content_tombstones",
+        "projection_checkpoints",
+        "conversation_messages",
+    ];
+    for table in TABLES {
+        let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+            .fetch_one(pool)
+            .await
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
+        if count > 0 {
+            return Ok(true);
+        }
     }
-    let content: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM content_records")
-        .fetch_one(pool)
-        .await
-        .map_err(|e| DomainError::Storage(e.to_string()))?;
-    Ok(content > 0)
+    Ok(false)
 }
 
 async fn read_installation(pool: &Pool<Sqlite>) -> Result<Option<InstallationRecord>, DomainError> {
