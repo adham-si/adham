@@ -26,6 +26,7 @@ function IndexComponent() {
       projectsBy={sel.projectsBy}
       truncatedWorkspaces={sel.truncatedWorkspaces}
       truncatedProjects={sel.truncatedProjects}
+      failedWorkspaces={sel.failedProjectLists}
       activeWorkspaceId={sel.activeWorkspaceId}
       activeProjectId={sel.activeProjectId}
       loading={sel.loading}

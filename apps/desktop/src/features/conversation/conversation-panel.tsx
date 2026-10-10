@@ -105,14 +105,22 @@ export function ConversationPanel({
         const outcome = await prov.createWorkspace(name);
         // The announcement carries the confirmed step and triggers the
         // single authoritative refresh; failures stay local.
-        if (outcome.ok) announceScopeChanged('workspace', 'created');
+        if (outcome.ok)
+          announceScopeChanged('workspace', 'created', {
+            workspaceId: outcome.id,
+            projectId: null,
+          });
       } else {
         // Project step, or a workspace chosen for its first project: bind
         // creation to the chosen workspace, never recreate it.
         const wsId = chosenWorkspaceId ?? conv.activeWorkspaceId;
         if (!wsId) return;
         const outcome = await prov.createProject(name, wsId);
-        if (outcome.ok) announceScopeChanged('project', 'created');
+        if (outcome.ok)
+          announceScopeChanged('project', 'created', {
+            workspaceId: wsId,
+            projectId: outcome.id,
+          });
       }
     },
     [chosenWorkspaceId, conv, prov, provisionTransition],
@@ -206,8 +214,9 @@ export function ConversationPanel({
                 key={step}
                 workspaces={sel.workspaces}
                 projectsBy={sel.projectsBy}
-                truncatedWorkspaces={false}
-                truncatedProjects={{}}
+                truncatedWorkspaces={sel.truncatedWorkspaces}
+                truncatedProjects={sel.truncatedProjects}
+                failedWorkspaces={sel.failedProjectLists}
                 activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
                 activeProjectId={sel.activeProjectId}
                 loading={false}
@@ -297,6 +306,7 @@ export function ConversationPanel({
               projectsBy={sel.projectsBy}
               truncatedWorkspaces={sel.truncatedWorkspaces}
               truncatedProjects={sel.truncatedProjects}
+              failedWorkspaces={sel.failedProjectLists}
               activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
               activeProjectId={sel.activeProjectId}
               loading={sel.loading}

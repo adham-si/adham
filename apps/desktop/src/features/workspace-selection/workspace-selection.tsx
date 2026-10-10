@@ -8,6 +8,9 @@ export interface WorkspaceSelectionProps {
   projectsBy: Record<string, ProjectSummary[]>;
   truncatedWorkspaces: boolean;
   truncatedProjects: Record<string, boolean>;
+  /** Workspaces whose project list failed to load: shown as errors, never
+   * as empty, and never offering creation for unread records. */
+  failedWorkspaces: string[];
   activeWorkspaceId: string | null;
   activeProjectId: string | null;
   loading: boolean;
@@ -43,6 +46,7 @@ export function WorkspaceSelection({
   projectsBy,
   truncatedWorkspaces,
   truncatedProjects,
+  failedWorkspaces,
   activeWorkspaceId,
   activeProjectId,
   loading,
@@ -106,6 +110,7 @@ export function WorkspaceSelection({
         <MenuContent label={t('selectScope', 'Select workspace / project')} onSelect={handleSelect}>
           {workspaces.map((ws) => {
             const projects = projectsBy[ws.workspaceId] ?? [];
+            const failed = failedWorkspaces.includes(ws.workspaceId);
             return (
               <MenuGroup key={ws.workspaceId} label={ws.name}>
                 {projects.map((proj: ProjectSummary) => (
@@ -118,7 +123,11 @@ export function WorkspaceSelection({
                     {proj.name}
                   </MenuItem>
                 ))}
-                {projects.length === 0 && !loading ? (
+                {failed ? (
+                  <p className="px-3 py-1 text-xs text-danger-foreground">
+                    {t('projectsLoadFailed', 'Projects failed to load')}
+                  </p>
+                ) : projects.length === 0 && !loading ? (
                   onChooseWorkspace ? (
                     <MenuItem value={workspaceValue(ws.workspaceId)} disabled={disabled}>
                       {t('createFirstProject', 'Create first project…')}

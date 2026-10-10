@@ -15,6 +15,7 @@ import {
   rejectionMessage,
   SCOPE_CHANGED_EVENT,
   writeSelectIntent,
+  type ScopeChangedDetail,
 } from '../conversation/conversation-identity';
 
 /// Minimal backend surface for discovery + explicit selection.
@@ -123,14 +124,19 @@ export function useSelection({
   }, [enabled, refresh]);
 
   // Confirmed creations re-read the lists so every live instance (panel
-  // slot, sidebar) shows new records. Selections write no records, so
-  // their lists cannot be stale — skipping avoids a redundant read racing
-  // the authoritative bootstrap refresh.
+  // slot, sidebar) shows new records. The confirmed scope IDs travel on the
+  // event itself, so every instance synchronizes even when it did not
+  // perform the change. Selections write no records, so their lists cannot
+  // be stale.
   React.useEffect(() => {
     if (!enabled) return;
     const onScopeChanged = (event: Event) => {
-      const origin = (event as CustomEvent<{ origin?: unknown }>).detail?.origin;
-      if (origin !== 'selected') void refresh();
+      const detail = (event as CustomEvent<Partial<ScopeChangedDetail>>).detail;
+      if (typeof detail?.workspaceId === 'string') {
+        setActiveWorkspaceId(detail.workspaceId);
+        setActiveProjectId(typeof detail?.projectId === 'string' ? detail.projectId : null);
+      }
+      if (detail?.origin !== 'selected') void refresh();
     };
     window.addEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
     return () => window.removeEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
@@ -181,7 +187,10 @@ export function useSelection({
           setActiveWorkspaceId(scope.activeWorkspaceId);
           setActiveProjectId(scope.activeProjectId);
           setError(null);
-          announceScopeChanged('project', 'selected');
+          announceScopeChanged('project', 'selected', {
+            workspaceId,
+            projectId,
+          });
           return { ok: true, scope };
         } catch (err) {
           // Proven pre-effect: nothing was stored, the identity is spent
