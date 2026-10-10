@@ -137,12 +137,16 @@ test result: ok across all workspace crates (core-types, runtime, verify, projec
 3. **Rust & Tauri Host Status:**
    - `cargo check --workspace`: Passed.
    - `cargo test --workspace`: Passed.
-4. **Manual Native Verification Checklist:**
-   Execute via `pnpm --filter @adham/desktop tauri dev`:
-   - [ ] Light / Dark / System appearance toggle.
-   - [ ] Cold restart in dark mode (verify zero light-theme flash).
-   - [ ] Buttons and inputs (radius, padding, control height, focus outline).
-   - [ ] Dialogs and menus (stacking order, floating shadow).
-   - [ ] Arabic / RTL text alignment and logical margins.
-   - [ ] Reduced motion preference toggle (animations disabled).
-   - [ ] High-contrast / forced-colors mode rendering.
+4. **Manual Native Verification Checklist (Host: macOS arm64, Head: `6d87a48`):**
+
+| Check | Expected Result | Status | Notes |
+|---|---|---|---|
+| Light / Dark / System appearance | Colors render according to theme; System tracks OS changes | **PENDING** | Manual verification via `tauri dev` |
+| Cold restart in dark mode | Initial paint uses dark tokens without light-theme flash | **PENDING** | Manual verification via `tauri dev` |
+| Buttons & inputs | Preserves radius (`6px`), padding, heights (`32/36/40px`), and focus ring | **PENDING** | Manual verification via `tauri dev` |
+| Dialogs & menus | Proper z-index stacking (`400/500`) and floating box-shadow | **PENDING** | Manual verification via `tauri dev` |
+| Arabic / RTL layout | Correct alignment, text direction, and logical margins/padding | **PENDING** | Manual verification via `tauri dev` |
+| Reduced motion | Token-controlled animations/transitions disabled (`0ms`) | **PENDING** | Media query override verified in tokens test; runtime visual pending |
+| Forced colors / High contrast | Controls, borders, and focus rings remain distinct | **PENDING** | System palette overrides verified in tokens test; runtime visual pending |
+
+*Notice: Per project review policy, visual acceptance checks are explicitly tracked as pending manual confirmation. None are marked passed without live screen verification.*
