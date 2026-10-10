@@ -67,7 +67,9 @@ describe('parity between tokens.css and the typed mirror', () => {
 
 describe('accessibility media query overrides in tokens.css', () => {
   it('overrides duration to 0ms under prefers-reduced-motion: reduce', () => {
-    const reducedMotionMatch = css.match(/@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)\s*{([^}]*)}/);
+    const reducedMotionMatch = css.match(
+      /@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)\s*{([^}]*)}/,
+    );
     const body = reducedMotionMatch?.[1] ?? '';
     expect(body).toContain('--duration-fast: 0ms;');
     expect(body).toContain('--duration-base: 0ms;');
