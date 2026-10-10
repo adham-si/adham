@@ -2,8 +2,10 @@
 
 - **Branch:** `refactor/frontend-native-tokens`
 - **Draft PR:** [#6](https://github.com/adham-si/adham/pull/6) targeting `main`
-- **Revision SHA:** `f7647a6fe94ab4eaf5c8f9b1342f208533cbb9cd`
 - **Parent SHA:** `237720e665a925f5744da1045356d37a996aae3e`
+- **Implementation Commit:** `f7647a6fe94ab4eaf5c8f9b1342f208533cbb9cd`
+- **Documentation Update Commit:** `e3b234a166c277a4f2e09dba304e8fe0e0c489a1`
+- **GitHub CI Run:** [Run 38065240679 / Job 114251438370](https://github.com/adham-si/adham/actions/runs/38065240679/job/114251438370) (Status: SUCCESS on `e3b234a`)
 - **Data scope:** Synthetic canary data only
 
 ---
@@ -13,7 +15,7 @@
 PR 1 implements the first step of the approved frontend styling migration:
 1. Decouple `packages/design-tokens/tokens.css` into pure native CSS custom properties (`:root` base scales, `:root` light scheme, `.dark` dark scheme, accessibility media queries).
 2. Isolate temporary Tailwind v4 mappings into `packages/design-tokens/tailwind-bridge.css` (`@theme`, `@custom-variant dark`, `@theme inline`).
-3. Maintain 100% utility and visual parity across all existing consumers while preparing for subsequent CSS Modules migration.
+3. Retain existing token names, values, and utility classes so that unmigrated components continue functioning without disruption ahead of PR 2.
 
 ---
 
@@ -29,10 +31,10 @@ This is likely not portable. A type annotation is necessary.
 ```
 
 ### Root Cause
-`apps/desktop/tsconfig.json` extended `@adham/tsconfig/base.json`, which specifies `"declaration": true` for monorepo packages. Because `apps/desktop` is an application executable bundle built by Vite (not a library emitting `.d.ts` declaration files for consumers), enforcing declaration file constraints on application source and test helpers triggered TS2883 portable-type checks.
+`apps/desktop/tsconfig.json` extended `@adham/tsconfig/base.json`, which specifies `"declaration": true` for monorepo packages. Because `apps/desktop` is a client application bundle built with Vite (not a published npm library emitting `.d.ts` declaration files for downstream consumers), enforcing declaration file constraints on application source and test helpers triggered TS2883 portable-type checks.
 
 ### Resolution
-Configured `"declaration": false` and `"declarationMap": false` in `apps/desktop/tsconfig.json` (matching the repository's root `tsconfig.json`).
+Configured `"declaration": false` and `"declarationMap": false` in `apps/desktop/tsconfig.json` (matching the repository root `tsconfig.json`).
 This cleanly unblocks `pnpm --filter @adham/desktop build` without introducing artificial type dependencies or modifying test utility implementation code.
 
 ---
@@ -54,33 +56,42 @@ Earlier architecture notes (P0-06) asserted:
 
 ---
 
-## 4. Utility & Visual Parity Verification Against Parent (`237720e`)
+## 4. CSS Utility & Declaration Rule Parity
 
-A full production CSS build was executed for both the parent revision (`237720e`) and the PR 1 branch revision (`f7647a6`):
+### Comparison Methodology
+To evaluate the impact on compiled styles, the desktop renderer CSS bundle was compiled under two configurations:
+1. **Parent-CSS Configuration:** `tokens.css` and `index.css` from parent revision `237720e`.
+2. **PR 1 Branch Configuration:** Native `tokens.css` + `tailwind-bridge.css` on `refactor/frontend-native-tokens`.
 
-| Metric | Parent Revision (`237720e`) | PR 1 Revision (`f7647a6`) | Diff |
+### Selector Presence
+- **Parent Unique Selectors:** 429
+- **Branch Unique Selectors:** 429 (+ 3 duration tokens preserved from `:root` by lightningcss)
+- **Missing Utility Selectors Detected:** **0**
+
+### Rule Declaration Inspection
+Inspecting the compiled rules confirms that Tailwind v4 emits identical CSS property declarations referencing the same custom properties:
+
+| Utility Class | Parent Rule Declaration | PR 1 Rule Declaration | Resolved Value |
 |---|---|---|---|
-| CSS Output File | `index-D2Ljlnfe.css` | `index-XbnZ33IN.css` | Name hash changed |
-| CSS Bundle Size | 47,317 bytes (8.81 kB gzip) | 47,950 bytes (8.95 kB gzip) | +633 bytes (native :root scale preservation) |
-| Total Unique Utility Classes | 429 | 429 (+ 3 lightningcss duration tokens) | **0 missing classes** |
+| `.rounded-md` | `border-radius: var(--radius-md)` | `border-radius: var(--radius-md)` | `6px` |
+| `.rounded-lg` | `border-radius: var(--radius-lg)` | `border-radius: var(--radius-lg)` | `8px` |
+| `.min-h-control-md` | `min-height: var(--control-md)` | `min-height: var(--control-md)` | `36px` |
+| `.size-icon-md` | `width: var(--icon-md); height: var(--icon-md)` | `width: var(--icon-md); height: var(--icon-md)` | `20px` |
+| `.z-dialog` | `z-index: var(--z-dialog)` | `z-index: var(--z-dialog)` | `400` |
+| `.z-menu` | `z-index: var(--z-menu)` | `z-index: var(--z-menu)` | `500` |
+| `.bg-surface` | `background-color: var(--surface)` | `background-color: var(--surface)` | `#ffffff` (light) / `#16161c` (dark) |
+| `.text-foreground` | `color: var(--foreground)` | `color: var(--foreground)` | `#121214` (light) / `#f4f4f6` (dark) |
+| `.border-border` | `border-color: var(--border)` | `border-color: var(--border)` | `#8a8a96` (light) / `#6a6a80` (dark) |
+| `.shadow-floating` | `--tw-shadow: var(--shadow-floating); box-shadow: ...` | `--tw-shadow: var(--shadow-floating); box-shadow: ...` | `0 1px 2px rgb(...) 0 4px 12px rgb(...)` |
 
-### Verified Utility Classes
-All semantic and scale utility classes were verified present in the compiled bundle:
-- `min-h-control-sm`, `min-h-control-md`, `min-h-control-lg`: **PRESENT**
-- `size-icon-sm`, `size-icon-md`, `size-icon-lg`: **PRESENT**
-- `z-dialog`, `z-menu`, `z-popover`, `z-toast`: **PRESENT**
-- `rounded-sm`, `rounded-md`, `rounded-lg`: **PRESENT**
-- `bg-surface`, `bg-surface-raised`, `bg-action`: **PRESENT**
-- `text-foreground`, `text-foreground-secondary`, `text-foreground-muted`: **PRESENT**
-- `border-border`, `border-border-subtle`, `border-border-strong`: **PRESENT**
-
-Missing classes compared to parent revision: **0 (`[]`)**. Visual and utility output is 100% identical.
+**Note on Visual Parity:**
+While the selector and declaration inspections prove that identical CSS rules are emitted by Tailwind v4, full rendering verification requires interactive computed-style checks in a running desktop/browser environment.
 
 ---
 
-## 5. Automated Gates & Test Execution Evidence
+## 5. Automated Gates Evidence
 
-All gates executed cleanly at revision `f7647a6`:
+Local execution at current working revision:
 
 ```bash
 $ pnpm format:check
@@ -95,11 +106,10 @@ Tests       350 passed (350)
 Duration    4.41s
 
 $ pnpm check:magic-values
-Magic-value check passed: no hex literals, arbitrary var() values, bare z-index utilities,
-non-1px borders, or cleared Tailwind defaults. (25/25 cases passed)
+Magic-value check passed: 25/25 cases passed.
 
 $ pnpm check:deny-exceptions
-deny exceptions ok (1 record(s) checked, today 2026-10-10). (22/22 cases passed)
+deny exceptions ok: 22/22 cases passed.
 
 $ pnpm --filter @adham/desktop build
 vite v8.3.3 building client environment for production...
@@ -108,16 +118,25 @@ dist/assets/index-XbnZ33IN.css   47.95 kB │ gzip:   8.95 kB
 dist/assets/routes-MOPfAmXV.js  302.17 kB │ gzip:  70.42 kB
 dist/assets/index-DbJYXgJW.js   468.22 kB │ gzip: 146.70 kB
 ✓ built in 327ms
+
+$ cargo test --workspace
+test result: ok across all workspace crates (core-types, runtime, verify, projections, provider, desktop-api, platform).
 ```
 
 ---
 
-## 6. Review Checklist & Next Steps
+## 6. Visual / Native Acceptance Check Status
 
-- [x] Branch `refactor/frontend-native-tokens` published to `origin`.
-- [x] Draft PR [#6](https://github.com/adham-si/adham/pull/6) opened targeting `main`.
-- [x] TypeScript build fix documented.
-- [x] Tier-1 mapping claim corrected.
-- [x] CSS utility parity against parent revision verified (0 missing classes).
-- [x] All checks passing (`pnpm check`, `build`).
-- [ ] PR 2 (`refactor/ui-css-modules`) is blocked until PR 1 is reviewed and merged.
+1. **Automated Unit & Contrast Tests:** All 19 tests in `packages/design-tokens/src/tokens.test.ts` pass, verifying:
+   - Light and dark theme variable declaration parity.
+   - WCAG contrast >= 4.5:1 for body text on all surfaces across light and dark themes.
+   - Reduced motion overrides (`--duration-*: 0ms`).
+   - Forced colors high-contrast system overrides.
+2. **Browser Subagent / Automated Headless Verification:**
+   - Attempted running browser verification against `http://localhost:11111/gallery`.
+   - Tool execution failed due to an external Playwright driver CDN issue:
+     `could not install driver: got non 200 status code: 404 from https://playwright.azureedge.net/builds/driver/playwright-1.57.0-mac-arm64.zip`.
+3. **Rust & Tauri Host Status:**
+   - `cargo check --workspace`: Passed (26s).
+   - `cargo test --workspace`: Passed (all crates).
+   - Live native Tauri launch requires user interaction / local verification.
