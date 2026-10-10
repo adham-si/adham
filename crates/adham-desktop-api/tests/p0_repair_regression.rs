@@ -128,13 +128,23 @@ async fn test_concurrent_init_single_identity() {
         }));
     }
     let mut ids = Vec::new();
+    let mut created_count = 0usize;
     for h in handles {
-        let rec = h.await.expect("join");
-        ids.push((rec.installation_id.to_string(), rec.actor_id.to_string()));
+        let init = h.await.expect("join");
+        if init.created {
+            created_count += 1;
+        }
+        ids.push((
+            init.record.installation_id.to_string(),
+            init.record.actor_id.to_string(),
+        ));
     }
     for id in &ids {
         assert_eq!(id, &ids[0]);
     }
+    // Exactly one concurrent caller may win first-creation authority; that
+    // winner alone is allowed to initialize the content key.
+    assert_eq!(created_count, 1, "exactly one init winner expected");
     let row_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM installation")
         .fetch_one(&pool)
         .await
