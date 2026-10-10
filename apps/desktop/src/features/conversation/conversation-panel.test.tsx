@@ -205,7 +205,9 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
 
     expect(box.value).toBe('early thought');
-    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
+    await waitFor(() =>
+      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+    );
   });
 
   it('restores text typed before bootstrap across unmount and remount', async () => {
@@ -231,6 +233,8 @@ describe('ConversationPanel', () => {
     expect(restored.value).toBe('early thought');
     await waitFor(() => expect(secondBackend.createSession).toHaveBeenCalled());
     expect(restored.value).toBe('early thought');
-    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
+    await waitFor(() =>
+      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+    );
   });
 });
