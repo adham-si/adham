@@ -6,6 +6,7 @@ import type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  PlatformInfo,
   ProjectSummary,
   SessionSummary,
   StorageStatus,
@@ -15,6 +16,7 @@ import type {
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
+  PlatformInfoSchema,
   ProjectSummarySchema,
   SessionSummarySchema,
   StorageStatusSchema,
@@ -29,6 +31,7 @@ export type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  PlatformInfo,
   ProjectSummary,
   SessionSummary,
   StorageStatus,
@@ -52,14 +55,18 @@ function generateRequestId(): string {
 
 export interface AdhamClient {
   getBootstrapState(): Promise<BootstrapState>;
-  createWorkspace(payload: {
-    name: string;
-    kind: string;
-    preferredLanguage: string;
-  }): Promise<WorkspaceSummary>;
+  createWorkspace(
+    payload: {
+      name: string;
+      kind: string;
+      preferredLanguage: string;
+    },
+    options?: { requestId?: string },
+  ): Promise<WorkspaceSummary>;
   createProject(
     workspaceId: string,
     payload: { name: string; storageKind: string },
+    options?: { requestId?: string },
   ): Promise<ProjectSummary>;
   createSession(
     workspaceId: string,
@@ -82,6 +89,7 @@ export interface AdhamClient {
     limit?: number,
   ): Promise<ConversationPage>;
   getStorageStatus(): Promise<StorageStatus>;
+  getPlatformInfo(): Promise<PlatformInfo>;
 }
 
 export class AdhamApiClient implements AdhamClient {
@@ -107,12 +115,15 @@ export class AdhamApiClient implements AdhamClient {
     return BootstrapStateSchema.parse(raw);
   }
 
-  async createWorkspace(payload: {
-    name: string;
-    kind: string;
-    preferredLanguage: string;
-  }): Promise<WorkspaceSummary> {
-    const envelope = this.wrapCommand(payload);
+  async createWorkspace(
+    payload: {
+      name: string;
+      kind: string;
+      preferredLanguage: string;
+    },
+    options?: { requestId?: string },
+  ): Promise<WorkspaceSummary> {
+    const envelope = this.wrapCommand(payload, undefined, options?.requestId);
     const result = await invoke<CommandResult<WorkspaceSummary>>('create_workspace', {
       request: envelope,
     });
@@ -122,12 +133,17 @@ export class AdhamApiClient implements AdhamClient {
   async createProject(
     workspaceId: string,
     payload: { name: string; storageKind: string },
+    options?: { requestId?: string },
   ): Promise<ProjectSummary> {
-    const envelope = this.wrapCommand(payload, {
-      workspaceId,
-      projectId: null,
-      sessionId: null,
-    });
+    const envelope = this.wrapCommand(
+      payload,
+      {
+        workspaceId,
+        projectId: null,
+        sessionId: null,
+      },
+      options?.requestId,
+    );
     const result = await invoke<CommandResult<ProjectSummary>>('create_project', {
       request: envelope,
     });
@@ -199,6 +215,11 @@ export class AdhamApiClient implements AdhamClient {
   async getStorageStatus(): Promise<StorageStatus> {
     const raw = await invoke('get_storage_status');
     return StorageStatusSchema.parse(raw);
+  }
+
+  async getPlatformInfo(): Promise<PlatformInfo> {
+    const raw = await invoke('get_platform_info');
+    return PlatformInfoSchema.parse(raw);
   }
 }
 

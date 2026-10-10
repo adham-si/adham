@@ -161,4 +161,18 @@ describe('AdhamApiClient request identity', () => {
       }),
     );
   });
+
+  it('validates getPlatformInfo returns schema-parsed platform metadata', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({
+      os: 'macos',
+      arch: 'aarch64',
+      hasNativeTitlebarControls: true,
+    });
+    const client = new AdhamApiClient();
+    const info = await client.getPlatformInfo();
+    expect(info.os).toBe('macos');
+    expect(info.arch).toBe('aarch64');
+    expect(info.hasNativeTitlebarControls).toBe(true);
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_platform_info');
+  });
 });

@@ -10,6 +10,8 @@ import {
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
 import { useConversation, type ConversationBackend } from './use-conversation';
+import { useProvisioning, type ProvisioningBackend } from './use-provisioning';
+import { ProvisioningForm } from './provisioning-form';
 import { submissionNotice } from './submission-notice';
 
 const DEFAULT_MODEL_ID = 'local:qwen2.5-coder:32b';
@@ -23,6 +25,8 @@ function formatTimestamp(createdAt: string): string {
 
 export interface ConversationPanelProps {
   backend?: ConversationBackend;
+  /** Injectable provisioning backend for tests; defaults to the real client. */
+  provisioning?: ProvisioningBackend;
 }
 
 /**
@@ -31,9 +35,19 @@ export interface ConversationPanelProps {
  * text. Execution, approval, and stop have no backend command and are
  * rendered unavailable instead of faked.
  */
-export function ConversationPanel({ backend = adhamClient }: ConversationPanelProps) {
+export function ConversationPanel({ backend = adhamClient, provisioning }: ConversationPanelProps) {
   const { t } = useTranslation();
   const conv = useConversation({ backend });
+  const prov = useProvisioning({ backend: provisioning });
+  const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
+  /// Committed creation awaiting authoritative bootstrap. Holds the old
+  /// step disabled so a second click cannot mint a second workspace/project
+  /// while the read is in flight. Cleared only when bootstrap advances;
+  /// a read failure keeps it and shows a read-only retry (never a fresh
+  /// creation).
+  const [provisionTransition, setProvisionTransition] = React.useState<
+    'workspace' | 'project' | null
+  >(null);
   const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({
     sessionId: conv.sessionId ?? PENDING_DRAFT_BUCKET,
   });
@@ -47,6 +61,46 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
   const [stopNotice, setStopNotice] = React.useState(false);
 
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
+
+  const handleProvision = React.useCallback(
+    async (name: string) => {
+      if (prov.working || provisionTransition) return;
+      if (conv.status === 'needs-workspace') {
+        const outcome = await prov.createWorkspace(name);
+        if (outcome.ok) {
+          setProvisionTransition('workspace');
+          conv.refreshScope();
+        }
+      } else if (conv.status === 'needs-project') {
+        // Authoritative selection only: never prefer a stale local ID and
+        // never transfer a frozen project intent into another scope (the
+        // hook blocks cross-scope reuse).
+        const wsId = conv.activeWorkspaceId;
+        if (!wsId) return;
+        const outcome = await prov.createProject(name, wsId);
+        if (outcome.ok) {
+          setProvisionTransition('project');
+          conv.refreshScope();
+        }
+      }
+    },
+    [conv, prov, provisionTransition],
+  );
+
+  // Release the hold only when authoritative bootstrap advances past the
+  // confirmed step. A read failure (error) keeps the hold for a read-only
+  // retry; it never re-enables the old creation action.
+  React.useEffect(() => {
+    if (provisionTransition === 'workspace' && conv.status !== 'needs-workspace') {
+      if (conv.status === 'needs-project' || conv.status === 'ready') {
+        setProvisionTransition(null);
+      }
+    } else if (provisionTransition === 'project' && conv.status === 'ready') {
+      setProvisionTransition(null);
+    }
+  }, [conv.status, provisionTransition]);
+
+  const formWorking = prov.working || provisionTransition !== null;
 
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
@@ -71,6 +125,45 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
   });
   const executionUnavailable = mode === 'execute';
   const isEmpty = conv.messages.length === 0;
+
+  // Partial provisioning replaces the composer: there is no session yet, so
+  // nothing may be submitted. The form drives one deliberate creation step.
+  // After a committed creation the step stays held (disabled) until the
+  // authoritative bootstrap advances; a read failure offers a read-only
+  // retry that preserves the issued identity.
+  if (provisionTransition && conv.status === 'error') {
+    return (
+      <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+          <p role="alert" className="text-sm">
+            {conv.error ?? t('provision.refreshFailed', 'Workspace was created. Reload failed.')}
+          </p>
+          <button type="button" onClick={() => conv.refreshScope()} className="text-sm underline">
+            {t('provision.retryLoad', 'Retry loading')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (needsProvisioning || (provisionTransition && conv.status === 'bootstrapping')) {
+    const step =
+      conv.status === 'needs-workspace'
+        ? 'workspace'
+        : conv.status === 'needs-project'
+          ? 'project'
+          : (provisionTransition ?? 'workspace');
+    return (
+      <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+        <ProvisioningForm
+          key={step}
+          step={step}
+          working={formWorking}
+          error={prov.error}
+          onSubmit={(name) => void handleProvision(name)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent">
