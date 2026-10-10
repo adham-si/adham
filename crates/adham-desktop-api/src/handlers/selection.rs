@@ -1,15 +1,13 @@
 use crate::dtos::*;
 
-pub async fn handle_list_workspaces(
-    ctx: &super::ApiContext,
-) -> Result<Vec<WorkspaceSummary>, String> {
+pub async fn handle_list_workspaces(ctx: &super::ApiContext) -> Result<WorkspaceList, String> {
     crate::service::list_workspaces(ctx).await
 }
 
 pub async fn handle_list_projects(
     ctx: &super::ApiContext,
     context: CommandContext,
-) -> Result<Vec<ProjectSummary>, String> {
+) -> Result<ProjectList, String> {
     let workspace_id = context
         .workspace_id
         .as_deref()

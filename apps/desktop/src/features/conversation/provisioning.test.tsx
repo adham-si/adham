@@ -350,10 +350,15 @@ describe('provisioning journey', () => {
         state.activeProj = 'proj-9';
         return { ...projSummary, workspaceId: wsId };
       }),
-      listWorkspaces: vi.fn(async () => (state.wsCreated ? [wsSummary] : [])),
-      listProjects: vi.fn(async (wsId: string) =>
-        state.projWs === wsId ? [{ ...projSummary, workspaceId: wsId }] : [],
-      ),
+      listWorkspaces: vi.fn(async () => ({
+        workspaces: state.wsCreated ? [wsSummary] : [],
+        truncated: false,
+      })),
+      listProjects: vi.fn(async (wsId: string) => ({
+        workspaceId: wsId,
+        projects: state.projWs === wsId ? [{ ...projSummary, workspaceId: wsId }] : [],
+        truncated: false,
+      })),
       selectProject: vi.fn(async (wsId: string, payload: { projectId: string }) => {
         state.activeWs = wsId;
         state.activeProj = payload.projectId;

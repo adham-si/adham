@@ -16,7 +16,9 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 /// Bounded reads: deterministic creation order, no cursor pagination at P0
-/// scale. Pagination arrives with its own contract when lists outgrow this.
+/// scale. One row past the limit is probed so truncation is disclosed,
+/// never silent. Pagination arrives with its own contract when lists
+/// outgrow this.
 const LIST_LIMIT: i64 = 100;
 
 fn storage_unavailable(e: impl std::fmt::Display) -> String {
@@ -32,20 +34,21 @@ fn occurred_iso(occurred_at_us: i64) -> String {
 
 /// All personal workspaces in creation order. Reads only; empty when the
 /// installation is fresh (provisioning, not selection, owns that case).
-pub async fn list_workspaces(ctx: &ApiContext) -> Result<Vec<WorkspaceSummary>, String> {
+pub async fn list_workspaces(ctx: &ApiContext) -> Result<WorkspaceList, String> {
     let rows: Vec<(Vec<u8>, i64)> = sqlx::query_as(
         "SELECT payload_json, occurred_at_us FROM events
          WHERE event_type = 'WorkspaceCreated' ORDER BY global_position LIMIT ?",
     )
-    .bind(LIST_LIMIT)
+    .bind(LIST_LIMIT + 1)
     .fetch_all(&ctx.pool)
     .await
     .map_err(storage_unavailable)?;
-    let mut out = Vec::with_capacity(rows.len());
-    for (payload_json, occurred_at_us) in rows {
+    let truncated = rows.len() as i64 > LIST_LIMIT;
+    let mut workspaces = Vec::with_capacity(rows.len().min(LIST_LIMIT as usize));
+    for (payload_json, occurred_at_us) in rows.into_iter().take(LIST_LIMIT as usize) {
         let created: WorkspaceCreatedV1 = serde_json::from_slice(&payload_json)
             .map_err(|_| "STORAGE_REPAIR_REQUIRED: workspace record unparseable".to_string())?;
-        out.push(WorkspaceSummary {
+        workspaces.push(WorkspaceSummary {
             workspace_id: created.workspace_id.to_string(),
             name: created.name,
             kind: created.kind,
@@ -53,7 +56,10 @@ pub async fn list_workspaces(ctx: &ApiContext) -> Result<Vec<WorkspaceSummary>, 
             created_at: occurred_iso(occurred_at_us),
         });
     }
-    Ok(out)
+    Ok(WorkspaceList {
+        workspaces,
+        truncated,
+    })
 }
 
 /// Projects strictly inside one workspace, in creation order. The workspace
@@ -61,7 +67,7 @@ pub async fn list_workspaces(ctx: &ApiContext) -> Result<Vec<WorkspaceSummary>, 
 pub async fn list_projects(
     ctx: &ApiContext,
     workspace_id: &str,
-) -> Result<Vec<ProjectSummary>, String> {
+) -> Result<ProjectList, String> {
     let ws_id = WorkspaceId::from_string(workspace_id)
         .map_err(|_| "VALIDATION_FAILED: workspace_id must be UUID".to_string())?;
     let ws_stream = format!("workspace:{ws_id}");
@@ -80,15 +86,16 @@ pub async fn list_projects(
          ORDER BY global_position LIMIT ?",
     )
     .bind(ws_id.to_string())
-    .bind(LIST_LIMIT)
+    .bind(LIST_LIMIT + 1)
     .fetch_all(&ctx.pool)
     .await
     .map_err(storage_unavailable)?;
-    let mut out = Vec::with_capacity(rows.len());
-    for (payload_json, occurred_at_us) in rows {
+    let truncated = rows.len() as i64 > LIST_LIMIT;
+    let mut projects = Vec::with_capacity(rows.len().min(LIST_LIMIT as usize));
+    for (payload_json, occurred_at_us) in rows.into_iter().take(LIST_LIMIT as usize) {
         let created: ProjectCreatedV1 = serde_json::from_slice(&payload_json)
             .map_err(|_| "STORAGE_REPAIR_REQUIRED: project record unparseable".to_string())?;
-        out.push(ProjectSummary {
+        projects.push(ProjectSummary {
             project_id: created.project_id.to_string(),
             workspace_id: created.workspace_id.to_string(),
             name: created.name,
@@ -96,7 +103,11 @@ pub async fn list_projects(
             created_at: occurred_iso(occurred_at_us),
         });
     }
-    Ok(out)
+    Ok(ProjectList {
+        workspace_id: ws_id.to_string(),
+        projects,
+        truncated,
+    })
 }
 
 fn replay_bootstrap(

@@ -24,13 +24,15 @@ function IndexComponent() {
     <WorkspaceSelection
       workspaces={sel.workspaces}
       projectsBy={sel.projectsBy}
+      truncatedWorkspaces={sel.truncatedWorkspaces}
+      truncatedProjects={sel.truncatedProjects}
       activeWorkspaceId={sel.activeWorkspaceId}
       activeProjectId={sel.activeProjectId}
       loading={sel.loading}
       listError={sel.listError}
       disabled={sel.working}
       selectError={sel.error}
-      onSelect={handleSelectProject}
+      onSelectProject={handleSelectProject}
       onRetryLists={() => void sel.refresh()}
     />
   );

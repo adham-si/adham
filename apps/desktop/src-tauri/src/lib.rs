@@ -1,8 +1,8 @@
 use adham_desktop_api::{
     ApiContext, BootstrapState, CommandContext, CommandEnvelope, CommandResult, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope,
+    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope, ProjectList,
     ProjectSummary, RebuildProjectionsResponse, SelectProjectPayload, SessionSummary,
-    StorageStatus, SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
+    StorageStatus, SubmitMessagePayload, SubmittedMessage, WorkspaceList, WorkspaceSummary,
 };
 
 #[tauri::command]
@@ -46,7 +46,7 @@ async fn create_project(
 #[tauri::command]
 async fn list_workspaces(
     state: tauri::State<'_, ApiContext>,
-) -> Result<Vec<WorkspaceSummary>, ErrorEnvelope> {
+) -> Result<WorkspaceList, ErrorEnvelope> {
     adham_desktop_api::handle_list_workspaces(&state)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
@@ -56,7 +56,7 @@ async fn list_workspaces(
 async fn list_projects(
     state: tauri::State<'_, ApiContext>,
     context: CommandContext,
-) -> Result<Vec<ProjectSummary>, ErrorEnvelope> {
+) -> Result<ProjectList, ErrorEnvelope> {
     adham_desktop_api::handle_list_projects(&state, context)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))

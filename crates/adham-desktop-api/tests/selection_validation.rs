@@ -52,21 +52,25 @@ async fn receipt_count(ctx: &ApiContext, request_id: &str) -> i64 {
 #[tokio::test]
 async fn lists_start_empty_and_show_created_scopes_in_order() {
     let ctx = setup_ctx(&test_db_path()).await;
-    assert!(handle_list_workspaces(&ctx).await.expect("list").is_empty());
+    let empty = handle_list_workspaces(&ctx).await.expect("list");
+    assert!(empty.workspaces.is_empty());
+    assert!(!empty.truncated);
 
     let ws_a = create_test_workspace(&ctx, "WS-A").await;
     let ws_b = create_test_workspace(&ctx, "WS-B").await;
     let proj_a = create_test_project(&ctx, &ws_a, "Proj-A").await;
     // Creation selects the newest scope; lists are independent of selection.
     let workspaces = handle_list_workspaces(&ctx).await.expect("list ws");
+    assert!(!workspaces.truncated);
     assert_eq!(
         workspaces
+            .workspaces
             .iter()
             .map(|w| w.workspace_id.clone())
             .collect::<Vec<_>>(),
         vec![ws_a.clone(), ws_b.clone()]
     );
-    assert_eq!(workspaces[0].name, "WS-A");
+    assert_eq!(workspaces.workspaces[0].name, "WS-A");
     let projects = handle_list_projects(
         &ctx,
         CommandContext {
@@ -77,9 +81,11 @@ async fn lists_start_empty_and_show_created_scopes_in_order() {
     )
     .await
     .expect("list proj");
-    assert_eq!(projects.len(), 1);
-    assert_eq!(projects[0].project_id, proj_a);
-    assert_eq!(projects[0].workspace_id, ws_a);
+    assert!(!projects.truncated);
+    assert_eq!(projects.workspace_id, ws_a);
+    assert_eq!(projects.projects.len(), 1);
+    assert_eq!(projects.projects[0].project_id, proj_a);
+    assert_eq!(projects.projects[0].workspace_id, ws_a);
     let other = handle_list_projects(
         &ctx,
         CommandContext {
@@ -90,7 +96,30 @@ async fn lists_start_empty_and_show_created_scopes_in_order() {
     )
     .await
     .expect("list proj b");
-    assert!(other.is_empty());
+    assert!(other.projects.is_empty());
+    assert!(!other.truncated);
+}
+
+#[tokio::test]
+async fn lists_disclose_truncation_past_the_limit() {
+    let ctx = setup_ctx(&test_db_path()).await;
+    let ws = create_test_workspace(&ctx, "WS").await;
+    for i in 0..101 {
+        create_test_project(&ctx, &ws, &format!("Proj-{i:03}")).await;
+    }
+    let projects = handle_list_projects(
+        &ctx,
+        CommandContext {
+            workspace_id: Some(ws.clone()),
+            project_id: None,
+            session_id: None,
+        },
+    )
+    .await
+    .expect("list proj");
+    assert_eq!(projects.projects.len(), 100);
+    assert!(projects.truncated);
+    assert_eq!(projects.projects[0].name, "Proj-000");
 }
 
 #[tokio::test]

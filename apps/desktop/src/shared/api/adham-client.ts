@@ -6,20 +6,24 @@ import type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  ProjectList,
   ProjectSummary,
   SelectProjectPayload,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
+  WorkspaceList,
   WorkspaceSummary,
 } from '@adham/contracts-generated';
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
+  ProjectListSchema,
   ProjectSummarySchema,
   SessionSummarySchema,
   StorageStatusSchema,
   SubmittedMessageSchema,
+  WorkspaceListSchema,
   WorkspaceSummarySchema,
 } from './schemas';
 
@@ -66,8 +70,8 @@ export interface AdhamClient {
     payload: { name: string; storageKind: string },
     options?: { requestId?: string },
   ): Promise<ProjectSummary>;
-  listWorkspaces(): Promise<WorkspaceSummary[]>;
-  listProjects(workspaceId: string): Promise<ProjectSummary[]>;
+  listWorkspaces(): Promise<WorkspaceList>;
+  listProjects(workspaceId: string): Promise<ProjectList>;
   selectProject(
     workspaceId: string,
     payload: SelectProjectPayload,
@@ -154,12 +158,12 @@ export class AdhamApiClient implements AdhamClient {
     return ProjectSummarySchema.parse(result.data);
   }
 
-  async listWorkspaces(): Promise<WorkspaceSummary[]> {
+  async listWorkspaces(): Promise<WorkspaceList> {
     const raw = await invoke('list_workspaces');
-    return WorkspaceSummarySchema.array().parse(raw);
+    return WorkspaceListSchema.parse(raw);
   }
 
-  async listProjects(workspaceId: string): Promise<ProjectSummary[]> {
+  async listProjects(workspaceId: string): Promise<ProjectList> {
     const raw = await invoke('list_projects', {
       context: {
         workspaceId,
@@ -167,7 +171,7 @@ export class AdhamApiClient implements AdhamClient {
         sessionId: null,
       },
     });
-    return ProjectSummarySchema.array().parse(raw);
+    return ProjectListSchema.parse(raw);
   }
 
   async selectProject(

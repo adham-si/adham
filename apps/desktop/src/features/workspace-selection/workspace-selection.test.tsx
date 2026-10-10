@@ -34,8 +34,12 @@ function fakeSelection() {
       activeWorkspaceId: selected.ws,
       activeProjectId: selected.proj,
     })),
-    listWorkspaces: vi.fn(async () => [WS]),
-    listProjects: vi.fn(async (wsId: string) => (wsId === 'ws-1' ? [PROJ] : [])),
+    listWorkspaces: vi.fn(async () => ({ workspaces: [WS], truncated: false })),
+    listProjects: vi.fn(async (wsId: string) => ({
+      workspaceId: wsId,
+      projects: wsId === 'ws-1' ? [PROJ] : [],
+      truncated: false,
+    })),
     selectProject: vi.fn(
       async (wsId: string, payload: { projectId: string }, _options?: unknown) => {
         selected.ws = wsId;
@@ -177,6 +181,16 @@ describe('useSelection', () => {
     expect(readSelectIntent()).toBeNull();
   });
 
+  it('tracks workspaces whose project list failed', async () => {
+    const backend = fakeSelection();
+    backend.listProjects.mockRejectedValueOnce(new Error('read outage'));
+    const { result } = renderHook(() => useSelection({ backend }));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.failedProjectLists).toEqual(['ws-1']);
+    expect(result.current.listError).toMatch(/retry/i);
+    expect(result.current.projectsBy).toEqual({ 'ws-1': [] });
+  });
+
   it('shares the frozen intent across live instances', async () => {
     const backend = fakeSelection();
     let resolveSelect!: (value: unknown) => void;
@@ -281,12 +295,26 @@ describe('selection journey', () => {
                 activeProjectId: state.activeProj,
               };
       }),
-      createWorkspace: vi.fn(),
-      createProject: vi.fn(),
-      listWorkspaces: vi.fn(async () => (state.wsCreated ? [wsSummary] : [])),
-      listProjects: vi.fn(async (wsId: string) =>
-        state.projWs === wsId ? [{ ...projSummary, workspaceId: wsId }] : [],
-      ),
+      createWorkspace: vi.fn(async () => {
+        state.wsCreated = true;
+        state.activeWs = 'ws-9';
+        return wsSummary;
+      }),
+      createProject: vi.fn(async (wsId: string) => {
+        state.projWs = wsId;
+        state.activeWs = wsId;
+        state.activeProj = 'proj-9';
+        return { ...projSummary, workspaceId: wsId };
+      }),
+      listWorkspaces: vi.fn(async () => ({
+        workspaces: state.wsCreated ? [wsSummary] : [],
+        truncated: false,
+      })),
+      listProjects: vi.fn(async (wsId: string) => ({
+        workspaceId: wsId,
+        projects: state.projWs === wsId ? [{ ...projSummary, workspaceId: wsId }] : [],
+        truncated: false,
+      })),
       selectProject: vi.fn(
         async (wsId: string, payload: { projectId: string }, _options?: unknown) => {
           state.activeWs = wsId;
@@ -429,6 +457,59 @@ describe('selection journey', () => {
     expect(backend.createProject).not.toHaveBeenCalled();
   });
 
+  it('offers retry when the active workspace project list fails', async () => {
+    const user = userEvent.setup();
+    const { backend, state } = journeyBackend();
+    state.activeWs = 'ws-9';
+    backend.listProjects.mockRejectedValueOnce(new Error('read outage'));
+    render(<ConversationPanel backend={backend} provisioning={backend} selection={backend} />);
+
+    // Failed is not empty: retry UI, never the creation form.
+    await screen.findByRole('alert');
+    expect(screen.queryByLabelText(/project name/i)).toBeNull();
+    expect(backend.createProject).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Proj' }));
+    await waitFor(() => expect(backend.selectProject).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    expect(backend.createProject).not.toHaveBeenCalled();
+  });
+
+  it('chooses an empty workspace then creates its first project', async () => {
+    const user = userEvent.setup();
+    const { backend, state } = journeyBackend();
+    state.projWs = null;
+    render(<ConversationPanel backend={backend} provisioning={backend} selection={backend} />);
+
+    async function openWorkspaceMenu() {
+      await screen.findByRole('button', { name: /select workspace/i });
+      await user.click(screen.getByRole('button', { name: /select workspace/i }));
+      await screen.findByRole('menuitem', { name: /create first project/i });
+    }
+
+    await openWorkspaceMenu();
+    expect(screen.queryByLabelText(/workspace name/i)).toBeNull();
+    await user.click(screen.getByRole('menuitem', { name: /create first project/i }));
+    await screen.findByText(/first project in/i);
+    expect(screen.queryByRole('button', { name: /select workspace/i })).toBeNull();
+
+    // Back out works too.
+    await user.click(screen.getByRole('button', { name: /all workspaces/i }));
+    await openWorkspaceMenu();
+    await user.click(screen.getByRole('menuitem', { name: /create first project/i }));
+    await user.type(screen.getByLabelText(/project name/i), 'Proj');
+    await user.click(screen.getByRole('button', { name: /create project/i }));
+    await waitFor(() => expect(backend.createProject).toHaveBeenCalledTimes(1));
+    expect(backend.createProject).toHaveBeenCalledWith(
+      'ws-9',
+      { name: 'Proj', storageKind: 'isolated' },
+      { requestId: expect.any(String) },
+    );
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+  });
+
   it('restores the selected scope across remount', async () => {
     const user = userEvent.setup();
     const { backend } = journeyBackend();
@@ -455,12 +536,14 @@ describe('WorkspaceSelection', () => {
       <WorkspaceSelection
         workspaces={[WS, { ...WS, workspaceId: 'ws-2', name: 'Other' }]}
         projectsBy={{ 'ws-1': [PROJ] }}
+        truncatedWorkspaces={false}
+        truncatedProjects={{}}
         activeWorkspaceId="ws-1"
         activeProjectId="proj-1"
         loading={false}
         listError={null}
         selectError={null}
-        onSelect={onSelect}
+        onSelectProject={onSelect}
       />,
     );
     await user.click(screen.getByRole('button', { name: /select workspace/i }));
@@ -469,5 +552,26 @@ describe('WorkspaceSelection', () => {
     expect(screen.getByText('No projects yet')).toBeDefined();
     await user.click(screen.getByRole('menuitem', { name: 'Proj' }));
     expect(onSelect).toHaveBeenCalledWith('ws-1', 'proj-1');
+  });
+
+  it('discloses truncated lists', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceSelection
+        workspaces={[WS]}
+        projectsBy={{ 'ws-1': [PROJ] }}
+        truncatedWorkspaces
+        truncatedProjects={{ 'ws-1': true }}
+        activeWorkspaceId={null}
+        activeProjectId={null}
+        loading={false}
+        listError={null}
+        selectError={null}
+        onSelectProject={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /select workspace/i }));
+    expect(screen.getByText('Showing first 100 workspaces')).toBeDefined();
+    expect(screen.getByText('Showing first 100 projects')).toBeDefined();
   });
 });

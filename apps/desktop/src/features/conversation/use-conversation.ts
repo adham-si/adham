@@ -12,6 +12,7 @@ import {
   removeStorage,
   sameScope,
   type PendingSend,
+  unresolvedSelectionMessage,
   writePendingSend,
   writeStorage,
 } from './conversation-identity';
@@ -329,13 +330,14 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     void bootstrap();
   }, [bootstrap]);
 
-  /// Re-run bootstrap after out-of-band provisioning (workspace/project
-  /// creation): drops the settled run so the fresh snapshot drives scope.
-  /// Sets a transitioning status so the old creation form cannot dispatch
-  /// again while the authoritative read is in flight. A read failure retries
-  /// the read, never a fresh creation.
+  /// Re-run bootstrap after an out-of-band scope change (creation or
+  /// selection): drops the settled run, bumps generation to discard
+  /// old-scope history, and clears pending session switches. A read failure
+  /// retries the read, never a fresh creation.
   const refreshScope = React.useCallback(() => {
     bootPromiseRef.current = null;
+    generationRef.current += 1;
+    requestedRef.current = null;
     setStatus('bootstrapping');
     setError(null);
     void bootstrap();
@@ -428,6 +430,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     async (text: string): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed) return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+      const selectionBlock = unresolvedSelectionMessage();
+      if (selectionBlock) return { ok: false, error: selectionBlock, uncertain: false };
       // Controller-boundary guard: overlapping submits are rejected before
       // any dispatch, not merely hidden by a later busy render. The guard
       // is acquired BEFORE the bootstrap await below, so two submits that

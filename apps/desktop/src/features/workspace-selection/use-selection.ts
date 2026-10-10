@@ -1,6 +1,12 @@
 import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
-import type { BootstrapState, ProjectSummary, WorkspaceSummary } from '@adham/contracts-generated';
+import type {
+  BootstrapState,
+  ProjectList,
+  ProjectSummary,
+  WorkspaceList,
+  WorkspaceSummary,
+} from '@adham/contracts-generated';
 import {
   announceScopeChanged,
   clearSelectIntent,
@@ -18,8 +24,8 @@ export interface SelectionBackend {
     activeWorkspaceId: string | null;
     activeProjectId: string | null;
   }>;
-  listWorkspaces(): Promise<WorkspaceSummary[]>;
-  listProjects(workspaceId: string): Promise<ProjectSummary[]>;
+  listWorkspaces(): Promise<WorkspaceList>;
+  listProjects(workspaceId: string): Promise<ProjectList>;
   selectProject(
     workspaceId: string,
     payload: { projectId: string },
@@ -50,6 +56,9 @@ export function useSelection({
 } = {}) {
   const [workspaces, setWorkspaces] = React.useState<WorkspaceSummary[]>([]);
   const [projectsBy, setProjectsBy] = React.useState<Record<string, ProjectSummary[]>>({});
+  const [truncatedWorkspaces, setTruncatedWorkspaces] = React.useState(false);
+  const [truncatedProjects, setTruncatedProjects] = React.useState<Record<string, boolean>>({});
+  const [failedProjectLists, setFailedProjectLists] = React.useState<string[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = React.useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = React.useState<string | null>(null);
   const [loaded, setLoaded] = React.useState(false);
@@ -72,17 +81,22 @@ export function useSelection({
       if (loadSeqRef.current !== seq) return;
       setActiveWorkspaceId(scope.activeWorkspaceId);
       setActiveProjectId(scope.activeProjectId);
-      setWorkspaces(found);
+      setWorkspaces(found.workspaces);
+      setTruncatedWorkspaces(found.truncated);
       const grouped: Record<string, ProjectSummary[]> = {};
+      const truncatedBy: Record<string, boolean> = {};
       const unreadable: string[] = [];
       await Promise.all(
-        found.map(async (ws) => {
+        found.workspaces.map(async (ws) => {
           try {
-            grouped[ws.workspaceId] = await backend.listProjects(ws.workspaceId);
+            const listed = await backend.listProjects(ws.workspaceId);
+            grouped[ws.workspaceId] = listed.projects;
+            truncatedBy[ws.workspaceId] = listed.truncated;
           } catch {
-            // Honest degradation: a failed workspace shows no projects AND
-            // raises the list error, never a silent empty.
+            // Honest degradation: a failed workspace contributes no
+            // projects AND is reported, never a silent empty.
             grouped[ws.workspaceId] = [];
+            truncatedBy[ws.workspaceId] = false;
             unreadable.push(ws.workspaceId);
           }
           if (loadSeqRef.current !== seq) return;
@@ -90,6 +104,8 @@ export function useSelection({
       );
       if (loadSeqRef.current !== seq) return;
       setProjectsBy(grouped);
+      setTruncatedProjects(truncatedBy);
+      setFailedProjectLists(unreadable);
       setListError(
         unreadable.length > 0 ? 'Some project lists failed to load. Retry to refresh.' : null,
       );
@@ -187,6 +203,9 @@ export function useSelection({
   return {
     workspaces,
     projectsBy,
+    truncatedWorkspaces,
+    truncatedProjects,
+    failedProjectLists,
     activeWorkspaceId,
     activeProjectId,
     hasRecords: workspaces.length > 0,

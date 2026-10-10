@@ -339,3 +339,12 @@ export function writeSelectIntent(intent: SelectIntent): boolean {
 export function clearSelectIntent(): void {
   removeStorage(SELECT_INTENT_KEY);
 }
+
+/// Definite send-block while a scope selection is unresolved: the send
+/// would otherwise use the old scope. Nothing is dispatched, so the block
+/// is definite, not uncertain. Returns the message, or null when sending
+/// may proceed.
+export function unresolvedSelectionMessage(): string | null {
+  if (!readSelectIntent()) return null;
+  return 'A workspace/project selection has unknown status. Retry it before sending.';
+}

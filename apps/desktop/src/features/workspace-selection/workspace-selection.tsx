@@ -6,6 +6,8 @@ import type { ProjectSummary, WorkspaceSummary } from '@adham/contracts-generate
 export interface WorkspaceSelectionProps {
   workspaces: WorkspaceSummary[];
   projectsBy: Record<string, ProjectSummary[]>;
+  truncatedWorkspaces: boolean;
+  truncatedProjects: Record<string, boolean>;
   activeWorkspaceId: string | null;
   activeProjectId: string | null;
   loading: boolean;
@@ -13,30 +15,42 @@ export interface WorkspaceSelectionProps {
   /** Held while a selection or creation is in flight. */
   disabled?: boolean | undefined;
   selectError: string | null;
-  onSelect: (workspaceId: string, projectId: string) => void;
+  onSelectProject: (workspaceId: string, projectId: string) => void;
+  /** Offered only for workspaces without projects: choose the workspace so
+   * its first project can be created. Omitted surfaces keep the honest
+   * "no projects" text instead. */
+  onChooseWorkspace?: ((workspaceId: string) => void) | undefined;
   onRetryLists?: (() => void) | undefined;
 }
 
-function encodeValue(workspaceId: string, projectId: string): string {
+function projectValue(workspaceId: string, projectId: string): string {
   return `${workspaceId}:${projectId}`;
+}
+
+function workspaceValue(workspaceId: string): string {
+  return `ws:${workspaceId}`;
 }
 
 /**
  * Deliberate discovery UI: existing workspaces with their projects, one
- * Menu surface. Selecting dispatches nothing by itself — the container's
- * `onSelect` runs the frozen-intent selection. Reused in the sidebar
- * header and the first-run selection slot: one design, two placements.
+ * Menu surface. Choosing dispatches nothing by itself — the container runs
+ * the frozen-intent selection (project) or advances to first-project
+ * creation (workspace). Reused in the sidebar header and the first-run
+ * selection slot: one design, two placements.
  */
 export function WorkspaceSelection({
   workspaces,
   projectsBy,
+  truncatedWorkspaces,
+  truncatedProjects,
   activeWorkspaceId,
   activeProjectId,
   loading,
   listError,
   disabled = false,
   selectError,
-  onSelect,
+  onSelectProject,
+  onChooseWorkspace,
   onRetryLists,
 }: WorkspaceSelectionProps) {
   const { t } = useTranslation();
@@ -55,11 +69,15 @@ export function WorkspaceSelection({
 
   const handleSelect = React.useCallback(
     (value: string) => {
+      if (value.startsWith('ws:')) {
+        onChooseWorkspace?.(value.slice(3));
+        return;
+      }
       const sep = value.indexOf(':');
       if (sep <= 0) return;
-      onSelect(value.slice(0, sep), value.slice(sep + 1));
+      onSelectProject(value.slice(0, sep), value.slice(sep + 1));
     },
-    [onSelect],
+    [onChooseWorkspace, onSelectProject],
   );
 
   if (!loading && workspaces.length === 0 && !listError) {
@@ -86,25 +104,44 @@ export function WorkspaceSelection({
           </span>
         </MenuTrigger>
         <MenuContent label={t('selectScope', 'Select workspace / project')} onSelect={handleSelect}>
-          {workspaces.map((ws) => (
-            <MenuGroup key={ws.workspaceId} label={ws.name}>
-              {(projectsBy[ws.workspaceId] ?? []).map((proj: ProjectSummary) => (
-                <MenuItem
-                  key={proj.projectId}
-                  value={encodeValue(ws.workspaceId, proj.projectId)}
-                  active={proj.projectId === activeProjectId}
-                  disabled={disabled}
-                >
-                  {proj.name}
-                </MenuItem>
-              ))}
-              {(projectsBy[ws.workspaceId] ?? []).length === 0 && !loading ? (
-                <p className="px-3 py-1 text-xs text-foreground-muted">
-                  {t('noProjects', 'No projects yet')}
-                </p>
-              ) : null}
-            </MenuGroup>
-          ))}
+          {workspaces.map((ws) => {
+            const projects = projectsBy[ws.workspaceId] ?? [];
+            return (
+              <MenuGroup key={ws.workspaceId} label={ws.name}>
+                {projects.map((proj: ProjectSummary) => (
+                  <MenuItem
+                    key={proj.projectId}
+                    value={projectValue(ws.workspaceId, proj.projectId)}
+                    active={proj.projectId === activeProjectId}
+                    disabled={disabled}
+                  >
+                    {proj.name}
+                  </MenuItem>
+                ))}
+                {projects.length === 0 && !loading ? (
+                  onChooseWorkspace ? (
+                    <MenuItem value={workspaceValue(ws.workspaceId)} disabled={disabled}>
+                      {t('createFirstProject', 'Create first project…')}
+                    </MenuItem>
+                  ) : (
+                    <p className="px-3 py-1 text-xs text-foreground-muted">
+                      {t('noProjects', 'No projects yet')}
+                    </p>
+                  )
+                ) : null}
+                {truncatedProjects[ws.workspaceId] ? (
+                  <p className="px-3 py-1 text-xs text-foreground-muted">
+                    {t('truncatedProjects', 'Showing first 100 projects')}
+                  </p>
+                ) : null}
+              </MenuGroup>
+            );
+          })}
+          {truncatedWorkspaces ? (
+            <p className="px-3 py-1 text-xs text-foreground-muted">
+              {t('truncatedWorkspaces', 'Showing first 100 workspaces')}
+            </p>
+          ) : null}
         </MenuContent>
       </MenuRoot>
       {listError ? (

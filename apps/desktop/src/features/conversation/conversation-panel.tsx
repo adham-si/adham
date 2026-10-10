@@ -73,6 +73,13 @@ export function ConversationPanel({
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
   const refreshScope = conv.refreshScope;
   const sel = useSelection({ backend: selection, enabled: needsProvisioning });
+  /// Workspace chosen for its first project (an existing workspace without
+  /// projects). Project creation binds to it; the workspace itself is never
+  /// recreated. Cleared once authoritative scope is ready.
+  const [chosenWorkspaceId, setChosenWorkspaceId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (conv.status === 'ready') setChosenWorkspaceId(null);
+  }, [conv.status]);
 
   // A confirmed scope change (creation or selection, from any surface)
   // advances through the authoritative bootstrap. The announced step is
@@ -94,22 +101,21 @@ export function ConversationPanel({
   const handleProvision = React.useCallback(
     async (name: string) => {
       if (prov.working || provisionTransition) return;
-      if (conv.status === 'needs-workspace') {
+      if (conv.status === 'needs-workspace' && chosenWorkspaceId === null) {
         const outcome = await prov.createWorkspace(name);
         // The announcement carries the confirmed step and triggers the
         // single authoritative refresh; failures stay local.
         if (outcome.ok) announceScopeChanged('workspace', 'created');
-      } else if (conv.status === 'needs-project') {
-        // Authoritative selection only: never prefer a stale local ID and
-        // never transfer a frozen project intent into another scope (the
-        // hook blocks cross-scope reuse).
-        const wsId = conv.activeWorkspaceId;
+      } else {
+        // Project step, or a workspace chosen for its first project: bind
+        // creation to the chosen workspace, never recreate it.
+        const wsId = chosenWorkspaceId ?? conv.activeWorkspaceId;
         if (!wsId) return;
         const outcome = await prov.createProject(name, wsId);
         if (outcome.ok) announceScopeChanged('project', 'created');
       }
     },
-    [conv, prov, provisionTransition],
+    [chosenWorkspaceId, conv, prov, provisionTransition],
   );
 
   const handleSelect = React.useCallback(
@@ -200,13 +206,15 @@ export function ConversationPanel({
                 key={step}
                 workspaces={sel.workspaces}
                 projectsBy={sel.projectsBy}
+                truncatedWorkspaces={false}
+                truncatedProjects={{}}
                 activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
                 activeProjectId={sel.activeProjectId}
                 loading={false}
                 listError={null}
                 disabled
                 selectError={null}
-                onSelect={() => {}}
+                onSelectProject={() => {}}
               />
             </div>
           </div>
@@ -226,11 +234,16 @@ export function ConversationPanel({
     }
     // Existing records are offered for selection first; provisioning owns
     // only the genuinely empty step — never automatic recreation. The check
-    // is per step: a workspace without projects still provisions its project.
+    // is per step: a workspace without projects still provisions its project,
+    // and a project step with projects anywhere offers switching.
+    const totalProjects = Object.values(sel.projectsBy).reduce((n, ps) => n + ps.length, 0);
     const stepHasRecords =
-      conv.status === 'needs-workspace'
-        ? sel.workspaces.length > 0
-        : (sel.projectsBy[conv.activeWorkspaceId ?? ''] ?? []).length > 0;
+      conv.status === 'needs-workspace' ? sel.workspaces.length > 0 : totalProjects > 0;
+    // A failed project list for the active workspace is not empty: offer a
+    // read-only retry, never the creation form.
+    const activeProjectsFailed =
+      conv.status === 'needs-project' &&
+      sel.failedProjectLists.includes(conv.activeWorkspaceId ?? '');
     if (sel.loading && !sel.loaded) {
       return (
         <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
@@ -240,7 +253,41 @@ export function ConversationPanel({
     }
     // A failed first load offers a read-only retry — never the creation
     // form, which would invite duplicate creation for existing records.
-    if (stepHasRecords || (sel.listError && !sel.loaded)) {
+    // A workspace chosen for its first project provisions that project here,
+    // bound to the chosen workspace. Checked before the selection list so
+    // the choice is honored. The key resets the name field so the workspace
+    // text never bleeds into the project name.
+    if (chosenWorkspaceId !== null) {
+      const chosenProjects = sel.projectsBy[chosenWorkspaceId] ?? [];
+      if (chosenProjects.length === 0) {
+        const chosenName =
+          sel.workspaces.find((w) => w.workspaceId === chosenWorkspaceId)?.name ?? '';
+        return (
+          <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+            <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+              <p className="text-sm text-foreground-muted">
+                {t('firstProjectIn', 'First project in {{name}}', { name: chosenName })}
+              </p>
+              <ProvisioningForm
+                key={`project:${chosenWorkspaceId}`}
+                step="project"
+                working={formWorking}
+                error={prov.error}
+                onSubmit={(name) => void handleProvision(name)}
+              />
+              <button
+                type="button"
+                onClick={() => setChosenWorkspaceId(null)}
+                className="text-sm underline"
+              >
+                {t('allWorkspaces', 'All workspaces')}
+              </button>
+            </div>
+          </div>
+        );
+      }
+    }
+    if (stepHasRecords || activeProjectsFailed || (sel.listError && !sel.loaded)) {
       return (
         <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
           <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
@@ -248,13 +295,16 @@ export function ConversationPanel({
               key={step}
               workspaces={sel.workspaces}
               projectsBy={sel.projectsBy}
+              truncatedWorkspaces={sel.truncatedWorkspaces}
+              truncatedProjects={sel.truncatedProjects}
               activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
               activeProjectId={sel.activeProjectId}
               loading={sel.loading}
               listError={sel.listError}
               disabled={formWorking}
               selectError={sel.error}
-              onSelect={(wsId, projId) => void handleSelect(wsId, projId)}
+              onSelectProject={(wsId, projId) => void handleSelect(wsId, projId)}
+              onChooseWorkspace={setChosenWorkspaceId}
               onRetryLists={() => void sel.refresh()}
             />
           </div>
