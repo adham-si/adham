@@ -6,11 +6,11 @@ pub async fn handle_get_bootstrap_state(ctx: &super::ApiContext) -> Result<Boots
     // active workspace/project written by creation commands. History is
     // never mined for an active scope — the earliest workspace event has
     // no project and must not stand in for one.
-    let record = adham_event_log::load_or_create_installation(&ctx.pool)
+    let init = adham_event_log::load_or_create_installation(&ctx.pool)
         .await
         .map_err(|e| e.to_string())?;
-    let active_workspace_id = record.active_workspace_id.map(|w| w.to_string());
-    let active_project_id = record.active_project_id.map(|p| p.to_string());
+    let active_workspace_id = init.record.active_workspace_id.map(|w| w.to_string());
+    let active_project_id = init.record.active_project_id.map(|p| p.to_string());
     Ok(BootstrapState {
         is_initialized: active_workspace_id.is_some(),
         active_workspace_id,
