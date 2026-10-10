@@ -4,6 +4,33 @@ import type { PlatformInfo, PlatformLayoutConfig, PlatformOs, PlatformStatus } f
 
 let testPlatformOverride: PlatformOs | null = null;
 let testArchOverride: string | null = null;
+let testAmbientIsMacOverride: boolean | null = null;
+
+/**
+ * Configure ambient macOS detection override for tests.
+ * Pass `null` to reset to browser/navigator ambient check.
+ */
+export function setAmbientForTesting(isMac: boolean | null): void {
+  testAmbientIsMacOverride = isMac;
+}
+
+export function detectAmbientIsMac(): boolean {
+  if (testAmbientIsMacOverride !== null) {
+    return testAmbientIsMacOverride;
+  }
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return false;
+  }
+  const navAny = navigator as unknown as { userAgentData?: { platform?: string } };
+  const platformHint = navAny.userAgentData?.platform?.toLowerCase();
+  if (platformHint && platformHint.includes('mac')) return true;
+
+  const navPlatform = (navigator.platform || '').toLowerCase();
+  if (navPlatform.includes('mac')) return true;
+
+  const userAgent = (navigator.userAgent || '').toLowerCase();
+  return userAgent.includes('macintosh') || userAgent.includes('mac os');
+}
 
 /**
  * Configure a test override for platform detection.
@@ -38,14 +65,22 @@ export function createPlatformInfo(
   status: PlatformStatus = 'resolved',
   error?: Error | null,
 ): PlatformInfo {
+  // Collision-safe clearance: When host is ambient macOS and platform is still loading
+  // or in error/unknown state, ensure traffic-light clearance is preserved to prevent
+  // toolbar items from colliding with native overlay controls.
+  const isAmbientMac = testPlatformOverride === null && detectAmbientIsMac();
+  const isMac = os === 'macos' || (os === 'unknown' && isAmbientMac);
+  const isWindows = os === 'windows';
+  const isLinux = os === 'linux';
+
   return {
     os,
     arch,
     status,
-    isMac: os === 'macos',
-    isWindows: os === 'windows',
-    isLinux: os === 'linux',
-    layout: getLayoutConfig(os),
+    isMac,
+    isWindows,
+    isLinux,
+    layout: getLayoutConfig(isMac ? 'macos' : os),
     error: error ?? null,
   };
 }

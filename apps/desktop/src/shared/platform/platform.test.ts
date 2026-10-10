@@ -6,16 +6,20 @@ import {
   isWindows,
   isLinux,
   setPlatformForTesting,
+  setAmbientForTesting,
   getLayoutConfig,
+  createPlatformInfo,
 } from './platform';
 
 describe('Platform Abstraction Layer', () => {
   beforeEach(() => {
     setPlatformForTesting(null);
+    setAmbientForTesting(null);
   });
 
   afterEach(() => {
     setPlatformForTesting(null);
+    setAmbientForTesting(null);
   });
 
   describe('Explicit Platform Overrides', () => {
@@ -142,6 +146,43 @@ describe('Platform Abstraction Layer', () => {
       expect(config.showCustomCaptionControls).toBe(false);
       expect(config.hasNativeTitlebarControls).toBe(false);
       expect(config.trafficLightClearanceClass).toBe('');
+    });
+  });
+
+  describe('Collision-Safe Toolbar Loading and Error States', () => {
+    it('applies collision-safe traffic-light clearance during loading state on macOS host', () => {
+      setAmbientForTesting(true);
+      const info = resolvePlatform();
+
+      expect(info.status).toBe('loading');
+      expect(info.isMac).toBe(true);
+      expect(info.layout.hasNativeTitlebarControls).toBe(true);
+      expect(info.layout.trafficLightClearanceClass).toBe('pl-20');
+      expect(info.layout.showCustomCaptionControls).toBe(false);
+    });
+
+    it('maintains collision-safe traffic-light clearance during error state on macOS host', () => {
+      setAmbientForTesting(true);
+      const testError = new Error('IPC timeout');
+      const info = createPlatformInfo('unknown', '', 'error', testError);
+
+      expect(info.status).toBe('error');
+      expect(info.error).toBe(testError);
+      expect(info.isMac).toBe(true);
+      expect(info.layout.hasNativeTitlebarControls).toBe(true);
+      expect(info.layout.trafficLightClearanceClass).toBe('pl-20');
+      expect(info.layout.showCustomCaptionControls).toBe(false);
+    });
+
+    it('suppresses both traffic-light clearance and custom captions during loading state on non-macOS host', () => {
+      setAmbientForTesting(false);
+      const info = resolvePlatform();
+
+      expect(info.status).toBe('loading');
+      expect(info.isMac).toBe(false);
+      expect(info.layout.hasNativeTitlebarControls).toBe(false);
+      expect(info.layout.trafficLightClearanceClass).toBe('');
+      expect(info.layout.showCustomCaptionControls).toBe(false);
     });
   });
 });

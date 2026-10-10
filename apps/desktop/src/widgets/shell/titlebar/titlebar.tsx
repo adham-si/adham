@@ -184,7 +184,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
               <MenuItem value="reload">Reload Window</MenuItem>
               <MenuItem value="minimize">Minimize</MenuItem>
               <MenuItem value="maximize">{isMaximized ? 'Restore' : 'Maximize'}</MenuItem>
-              <MenuItem value="close">Exit</MenuItem>
+              <MenuItem value="close">Close Window</MenuItem>
             </MenuContent>
           </MenuRoot>
         </div>

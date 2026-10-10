@@ -1,9 +1,9 @@
 import * as React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { ShellLayoutProvider } from '../context';
 import { Titlebar } from './titlebar';
-import { setPlatformForTesting } from '@/shared/platform';
+import { setPlatformForTesting, setAmbientForTesting } from '@/shared/platform';
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return <ShellLayoutProvider>{children}</ShellLayoutProvider>;
@@ -12,10 +12,12 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('Titlebar Platform-Chrome Adaptation', () => {
   beforeEach(() => {
     setPlatformForTesting(null);
+    setAmbientForTesting(null);
   });
 
   afterEach(() => {
     setPlatformForTesting(null);
+    setAmbientForTesting(null);
   });
 
   describe('macOS Chrome Behavior', () => {
@@ -92,9 +94,23 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       expect(screen.getByRole('button', { name: /primary sidebar/i })).not.toBeNull();
       expect(screen.getByRole('button', { name: /navigation rail/i })).not.toBeNull();
     });
+
+    it('uses truthful "Close Window" labeling in actions menu instead of "Exit"', () => {
+      render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const actionsBtn = screen.getByRole('button', { name: /actions/i });
+      fireEvent.click(actionsBtn);
+
+      expect(screen.getByRole('menuitem', { name: 'Close Window' })).not.toBeNull();
+      expect(screen.queryByRole('menuitem', { name: 'Exit' })).toBeNull();
+    });
   });
 
-  describe('Windows Chrome Behavior', () => {
+  describe('Windows Chrome Component Behavior (DOM)', () => {
     beforeEach(() => {
       setPlatformForTesting('windows');
     });
@@ -185,6 +201,46 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       const dragRegion = container.querySelector('div[data-tauri-drag-region]');
       expect(dragRegion).not.toBeNull();
       expect(dragRegion?.classList.contains('flex-1')).toBe(true);
+    });
+  });
+
+  describe('Collision-Safe Toolbar Loading and Error States (Component Tests)', () => {
+    it('preserves collision-safe traffic-light clearance during ambient macOS loading state', () => {
+      setAmbientForTesting(true);
+      setPlatformForTesting(null);
+
+      const { container } = render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const header = container.querySelector('header');
+      expect(header).not.toBeNull();
+      expect(header?.classList.contains('pl-20')).toBe(true);
+
+      // Custom caption controls remain suppressed
+      expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    });
+
+    it('suppresses both traffic-light clearance and custom captions during non-macOS loading state', () => {
+      setAmbientForTesting(false);
+      setPlatformForTesting(null);
+
+      const { container } = render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const header = container.querySelector('header');
+      expect(header).not.toBeNull();
+      expect(header?.classList.contains('pl-20')).toBe(false);
+
+      // Custom caption controls remain suppressed during loading
+      expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
     });
   });
 });
