@@ -95,4 +95,78 @@ describe('useConversation scope-change guards', () => {
       expect.objectContaining({ id: 'msg-new', text: 'new scope words' }),
     ]);
   });
+
+  it('blocks sending while a scope refresh is unresolved', async () => {
+    const backend = fakeBackend();
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let resolveBootstrap!: (value: unknown) => void;
+    backend.getBootstrapState.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveBootstrap = resolve as (value: unknown) => void;
+        }),
+    );
+    await act(async () => {
+      result.current.refreshScope();
+    });
+    let blocked: unknown;
+    await act(async () => {
+      blocked = await result.current.submit('hello');
+    });
+    expect(blocked).toEqual({
+      ok: false,
+      uncertain: false,
+      error: expect.stringMatching(/scope is changing/i),
+    });
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveBootstrap({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-1',
+        activeProjectId: 'proj-1',
+      });
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hello');
+    });
+    expect(outcome).toEqual({ ok: true });
+    expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps sending blocked after a failed scope refresh until resolve', async () => {
+    const backend = fakeBackend();
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    backend.getBootstrapState.mockRejectedValueOnce(new Error('read outage'));
+    await act(async () => {
+      result.current.refreshScope();
+    });
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    let blocked: unknown;
+    await act(async () => {
+      blocked = await result.current.submit('hello');
+    });
+    expect(blocked).toEqual({
+      ok: false,
+      uncertain: false,
+      error: expect.stringMatching(/scope is changing/i),
+    });
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      result.current.refreshScope();
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hello');
+    });
+    expect(outcome).toEqual({ ok: true });
+  });
 });

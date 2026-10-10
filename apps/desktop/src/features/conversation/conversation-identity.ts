@@ -280,18 +280,32 @@ export const writeProjectIntent = (intent: ProvisionIntent): boolean =>
 export const clearProjectIntent = (): void => removeStorage(PROVISION_PROJ_KEY);
 
 /// Window event announcing a confirmed scope change (creation or
-/// selection). Carries the confirmed step so the conversation surface can
-/// hold exactly that step until authoritative bootstrap advances. The
-/// conversation surface refreshes its scope on it and selection lists
-/// re-read on it. Failures never dispatch it.
+/// selection). Carries the confirmed step and, when known, the confirmed
+/// scope IDs so every surface synchronizes without re-reading. The
+/// conversation surface refreshes its authoritative scope on it and
+/// selection lists re-read on creation. Failures never dispatch it.
 export const SCOPE_CHANGED_EVENT = 'adham:scope-changed';
+
+export interface ScopeChangedDetail {
+  step: 'workspace' | 'project';
+  origin: 'created' | 'selected';
+  workspaceId: string | null;
+  projectId: string | null;
+}
 
 export function announceScopeChanged(
   step: 'workspace' | 'project' = 'project',
   origin: 'created' | 'selected' = 'selected',
+  scope: { workspaceId: string | null; projectId: string | null } | null = null,
 ): void {
   try {
-    window.dispatchEvent(new CustomEvent(SCOPE_CHANGED_EVENT, { detail: { step, origin } }));
+    const detail: ScopeChangedDetail = {
+      step,
+      origin,
+      workspaceId: scope?.workspaceId ?? null,
+      projectId: scope?.projectId ?? null,
+    };
+    window.dispatchEvent(new CustomEvent(SCOPE_CHANGED_EVENT, { detail }));
   } catch {
     // ignore
   }
@@ -347,4 +361,14 @@ export function clearSelectIntent(): void {
 export function unresolvedSelectionMessage(): string | null {
   if (!readSelectIntent()) return null;
   return 'A workspace/project selection has unknown status. Retry it before sending.';
+}
+
+/// First applicable definite pre-send block: unresolved selection, then a
+/// confirmed-but-unresolved scope change (creation/selection whose bootstrap
+/// is still pending or failed). Both protect the retained old-scope context.
+export function sendBlockedReason(scopeStale: boolean): string | null {
+  return (
+    unresolvedSelectionMessage() ??
+    (scopeStale ? 'Scope is changing. Wait for the new conversation scope before sending.' : null)
+  );
 }
