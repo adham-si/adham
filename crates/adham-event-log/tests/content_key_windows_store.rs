@@ -66,7 +66,10 @@ fn initialize_creates_once_reads_stable_and_never_overwrites() {
 #[test]
 fn missing_key_fails_closed_without_mint() {
     let (provider, account) = provider_for("no-mint");
-    let err = provider.content_key().expect_err("must fail closed");
+    let err = match provider.content_key() {
+        Ok(_) => panic!("must fail closed"),
+        Err(e) => e,
+    };
     match &err {
         DomainError::Storage(msg) => {
             assert!(
@@ -94,22 +97,26 @@ fn corrupt_key_is_integrity_error_and_not_overwritten() {
         .set_password("zzzz-not-a-valid-key")
         .expect("seed corrupt");
 
-    let read_err = _provider.content_key().expect_err("corrupt must fail");
+    let read_err = match _provider.content_key() {
+        Ok(_) => panic!("corrupt must fail"),
+        Err(e) => e,
+    };
     assert!(
         matches!(read_err, DomainError::Integrity(_)),
         "{read_err:?}"
     );
 
-    let init_err = _provider
-        .initialize_content_key()
-        .expect_err("init must refuse to overwrite");
+    let init_err = match _provider.initialize_content_key() {
+        Ok(_) => panic!("init must refuse to overwrite"),
+        Err(e) => e,
+    };
     assert!(
         matches!(init_err, DomainError::Integrity(_)),
         "{init_err:?}"
     );
-    assert_eq!(
-        entry.get_password().expect("still present"),
-        "zzzz-not-a-valid-key",
+    let stored = entry.get_password().expect("still present");
+    assert!(
+        stored == "zzzz-not-a-valid-key",
         "corrupt value must not be silently reset"
     );
     delete_credential(&account);

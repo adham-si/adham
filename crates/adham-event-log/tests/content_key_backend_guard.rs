@@ -25,7 +25,10 @@ fn ensure_persistent_backend_rejects_mock_store() {
 fn content_key_on_mock_store_never_mints() {
     install_mock_backend();
     let provider = OsKeyringProvider::new("adham-audit04-guard-test", "missing-account");
-    let err = provider.content_key().expect_err("must fail closed");
+    let err = match provider.content_key() {
+        Ok(_) => panic!("must fail closed"),
+        Err(e) => e,
+    };
     let msg = err.to_string();
     assert!(
         msg.contains("content key missing from credential store")
@@ -38,9 +41,10 @@ fn content_key_on_mock_store_never_mints() {
 fn initialize_on_mock_store_fails_read_back_verification() {
     install_mock_backend();
     let provider = OsKeyringProvider::new("adham-audit04-guard-test", "readback-account");
-    let err = provider
-        .initialize_content_key()
-        .expect_err("entry-scoped store cannot pass read-back verify");
+    let err = match provider.initialize_content_key() {
+        Ok(_) => panic!("entry-scoped store cannot pass read-back verify"),
+        Err(e) => e,
+    };
     let msg = err.to_string();
     assert!(msg.contains("did not persist"), "unexpected error: {msg}");
 }
