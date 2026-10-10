@@ -87,7 +87,8 @@ pub fn run() {
         .with_env_filter("info,sqlx=warn")
         .try_init();
 
-    let storage_policy = adham_platform::PlatformStoragePolicy::resolve();
+    let storage_policy = adham_platform::PlatformStoragePolicy::resolve()
+        .expect("Failed to initialize storage directories: platform data dir missing or invalid");
     storage_policy
         .ensure_directories()
         .expect("Failed to initialize storage directories");
