@@ -11,6 +11,7 @@ import {
   removePendingSend,
   removeStorage,
   sameScope,
+  sendBlockedReason,
   type PendingSend,
   writePendingSend,
   writeStorage,
@@ -133,6 +134,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // only superseded by a newer request. Retries and reloads target the
   // requested session, never silently the previous one.
   const requestedRef = React.useRef<ConversationContext | null>(null);
+  // Stale-scope latch: set by refreshScope, cleared only when a fresh
+  // bootstrap resolves to ready. While latched, sends are refused.
+  const scopeStaleRef = React.useRef(false);
   // Controller-boundary submit guard: overlapping submits are rejected
   // before any dispatch, not merely hidden by a later busy render. Held
   // across the bootstrap await so two early submits cannot both proceed.
@@ -168,6 +172,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setMessages(items);
         setError(null);
         setStatus('ready');
+        scopeStaleRef.current = false;
         return items;
       } catch (err) {
         if (
@@ -329,13 +334,15 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     void bootstrap();
   }, [bootstrap]);
 
-  /// Re-run bootstrap after out-of-band provisioning (workspace/project
-  /// creation): drops the settled run so the fresh snapshot drives scope.
-  /// Sets a transitioning status so the old creation form cannot dispatch
-  /// again while the authoritative read is in flight. A read failure retries
-  /// the read, never a fresh creation.
+  /// Re-run bootstrap after an out-of-band scope change (creation or
+  /// selection): drops the settled run, bumps generation to discard
+  /// old-scope history, and clears pending session switches. A read failure
+  /// retries the read, never a fresh creation.
   const refreshScope = React.useCallback(() => {
     bootPromiseRef.current = null;
+    generationRef.current += 1;
+    requestedRef.current = null;
+    scopeStaleRef.current = true;
     setStatus('bootstrapping');
     setError(null);
     void bootstrap();
@@ -428,6 +435,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     async (text: string): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed) return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+      const blocked = sendBlockedReason(scopeStaleRef.current);
+      if (blocked) return { ok: false, error: blocked, uncertain: false };
       // Controller-boundary guard: overlapping submits are rejected before
       // any dispatch, not merely hidden by a later busy render. The guard
       // is acquired BEFORE the bootstrap await below, so two submits that

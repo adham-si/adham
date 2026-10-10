@@ -75,6 +75,9 @@ Business decisions may occur only below the Tauri command adapter.
 | `submit_message` | Yes | Workspace + project + session | Submitted message summary |
 | `get_conversation` | No | Workspace + project + session | Paginated conversation |
 | `get_storage_status` | No | Installation | Safe readiness/repair state |
+| `list_workspaces` | No | Installation | Workspace summaries, creation order, clamped to 100 with `truncated` disclosure |
+| `list_projects` | No | Workspace (`CommandContext.workspace_id` required) | Project summaries of one workspace, creation order, clamped to 100 with `truncated` disclosure |
+| `select_project` | Yes (scope state only, no event) | Workspace (context) + `SelectProjectPayload.project_id` | Updated bootstrap state; receipt-backed idempotency under its own `select_project` fingerprint domain |
 
 Not exposed:
 

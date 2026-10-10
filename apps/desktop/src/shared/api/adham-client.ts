@@ -6,21 +6,26 @@ import type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  ProjectList,
   PlatformInfo,
   ProjectSummary,
+  SelectProjectPayload,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
+  WorkspaceList,
   WorkspaceSummary,
 } from '@adham/contracts-generated';
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
+  ProjectListSchema,
   PlatformInfoSchema,
   ProjectSummarySchema,
   SessionSummarySchema,
   StorageStatusSchema,
   SubmittedMessageSchema,
+  WorkspaceListSchema,
   WorkspaceSummarySchema,
 } from './schemas';
 
@@ -68,6 +73,13 @@ export interface AdhamClient {
     payload: { name: string; storageKind: string },
     options?: { requestId?: string },
   ): Promise<ProjectSummary>;
+  listWorkspaces(): Promise<WorkspaceList>;
+  listProjects(workspaceId: string): Promise<ProjectList>;
+  selectProject(
+    workspaceId: string,
+    payload: SelectProjectPayload,
+    options?: { requestId?: string },
+  ): Promise<BootstrapState>;
   createSession(
     workspaceId: string,
     projectId: string,
@@ -148,6 +160,42 @@ export class AdhamApiClient implements AdhamClient {
       request: envelope,
     });
     return ProjectSummarySchema.parse(result.data);
+  }
+
+  async listWorkspaces(): Promise<WorkspaceList> {
+    const raw = await invoke('list_workspaces');
+    return WorkspaceListSchema.parse(raw);
+  }
+
+  async listProjects(workspaceId: string): Promise<ProjectList> {
+    const raw = await invoke('list_projects', {
+      context: {
+        workspaceId,
+        projectId: null,
+        sessionId: null,
+      },
+    });
+    return ProjectListSchema.parse(raw);
+  }
+
+  async selectProject(
+    workspaceId: string,
+    payload: SelectProjectPayload,
+    options?: { requestId?: string },
+  ): Promise<BootstrapState> {
+    const envelope = this.wrapCommand(
+      payload,
+      {
+        workspaceId,
+        projectId: null,
+        sessionId: null,
+      },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<BootstrapState>>('select_project', {
+      request: envelope,
+    });
+    return BootstrapStateSchema.parse(result.data);
   }
 
   async createSession(

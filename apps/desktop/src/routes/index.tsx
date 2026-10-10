@@ -1,6 +1,9 @@
+import * as React from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { Shell, Context, Titlebar, NavRail, Sidebar, Panel } from '@/widgets/shell';
 import { ConversationPanel } from '@/features/conversation/conversation-panel';
+import { useSelection } from '@/features/workspace-selection/use-selection';
+import { WorkspaceSelection } from '@/features/workspace-selection/workspace-selection';
 import { SettingsPage } from '@/pages/settings';
 
 export const Route = createFileRoute('/')({
@@ -8,11 +11,37 @@ export const Route = createFileRoute('/')({
 });
 
 function IndexComponent() {
+  // Sidebar discovery owns its own read lifecycle; a confirmed selection
+  // announces scope-changed for the conversation surface to follow.
+  const sel = useSelection();
+  const handleSelectProject = React.useCallback(
+    (workspaceId: string, projectId: string) => {
+      void sel.select(workspaceId, projectId);
+    },
+    [sel],
+  );
+  const selectionMenu = (
+    <WorkspaceSelection
+      workspaces={sel.workspaces}
+      projectsBy={sel.projectsBy}
+      truncatedWorkspaces={sel.truncatedWorkspaces}
+      truncatedProjects={sel.truncatedProjects}
+      failedWorkspaces={sel.failedProjectLists}
+      activeWorkspaceId={sel.activeWorkspaceId}
+      activeProjectId={sel.activeProjectId}
+      loading={sel.loading}
+      listError={sel.listError}
+      disabled={sel.working}
+      selectError={sel.error}
+      onSelectProject={handleSelectProject}
+      onRetryLists={() => void sel.refresh()}
+    />
+  );
   return (
     <Shell
       titlebar={<Titlebar />}
       navRail={<NavRail />}
-      sidebar={<Sidebar />}
+      sidebar={<Sidebar primaryProps={{ selectionMenu }} />}
       panel={<Panel />}
       overlays={<SettingsPage />}
     >

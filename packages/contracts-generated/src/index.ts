@@ -45,6 +45,12 @@ export type CreateProjectPayload = { name: string, storageKind: string, };
 
 export type ProjectSummary = { projectId: string, workspaceId: string, name: string, storageKind: string, createdAt: string, };
 
+export type SelectProjectPayload = { projectId: string, };
+
+export type WorkspaceList = { workspaces: Array<WorkspaceSummary>, truncated: boolean, };
+
+export type ProjectList = { workspaceId: string, projects: Array<ProjectSummary>, truncated: boolean, };
+
 export type CreateSessionPayload = { title: string | null, };
 
 export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, };
