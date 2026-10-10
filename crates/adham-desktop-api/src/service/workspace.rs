@@ -23,6 +23,25 @@ fn replay(
     }
 }
 
+/// P0 wire values. `kind`/`storage_kind` are validated, never normalized:
+/// an unsupported value is rejected rather than renamed.
+const WORKSPACE_KIND_PERSONAL: &str = "personal";
+const PROJECT_STORAGE_ISOLATED: &str = "isolated";
+/// P0 boundary: names are limited to 120 Unicode scalar values.
+const MAX_NAME_CHARS: usize = 120;
+
+fn validate_name(field: &str, name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err(format!("VALIDATION_FAILED: {field} name must not be empty"));
+    }
+    if name.chars().count() > MAX_NAME_CHARS {
+        return Err(format!(
+            "VALIDATION_FAILED: {field} name exceeds {MAX_NAME_CHARS} characters"
+        ));
+    }
+    Ok(())
+}
+
 fn replay_project(
     request_id: String,
     receipt: adham_event_log::CommandReceiptRecord,
@@ -48,6 +67,10 @@ pub async fn create_workspace(
     let trimmed = env.payload.name.trim().to_string();
     let request_id = RequestId::from_client_str(&env.request_id)
         .map_err(|_| "VALIDATION_FAILED: request_id must be UUID".to_string())?;
+    validate_name("workspace", &trimmed)?;
+    if env.payload.kind != WORKSPACE_KIND_PERSONAL {
+        return Err("VALIDATION_FAILED: unsupported workspace kind".to_string());
+    }
     let request_fp = adham_event_log::request_fingerprint("create_workspace", 1, &trimmed);
     let scope_fp = adham_event_log::scope_fingerprint(
         "create_workspace",
@@ -209,6 +232,10 @@ pub async fn create_project(
     .map_err(|e| e.to_string())?;
     let request_id = RequestId::from_client_str(&env.request_id)
         .map_err(|_| "VALIDATION_FAILED: request_id must be UUID".to_string())?;
+    validate_name("project", &trimmed)?;
+    if env.payload.storage_kind != PROJECT_STORAGE_ISOLATED {
+        return Err("VALIDATION_FAILED: unsupported project storage kind".to_string());
+    }
     let request_fp = adham_event_log::request_fingerprint("create_project", 1, &trimmed);
     let scope_fp = adham_event_log::scope_fingerprint(
         "create_project",

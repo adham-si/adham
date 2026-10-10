@@ -25,7 +25,13 @@ export interface UiMessage {
   createdAt: string;
 }
 
-export type ConversationStatus = 'bootstrapping' | 'ready' | 'submitting' | 'error';
+export type ConversationStatus =
+  | 'bootstrapping'
+  | 'needs-workspace'
+  | 'needs-project'
+  | 'ready'
+  | 'submitting'
+  | 'error';
 
 export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain: boolean };
 
@@ -105,6 +111,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [context, setContext] = React.useState<ConversationContext | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // Authoritative selection from the latest bootstrap snapshot. Surfaced so
+  // provisioning can bind project creation to the backend-issued workspace
+  // without re-fetching or trusting cached IDs.
+  const [activeWorkspaceId, setActiveWorkspaceId] = React.useState<string | null>(null);
   // Hydrated from sessionStorage so a remount never loses the frozen
   // logical command of an unresolved write.
   const [pendingSend, setPendingSend] = React.useState<PendingSend | null>(() => readPendingSend());
@@ -209,9 +219,18 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         }
         return null;
       }
-      if (!snapshot.isInitialized || !snapshot.activeWorkspaceId || !snapshot.activeProjectId) {
+      // Partial provisioning is a state, not a fatal error: a workspace
+      // without a project must reach the project step, never a session.
+      setActiveWorkspaceId(snapshot.activeWorkspaceId);
+      if (!snapshot.isInitialized || !snapshot.activeWorkspaceId) {
         if (mountedRef.current && generationRef.current === generation) {
-          fail('No provisioned workspace or project. Create one before chatting.');
+          setStatus('needs-workspace');
+        }
+        return null;
+      }
+      if (!snapshot.activeProjectId) {
+        if (mountedRef.current && generationRef.current === generation) {
+          setStatus('needs-project');
         }
         return null;
       }
@@ -307,6 +326,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   }, [backend, loadHistory]);
 
   React.useEffect(() => {
+    void bootstrap();
+  }, [bootstrap]);
+
+  /// Re-run bootstrap after out-of-band provisioning (workspace/project
+  /// creation): drops the settled run so the fresh snapshot drives scope.
+  const refreshScope = React.useCallback(() => {
+    bootPromiseRef.current = null;
     void bootstrap();
   }, [bootstrap]);
 
@@ -541,12 +567,14 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     messages,
     context,
     sessionId: context?.sessionId ?? null,
+    activeWorkspaceId,
     error,
     pendingSend,
     submit,
     retry,
     reload,
     openSession,
+    refreshScope,
     capabilities: conversationCapabilities,
   };
 }

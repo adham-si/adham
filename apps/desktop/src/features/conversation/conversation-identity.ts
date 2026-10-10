@@ -72,6 +72,8 @@ export function rejectionMessage(err: unknown): string {
 export const SESSION_CACHE_KEY = 'adham:compose:session';
 export const CREATE_INTENT_KEY = 'adham:compose:create-intent';
 const PENDING_SEND_KEY = 'adham:compose:pending-send';
+export const PROVISION_WS_KEY = 'adham:provision:workspace';
+export const PROVISION_PROJ_KEY = 'adham:provision:project';
 
 export function readStorage(key: string): string | null {
   try {
@@ -189,3 +191,45 @@ export function sameScope(a: ConversationScope, b: ConversationScope): boolean {
     a.workspaceId === b.workspaceId && a.projectId === b.projectId && a.sessionId === b.sessionId
   );
 }
+
+/// Frozen provisioning intent: request identity + payload frozen BEFORE
+/// dispatch so an uncertain retry reuses both instead of forking a duplicate
+/// workspace or project. Mirrors the PendingSend discipline.
+export interface ProvisionIntent {
+  requestId: string;
+  name: string;
+  workspaceId?: string | undefined;
+}
+
+function readProvisionIntent(key: string): ProvisionIntent | null {
+  const raw = readStorage(key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<ProvisionIntent>;
+    if (typeof parsed.requestId === 'string' && typeof parsed.name === 'string') {
+      return {
+        requestId: parsed.requestId,
+        name: parsed.name,
+        workspaceId: typeof parsed.workspaceId === 'string' ? parsed.workspaceId : undefined,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeProvisionIntent(key: string, intent: ProvisionIntent): boolean {
+  return writeStorage(key, JSON.stringify(intent));
+}
+
+export const readWorkspaceIntent = (): ProvisionIntent | null =>
+  readProvisionIntent(PROVISION_WS_KEY);
+export const writeWorkspaceIntent = (intent: ProvisionIntent): boolean =>
+  writeProvisionIntent(PROVISION_WS_KEY, intent);
+export const clearWorkspaceIntent = (): void => removeStorage(PROVISION_WS_KEY);
+export const readProjectIntent = (): ProvisionIntent | null =>
+  readProvisionIntent(PROVISION_PROJ_KEY);
+export const writeProjectIntent = (intent: ProvisionIntent): boolean =>
+  writeProvisionIntent(PROVISION_PROJ_KEY, intent);
+export const clearProjectIntent = (): void => removeStorage(PROVISION_PROJ_KEY);

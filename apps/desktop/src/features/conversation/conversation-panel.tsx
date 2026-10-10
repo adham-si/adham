@@ -10,6 +10,8 @@ import {
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
 import { useConversation, type ConversationBackend } from './use-conversation';
+import { useProvisioning, type ProvisioningBackend } from './use-provisioning';
+import { ProvisioningForm } from './provisioning-form';
 import { submissionNotice } from './submission-notice';
 
 const DEFAULT_MODEL_ID = 'local:qwen2.5-coder:32b';
@@ -23,6 +25,8 @@ function formatTimestamp(createdAt: string): string {
 
 export interface ConversationPanelProps {
   backend?: ConversationBackend;
+  /** Injectable provisioning backend for tests; defaults to the real client. */
+  provisioning?: ProvisioningBackend;
 }
 
 /**
@@ -31,9 +35,11 @@ export interface ConversationPanelProps {
  * text. Execution, approval, and stop have no backend command and are
  * rendered unavailable instead of faked.
  */
-export function ConversationPanel({ backend = adhamClient }: ConversationPanelProps) {
+export function ConversationPanel({ backend = adhamClient, provisioning }: ConversationPanelProps) {
   const { t } = useTranslation();
   const conv = useConversation({ backend });
+  const prov = useProvisioning({ backend: provisioning });
+  const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
   const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({
     sessionId: conv.sessionId ?? PENDING_DRAFT_BUCKET,
   });
@@ -47,6 +53,19 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
   const [stopNotice, setStopNotice] = React.useState(false);
 
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
+
+  const handleProvision = React.useCallback(
+    async (name: string) => {
+      if (conv.status === 'needs-workspace') {
+        const outcome = await prov.createWorkspace(name);
+        if (outcome.ok) conv.refreshScope();
+      } else if (conv.status === 'needs-project') {
+        const outcome = await prov.createProject(name, prov.workspaceId ?? conv.activeWorkspaceId);
+        if (outcome.ok) conv.refreshScope();
+      }
+    },
+    [conv, prov],
+  );
 
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
@@ -71,6 +90,23 @@ export function ConversationPanel({ backend = adhamClient }: ConversationPanelPr
   });
   const executionUnavailable = mode === 'execute';
   const isEmpty = conv.messages.length === 0;
+
+  // Partial provisioning replaces the composer: there is no session yet, so
+  // nothing may be submitted. The form drives one deliberate creation step.
+  if (needsProvisioning) {
+    const step = conv.status === 'needs-workspace' ? 'workspace' : 'project';
+    return (
+      <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
+        <ProvisioningForm
+          key={step}
+          step={step}
+          working={prov.working}
+          error={prov.error}
+          onSubmit={(name) => void handleProvision(name)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent">

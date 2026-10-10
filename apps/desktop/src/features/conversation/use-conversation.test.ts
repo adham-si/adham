@@ -60,7 +60,7 @@ describe('useConversation submit', () => {
     expect(backend.createSession).toHaveBeenCalledTimes(1);
   });
 
-  it('provisions nothing and reports unavailable when bootstrap has no context', async () => {
+  it('reports needs-workspace without provisioning when bootstrap has no context', async () => {
     const backend = fakeBackend();
     backend.getBootstrapState.mockResolvedValueOnce({
       isInitialized: false,
@@ -69,7 +69,23 @@ describe('useConversation submit', () => {
     });
     const { result } = renderHook(() => useConversation({ backend }));
 
-    await waitFor(() => expect(result.current.status).toBe('error'));
+    await waitFor(() => expect(result.current.status).toBe('needs-workspace'));
+    expect(backend.createSession).not.toHaveBeenCalled();
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+    expect(backend.createProject).not.toHaveBeenCalled();
+    expect(result.current.sessionId).toBeNull();
+  });
+
+  it('reports needs-project without creating a session when no project is active', async () => {
+    const backend = fakeBackend();
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: null,
+    });
+    const { result } = renderHook(() => useConversation({ backend }));
+
+    await waitFor(() => expect(result.current.status).toBe('needs-project'));
     expect(backend.createSession).not.toHaveBeenCalled();
     expect(backend.createWorkspace).not.toHaveBeenCalled();
     expect(backend.createProject).not.toHaveBeenCalled();
