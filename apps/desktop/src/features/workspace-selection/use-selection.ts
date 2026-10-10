@@ -122,12 +122,16 @@ export function useSelection({
     if (enabled) void refresh();
   }, [enabled, refresh]);
 
-  // Confirmed scope changes re-read the lists so every live instance (panel
-  // slot, sidebar) shows new records. Selection results themselves arrive
-  // through select(), never this path.
+  // Confirmed creations re-read the lists so every live instance (panel
+  // slot, sidebar) shows new records. Selections write no records, so
+  // their lists cannot be stale — skipping avoids a redundant read racing
+  // the authoritative bootstrap refresh.
   React.useEffect(() => {
     if (!enabled) return;
-    const onScopeChanged = () => void refresh();
+    const onScopeChanged = (event: Event) => {
+      const origin = (event as CustomEvent<{ origin?: unknown }>).detail?.origin;
+      if (origin !== 'selected') void refresh();
+    };
     window.addEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
     return () => window.removeEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
   }, [enabled, refresh]);

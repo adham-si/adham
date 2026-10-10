@@ -350,24 +350,6 @@ describe('provisioning journey', () => {
         state.activeProj = 'proj-9';
         return { ...projSummary, workspaceId: wsId };
       }),
-      listWorkspaces: vi.fn(async () => ({
-        workspaces: state.wsCreated ? [wsSummary] : [],
-        truncated: false,
-      })),
-      listProjects: vi.fn(async (wsId: string) => ({
-        workspaceId: wsId,
-        projects: state.projWs === wsId ? [{ ...projSummary, workspaceId: wsId }] : [],
-        truncated: false,
-      })),
-      selectProject: vi.fn(async (wsId: string, payload: { projectId: string }) => {
-        state.activeWs = wsId;
-        state.activeProj = payload.projectId;
-        return {
-          isInitialized: true,
-          activeWorkspaceId: wsId,
-          activeProjectId: payload.projectId,
-        };
-      }),
       createSession: vi.fn().mockResolvedValue({
         sessionId: 'sess-9',
         projectId: 'proj-9',
@@ -381,19 +363,38 @@ describe('provisioning journey', () => {
         projectionPosition: '0',
       }),
     };
-    return { backend, state };
+    // Selection reads go through a separate object with a plain bootstrap
+    // reader: conv-side fail/delay flags belong to the authoritative refresh
+    // only, so no interleaving can divert them.
+    const selectionBackend = {
+      getBootstrapState: vi.fn(async () => bootstrapNow()),
+      listWorkspaces: vi.fn(async () => ({
+        workspaces: state.wsCreated ? [wsSummary] : [],
+        truncated: false,
+      })),
+      listProjects: vi.fn(async (wsId: string) => ({
+        workspaceId: wsId,
+        projects: state.projWs === wsId ? [{ ...projSummary, workspaceId: wsId }] : [],
+        truncated: false,
+      })),
+      selectProject: vi.fn(),
+    };
+    return { backend, selectionBackend, state };
   }
 
-  function renderPanel(backend: ReturnType<typeof journeyBackend>['backend']) {
+  function renderPanel(
+    backend: ReturnType<typeof journeyBackend>['backend'],
+    selectionBackend: ReturnType<typeof journeyBackend>['selectionBackend'],
+  ) {
     return render(
-      <ConversationPanel backend={backend} provisioning={backend} selection={backend} />,
+      <ConversationPanel backend={backend} provisioning={backend} selection={selectionBackend} />,
     );
   }
 
   it('fresh UI creates workspace then project and reaches the conversation', async () => {
     const user = userEvent.setup();
-    const { backend } = journeyBackend();
-    renderPanel(backend);
+    const { backend, selectionBackend } = journeyBackend();
+    renderPanel(backend, selectionBackend);
 
     await screen.findByText(/create your workspace/i);
     const wsBox = screen.getByLabelText(/workspace name/i);
@@ -419,13 +420,13 @@ describe('provisioning journey', () => {
     await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
     expect(screen.queryByText(/create your project/i)).toBeNull();
     expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
-    expect(backend.selectProject).not.toHaveBeenCalled();
+    expect(selectionBackend.selectProject).not.toHaveBeenCalled();
   });
 
   it('holds the confirmed workspace while bootstrap loads and dispatches once', async () => {
     const user = userEvent.setup();
-    const { backend, state } = journeyBackend();
-    renderPanel(backend);
+    const { backend, selectionBackend, state } = journeyBackend();
+    renderPanel(backend, selectionBackend);
 
     await screen.findByText(/create your workspace/i);
     let resolveRefresh!: (value: unknown) => void;
@@ -449,8 +450,8 @@ describe('provisioning journey', () => {
 
   it('retries the read after a post-creation bootstrap failure without recreating', async () => {
     const user = userEvent.setup();
-    const { backend, state } = journeyBackend();
-    renderPanel(backend);
+    const { backend, selectionBackend, state } = journeyBackend();
+    renderPanel(backend, selectionBackend);
 
     await screen.findByText(/create your workspace/i);
     state.failRefreshOnce = true;
@@ -471,10 +472,10 @@ describe('provisioning journey', () => {
 
   it('holds the confirmed project while bootstrap loads and dispatches once', async () => {
     const user = userEvent.setup();
-    const { backend, state } = journeyBackend();
+    const { backend, selectionBackend, state } = journeyBackend();
     state.wsCreated = true;
     state.activeWs = 'ws-9';
-    renderPanel(backend);
+    renderPanel(backend, selectionBackend);
 
     await screen.findByText(/create your project/i);
     let resolveRefresh!: (value: unknown) => void;
@@ -504,10 +505,10 @@ describe('provisioning journey', () => {
 
   it('retries the read after a post-project bootstrap failure without recreating', async () => {
     const user = userEvent.setup();
-    const { backend, state } = journeyBackend();
+    const { backend, selectionBackend, state } = journeyBackend();
     state.wsCreated = true;
     state.activeWs = 'ws-9';
-    renderPanel(backend);
+    renderPanel(backend, selectionBackend);
 
     await screen.findByText(/create your project/i);
     state.failRefreshOnce = true;
