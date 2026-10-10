@@ -4,7 +4,7 @@ use super::common::conflict_msg;
 use crate::dtos::*;
 use crate::handlers::ApiContext;
 use adham_core_types::*;
-use adham_event_log::{AppendEventRequest, SqliteEventStore};
+use adham_event_log::{set_active_scope_tx, AppendEventRequest, SqliteEventStore};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
@@ -38,7 +38,9 @@ fn replay_project(
     }
 }
 
-/// Atomic workspace creation: event + stream + receipt in one tx.
+/// Atomic workspace creation: event + stream + receipt + active-selection
+/// update in one tx. Receipt replay returns the original result without
+/// re-selecting.
 pub async fn create_workspace(
     ctx: &ApiContext,
     env: CommandEnvelope<CreateWorkspacePayload>,
@@ -76,7 +78,11 @@ pub async fn create_workspace(
             .await
             .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         if matches {
-            return replay(env.request_id, receipt);
+            // Replay returns the original result only. It must never act
+            // as a new selection command: the user may have selected a
+            // different project since the first execution.
+            let out = replay(env.request_id, receipt)?;
+            return Ok(out);
         }
         return Err(conflict_msg());
     }
@@ -151,6 +157,15 @@ pub async fn create_workspace(
             "STORAGE_UNAVAILABLE: failed to record receipt: {e}"
         ));
     }
+    // Explicit authorized selection: creating a workspace makes it active
+    // and clears any project selection from another workspace. Part of the
+    // same owned unit of work as the event + receipt: if the selection
+    // update fails, the entire creation rolls back — the caller never
+    // observes durable creation paired with a reported failure.
+    if let Err(e) = set_active_scope_tx(&mut tx, Some(&workspace_id), None).await {
+        let _ = tx.rollback().await;
+        return Err(e.to_string());
+    }
     if let Err(e) = tx.commit().await {
         // Reconcile: winner's receipt decides replay vs conflict.
         match ctx.store.check_receipt(&request_id).await {
@@ -159,7 +174,10 @@ pub async fn create_workspace(
                     && receipt.request_fingerprint == request_fp
                     && receipt.scope_fingerprint == scope_fp;
                 if matches {
-                    return replay(env.request_id, receipt);
+                    // Replay only: the winner's creation already carried
+                    // its own selection; a replay must not re-select.
+                    let out = replay(env.request_id, receipt)?;
+                    return Ok(out);
                 }
                 return Err(conflict_msg());
             }
@@ -174,7 +192,9 @@ pub async fn create_workspace(
     })
 }
 
-/// Atomic project creation: event + stream + receipt in one tx.
+/// Atomic project creation: event + stream + receipt + active-selection
+/// update in one tx. Receipt replay returns the original result without
+/// re-selecting.
 pub async fn create_project(
     ctx: &ApiContext,
     env: CommandEnvelope<CreateProjectPayload>,
@@ -229,7 +249,11 @@ pub async fn create_project(
             .await
             .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         if matches {
-            return replay_project(env.request_id, receipt);
+            // Replay returns the original result only. It must never act
+            // as a new selection command: a newer project may already be
+            // selected.
+            let out = replay_project(env.request_id, receipt)?;
+            return Ok(out);
         }
         return Err(conflict_msg());
     }
@@ -303,6 +327,13 @@ pub async fn create_project(
             "STORAGE_UNAVAILABLE: failed to record receipt: {e}"
         ));
     }
+    // Explicit authorized selection: the created project becomes active in
+    // its workspace. Part of the same owned unit of work as the event +
+    // receipt: a failed selection update rolls back the whole creation.
+    if let Err(e) = set_active_scope_tx(&mut tx, Some(&ws_id), Some(&project_id)).await {
+        let _ = tx.rollback().await;
+        return Err(e.to_string());
+    }
     if let Err(e) = tx.commit().await {
         match ctx.store.check_receipt(&request_id).await {
             Ok(Some(receipt)) => {
@@ -310,7 +341,9 @@ pub async fn create_project(
                     && receipt.request_fingerprint == request_fp
                     && receipt.scope_fingerprint == scope_fp;
                 if matches {
-                    return replay_project(env.request_id, receipt);
+                    // Replay only: never re-select over a newer choice.
+                    let out = replay_project(env.request_id, receipt)?;
+                    return Ok(out);
                 }
                 return Err(conflict_msg());
             }

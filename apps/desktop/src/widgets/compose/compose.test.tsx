@@ -9,6 +9,7 @@ import {
   ComposeModelPicker,
   ComposeStatusStrip,
   ComposeApprovalBar,
+  migratePendingDraft,
   useComposeState,
   useDrafts,
 } from './index';
@@ -90,6 +91,93 @@ describe('useDrafts', () => {
       expect(recalled).toBe('My draft query');
     });
     expect(result.current.draft).toBe('My draft query');
+  });
+
+  it('restores a draft persisted under its session key on remount', () => {
+    localStorage.setItem('adham:compose:draft:session-9', 'Restored words');
+    const { result, unmount } = renderHook(() => useDrafts({ sessionId: 'session-9' }));
+    expect(result.current.draft).toBe('Restored words');
+    unmount();
+  });
+
+  it('hydrates per-session drafts and history when the session key changes', () => {
+    localStorage.setItem('adham:compose:draft:session-a', 'Draft A');
+    localStorage.setItem('adham:compose:history:session-a', JSON.stringify(['prompt A']));
+    localStorage.setItem('adham:compose:draft:session-b', 'Draft B');
+    localStorage.setItem('adham:compose:history:session-b', JSON.stringify(['prompt B']));
+
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string }) => useDrafts({ sessionId: id }),
+      { initialProps: { id: 'session-a' } },
+    );
+    expect(result.current.draft).toBe('Draft A');
+    expect(result.current.history).toEqual(['prompt A']);
+
+    rerender({ id: 'session-b' });
+    expect(result.current.draft).toBe('Draft B');
+    expect(result.current.history).toEqual(['prompt B']);
+    expect(localStorage.getItem('adham:compose:draft:session-a')).toBe('Draft A');
+
+    rerender({ id: 'session-a' });
+    expect(result.current.draft).toBe('Draft A');
+    expect(result.current.history).toEqual(['prompt A']);
+  });
+
+  it('adopts pending text into the resolved session and keeps it live', () => {
+    localStorage.setItem('adham:compose:draft:pending', 'Typed early');
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string }) => useDrafts({ sessionId: id }),
+      { initialProps: { id: 'pending' } },
+    );
+    expect(result.current.draft).toBe('Typed early');
+
+    rerender({ id: 'sess-1' });
+    expect(result.current.draft).toBe('Typed early');
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('Typed early');
+    expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
+  });
+
+  it('keeps both drafts when pending text conflicts with a stored session draft', () => {
+    localStorage.setItem('adham:compose:draft:pending', 'Typed early');
+    localStorage.setItem('adham:compose:draft:sess-1', 'Stored draft');
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string }) => useDrafts({ sessionId: id }),
+      { initialProps: { id: 'pending' } },
+    );
+    expect(result.current.draft).toBe('Typed early');
+
+    rerender({ id: 'sess-1' });
+    // The newer edit stays live; the stored draft is preserved in history.
+    expect(result.current.draft).toBe('Typed early');
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('Typed early');
+    expect(result.current.history).toContain('Stored draft');
+    expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
+  });
+});
+
+describe('migratePendingDraft', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('moves pre-bootstrap text into the resolved session bucket', () => {
+    localStorage.setItem('adham:compose:draft:pending', 'Early thought');
+    migratePendingDraft('sess-1');
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('Early thought');
+    expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
+  });
+
+  it('preserves a distinct target draft in history instead of dropping the pending text', () => {
+    localStorage.setItem('adham:compose:draft:pending', 'Early thought');
+    localStorage.setItem('adham:compose:draft:sess-1', 'Stored draft');
+    migratePendingDraft('sess-1');
+    // The pending (newer) edit wins the session bucket; the displaced
+    // draft is preserved in recallable history — nothing is dropped.
+    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('Early thought');
+    expect(JSON.parse(localStorage.getItem('adham:compose:history:sess-1') ?? '[]')).toContain(
+      'Stored draft',
+    );
+    expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
   });
 });
 
@@ -222,6 +310,15 @@ describe('ComposeStatusStrip', () => {
     expect(screen.getByText(/Standing Approval/i)).toBeDefined();
     expect(screen.getByText(/16.0k \/ 128k/i)).toBeDefined();
     expect(screen.getByText('$0.12')).toBeDefined();
+  });
+
+  it('renders unknown instead of invented telemetry when nothing is reported', () => {
+    const { container } = render(<ComposeStatusStrip />);
+
+    expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
+    expect(container.textContent).not.toMatch(/12\.4k \/ 128k/);
+    expect(container.textContent).not.toMatch(/\$0\.00/);
+    expect(container.textContent).not.toMatch(/adham\.si/);
   });
 });
 
