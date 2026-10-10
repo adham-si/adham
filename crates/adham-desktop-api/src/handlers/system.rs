@@ -46,3 +46,20 @@ pub async fn handle_admin_rebuild_projections(
         replayed_count: replayed,
     })
 }
+
+pub fn handle_get_platform_info() -> PlatformInfo {
+    PlatformInfo {
+        os: if cfg!(target_os = "macos") {
+            "macos".to_string()
+        } else if cfg!(target_os = "windows") {
+            "windows".to_string()
+        } else if cfg!(target_os = "linux") {
+            "linux".to_string()
+        } else {
+            "unknown".to_string()
+        },
+        arch: std::env::consts::ARCH.to_string(),
+        has_native_titlebar_controls: cfg!(target_os = "macos"),
+    }
+}
+

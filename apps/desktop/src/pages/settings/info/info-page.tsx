@@ -1,18 +1,28 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
+import { getPlatform } from '@/shared/platform';
 
 export function InfoPage() {
   const { t } = useTranslation();
   const [copied, setCopied] = React.useState(false);
   const [autoUpdate, setAutoUpdate] = React.useState(true);
 
+  const currentPlatform = getPlatform();
+  const platformLabel = currentPlatform.isMac
+    ? 'macOS (Darwin)'
+    : currentPlatform.isWindows
+      ? 'Windows x86_64'
+      : currentPlatform.isLinux
+        ? 'Linux'
+        : 'Unknown Platform';
+
   const sysInfo = {
     version: '0.1.0-alpha',
     build: '2026.10.07-nightly',
     engine: 'Tauri v2 + Rust Core',
     database: 'SQLite v3.45 (WAL Mode)',
-    platform: 'Windows x86_64',
+    platform: platformLabel,
     license: 'Dual MIT / Apache-2.0',
   };
 

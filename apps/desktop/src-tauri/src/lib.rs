@@ -1,9 +1,15 @@
 use adham_desktop_api::{
     ApiContext, BootstrapState, CommandContext, CommandEnvelope, CommandResult, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope,
+    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope, PlatformInfo,
     ProjectSummary, RebuildProjectionsResponse, SessionSummary, StorageStatus,
     SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
 };
+use tauri::Manager;
+
+#[tauri::command]
+fn get_platform_info() -> PlatformInfo {
+    adham_desktop_api::handle_get_platform_info()
+}
 
 #[tauri::command]
 async fn get_bootstrap_state(
@@ -106,18 +112,64 @@ pub fn run() {
             .expect("Failed to load installation identity")
     });
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(api_ctx)
+        .setup(|app| {
+            let mut window_config = app
+                .config()
+                .app
+                .windows
+                .first()
+                .cloned()
+                .unwrap_or_default();
+
+            #[cfg(target_os = "macos")]
+            {
+                window_config.decorations = true;
+                window_config.title_bar_style = tauri::TitleBarStyle::Overlay;
+                window_config.hidden_title = true;
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                window_config.decorations = false;
+            }
+
+            let _window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_config)?
+                .build()?;
+
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_bootstrap_state,
             get_storage_status,
+            get_platform_info,
             create_workspace,
             create_project,
             create_session,
             submit_message,
             get_conversation,
             admin_rebuild_projections,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        ]);
+
+    let app = builder
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen { .. } = event {
+            if let Some(window) = app_handle.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+    });
 }

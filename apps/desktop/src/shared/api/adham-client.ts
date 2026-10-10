@@ -6,6 +6,7 @@ import type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  PlatformInfo,
   ProjectSummary,
   SessionSummary,
   StorageStatus,
@@ -15,6 +16,7 @@ import type {
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
+  PlatformInfoSchema,
   ProjectSummarySchema,
   SessionSummarySchema,
   StorageStatusSchema,
@@ -29,6 +31,7 @@ export type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  PlatformInfo,
   ProjectSummary,
   SessionSummary,
   StorageStatus,
@@ -86,6 +89,7 @@ export interface AdhamClient {
     limit?: number,
   ): Promise<ConversationPage>;
   getStorageStatus(): Promise<StorageStatus>;
+  getPlatformInfo(): Promise<PlatformInfo>;
 }
 
 export class AdhamApiClient implements AdhamClient {
@@ -211,6 +215,11 @@ export class AdhamApiClient implements AdhamClient {
   async getStorageStatus(): Promise<StorageStatus> {
     const raw = await invoke('get_storage_status');
     return StorageStatusSchema.parse(raw);
+  }
+
+  async getPlatformInfo(): Promise<PlatformInfo> {
+    const raw = await invoke('get_platform_info');
+    return PlatformInfoSchema.parse(raw);
   }
 }
 

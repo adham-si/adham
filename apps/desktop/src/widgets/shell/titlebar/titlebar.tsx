@@ -15,6 +15,7 @@ import {
   buttonVariants,
   cn,
 } from '@adham/ui';
+import { usePlatform } from '@/shared/platform';
 import { useShellLayout } from '../context';
 
 export interface TitlebarProps extends React.HTMLAttributes<HTMLElement> {
@@ -42,7 +43,9 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
     secondarySidebarOpen,
     toggleSecondarySidebar,
   } = useShellLayout();
+  const platform = usePlatform();
   const [isMaximized, setIsMaximized] = React.useState(false);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   // Safe window reference check for both Tauri and web preview environments
@@ -58,17 +61,21 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
     if (!win) return;
 
     let unlisten: (() => void) | undefined;
-    win
-      .isMaximized()
-      .then((maximized) => setIsMaximized(maximized))
-      .catch(() => {});
+    const updateWindowState = async () => {
+      try {
+        const [maximized, fullscreen] = await Promise.all([win.isMaximized(), win.isFullscreen()]);
+        setIsMaximized(maximized);
+        setIsFullscreen(fullscreen);
+      } catch {
+        // ignore
+      }
+    };
+
+    updateWindowState();
 
     win
       .listen('tauri://resize', () => {
-        win
-          .isMaximized()
-          .then((maximized) => setIsMaximized(maximized))
-          .catch(() => {});
+        updateWindowState();
       })
       .then((unsub) => {
         unlisten = unsub;
@@ -122,11 +129,17 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
       data-tauri-drag-region
       onDoubleClick={handleToggleMaximize}
       aria-label="Application Titlebar"
-      className={`relative z-menu flex h-10 min-h-10 max-h-10 w-full shrink-0 items-center justify-between bg-background select-none ${className}`}
+      className={cn(
+        'relative z-menu flex h-10 min-h-10 max-h-10 w-full shrink-0 items-center justify-between bg-background select-none',
+        platform.layout.hasNativeTitlebarControls &&
+          !isFullscreen &&
+          platform.layout.trafficLightClearanceClass,
+        className,
+      )}
       {...props}
     >
       {/* Top-Left: NavRail toggle and Chrome tab-search style actions menu button */}
-      <div className="flex items-center gap-1 ps-2">
+      <div className={cn('flex items-center gap-1', platform.layout.titlebarStartPaddingClass)}>
         <button
           type="button"
           onClick={toggleNavRail}
@@ -186,7 +199,12 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
       />
 
       {/* Top-Right: Layout toggles, vertical separator, and window controls */}
-      <div className="flex h-full items-center">
+      <div
+        className={cn(
+          'flex h-full items-center',
+          !platform.layout.showCustomCaptionControls && 'pe-2',
+        )}
+      >
         {/* Layout controls */}
         <div className="flex items-center gap-1">
           {/* Primary sidebar toggle */}
@@ -241,59 +259,63 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
           </button>
         </div>
 
-        {/* Separator vertical line */}
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          className="mx-2 h-4 w-px bg-border-subtle"
-        />
+        {/* Custom Window Controls (Windows / Linux only) */}
+        {platform.layout.showCustomCaptionControls && (
+          <>
+            {/* Separator vertical line */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              className="mx-2 h-4 w-px bg-border-subtle"
+            />
 
-        {/* Window Controls (Minimize, Maximize / Restore, Close) */}
-        {/* Minimize */}
-        <button
-          type="button"
-          onClick={handleMinimize}
-          aria-label="Minimize"
-          title="Minimize"
-          className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-        >
-          <AdhamIcon size="sm">
-            <path d="M5 12h14" />
-          </AdhamIcon>
-        </button>
+            {/* Minimize */}
+            <button
+              type="button"
+              onClick={handleMinimize}
+              aria-label="Minimize"
+              title="Minimize"
+              className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+            >
+              <AdhamIcon size="sm">
+                <path d="M5 12h14" />
+              </AdhamIcon>
+            </button>
 
-        {/* Maximize / Restore */}
-        <button
-          type="button"
-          onClick={handleToggleMaximize}
-          aria-label={isMaximized ? 'Restore' : 'Maximize'}
-          title={isMaximized ? 'Restore' : 'Maximize'}
-          className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-        >
-          <AdhamIcon size="sm">
-            {isMaximized ? (
-              <>
-                <rect x="5" y="9" width="10" height="10" rx="1" />
-                <path d="M9 5h10v10" />
-              </>
-            ) : (
-              <rect x="5" y="5" width="14" height="14" rx="1" />
-            )}
-          </AdhamIcon>
-        </button>
+            {/* Maximize / Restore */}
+            <button
+              type="button"
+              onClick={handleToggleMaximize}
+              aria-label={isMaximized ? 'Restore' : 'Maximize'}
+              title={isMaximized ? 'Restore' : 'Maximize'}
+              className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+            >
+              <AdhamIcon size="sm">
+                {isMaximized ? (
+                  <>
+                    <rect x="5" y="9" width="10" height="10" rx="1" />
+                    <path d="M9 5h10v10" />
+                  </>
+                ) : (
+                  <rect x="5" y="5" width="14" height="14" rx="1" />
+                )}
+              </AdhamIcon>
+            </button>
 
-        {/* Close */}
-        <button
-          type="button"
-          onClick={handleClose}
-          aria-label="Close"
-          title="Close"
-          className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-danger hover:text-action-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-        >
-          <AdhamIcon size="sm">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </AdhamIcon>
-        </button>
+            {/* Close */}
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Close"
+              title="Close"
+              className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-danger hover:text-action-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+            >
+              <AdhamIcon size="sm">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </AdhamIcon>
+            </button>
+          </>
+        )}
       </div>
     </header>
   );
