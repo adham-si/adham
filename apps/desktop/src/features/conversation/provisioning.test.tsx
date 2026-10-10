@@ -449,4 +449,88 @@ describe('provisioning journey', () => {
     expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
     expect(backend.createProject).not.toHaveBeenCalled();
   });
+
+  it('holds the confirmed project while bootstrap loads and dispatches once', async () => {
+    const user = userEvent.setup();
+    const backend = journeyBackend();
+    let resolveRefresh!: (value: unknown) => void;
+    backend.getBootstrapState
+      .mockReset()
+      .mockResolvedValueOnce({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: null,
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = resolve as (value: unknown) => void;
+          }),
+      )
+      .mockResolvedValue({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: 'proj-9',
+      });
+    render(<ConversationPanel backend={backend} provisioning={backend} />);
+
+    await screen.findByText(/create your project/i);
+    await user.type(screen.getByLabelText(/project name/i), 'Proj');
+    await user.click(screen.getByRole('button', { name: /create project/i }));
+    await waitFor(() => expect(backend.createProject).toHaveBeenCalledTimes(1));
+    expect(backend.createProject).toHaveBeenCalledWith(
+      'ws-9',
+      { name: 'Proj', storageKind: 'isolated' },
+      { requestId: expect.any(String) },
+    );
+    // Held disabled while the authoritative read is in flight.
+    const held = screen.getByRole('button', { name: /create project/i }) as HTMLButtonElement;
+    expect(held.disabled).toBe(true);
+    await user.click(held);
+    expect(backend.createProject).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveRefresh({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: 'proj-9',
+      });
+    });
+    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    expect(backend.createProject).toHaveBeenCalledTimes(1);
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('retries the read after a post-project bootstrap failure without recreating', async () => {
+    const user = userEvent.setup();
+    const backend = journeyBackend();
+    backend.getBootstrapState
+      .mockReset()
+      .mockResolvedValueOnce({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: null,
+      })
+      .mockRejectedValueOnce(new Error('read outage'))
+      .mockResolvedValue({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-9',
+        activeProjectId: 'proj-9',
+      });
+    render(<ConversationPanel backend={backend} provisioning={backend} />);
+
+    await screen.findByText(/create your project/i);
+    await user.type(screen.getByLabelText(/project name/i), 'Proj');
+    await user.click(screen.getByRole('button', { name: /create project/i }));
+    await waitFor(() => expect(backend.createProject).toHaveBeenCalledTimes(1));
+    // Read failure after a committed project: read-only retry, no creation.
+    await screen.findByRole('button', { name: /retry loading/i });
+    expect(backend.createProject).toHaveBeenCalledTimes(1);
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+    const readsBefore = backend.getBootstrapState.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: /retry loading/i }));
+    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    expect(backend.getBootstrapState.mock.calls.length).toBeGreaterThan(readsBefore);
+    expect(backend.createProject).toHaveBeenCalledTimes(1);
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+  });
 });
