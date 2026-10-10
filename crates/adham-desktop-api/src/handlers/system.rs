@@ -62,4 +62,3 @@ pub fn handle_get_platform_info() -> PlatformInfo {
         has_native_titlebar_controls: cfg!(target_os = "macos"),
     }
 }
-
