@@ -39,21 +39,41 @@ impl ApiContext {
         }
     }
 
+    /// Production startup path.
+    ///
+    /// Fail-closed ordering: (1) reject non-persistent (mock) credential
+    /// backends before any initialization write; (2) load or atomically create
+    /// the installation record; (3) only the create-INSERT winner initializes
+    /// the content key — everyone else reads it, and a missing key on an
+    /// existing installation is an explicit key-loss error, never a mint.
     pub async fn load_or_create(pool: Pool<Sqlite>) -> Result<Self, adham_core_types::DomainError> {
-        let rec = adham_event_log::load_or_create_installation(&pool).await?;
-        let provider: Arc<dyn ContentKeyProvider> = Arc::new(
-            OsKeyringProvider::default_for_installation(&rec.installation_id.to_string()),
-        );
-        // Touch the key early so missing/unavailable store fails fast.
-        provider.content_key()?;
-        Ok(Self::new(pool, rec.installation_id, rec.actor_id, provider))
+        OsKeyringProvider::ensure_persistent_backend()?;
+        let init = adham_event_log::load_or_create_installation(&pool).await?;
+        let provider =
+            OsKeyringProvider::default_for_installation(&init.record.installation_id.to_string());
+        if init.created {
+            provider.initialize_content_key()?;
+        } else {
+            provider.content_key()?;
+        }
+        Ok(Self::new(
+            pool,
+            init.record.installation_id,
+            init.record.actor_id,
+            Arc::new(provider),
+        ))
     }
 
     pub async fn load_or_create_with_key(
         pool: Pool<Sqlite>,
         provider: Arc<dyn ContentKeyProvider>,
     ) -> Result<Self, adham_core_types::DomainError> {
-        let rec = adham_event_log::load_or_create_installation(&pool).await?;
-        Ok(Self::new(pool, rec.installation_id, rec.actor_id, provider))
+        let init = adham_event_log::load_or_create_installation(&pool).await?;
+        Ok(Self::new(
+            pool,
+            init.record.installation_id,
+            init.record.actor_id,
+            provider,
+        ))
     }
 }

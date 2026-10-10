@@ -13,19 +13,42 @@ pub struct InstallationRecord {
     pub actor_id: ActorId,
 }
 
+/// Result of loading or creating the installation record.
+///
+/// `created` is true only for the process that won the atomic first-create
+/// INSERT; that winner is the sole authority allowed to initialize the
+/// content key. Everyone else must treat key material as read-only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InstallationInit {
+    pub record: InstallationRecord,
+    pub created: bool,
+}
+
 pub async fn load_or_create_installation(
     pool: &Pool<Sqlite>,
-) -> Result<InstallationRecord, DomainError> {
+) -> Result<InstallationInit, DomainError> {
     // Fast path: existing row.
     if let Some(rec) = read_installation(pool).await? {
-        return Ok(rec);
+        return Ok(InstallationInit {
+            record: rec,
+            created: false,
+        });
+    }
+
+    // Guardrail: a missing installation row under existing events/content
+    // means identity was lost under live data. Never regenerate identity
+    // (and thereby encryption keys) in that state — report integrity loss.
+    if has_orphaned_content(pool).await? {
+        return Err(DomainError::Integrity(
+            "installation record missing but events/content exist; refusing to regenerate identity or encryption keys".into(),
+        ));
     }
 
     // Atomic create: INSERT ... ON CONFLICT DO NOTHING handles concurrent init.
     let installation_id = InstallationId::new_v7();
     let actor_id = ActorId::new_v7();
     let now_us = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
-    sqlx::query(
+    let result = sqlx::query(
         "INSERT INTO installation (id, installation_id, actor_id, created_at_us, updated_at_us)
          VALUES (1, ?, ?, ?, ?)
          ON CONFLICT(id) DO NOTHING",
@@ -39,9 +62,30 @@ pub async fn load_or_create_installation(
     .map_err(|e| DomainError::Storage(e.to_string()))?;
 
     // Whoever won the race, read back the authoritative row.
-    read_installation(pool)
+    let record = read_installation(pool)
         .await?
-        .ok_or_else(|| DomainError::Storage("installation record missing after create".into()))
+        .ok_or_else(|| DomainError::Storage("installation record missing after create".into()))?;
+    Ok(InstallationInit {
+        record,
+        created: result.rows_affected() == 1,
+    })
+}
+
+/// True when authoritative events or sealed content exist without an
+/// installation record (identity lost under live data).
+async fn has_orphaned_content(pool: &Pool<Sqlite>) -> Result<bool, DomainError> {
+    let events: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM events")
+        .fetch_one(pool)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+    if events > 0 {
+        return Ok(true);
+    }
+    let content: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM content_records")
+        .fetch_one(pool)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+    Ok(content > 0)
 }
 
 async fn read_installation(pool: &Pool<Sqlite>) -> Result<Option<InstallationRecord>, DomainError> {

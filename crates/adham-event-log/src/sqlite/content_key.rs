@@ -29,10 +29,32 @@ impl OsKeyringProvider {
     pub fn default_for_installation(installation_id: &str) -> Self {
         Self::new("adham-content-key", installation_id)
     }
-}
 
-impl ContentKeyProvider for OsKeyringProvider {
-    fn content_key(&self) -> Result<[u8; 32], DomainError> {
+    /// Reject non-persistent (mock/test) credential backends before any
+    /// initialization write. Zero store mutation: only opens an entry and
+    /// inspects its concrete credential type.
+    ///
+    /// The selected credential builder is process-global, so the probe entry
+    /// needs no real service/account.
+    pub fn ensure_persistent_backend() -> Result<(), DomainError> {
+        let entry = keyring::Entry::new("adham-backend-probe", "probe")
+            .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
+        if entry
+            .get_credential()
+            .downcast_ref::<keyring::mock::MockCredential>()
+            .is_some()
+        {
+            return Err(DomainError::Storage(
+                "no supported OS credential backend for this platform (mock store selected); refusing to store content key".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// First-time key initialization. Creates the key only when absent and
+    /// verifies persistence with a fresh-Entry read-back before admitting it;
+    /// never overwrites an existing credential.
+    pub fn initialize_content_key(&self) -> Result<[u8; 32], DomainError> {
         let entry = keyring::Entry::new(&self.service, &self.account)
             .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
         match entry.get_password() {
@@ -42,14 +64,50 @@ impl ContentKeyProvider for OsKeyringProvider {
             Err(keyring::Error::NoEntry) => {
                 let mut key = [0u8; 32];
                 rand::rngs::OsRng.fill_bytes(&mut key);
-                let hex = hex_encode(&key);
+                let mut hex = hex_encode(&key);
+                key.zeroize();
                 entry
                     .set_password(&hex)
                     .map_err(|e| DomainError::Storage(format!("keyring store failed: {e}")))?;
-                key.zeroize();
-                parse_key_hex(&hex)
-                    .ok_or_else(|| DomainError::Integrity("key encode failed".into()))
+                // Read-back verify with a fresh Entry: catches stores that
+                // accept writes but do not persist them.
+                let verify = keyring::Entry::new(&self.service, &self.account)
+                    .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
+                let verified = match verify.get_password() {
+                    Ok(stored) if stored == hex => parse_key_hex(&hex).ok_or_else(|| {
+                        DomainError::Integrity("key encode failed".into())
+                    }),
+                    Ok(_) => Err(DomainError::Storage(
+                        "content key read-back mismatch after create; store did not persist the written key".into(),
+                    )),
+                    Err(keyring::Error::NoEntry) => Err(DomainError::Storage(
+                        "content key missing after create; store did not persist the written key".into(),
+                    )),
+                    Err(e) => Err(DomainError::Storage(format!(
+                        "keyring verify read failed: {e}"
+                    ))),
+                };
+                hex.zeroize();
+                verified
             }
+            Err(e) => Err(DomainError::Storage(format!("keyring read failed: {e}"))),
+        }
+    }
+}
+
+impl ContentKeyProvider for OsKeyringProvider {
+    /// Read-only. Never creates: NoEntry is an explicit key-loss error.
+    fn content_key(&self) -> Result<[u8; 32], DomainError> {
+        let entry = keyring::Entry::new(&self.service, &self.account)
+            .map_err(|e| DomainError::Storage(format!("keyring open failed: {e}")))?;
+        match entry.get_password() {
+            Ok(hex) => parse_key_hex(&hex).ok_or_else(|| {
+                DomainError::Integrity("corrupt content key in credential store".into())
+            }),
+            Err(keyring::Error::NoEntry) => Err(DomainError::Storage(
+                "content key missing from credential store; automatic (re)creation is disabled"
+                    .into(),
+            )),
             Err(e) => Err(DomainError::Storage(format!("keyring read failed: {e}"))),
         }
     }

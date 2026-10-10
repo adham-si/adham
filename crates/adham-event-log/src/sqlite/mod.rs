@@ -13,5 +13,5 @@ pub use content_key::{
 };
 pub use fingerprint::{request_fingerprint, scope_fingerprint};
 pub use health::{verify_storage_health, StorageHealthReport};
-pub use identity::{load_or_create_installation, InstallationRecord};
+pub use identity::{load_or_create_installation, InstallationInit, InstallationRecord};
 pub use store::{AppendEventRequest, AppendEventResult, CommandReceiptRecord, SqliteEventStore};
