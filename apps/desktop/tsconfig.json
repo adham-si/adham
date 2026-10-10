@@ -6,9 +6,7 @@
     "outDir": "dist",
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "declaration": false,
-    "declarationMap": false
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]

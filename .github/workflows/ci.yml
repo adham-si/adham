@@ -89,3 +89,87 @@ jobs:
 
       - name: Dependency audit (pnpm)
         run: pnpm audit --audit-level=high
+
+  # Additive macOS coverage. The `validate` job above keeps its id, name,
+  # and runner so the existing required Windows check is unchanged; no
+  # branch-rule update is needed for Windows protection. Require this job
+  # too once it is green.
+  validate-macos:
+    name: Validation and Quality Checks (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version-file: '.node-version'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          run_install: false
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check file sizes
+        run: node scripts/check-file-size.mjs
+
+      - name: Biome formatting check
+        run: pnpm format:check
+
+      - name: Oxlint linting check
+        run: pnpm lint
+
+      - name: TypeScript typecheck
+        run: pnpm typecheck
+
+      - name: Frontend unit & component tests
+        run: pnpm test
+
+      - name: Rust formatting check
+        run: cargo fmt --all -- --check
+
+      - name: Rust typecheck
+        run: cargo check --workspace --all-targets --locked
+
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Contracts drift check
+        run: cargo xtask contracts
+
+      - name: Contracts no-diff
+        run: git diff --exit-code -- packages/contracts-generated
+
+      - name: Rust tests
+        run: cargo test --workspace --locked
+
+      - name: P0 repair regression suite
+        run: cargo test -p adham-desktop-api --test p0_repair_regression --locked
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Dependency audit (cargo-deny)
+        run: cargo deny check
+
+      - name: Deny exception record check
+        run: pnpm check:deny-exceptions
+
+      - name: Deny exception record self-test
+        run: pnpm check:deny-exceptions:self-test
+
+      - name: Dependency audit (pnpm)
+        run: pnpm audit --audit-level=high

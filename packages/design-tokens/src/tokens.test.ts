@@ -65,6 +65,27 @@ describe('parity between tokens.css and the typed mirror', () => {
   });
 });
 
+describe('accessibility media query overrides in tokens.css', () => {
+  it('overrides duration to 0ms under prefers-reduced-motion: reduce', () => {
+    const reducedMotionMatch = css.match(/@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)\s*{([^}]*)}/);
+    const body = reducedMotionMatch?.[1] ?? '';
+    expect(body).toContain('--duration-fast: 0ms;');
+    expect(body).toContain('--duration-base: 0ms;');
+    expect(body).toContain('--duration-slow: 0ms;');
+  });
+
+  it('sets system high-contrast colors under forced-colors: active', () => {
+    const forcedColorsMatch = css.match(/@media\s*\(\s*forced-colors:\s*active\s*\)\s*{([^}]*)}/);
+    const body = forcedColorsMatch?.[1] ?? '';
+    expect(body).toContain('--background: Canvas;');
+    expect(body).toContain('--foreground: CanvasText;');
+    expect(body).toContain('--accent: LinkText;');
+    expect(body).toContain('--border-interactive: LinkText;');
+    expect(body).toContain('--focus: Highlight;');
+    expect(body).toContain('--selection: Highlight;');
+  });
+});
+
 describe('tailwind bridge mappings', () => {
   it('maps every tier-2 name to a Tailwind utility in @theme inline', () => {
     // Shadow values are not colors: `shadow-floating` maps into the `--shadow-*`
