@@ -19,12 +19,7 @@ import {
 
 export type { PendingSend } from './conversation-identity';
 
-export interface UiMessage {
-  id: string;
-  role: string;
-  text: string;
-  createdAt: string;
-}
+export type UiMessage = { id: string; role: string; text: string; createdAt: string };
 
 export type ConversationStatus =
   | 'bootstrapping'
@@ -45,31 +40,16 @@ export const conversationCapabilities = {
   stop: false,
 } as const;
 
-export interface ConversationContext {
-  workspaceId: string;
-  projectId: string;
-  sessionId: string;
-}
+export type ConversationContext = { workspaceId: string; projectId: string; sessionId: string };
 
-interface BootstrapSnapshot {
+type BootstrapSnapshot = {
   isInitialized: boolean;
   activeWorkspaceId: string | null;
   activeProjectId: string | null;
-}
-
-interface SessionSnapshot {
-  sessionId: string;
-}
-
-interface SubmittedSnapshot {
-  messageId: string;
-  text: string;
-  createdAt: string;
-}
-
-interface ConversationSnapshot {
-  items: ConversationMessageDto[];
-}
+};
+type SessionSnapshot = { sessionId: string };
+type SubmittedSnapshot = { messageId: string; text: string; createdAt: string };
+type ConversationSnapshot = { items: ConversationMessageDto[] };
 
 export interface ConversationBackend {
   getBootstrapState(): Promise<BootstrapSnapshot>;
@@ -93,19 +73,29 @@ export interface ConversationBackend {
   ): Promise<ConversationSnapshot>;
 }
 
-function toUiMessage(dto: {
+const toUiMessage = (dto: {
   messageId: string;
   role?: string;
   text: string;
   createdAt: string;
-}): UiMessage {
-  return {
-    id: dto.messageId,
-    role: dto.role ?? 'user',
-    text: dto.text,
-    createdAt: dto.createdAt,
-  };
-}
+}): UiMessage => ({
+  id: dto.messageId,
+  role: dto.role ?? 'user',
+  text: dto.text,
+  createdAt: dto.createdAt,
+});
+
+const switchUnresolved = (
+  req: ConversationContext | null,
+  curId: string | undefined,
+): SubmitOutcome | null =>
+  req && req.sessionId !== curId
+    ? {
+        ok: false,
+        error: 'Session switch has not completed. Retry the switch before sending.',
+        uncertain: false,
+      }
+    : null;
 
 export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [status, setStatus] = React.useState<ConversationStatus>('bootstrapping');
@@ -149,6 +139,18 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     };
   }, []);
 
+  const isStale = React.useCallback(
+    (gen: number, load: number, mut: number, sessId?: string) =>
+      !mountedRef.current ||
+      generationRef.current !== gen ||
+      loadSeqRef.current !== load ||
+      mutationSeqRef.current !== mut ||
+      (requestedRef.current !== null &&
+        sessId !== undefined &&
+        requestedRef.current.sessionId !== sessId),
+    [],
+  );
+
   const loadHistory = React.useCallback(
     async (
       ctx: ConversationContext,
@@ -163,15 +165,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     ): Promise<UiMessage[] | null> => {
       try {
         const page = await backend.getConversation(ctx.workspaceId, ctx.projectId, ctx.sessionId);
-        if (
-          !mountedRef.current ||
-          generationRef.current !== generation ||
-          loadSeqRef.current !== loadSeq ||
-          mutationSeqRef.current !== mutationSeq ||
-          (requestedRef.current !== null && requestedRef.current.sessionId !== ctx.sessionId)
-        ) {
-          return null;
-        }
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
         const items = page.items.map(toUiMessage);
         setContext(ctx);
         setMessages(items);
@@ -180,21 +174,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (verifiedScope) scopeStaleRef.current = false;
         return items;
       } catch (err) {
-        if (
-          !mountedRef.current ||
-          generationRef.current !== generation ||
-          loadSeqRef.current !== loadSeq ||
-          mutationSeqRef.current !== mutationSeq ||
-          (requestedRef.current !== null && requestedRef.current.sessionId !== ctx.sessionId)
-        ) {
-          return null;
-        }
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
         setError(err instanceof Error ? err.message : 'Conversation history failed to load.');
         setStatus('error');
         return null;
       }
     },
-    [backend],
+    [backend, isStale],
   );
 
   const bootstrap = React.useCallback(async (): Promise<ConversationContext | null> => {
@@ -471,15 +457,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       if (submitInFlightRef.current) {
         return { ok: false, error: 'A message is already being saved.', uncertain: false };
       }
-      // A requested session switch that has not resolved must never fall
-      // back to the previous context for sending.
-      if (requestedRef.current && requestedRef.current.sessionId !== context?.sessionId) {
-        return {
-          ok: false,
-          error: 'Session switch has not completed. Retry the switch before sending.',
-          uncertain: false,
-        };
-      }
+      const preSwitch = switchUnresolved(requestedRef.current, context?.sessionId);
+      if (preSwitch) return preSwitch;
       submitInFlightRef.current = true;
       try {
         let ctx = context;
@@ -487,13 +466,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           setStatus('bootstrapping');
           ctx = await bootstrap();
           if (!ctx) return { ok: false, error: 'Conversation is not ready.', uncertain: false };
-          if (requestedRef.current && requestedRef.current.sessionId !== ctx.sessionId) {
-            return {
-              ok: false,
-              error: 'Session switch has not completed. Retry the switch before sending.',
-              uncertain: false,
-            };
-          }
+          const postSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
+          if (postSwitch) return postSwitch;
         }
         // Frozen logical command: the identity is frozen BEFORE dispatch, so
         // navigating away, crashing, or losing the transport mid-save can
