@@ -169,4 +169,154 @@ describe('useConversation scope-change guards', () => {
     });
     expect(outcome).toEqual({ ok: true });
   });
+
+  it('pins authoritative recovery: ready A -> confirmed B -> B bootstrap outage -> reload/retry cannot load retained A or unlock sends to A -> B-only dispatch after recovery', async () => {
+    const backend = fakeBackend();
+    // Scope A: ws-A, proj-A
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.createSession.mockResolvedValueOnce({
+      sessionId: 'sess-A',
+      projectId: 'proj-A',
+      title: null,
+      createdAt: '2026-10-09T00:00:00Z',
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [
+        {
+          messageId: 'msg-A',
+          role: 'user',
+          text: 'existing A message',
+          createdAt: '2026-10-09T00:00:01Z',
+          sourceEventId: 'evt-A',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    });
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-A',
+      projectId: 'proj-A',
+      sessionId: 'sess-A',
+    });
+    expect(result.current.messages).toHaveLength(1);
+
+    // Now confirmed scope B is announced / refreshed, but B bootstrap experiences an outage
+    backend.getBootstrapState.mockRejectedValueOnce(new Error('B bootstrap outage'));
+    await act(async () => {
+      result.current.refreshScope();
+    });
+    await waitFor(() => expect(result.current.status).toBe('error'));
+
+    // Verify context A was not retained and sending is blocked
+    expect(result.current.context).toBeNull();
+    let blocked1: unknown;
+    await act(async () => {
+      blocked1 = await result.current.submit('send during outage');
+    });
+    expect(blocked1).toEqual({
+      ok: false,
+      uncertain: false,
+      error: expect.stringMatching(/scope is changing/i),
+    });
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+
+    // Calling reload() during outage must route to bootstrap (not load retained A history or clear the latch)
+    backend.getBootstrapState.mockRejectedValueOnce(new Error('B bootstrap outage on reload'));
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.context).toBeNull();
+    let blocked2: unknown;
+    await act(async () => {
+      blocked2 = await result.current.submit('send after reload');
+    });
+    expect(blocked2).toEqual({
+      ok: false,
+      uncertain: false,
+      error: expect.stringMatching(/scope is changing/i),
+    });
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+
+    // Calling retry() during outage must also route to bootstrap (not load retained A session)
+    backend.getBootstrapState.mockRejectedValueOnce(new Error('B bootstrap outage on retry'));
+    await act(async () => {
+      await result.current.retry();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.context).toBeNull();
+    let blocked3: unknown;
+    await act(async () => {
+      blocked3 = await result.current.submit('send after retry');
+    });
+    expect(blocked3).toEqual({
+      ok: false,
+      uncertain: false,
+      error: expect.stringMatching(/scope is changing/i),
+    });
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+
+    // Assert ZERO sends to A occurred across all failed/repeated reload/retry attempts
+    expect(backend.submitMessage.mock.calls.filter((call) => call[0] === 'ws-A')).toHaveLength(0);
+
+    // Now connectivity returns and B bootstrap succeeds
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-B',
+      activeProjectId: 'proj-B',
+    });
+    backend.createSession.mockResolvedValueOnce({
+      sessionId: 'sess-B',
+      projectId: 'proj-B',
+      title: null,
+      createdAt: '2026-10-09T00:00:02Z',
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+
+    await act(async () => {
+      await result.current.retry();
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+
+    // Now submit permits ONLY B sends
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-B1',
+      sessionId: 'sess-B',
+      text: 'hello B',
+      createdAt: '2026-10-09T00:00:03Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hello B');
+    });
+    expect(outcome).toEqual({ ok: true });
+    expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+    expect(backend.submitMessage).toHaveBeenCalledWith(
+      'ws-B',
+      'proj-B',
+      'sess-B',
+      { text: 'hello B' },
+      expect.objectContaining({ requestId: expect.any(String) }),
+    );
+    // Absolute guarantee: zero sends ever targeted ws-A
+    expect(backend.submitMessage.mock.calls.some((call) => call[0] === 'ws-A')).toBe(false);
+  });
 });

@@ -155,6 +155,11 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       generation: number,
       loadSeq: number,
       mutationSeq: number,
+      // True only for a history load issued by bootstrap for the scope it
+      // just resolved authoritatively. Retained-context reloads, retries,
+      // and session switches must never release the stale-scope latch: the
+      // retained scope is not proof of the durable selection.
+      verifiedScope = false,
     ): Promise<UiMessage[] | null> => {
       try {
         const page = await backend.getConversation(ctx.workspaceId, ctx.projectId, ctx.sessionId);
@@ -172,7 +177,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setMessages(items);
         setError(null);
         setStatus('ready');
-        scopeStaleRef.current = false;
+        if (verifiedScope) scopeStaleRef.current = false;
         return items;
       } catch (err) {
         if (
@@ -217,6 +222,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       try {
         snapshot = await backend.getBootstrapState();
       } catch (err) {
+        bootPromiseRef.current = null;
         if (mountedRef.current && generationRef.current === generation) {
           fail(
             `${err instanceof Error ? err.message : 'Bootstrap state failed to load.'} Retry once connectivity returns.`,
@@ -248,12 +254,14 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       const cached = readSessionCache();
       if (cached && cached.workspaceId === ws && cached.projectId === proj) {
         const seq = freshSeq();
-        if ((await loadHistory(cached, generation, seq.loadSeq, seq.mutationSeq)) !== null) {
+        if ((await loadHistory(cached, generation, seq.loadSeq, seq.mutationSeq, true)) !== null) {
           createdRef.current = cached;
           writeStorage(SESSION_CACHE_KEY, JSON.stringify(cached));
+          scopeStaleRef.current = false;
           return cached;
         }
         if (superseded(seq)) return null;
+        bootPromiseRef.current = null;
         fail('Saved conversation could not be loaded. Retry once connectivity returns.');
         return null;
       }
@@ -311,9 +319,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           removeStorage(CREATE_INTENT_KEY);
         }
         const seq = freshSeq();
-        await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq);
+        const loaded = await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq, true);
+        if (loaded !== null) {
+          scopeStaleRef.current = false;
+        }
         return ctx;
       } catch (err) {
+        bootPromiseRef.current = null;
         if (mountedRef.current && generationRef.current === generation) {
           if (isDefinitePreEffectRejection(err)) {
             fail(rejectionMessage(err));
@@ -342,6 +354,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     bootPromiseRef.current = null;
     generationRef.current += 1;
     requestedRef.current = null;
+    createdRef.current = null;
+    setContext(null);
+    setMessages([]);
     scopeStaleRef.current = true;
     setStatus('bootstrapping');
     setError(null);
@@ -356,8 +371,14 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// so the request identity is never cleared here. It resolves only
   /// through the response or receipt replay for that exact request.
   const reload = React.useCallback(async () => {
+    if (scopeStaleRef.current || !context) {
+      bootPromiseRef.current = null;
+      await bootstrap();
+      return;
+    }
     const ctx = requestedRef.current ?? context ?? createdRef.current;
     if (!ctx) {
+      bootPromiseRef.current = null;
       await bootstrap();
       return;
     }
@@ -388,6 +409,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// requested switch target when one is pending.
   const retry = React.useCallback(async () => {
     bootPromiseRef.current = null;
+    if (scopeStaleRef.current || !context) {
+      await bootstrap();
+      return;
+    }
     const resumed = requestedRef.current ?? createdRef.current;
     setStatus('bootstrapping');
     setError(null);
@@ -397,7 +422,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       return;
     }
     await bootstrap();
-  }, [backend, bootstrap, loadHistory]);
+  }, [backend, bootstrap, context, loadHistory]);
 
   /// Switch to another session of the same workspace/project. Records the
   /// requested target immediately so retries and reloads cannot fall back
@@ -405,8 +430,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// the previous session are ignored.
   const openSession = React.useCallback(
     async (sessionId: string) => {
+      if (scopeStaleRef.current) return;
       let base = context ?? createdRef.current;
       if (!base) {
+        bootPromiseRef.current = null;
         const ctx = await bootstrap();
         if (!ctx) return;
         base = ctx;

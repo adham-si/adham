@@ -269,6 +269,75 @@ describe('useSelection', () => {
     expect(second.result.current.activeProjectId).toBe('proj-1');
     expect(backend.getBootstrapState.mock.calls.length).toBe(readsBefore);
   });
+
+  it('pins bystander stale snapshot: fences old in-flight getBootstrapState so confirmed event B remains displayed', async () => {
+    let resolveOldBootstrap!: (value: {
+      isInitialized: boolean;
+      activeWorkspaceId: string | null;
+      activeProjectId: string | null;
+    }) => void;
+    const backend = {
+      getBootstrapState: vi.fn(
+        () =>
+          new Promise<{
+            isInitialized: boolean;
+            activeWorkspaceId: string | null;
+            activeProjectId: string | null;
+          }>((resolve) => {
+            resolveOldBootstrap = resolve;
+          }),
+      ),
+      listWorkspaces: vi.fn(async () => ({ workspaces: [WS], truncated: false })),
+      listProjects: vi.fn(async (wsId: string) => ({
+        workspaceId: wsId,
+        projects: wsId === 'ws-1' ? [PROJ] : [],
+        truncated: false,
+      })),
+      selectProject: vi.fn(),
+    };
+
+    // Bystander surface mounts and starts refresh with deferred old getBootstrapState
+    const bystander = renderHook(() => useSelection({ backend }));
+    expect(bystander.result.current.loading).toBe(true);
+    expect(bystander.result.current.activeWorkspaceId).toBeNull();
+
+    // In parallel, another surface confirms selection of B and fires SCOPE_CHANGED_EVENT
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(SCOPE_CHANGED_EVENT, {
+          detail: {
+            step: 'project',
+            origin: 'selected',
+            workspaceId: 'ws-B',
+            projectId: 'proj-B',
+          },
+        }),
+      );
+    });
+
+    // Bystander immediately reflects confirmed scope B
+    expect(bystander.result.current.activeWorkspaceId).toBe('ws-B');
+    expect(bystander.result.current.activeProjectId).toBe('proj-B');
+
+    // Now bystander's deferred old bootstrap response resolves with old scope A
+    await act(async () => {
+      resolveOldBootstrap({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-A',
+        activeProjectId: 'proj-A',
+      });
+    });
+
+    // Wait for bystander loading to complete
+    await waitFor(() => expect(bystander.result.current.loading).toBe(false));
+
+    // The old snapshot was fenced: active IDs REMAIN B, never reverting to old A!
+    expect(bystander.result.current.activeWorkspaceId).toBe('ws-B');
+    expect(bystander.result.current.activeProjectId).toBe('proj-B');
+    // Lists finished loading normally
+    expect(bystander.result.current.loaded).toBe(true);
+    expect(bystander.result.current.workspaces).toEqual([WS]);
+  });
 });
 
 describe('WorkspaceSelection', () => {

@@ -68,11 +68,13 @@ export function useSelection({
   const [working, setWorking] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const loadSeqRef = React.useRef(0);
+  const scopeSeqRef = React.useRef(0);
   const workingRef = React.useRef(false);
 
   const refresh = React.useCallback(async () => {
     loadSeqRef.current += 1;
     const seq = loadSeqRef.current;
+    const scopeSeqAtStart = scopeSeqRef.current;
     setLoading(true);
     try {
       const [scope, found] = await Promise.all([
@@ -80,8 +82,10 @@ export function useSelection({
         backend.listWorkspaces(),
       ]);
       if (loadSeqRef.current !== seq) return;
-      setActiveWorkspaceId(scope.activeWorkspaceId);
-      setActiveProjectId(scope.activeProjectId);
+      if (scopeSeqRef.current === scopeSeqAtStart) {
+        setActiveWorkspaceId(scope.activeWorkspaceId);
+        setActiveProjectId(scope.activeProjectId);
+      }
       setWorkspaces(found.workspaces);
       setTruncatedWorkspaces(found.truncated);
       const grouped: Record<string, ProjectSummary[]> = {};
@@ -133,6 +137,7 @@ export function useSelection({
     const onScopeChanged = (event: Event) => {
       const detail = (event as CustomEvent<Partial<ScopeChangedDetail>>).detail;
       if (typeof detail?.workspaceId === 'string') {
+        scopeSeqRef.current += 1;
         setActiveWorkspaceId(detail.workspaceId);
         setActiveProjectId(typeof detail?.projectId === 'string' ? detail.projectId : null);
       }
@@ -184,6 +189,7 @@ export function useSelection({
             return { ok: false, error: 'Selection changed while confirming.', uncertain: false };
           }
           clearSelectIntent();
+          scopeSeqRef.current += 1;
           setActiveWorkspaceId(scope.activeWorkspaceId);
           setActiveProjectId(scope.activeProjectId);
           setError(null);
