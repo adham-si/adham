@@ -20,6 +20,7 @@ export const BootstrapStateSchema = z.object({
   isInitialized: z.boolean(),
   activeWorkspaceId: z.string().nullable(),
   activeProjectId: z.string().nullable(),
+  installationId: z.string().nullable().default(null),
 });
 
 export const PlatformInfoSchema = z.object({
@@ -60,6 +61,12 @@ export const SessionSummarySchema = z.object({
   projectId: z.string(),
   title: z.string().nullable(),
   createdAt: z.string(),
+});
+
+export const SessionListSchema = z.object({
+  projectId: z.string(),
+  sessions: z.array(SessionSummarySchema),
+  truncated: z.boolean(),
 });
 
 export const SubmittedMessageSchema = z.object({

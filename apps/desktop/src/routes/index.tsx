@@ -4,6 +4,7 @@ import { Shell, Context, Titlebar, NavRail, Sidebar, Panel } from '@/widgets/she
 import { ConversationPanel } from '@/features/conversation/conversation-panel';
 import { useSelection } from '@/features/workspace-selection/use-selection';
 import { WorkspaceSelection } from '@/features/workspace-selection/workspace-selection';
+import { useProjectSessions } from '@/features/conversation/use-project-sessions';
 import { SettingsPage } from '@/pages/settings';
 
 export const Route = createFileRoute('/')({
@@ -20,6 +21,21 @@ function IndexComponent() {
     },
     [sel],
   );
+
+  const {
+    sessions,
+    activeSessionId,
+    selectSession,
+    newSession,
+    creating: sessionsCreating,
+    error: sessionsError,
+    truncated: sessionsTruncated,
+    refresh: refreshSessions,
+  } = useProjectSessions({
+    workspaceId: sel.activeWorkspaceId,
+    projectId: sel.activeProjectId,
+  });
+
   const selectionMenu = (
     <WorkspaceSelection
       workspaces={sel.workspaces}
@@ -41,7 +57,21 @@ function IndexComponent() {
     <Shell
       titlebar={<Titlebar />}
       navRail={<NavRail />}
-      sidebar={<Sidebar primaryProps={{ selectionMenu }} />}
+      sidebar={
+        <Sidebar
+          primaryProps={{
+            selectionMenu,
+            sessions,
+            activeSessionId,
+            error: sessionsError,
+            onRetry: () => void refreshSessions(),
+            truncated: sessionsTruncated,
+            creatingSession: sessionsCreating,
+            onSelectSession: selectSession,
+            onNewSession: () => void newSession(),
+          }}
+        />
+      }
       panel={<Panel />}
       overlays={<SettingsPage />}
     >

@@ -10,10 +10,17 @@ import {
   writeStorage,
 } from './conversation-identity';
 
+import {
+  clearDurableSessionPreference,
+  readDurableSessionPreference,
+  writeDurableSessionPreference,
+} from './durable-session-storage';
+
 export type BootstrapSnapshot = {
   isInitialized: boolean;
   activeWorkspaceId: string | null;
   activeProjectId: string | null;
+  installationId?: string | null;
 };
 
 export type SessionSnapshot = { sessionId: string };
@@ -40,12 +47,17 @@ export interface ConversationBackend {
     projectId: string,
     sessionId: string,
   ): Promise<ConversationSnapshot>;
+  listSessions?(context: {
+    workspaceId?: string;
+    projectId: string;
+  }): Promise<{ sessions: Array<{ sessionId: string; title: string | null; createdAt: string }> }>;
 }
 
 export type ConversationContext = {
   workspaceId: string;
   projectId: string;
   sessionId: string;
+  installationId?: string | null;
 };
 
 export type ScopeResolutionOutcome =
@@ -56,9 +68,8 @@ export type ScopeResolutionOutcome =
   | { kind: 'error'; message: string };
 
 /// Resolve authoritative selection from the backend bootstrap state and acquire
-/// a durable session identity (resuming a cached session matching the active scope
-/// or creating a new session with an idempotent request identity). Fences all storage
-/// mutations against staleness so superseded asynchronous runs cannot corrupt newer state.
+/// a durable session identity (resuming a validated preference, recovering existing project
+/// sessions, or creating a new session with idempotent request identity).
 export async function resolveAuthoritativeSession(
   backend: ConversationBackend,
   isStale: () => boolean = () => false,
@@ -85,13 +96,99 @@ export async function resolveAuthoritativeSession(
 
   const ws = snapshot.activeWorkspaceId;
   const proj = snapshot.activeProjectId;
+  const instId = snapshot.installationId ?? null;
 
+  // 1. Check dedicated durable session preference for (installation, workspace, project)
+  if (instId) {
+    const pref = readDurableSessionPreference(instId, ws, proj);
+    if (pref) {
+      try {
+        await backend.getConversation(ws, proj, pref.sessionId);
+        if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+        return {
+          kind: 'resumed',
+          context: {
+            workspaceId: ws,
+            projectId: proj,
+            sessionId: pref.sessionId,
+            installationId: instId,
+          },
+        };
+      } catch (err) {
+        if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+        if (isDefinitePreEffectRejection(err)) {
+          // Stored preference is invalid (session stream missing or mismatched).
+          clearDurableSessionPreference(instId, ws, proj);
+        } else {
+          // Transient/storage read failure: offer retry rather than creating replacement session.
+          return {
+            kind: 'error',
+            message: `${err instanceof Error ? err.message : 'Saved conversation could not be loaded.'} Retry once connectivity returns.`,
+          };
+        }
+      }
+    }
+  }
+
+  // 2. Active session cache check
   const cached = readSessionCache();
   if (cached && cached.workspaceId === ws && cached.projectId === proj) {
     return { kind: 'resumed', context: cached };
   }
   if (cached && !isStale()) {
     removeStorage(SESSION_CACHE_KEY);
+  }
+
+  // 3. Existing-session recovery: discover existing project sessions through backend
+  if (backend.listSessions) {
+    let list: { sessions: Array<{ sessionId: string; title: string | null; createdAt: string }> };
+    try {
+      list = await backend.listSessions({ workspaceId: ws, projectId: proj });
+    } catch (err) {
+      if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+      const rawMsg = typeof err === 'string' ? err : err instanceof Error ? err.message : null;
+      return {
+        kind: 'error',
+        message: isDefinitePreEffectRejection(err)
+          ? (rawMsg ?? rejectionMessage(err))
+          : `${rawMsg ?? 'Session discovery failed.'} Retry once connectivity returns.`,
+      };
+    }
+    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+    const firstSession = list.sessions[0];
+    if (firstSession) {
+      const mostRecent = firstSession.sessionId;
+      try {
+        await backend.getConversation(ws, proj, mostRecent);
+      } catch (err) {
+        if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+        const rawMsg = typeof err === 'string' ? err : err instanceof Error ? err.message : null;
+        return {
+          kind: 'error',
+          message: isDefinitePreEffectRejection(err)
+            ? (rawMsg ?? rejectionMessage(err))
+            : `${rawMsg ?? 'Saved conversation could not be loaded.'} Retry once connectivity returns.`,
+        };
+      }
+      if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+      if (instId) {
+        writeDurableSessionPreference({
+          installationId: instId,
+          workspaceId: ws,
+          projectId: proj,
+          sessionId: mostRecent,
+        });
+      }
+      return {
+        kind: 'resumed',
+        context: {
+          workspaceId: ws,
+          projectId: proj,
+          sessionId: mostRecent,
+          ...(instId ? { installationId: instId } : {}),
+        },
+      };
+    }
   }
 
   if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
@@ -134,7 +231,17 @@ export async function resolveAuthoritativeSession(
       workspaceId: ws,
       projectId: proj,
       sessionId: session.sessionId,
+      ...(instId ? { installationId: instId } : {}),
     };
+
+    if (instId) {
+      writeDurableSessionPreference({
+        installationId: instId,
+        workspaceId: ws,
+        projectId: proj,
+        sessionId: session.sessionId,
+      });
+    }
 
     if (writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx))) {
       const stored = readCreateIntent(ws, proj);

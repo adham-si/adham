@@ -15,6 +15,7 @@ pub async fn handle_get_bootstrap_state(ctx: &super::ApiContext) -> Result<Boots
         is_initialized: active_workspace_id.is_some(),
         active_workspace_id,
         active_project_id,
+        installation_id: Some(init.record.installation_id.to_string()),
     })
 }
 

@@ -210,6 +210,7 @@ pub async fn select_project(
         is_initialized: true,
         active_workspace_id: Some(ws_id.to_string()),
         active_project_id: Some(project_id.to_string()),
+        installation_id: Some(ctx.installation_id.to_string()),
     };
     let response_json = serde_json::to_vec(&state).unwrap_or_default();
     let correlation_id = CorrelationId::new_v7();

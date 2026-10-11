@@ -2,8 +2,8 @@ use adham_desktop_api::{
     ApiContext, BootstrapState, CommandContext, CommandEnvelope, CommandResult, ConversationPage,
     CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope,
     PlatformInfo, ProjectList, ProjectSummary, RebuildProjectionsResponse, SelectProjectPayload,
-    SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage, WorkspaceList,
-    WorkspaceSummary,
+    SessionList, SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage,
+    WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -86,6 +86,16 @@ async fn create_session(
     request: CommandEnvelope<CreateSessionPayload>,
 ) -> Result<CommandResult<SessionSummary>, ErrorEnvelope> {
     adham_desktop_api::handle_create_session(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_sessions(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+) -> Result<SessionList, ErrorEnvelope> {
+    adham_desktop_api::handle_list_sessions(&state, context)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -188,6 +198,7 @@ pub fn run() {
             list_projects,
             select_project,
             create_session,
+            list_sessions,
             submit_message,
             get_conversation,
             admin_rebuild_projections,
