@@ -176,8 +176,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         loadSeqRef.current !== seq.loadSeq ||
         mutationSeqRef.current !== seq.mutationSeq;
 
-      const resolved = await resolveAuthoritativeSession(backend);
-      if (!mountedRef.current || generationRef.current !== generation) return null;
+      const isCurrentGen = () => !mountedRef.current || generationRef.current !== generation;
+      const resolved = await resolveAuthoritativeSession(backend, isCurrentGen);
+      if (isCurrentGen()) return null;
 
       if (resolved.kind === 'needs-workspace') {
         setActiveWorkspaceId(resolved.activeWorkspaceId);

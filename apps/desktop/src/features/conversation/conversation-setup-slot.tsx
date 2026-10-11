@@ -92,8 +92,13 @@ export function ConversationSetupSlot({
   }
 
   if (chosenWorkspaceId !== null) {
-    const chosenProjects = sel.projectsBy[chosenWorkspaceId] ?? [];
-    if (chosenProjects.length === 0) {
+    const isFailed = sel.failedProjectLists.includes(chosenWorkspaceId);
+    const isLoaded = chosenWorkspaceId in sel.projectsBy;
+    const chosenProjects = sel.projectsBy[chosenWorkspaceId];
+
+    // Genuinely empty workspace: projects discovery completed, did not fail,
+    // and confirmed 0 projects. Failed or unknown discovery MUST NOT offer creation.
+    if (!isFailed && isLoaded && chosenProjects && chosenProjects.length === 0) {
       const chosenName =
         sel.workspaces.find((w) => w.workspaceId === chosenWorkspaceId)?.name ?? '';
       return (
@@ -122,7 +127,11 @@ export function ConversationSetupSlot({
     }
   }
 
-  if (stepHasRecords || activeProjectsFailed || (sel.listError && !sel.loaded)) {
+  const chosenHadIssues =
+    chosenWorkspaceId !== null &&
+    (sel.failedProjectLists.includes(chosenWorkspaceId) || !(chosenWorkspaceId in sel.projectsBy));
+
+  if (stepHasRecords || activeProjectsFailed || chosenHadIssues || (sel.listError && !sel.loaded)) {
     return (
       <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">

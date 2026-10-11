@@ -57,19 +57,24 @@ export type ScopeResolutionOutcome =
 
 /// Resolve authoritative selection from the backend bootstrap state and acquire
 /// a durable session identity (resuming a cached session matching the active scope
-/// or creating a new session with an idempotent request identity).
+/// or creating a new session with an idempotent request identity). Fences all storage
+/// mutations against staleness so superseded asynchronous runs cannot corrupt newer state.
 export async function resolveAuthoritativeSession(
   backend: ConversationBackend,
+  isStale: () => boolean = () => false,
 ): Promise<ScopeResolutionOutcome> {
   let snapshot: BootstrapSnapshot;
   try {
     snapshot = await backend.getBootstrapState();
   } catch (err) {
+    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
     return {
       kind: 'error',
       message: `${err instanceof Error ? err.message : 'Bootstrap state failed to load.'} Retry once connectivity returns.`,
     };
   }
+
+  if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
 
   if (!snapshot.isInitialized || !snapshot.activeWorkspaceId) {
     return { kind: 'needs-workspace', activeWorkspaceId: snapshot.activeWorkspaceId };
@@ -85,13 +90,16 @@ export async function resolveAuthoritativeSession(
   if (cached && cached.workspaceId === ws && cached.projectId === proj) {
     return { kind: 'resumed', context: cached };
   }
-  if (cached) {
+  if (cached && !isStale()) {
     removeStorage(SESSION_CACHE_KEY);
   }
+
+  if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
 
   try {
     let intent = readCreateIntent(ws, proj);
     if (!intent) {
+      if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
       intent = { requestId: crypto.randomUUID(), workspaceId: ws, projectId: proj };
       if (!writeStorage(CREATE_INTENT_KEY, JSON.stringify(intent))) {
         return {
@@ -111,9 +119,16 @@ export async function resolveAuthoritativeSession(
         { requestId: intent.requestId },
       );
     } catch (err) {
-      if (isDefinitePreEffectRejection(err)) removeStorage(CREATE_INTENT_KEY);
+      if (isDefinitePreEffectRejection(err) && !isStale()) {
+        const stored = readCreateIntent(ws, proj);
+        if (stored?.requestId === intent.requestId) {
+          removeStorage(CREATE_INTENT_KEY);
+        }
+      }
       throw err;
     }
+
+    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
 
     const ctx: ConversationContext = {
       workspaceId: ws,
@@ -122,10 +137,14 @@ export async function resolveAuthoritativeSession(
     };
 
     if (writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx))) {
-      removeStorage(CREATE_INTENT_KEY);
+      const stored = readCreateIntent(ws, proj);
+      if (stored?.requestId === intent.requestId) {
+        removeStorage(CREATE_INTENT_KEY);
+      }
     }
     return { kind: 'created', context: ctx };
   } catch (err) {
+    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
     if (isDefinitePreEffectRejection(err)) {
       return { kind: 'error', message: rejectionMessage(err) };
     }
