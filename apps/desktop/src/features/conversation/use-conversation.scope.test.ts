@@ -548,9 +548,12 @@ describe('useConversation scope-change guards', () => {
       JSON.stringify({ requestId: 'intent-B', workspaceId: 'ws-B', projectId: 'proj-B' }),
     );
 
-    // 3. Scope A's createSession rejects late (e.g. pre-effect rejection)
+    // 3. Scope A's createSession rejects late with a definite pre-effect rejection
     await act(async () => {
-      rejectCreateA(new Error('VALIDATION_FAILED: scope invalid'));
+      rejectCreateA({
+        code: 'VALIDATION_FAILED',
+        messageKey: 'error.validationFailed',
+      });
     });
 
     // 4. Assert: Scope B cache and intent remain intact
