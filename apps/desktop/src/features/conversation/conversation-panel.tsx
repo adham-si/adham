@@ -12,9 +12,8 @@ import { adhamClient } from '@/shared/api/adham-client';
 import { useConversation, type ConversationBackend } from './use-conversation';
 import { useProvisioning, type ProvisioningBackend } from './use-provisioning';
 import { useSelection, type SelectionBackend } from '../workspace-selection/use-selection';
-import { WorkspaceSelection } from '../workspace-selection/workspace-selection';
+import { ConversationSetupSlot } from './conversation-setup-slot';
 import { announceScopeChanged, SCOPE_CHANGED_EVENT } from './conversation-identity';
-import { ProvisioningForm } from './provisioning-form';
 import { submissionNotice } from './submission-notice';
 
 const DEFAULT_MODEL_ID = 'local:qwen2.5-coder:32b';
@@ -196,141 +195,19 @@ export function ConversationPanel({
     );
   }
   if (needsProvisioning || (provisionTransition && conv.status === 'bootstrapping')) {
-    const step =
-      conv.status === 'needs-workspace'
-        ? 'workspace'
-        : conv.status === 'needs-project'
-          ? 'project'
-          : (provisionTransition?.step ?? 'workspace');
-    // A held transition keeps its own confirmed UI disabled: creation holds
-    // its form, selection holds its (disabled) list. No step switch happens
-    // until authoritative bootstrap advances.
-    if (provisionTransition) {
-      if (provisionTransition.origin === 'selected') {
-        return (
-          <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
-            <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
-              <WorkspaceSelection
-                key={step}
-                workspaces={sel.workspaces}
-                projectsBy={sel.projectsBy}
-                truncatedWorkspaces={sel.truncatedWorkspaces}
-                truncatedProjects={sel.truncatedProjects}
-                failedWorkspaces={sel.failedProjectLists}
-                activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
-                activeProjectId={sel.activeProjectId}
-                loading={false}
-                listError={null}
-                disabled
-                selectError={null}
-                onSelectProject={() => {}}
-              />
-            </div>
-          </div>
-        );
-      }
-      return (
-        <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
-          <ProvisioningForm
-            key={provisionTransition.step}
-            step={provisionTransition.step}
-            working
-            error={prov.error}
-            onSubmit={() => {}}
-          />
-        </div>
-      );
-    }
-    // Existing records are offered for selection first; provisioning owns
-    // only the genuinely empty step — never automatic recreation. The check
-    // is per step: a workspace without projects still provisions its project,
-    // and a project step with projects anywhere offers switching.
-    const totalProjects = Object.values(sel.projectsBy).reduce((n, ps) => n + ps.length, 0);
-    const stepHasRecords =
-      conv.status === 'needs-workspace' ? sel.workspaces.length > 0 : totalProjects > 0;
-    // A failed project list for the active workspace is not empty: offer a
-    // read-only retry, never the creation form.
-    const activeProjectsFailed =
-      conv.status === 'needs-project' &&
-      sel.failedProjectLists.includes(conv.activeWorkspaceId ?? '');
-    if (sel.loading && !sel.loaded) {
-      return (
-        <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
-          <p>{t('loading', 'Loading…')}</p>
-        </div>
-      );
-    }
-    // A failed first load offers a read-only retry — never the creation
-    // form, which would invite duplicate creation for existing records.
-    // A workspace chosen for its first project provisions that project here,
-    // bound to the chosen workspace. Checked before the selection list so
-    // the choice is honored. The key resets the name field so the workspace
-    // text never bleeds into the project name.
-    if (chosenWorkspaceId !== null) {
-      const chosenProjects = sel.projectsBy[chosenWorkspaceId] ?? [];
-      if (chosenProjects.length === 0) {
-        const chosenName =
-          sel.workspaces.find((w) => w.workspaceId === chosenWorkspaceId)?.name ?? '';
-        return (
-          <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
-            <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
-              <p className="text-sm text-foreground-muted">
-                {t('firstProjectIn', 'First project in {{name}}', { name: chosenName })}
-              </p>
-              <ProvisioningForm
-                key={`project:${chosenWorkspaceId}`}
-                step="project"
-                working={formWorking}
-                error={prov.error}
-                onSubmit={(name) => void handleProvision(name)}
-              />
-              <button
-                type="button"
-                onClick={() => setChosenWorkspaceId(null)}
-                className="text-sm underline"
-              >
-                {t('allWorkspaces', 'All workspaces')}
-              </button>
-            </div>
-          </div>
-        );
-      }
-    }
-    if (stepHasRecords || activeProjectsFailed || (sel.listError && !sel.loaded)) {
-      return (
-        <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
-          <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
-            <WorkspaceSelection
-              key={step}
-              workspaces={sel.workspaces}
-              projectsBy={sel.projectsBy}
-              truncatedWorkspaces={sel.truncatedWorkspaces}
-              truncatedProjects={sel.truncatedProjects}
-              failedWorkspaces={sel.failedProjectLists}
-              activeWorkspaceId={conv.activeWorkspaceId ?? sel.activeWorkspaceId}
-              activeProjectId={sel.activeProjectId}
-              loading={sel.loading}
-              listError={sel.listError}
-              disabled={formWorking}
-              selectError={sel.error}
-              onSelectProject={(wsId, projId) => void handleSelect(wsId, projId)}
-              onChooseWorkspace={setChosenWorkspaceId}
-              onRetryLists={() => void sel.refresh()}
-            />
-          </div>
-        </div>
-      );
-    }
     return (
-      <div className="relative flex h-full w-full flex-col items-center justify-center bg-transparent">
-        <ProvisioningForm
-          key={step}
-          step={step}
-          working={formWorking}
-          error={prov.error}
-          onSubmit={(name) => void handleProvision(name)}
-        />
-      </div>
+      <ConversationSetupSlot
+        status={conv.status as 'needs-workspace' | 'needs-project' | 'bootstrapping'}
+        activeWorkspaceId={conv.activeWorkspaceId}
+        provisionTransition={provisionTransition}
+        sel={sel}
+        prov={prov}
+        formWorking={formWorking}
+        chosenWorkspaceId={chosenWorkspaceId}
+        setChosenWorkspaceId={setChosenWorkspaceId}
+        onProvision={(name) => void handleProvision(name)}
+        onSelect={(wsId, projId) => void handleSelect(wsId, projId)}
+      />
     );
   }
 

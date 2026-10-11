@@ -1,22 +1,30 @@
 import * as React from 'react';
-import type { ConversationMessageDto } from '@/shared/api/adham-client';
 import {
-  CREATE_INTENT_KEY,
   SESSION_CACHE_KEY,
   isDefinitePreEffectRejection,
-  readCreateIntent,
   readPendingSend,
-  readSessionCache,
   rejectionMessage,
   removePendingSend,
-  removeStorage,
   sameScope,
   sendBlockedReason,
   type PendingSend,
   writePendingSend,
   writeStorage,
 } from './conversation-identity';
+import {
+  type ConversationBackend,
+  type ConversationContext,
+  resolveAuthoritativeSession,
+} from './conversation-scope';
 
+export type {
+  BootstrapSnapshot,
+  ConversationBackend,
+  ConversationContext,
+  ConversationSnapshot,
+  SessionSnapshot,
+  SubmittedSnapshot,
+} from './conversation-scope';
 export type { PendingSend } from './conversation-identity';
 
 export type UiMessage = { id: string; role: string; text: string; createdAt: string };
@@ -39,39 +47,6 @@ export const conversationCapabilities = {
   execution: false,
   stop: false,
 } as const;
-
-export type ConversationContext = { workspaceId: string; projectId: string; sessionId: string };
-
-type BootstrapSnapshot = {
-  isInitialized: boolean;
-  activeWorkspaceId: string | null;
-  activeProjectId: string | null;
-};
-type SessionSnapshot = { sessionId: string };
-type SubmittedSnapshot = { messageId: string; text: string; createdAt: string };
-type ConversationSnapshot = { items: ConversationMessageDto[] };
-
-export interface ConversationBackend {
-  getBootstrapState(): Promise<BootstrapSnapshot>;
-  createSession(
-    workspaceId: string,
-    projectId: string,
-    payload: { title: string | null },
-    options?: { requestId?: string },
-  ): Promise<SessionSnapshot>;
-  submitMessage(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
-    payload: { text: string },
-    options?: { requestId?: string },
-  ): Promise<SubmittedSnapshot>;
-  getConversation(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
-  ): Promise<ConversationSnapshot>;
-}
 
 const toUiMessage = (dto: {
   messageId: string;
@@ -200,129 +175,46 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         generationRef.current !== generation ||
         loadSeqRef.current !== seq.loadSeq ||
         mutationSeqRef.current !== seq.mutationSeq;
-      // 1. Trusted selection: the bootstrap snapshot is the authority for
-      //    the active workspace/project. A cached session may only be
-      //    resumed when it still belongs to that selection, so a stale
-      //    cache can never bypass a newer choice.
-      let snapshot: BootstrapSnapshot;
-      try {
-        snapshot = await backend.getBootstrapState();
-      } catch (err) {
+
+      const resolved = await resolveAuthoritativeSession(backend);
+      if (!mountedRef.current || generationRef.current !== generation) return null;
+
+      if (resolved.kind === 'needs-workspace') {
+        setActiveWorkspaceId(resolved.activeWorkspaceId);
+        setStatus('needs-workspace');
+        return null;
+      }
+      if (resolved.kind === 'needs-project') {
+        setActiveWorkspaceId(resolved.activeWorkspaceId);
+        setStatus('needs-project');
+        return null;
+      }
+      if (resolved.kind === 'error') {
         bootPromiseRef.current = null;
-        if (mountedRef.current && generationRef.current === generation) {
-          fail(
-            `${err instanceof Error ? err.message : 'Bootstrap state failed to load.'} Retry once connectivity returns.`,
-          );
-        }
+        fail(resolved.message);
         return null;
       }
-      // Partial provisioning is a state, not a fatal error: a workspace
-      // without a project must reach the project step, never a session.
-      setActiveWorkspaceId(snapshot.activeWorkspaceId);
-      if (!snapshot.isInitialized || !snapshot.activeWorkspaceId) {
-        if (mountedRef.current && generationRef.current === generation) {
-          setStatus('needs-workspace');
-        }
-        return null;
-      }
-      if (!snapshot.activeProjectId) {
-        if (mountedRef.current && generationRef.current === generation) {
-          setStatus('needs-project');
-        }
-        return null;
-      }
-      const ws = snapshot.activeWorkspaceId;
-      const proj = snapshot.activeProjectId;
-      // 2. Resume a cached session only within the trusted selection. A
-      //    history failure is an outage, never evidence the session is
-      //    gone: the cache and session identity are retained and nothing
-      //    is recreated.
-      const cached = readSessionCache();
-      if (cached && cached.workspaceId === ws && cached.projectId === proj) {
-        const seq = freshSeq();
-        if ((await loadHistory(cached, generation, seq.loadSeq, seq.mutationSeq, true)) !== null) {
-          createdRef.current = cached;
-          writeStorage(SESSION_CACHE_KEY, JSON.stringify(cached));
-          scopeStaleRef.current = false;
-          return cached;
-        }
-        if (superseded(seq)) return null;
-        bootPromiseRef.current = null;
-        fail('Saved conversation could not be loaded. Retry once connectivity returns.');
-        return null;
-      }
-      if (cached) {
-        removeStorage(SESSION_CACHE_KEY);
-      }
-      // 3. Deliberate creation with a stable request identity persisted
-      // across remounts and retries, so an uncertain creation never forks
-      // a duplicate session: the backend receipt replays the original.
-      try {
-        let intent = readCreateIntent(ws, proj);
-        if (!intent) {
-          intent = { requestId: crypto.randomUUID(), workspaceId: ws, projectId: proj };
-          // A create intent that cannot be persisted must block the
-          // dispatch: without a durable identity a retry would mint a
-          // second session.
-          if (!writeStorage(CREATE_INTENT_KEY, JSON.stringify(intent))) {
-            fail(
-              'Session creation identity could not be recorded. Retry once storage is available.',
-            );
-            return null;
-          }
-        }
-        let session: SessionSnapshot;
-        try {
-          session = await backend.createSession(
-            ws,
-            proj,
-            { title: null },
-            {
-              requestId: intent.requestId,
-            },
-          );
-        } catch (err) {
-          // Only proven pre-effect rejections clear the identity; unknown
-          // or storage errors may have committed and must retry with the
-          // same request identity.
-          if (isDefinitePreEffectRejection(err)) removeStorage(CREATE_INTENT_KEY);
-          throw err;
-        }
-        const ctx: ConversationContext = {
-          workspaceId: ws,
-          projectId: proj,
-          sessionId: session.sessionId,
-        };
-        // Durable identity first: the backend has issued the session, so
-        // the cache is written before history verification and the create
-        // intent is cleared only once the cache holds the identity. A
-        // history outage after a successful create can then never cause a
-        // second creation on remount. If the cache write itself fails the
-        // intent stays, so a remount replays creation with the same
-        // request identity instead of forking a duplicate.
+
+      setActiveWorkspaceId(resolved.context.workspaceId);
+      const ctx = resolved.context;
+      const seq = freshSeq();
+      const loaded = await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq, true);
+      if (loaded !== null) {
         createdRef.current = ctx;
-        if (writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx))) {
-          removeStorage(CREATE_INTENT_KEY);
+        if (resolved.kind === 'resumed') {
+          writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx));
         }
-        const seq = freshSeq();
-        const loaded = await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq, true);
-        if (loaded !== null) {
-          scopeStaleRef.current = false;
-        }
+        scopeStaleRef.current = false;
         return ctx;
-      } catch (err) {
-        bootPromiseRef.current = null;
-        if (mountedRef.current && generationRef.current === generation) {
-          if (isDefinitePreEffectRejection(err)) {
-            fail(rejectionMessage(err));
-          } else {
-            fail(
-              `${err instanceof Error ? err.message : 'Conversation failed to start.'} Reload or retry once connectivity returns.`,
-            );
-          }
-        }
-        return null;
       }
+      if (superseded(seq)) return null;
+      bootPromiseRef.current = null;
+      fail(
+        resolved.kind === 'resumed'
+          ? 'Saved conversation could not be loaded. Retry once connectivity returns.'
+          : 'Conversation failed to start. Reload or retry once connectivity returns.',
+      );
+      return null;
     })();
     bootPromiseRef.current = run;
     return run;
