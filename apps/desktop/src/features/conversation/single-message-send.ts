@@ -8,11 +8,7 @@ import {
   type PendingSend,
   writePendingSend,
 } from './conversation-identity';
-import {
-  readPendingFirstSend,
-  removePendingFirstSend,
-  writePendingFirstSend,
-} from './lazy-session-creation';
+import { readPendingFirstSend, removePendingFirstSend } from './lazy-session-creation';
 
 export type UiMessage = { id: string; role: string; text: string; createdAt: string };
 
@@ -75,15 +71,9 @@ export async function performSingleMessageSend(
     pendingFirst.workspaceId === workspaceId &&
     pendingFirst.projectId === projectId
   ) {
-    if (
-      (pendingFirst.sessionId === sessionId || pendingFirst.sessionId === null) &&
-      pendingFirst.text === trimmed
-    ) {
+    if (pendingFirst.sessionId === sessionId && pendingFirst.text === trimmed) {
       requestId = pendingFirst.messageRequestId;
       reusedFrozenIdentity = true;
-      if (pendingFirst.sessionId !== sessionId) {
-        writePendingFirstSend({ ...pendingFirst, sessionId });
-      }
     } else {
       const message =
         'A previous first-message save is pending resolution. Resend or reload before starting another conversation.';
@@ -117,7 +107,13 @@ export async function performSingleMessageSend(
     if (readPendingSend()?.requestId === requestId) {
       removePendingSend();
     }
-    if (readPendingFirstSend()?.messageRequestId === requestId) {
+    const currentFirst = readPendingFirstSend();
+    if (
+      currentFirst &&
+      currentFirst.workspaceId === workspaceId &&
+      currentFirst.projectId === projectId &&
+      currentFirst.messageRequestId === requestId
+    ) {
       removePendingFirstSend();
     }
     if (onIdentityCleared) {

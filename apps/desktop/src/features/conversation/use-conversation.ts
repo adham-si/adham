@@ -10,7 +10,6 @@ import {
 import {
   performLazyFirstSend,
   readPendingFirstSend,
-  removePendingFirstSend,
   pendingFirstSendBlockedReason,
 } from './lazy-session-creation';
 import { performSingleMessageSend } from './single-message-send';
@@ -532,7 +531,6 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         }
 
         if (singleOutcome.ok) {
-          removePendingFirstSend();
           mutationSeqRef.current += 1;
           setMessages((prev) =>
             prev.some((m) => m.id === singleOutcome.message.id)

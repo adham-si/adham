@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';
 import { fakeBackend } from './conversation-test-utils';
+import { readPendingFirstSend, writePendingFirstSend } from './lazy-session-creation';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -388,5 +389,113 @@ describe('useConversation cross-scope storage fencing & late completion guards',
     expect(result.current.messages).toEqual([]);
     expect(result.current.status).toBe('ready');
     expect(result.current.error).toBeNull();
+  });
+
+  it('does not treat pending first send with sessionId: null as permission to adopt existing session', async () => {
+    const backend = fakeBackend();
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-existing',
+          title: 'Existing Session',
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+
+    writePendingFirstSend({
+      workspaceId: 'ws-A',
+      projectId: 'proj-A',
+      sessionId: null,
+      text: 'Pending first message',
+      title: 'Pending first message',
+      createRequestId: 'req-create-1',
+      messageRequestId: 'req-msg-1',
+    });
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-existing'));
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('Pending first message');
+    });
+
+    expect(outcome).toEqual({
+      ok: false,
+      error:
+        'A previous first-message save is pending resolution. Resend or reload before starting another conversation.',
+      uncertain: true,
+    });
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+    const stored = readPendingFirstSend();
+    expect(stored?.sessionId).toBeNull();
+    expect(stored?.messageRequestId).toBe('req-msg-1');
+  });
+
+  it('unrelated successful message send in project B does not clear project A pending first send', async () => {
+    const backend = fakeBackend();
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-B',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-B-1',
+          title: 'Project B Session',
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-b-1',
+      sessionId: 'sess-B-1',
+      text: 'Hello from B',
+      createdAt: '2026-10-09T00:00:01Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+
+    const pendingA = {
+      workspaceId: 'ws-A',
+      projectId: 'proj-A',
+      sessionId: 'sess-A-created',
+      text: 'Pending in A',
+      title: 'Pending in A',
+      createRequestId: 'req-create-A',
+      messageRequestId: 'req-msg-A',
+    };
+    writePendingFirstSend(pendingA);
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBe('sess-B-1');
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('Hello from B');
+    });
+
+    expect(outcome).toEqual({ ok: true });
+    expect(readPendingFirstSend()).toEqual(pendingA);
   });
 });
