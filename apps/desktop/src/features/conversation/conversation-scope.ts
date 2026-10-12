@@ -247,3 +247,35 @@ export async function resolveAuthoritativeSession(
     message: 'Session discovery unavailable. Retry once connectivity returns.',
   };
 }
+
+export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain: boolean };
+
+export const conversationCapabilities = {
+  submitMessage: true,
+  execution: false,
+  stop: false,
+} as const;
+
+export const toUiMessage = (dto: {
+  messageId: string;
+  role?: string;
+  text: string;
+  createdAt: string;
+}): { id: string; role: string; text: string; createdAt: string } => ({
+  id: dto.messageId,
+  role: dto.role ?? 'user',
+  text: dto.text,
+  createdAt: dto.createdAt,
+});
+
+export const switchUnresolved = (
+  req: ConversationContext | null,
+  curId: string | null | undefined,
+): SubmitOutcome | null =>
+  req && req.sessionId !== curId
+    ? {
+        ok: false,
+        error: 'Session switch has not completed. Retry the switch before sending.',
+        uncertain: false,
+      }
+    : null;

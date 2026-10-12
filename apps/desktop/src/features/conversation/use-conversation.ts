@@ -18,12 +18,17 @@ import {
   type ConversationBackend,
   type ConversationContext,
   resolveAuthoritativeSession,
+  switchUnresolved,
+  toUiMessage,
+  conversationCapabilities,
+  type SubmitOutcome,
 } from './conversation-scope';
 import {
   isDurableSessionStorageAvailable,
   persistAndAnnounceActiveSession,
 } from './durable-session-storage';
 
+export { conversationCapabilities } from './conversation-scope';
 export type {
   BootstrapSnapshot,
   ConversationBackend,
@@ -31,6 +36,7 @@ export type {
   ConversationSnapshot,
   SessionSnapshot,
   SubmittedSnapshot,
+  SubmitOutcome,
 } from './conversation-scope';
 export type { PendingSend } from './conversation-identity';
 
@@ -43,41 +49,6 @@ export type ConversationStatus =
   | 'ready'
   | 'submitting'
   | 'error';
-
-export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain: boolean };
-
-/// Backend capability report. Execution, streaming, and stop have no
-/// backend command, so the UI must render them unavailable — never simulate
-/// them. submitMessage is the only supported conversation command.
-export const conversationCapabilities = {
-  submitMessage: true,
-  execution: false,
-  stop: false,
-} as const;
-
-const toUiMessage = (dto: {
-  messageId: string;
-  role?: string;
-  text: string;
-  createdAt: string;
-}): UiMessage => ({
-  id: dto.messageId,
-  role: dto.role ?? 'user',
-  text: dto.text,
-  createdAt: dto.createdAt,
-});
-
-const switchUnresolved = (
-  req: ConversationContext | null,
-  curId: string | null | undefined,
-): SubmitOutcome | null =>
-  req && req.sessionId !== curId
-    ? {
-        ok: false,
-        error: 'Session switch has not completed. Retry the switch before sending.',
-        uncertain: false,
-      }
-    : null;
 
 export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [status, setStatus] = React.useState<ConversationStatus>('bootstrapping');
@@ -507,12 +478,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             installationId: ctx.installationId ?? installationIdRef.current,
             isStale: () => !mountedRef.current || generationRef.current !== generation,
           });
+          if (!mountedRef.current || generationRef.current !== generation) {
+            return { ok: false, error: 'Session changed while sending.', uncertain: false };
+          }
           if (outcome.ok) {
-            if (!mountedRef.current || generationRef.current !== generation) {
-              return { ok: false, error: 'Session changed while sending.', uncertain: false };
-            }
             setContext(outcome.context);
             createdRef.current = outcome.context;
+            requestedRef.current = outcome.context;
             mutationSeqRef.current += 1;
             setMessages((prev) =>
               prev.some((m) => m.id === outcome.message.id) ? prev : [...prev, outcome.message],
@@ -531,6 +503,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             if (outcome.createdContext) {
               setContext(outcome.createdContext);
               createdRef.current = outcome.createdContext;
+              requestedRef.current = outcome.createdContext;
             }
             setError(outcome.error);
             setStatus('error');
@@ -547,9 +520,16 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           sessionId: ctx.sessionId,
           text: trimmed,
           isStale: () => !mountedRef.current || generationRef.current !== generation,
-          onIdentityRecorded: (rec) => setPendingSend(rec),
-          onIdentityCleared: () => setPendingSend(null),
+          onIdentityRecorded: (rec) => {
+            if (mountedRef.current && generationRef.current === generation) setPendingSend(rec);
+          },
+          onIdentityCleared: () => {
+            if (mountedRef.current && generationRef.current === generation) setPendingSend(null);
+          },
         });
+        if (!mountedRef.current || generationRef.current !== generation) {
+          return { ok: false, error: 'Session changed while sending.', uncertain: false };
+        }
 
         if (singleOutcome.ok) {
           removePendingFirstSend();

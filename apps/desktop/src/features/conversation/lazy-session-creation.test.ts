@@ -193,6 +193,10 @@ describe('lazy session creation regressions', () => {
     expect(backend.createSession).toHaveBeenCalledTimes(1);
     expect(backend.submitMessage).toHaveBeenCalledTimes(2);
     expect(backend.submitMessage.mock.calls[1]?.[2]).toBe('sess-two-command');
+    const firstReqId = backend.submitMessage.mock.calls[0]?.[4]?.requestId;
+    const secondReqId = backend.submitMessage.mock.calls[1]?.[4]?.requestId;
+    expect(firstReqId).toBeDefined();
+    expect(secondReqId).toBe(firstReqId);
     // Pending record cleared on confirmed message save
     expect(readPendingFirstSend()).toBeNull();
   });
@@ -382,8 +386,33 @@ describe('lazy session creation regressions', () => {
       uncertain: true,
     });
 
-    // Cleaning up
-    removePendingFirstSend();
+    // Switch to the retained session to retry
+    await act(async () => {
+      await secondHook.result.current.openSession('sess-half-baked');
+    });
+
+    // Retrying with matching text succeeds into retained session using frozen messageRequestId
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-recovered',
+      sessionId: 'sess-half-baked',
+      text: 'important first thought',
+      createdAt: '2026-10-12T00:00:01Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+    let retried: unknown;
+    await act(async () => {
+      retried = await secondHook.result.current.submit('important first thought');
+    });
+    expect(retried).toEqual({ ok: true });
+    expect(backend.submitMessage).toHaveBeenCalledWith(
+      'ws-1',
+      'proj-1',
+      'sess-half-baked',
+      { text: 'important first thought' },
+      { requestId: 'req-m-1' },
+    );
+    expect(readPendingFirstSend()).toBeNull();
   });
 
   // Regression 5: Nonempty discovery with failed history reads
@@ -480,5 +509,87 @@ describe('lazy session creation regressions', () => {
     expect(backend.createSession).not.toHaveBeenCalled();
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0]?.text).toBe('restored history');
+  });
+
+  // Regression 8: Existing conversation -> New Session -> first send -> second send
+  it('regression: existing conversation -> New Session -> first send -> second send, both saved into new session', async () => {
+    const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        { sessionId: 'sess-existing', title: 'Existing', createdAt: '2026-10-12T00:00:00Z' },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValue({
+      items: [
+        {
+          messageId: 'msg-old',
+          role: 'user',
+          text: 'old message',
+          createdAt: '2026-10-12T00:00:00Z',
+          sourceEventId: 'evt-old',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    });
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBe('sess-existing');
+    expect(result.current.messages).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.openSession(null);
+    });
+    expect(result.current.sessionId).toBeNull();
+    expect(result.current.messages).toHaveLength(0);
+
+    backend.createSession.mockResolvedValueOnce({
+      sessionId: 'sess-brand-new',
+      projectId: 'proj-1',
+      title: 'First send',
+      createdAt: '2026-10-12T00:00:01Z',
+    });
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-new-1',
+      sessionId: 'sess-brand-new',
+      text: 'First send',
+      createdAt: '2026-10-12T00:00:01Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+
+    let outcome1: unknown;
+    await act(async () => {
+      outcome1 = await result.current.submit('First send');
+    });
+    expect(outcome1).toEqual({ ok: true });
+    expect(result.current.sessionId).toBe('sess-brand-new');
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.text).toBe('First send');
+
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-new-2',
+      sessionId: 'sess-brand-new',
+      text: 'Second send',
+      createdAt: '2026-10-12T00:00:02Z',
+      streamSequence: '2',
+      projectionPosition: '2',
+    });
+
+    let outcome2: unknown;
+    await act(async () => {
+      outcome2 = await result.current.submit('Second send');
+    });
+    expect(outcome2).toEqual({ ok: true });
+    expect(result.current.sessionId).toBe('sess-brand-new');
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[1]?.text).toBe('Second send');
+
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.submitMessage).toHaveBeenCalledTimes(2);
+    expect(backend.submitMessage.mock.calls[0]?.[2]).toBe('sess-brand-new');
+    expect(backend.submitMessage.mock.calls[1]?.[2]).toBe('sess-brand-new');
   });
 });

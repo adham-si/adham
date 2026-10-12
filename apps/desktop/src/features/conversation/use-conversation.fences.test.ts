@@ -110,6 +110,16 @@ describe('useConversation cross-scope storage fencing & late completion guards',
       await sendPromiseA!;
     });
 
+    // Assert: Scope B's context, messages, status, and error remain untouched
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+
     // 4. Assert: Scope A DID NOT overwrite SESSION_CACHE_KEY
     const cacheAfterLateA = JSON.parse(sessionStorage.getItem('adham:compose:session') ?? '{}');
     expect(cacheAfterLateA).toEqual({
@@ -272,6 +282,16 @@ describe('useConversation cross-scope storage fencing & late completion guards',
       await sendPromiseA!;
     });
 
+    // Assert: Scope B's context, messages, status, and error remain untouched
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+
     // 4. Assert: Scope B cache and intent remain intact
     const cache = JSON.parse(sessionStorage.getItem('adham:compose:session') ?? '{}');
     expect(cache).toEqual({
@@ -285,5 +305,88 @@ describe('useConversation cross-scope storage fencing & late completion guards',
       workspaceId: 'ws-B',
       projectId: 'proj-B',
     });
+  });
+
+  it('late A message send failure: does not put Scope B into error state or overwrite context/messages', async () => {
+    const backend = fakeBackend();
+
+    // 1. Initial bootstrap for Scope A with existing session
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-A',
+          title: 'Session A',
+          createdAt: '2026-10-09T00:00:01Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+
+    let rejectSubmitA!: (err: unknown) => void;
+    backend.submitMessage.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectSubmitA = reject;
+        }),
+    );
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBe('sess-A');
+
+    // Scope A starts sending message
+    let sendPromiseA: Promise<unknown>;
+    act(() => {
+      sendPromiseA = result.current.submit('message A');
+    });
+    await waitFor(() => expect(backend.submitMessage).toHaveBeenCalledTimes(1));
+
+    // 2. Out-of-band scope change to Scope B occurs
+    mockScopeB(backend);
+    await act(async () => {
+      result.current.refreshScope();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+
+    // 3. Scope A's submitMessage rejects late with error
+    let outcomeA: unknown;
+    await act(async () => {
+      rejectSubmitA(new Error('Network connection dropped'));
+      outcomeA = await sendPromiseA!;
+    });
+    expect(outcomeA).toEqual({
+      ok: false,
+      error: 'Session changed while sending.',
+      uncertain: false,
+    });
+
+    // 4. Assert: Scope B's context, messages, status, and error remain completely untouched
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
   });
 });
