@@ -16,7 +16,30 @@
       "plan": "خطة",
       "execute": "تنفيذ",
       "code": "برمجة"
-    }
+    },
+    "newSession": "جلسة جديدة",
+    "emptyHistory": "لا توجد جلسات بعد",
+    "inputLabel": "حقل كتابة الرسالة",
+    "stop": "إيقاف التوليد",
+    "srStreaming": "الوكيل يبث الاستجابة",
+    "srAwaitingApproval": "يحتاج الوكيل إلى موافقة للمتابعة",
+    "telemetryUnknown": "غير معروف",
+    "scopeUnknown": "لم تُبلغ الخدمة الخلفية عن دليل المشروع",
+    "policyUnknown": "لم تُبلغ الخدمة الخلفية عن سياسة الموافقة",
+    "standingApproval": "موافقة دائمة",
+    "alwaysAsk": "طلب الموافقة دائمًا",
+    "tokensUnknown": "لم تُبلغ الخدمة الخلفية عن استخدام الرموز",
+    "budgetUnknown": "لم تُبلغ الخدمة الخلفية عن استخدام الميزانية",
+    "modelsHeading": "النماذج وحدود الخصوصية",
+    "modeLabel": "وضع التنفيذ",
+    "attach": "إرفاق ملفات أو صور أو مجلدات",
+    "attachFile": "إرفاق ملف",
+    "attachImage": "إرفاق صورة",
+    "attachFolder": "إرفاق نطاق مجلد",
+    "approvalRequired": "الموافقة مطلوبة",
+    "reviewDiff": "مراجعة",
+    "deny": "رفض",
+    "approve": "موافقة"
   },
   "status": {
     "ready": "جاهز",
@@ -172,5 +195,40 @@
       "labelled": "أيقونة قابلة للوصول",
       "mirrored": "معكوسة (RTL)"
     }
-  }
+  },
+  "sessions": "الجلسات",
+  "common": {
+    "retry": "إعادة المحاولة"
+  },
+  "provision": {
+    "refreshFailed": "تم حفظ التغيير. تعذّرت إعادة التحميل.",
+    "retryLoad": "إعادة محاولة التحميل",
+    "workspaceTitle": "أنشئ مساحة عملك",
+    "projectTitle": "أنشئ مشروعك",
+    "workspaceHint": "تضم مساحة العمل الشخصية مشاريعك المعزولة.",
+    "projectHint": "تستخدم المشاريع تخزينًا معزولًا يديره Adham.",
+    "workspaceLabel": "اسم مساحة العمل",
+    "projectLabel": "اسم المشروع",
+    "createWorkspace": "إنشاء مساحة عمل",
+    "createProject": "إنشاء مشروع"
+  },
+  "conversation": {
+    "starting": "جارٍ بدء المحادثة…",
+    "saving": "جارٍ حفظ الرسالة…",
+    "uncertainHint": "إذا كان من المحتمل أن الرسالة لم تُحفظ، فأعد تحميل السجل قبل إرسالها مجددًا.",
+    "reloadHistory": "إعادة تحميل السجل",
+    "executionUnavailable": "التنفيذ غير متاح في هذا الإصدار. تُحفظ الرسائل كنص فقط.",
+    "stopUnavailable": "الإيقاف غير متاح: لا توجد عملية قيد التشغيل لإلغائها."
+  },
+  "loading": "جارٍ التحميل…",
+  "firstProjectIn": "المشروع الأول في {{name}}",
+  "allWorkspaces": "جميع مساحات العمل",
+  "selectScope": "اختيار مساحة العمل / المشروع",
+  "noWorkspaces": "لا توجد مساحات عمل بعد",
+  "projectsLoadFailed": "تعذّر تحميل المشاريع",
+  "createFirstProject": "إنشاء المشروع الأول…",
+  "noProjects": "لا توجد مشاريع بعد",
+  "truncatedProjects": "عرض أول 100 مشروع",
+  "truncatedWorkspaces": "عرض أول 100 مساحة عمل",
+  "retry": "إعادة المحاولة"
 }
