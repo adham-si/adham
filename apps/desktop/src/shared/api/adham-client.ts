@@ -10,6 +10,7 @@ import type {
   PlatformInfo,
   ProjectSummary,
   SelectProjectPayload,
+  SessionList,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -22,6 +23,7 @@ import {
   ProjectListSchema,
   PlatformInfoSchema,
   ProjectSummarySchema,
+  SessionListSchema,
   SessionSummarySchema,
   StorageStatusSchema,
   SubmittedMessageSchema,
@@ -38,6 +40,7 @@ export type {
   ConversationPage,
   PlatformInfo,
   ProjectSummary,
+  SessionList,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -86,6 +89,7 @@ export interface AdhamClient {
     payload: { title: string | null },
     options?: { requestId?: string },
   ): Promise<SessionSummary>;
+  listSessions(context: { workspaceId?: string; projectId: string }): Promise<SessionList>;
   submitMessage(
     workspaceId: string,
     projectId: string,
@@ -217,6 +221,17 @@ export class AdhamApiClient implements AdhamClient {
       request: envelope,
     });
     return SessionSummarySchema.parse(result.data);
+  }
+
+  async listSessions(context: { workspaceId?: string; projectId: string }): Promise<SessionList> {
+    const result = await invoke<SessionList>('list_sessions', {
+      context: {
+        workspaceId: context.workspaceId ?? null,
+        projectId: context.projectId,
+        sessionId: null,
+      },
+    });
+    return SessionListSchema.parse(result);
   }
 
   async submitMessage(

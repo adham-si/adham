@@ -248,6 +248,14 @@ export function ConversationPanel({
           <p>{t('conversation.starting', 'Starting conversation…')}</p>
         )}
         {conv.status === 'submitting' && <p>{t('conversation.saving', 'Saving message…')}</p>}
+        {conv.storageWarning && (
+          <div
+            role="status"
+            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
+          >
+            <p>{conv.storageWarning}</p>
+          </div>
+        )}
         {conv.error && (
           <div role="alert">
             <p>{conv.error}</p>

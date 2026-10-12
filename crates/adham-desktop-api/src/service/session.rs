@@ -194,3 +194,74 @@ pub async fn create_session(
         data: summary,
     })
 }
+
+const LIST_LIMIT: i64 = 100;
+
+fn storage_unavailable<E: std::fmt::Display>(e: E) -> String {
+    format!("STORAGE_UNAVAILABLE: {e}")
+}
+
+fn occurred_iso(occurred_at_us: i64) -> String {
+    let dt = OffsetDateTime::from_unix_timestamp_nanos((occurred_at_us * 1_000) as i128)
+        .unwrap_or_else(|_| OffsetDateTime::now_utc());
+    dt.format(&Rfc3339).unwrap_or_default()
+}
+
+/// Project sessions in reverse-chronological order (most recent first).
+/// Validates that the project stream exists and matches workspace context if supplied.
+pub async fn list_sessions(
+    ctx: &ApiContext,
+    project_id: &str,
+    workspace_id: Option<&str>,
+) -> Result<SessionList, String> {
+    let proj_id = ProjectId::from_string(project_id)
+        .map_err(|_| "VALIDATION_FAILED: project_id must be UUID".to_string())?;
+    let proj_stream = format!("project:{proj_id}");
+    let proj_row: Option<sqlx::sqlite::SqliteRow> =
+        sqlx::query("SELECT workspace_id FROM events WHERE stream_id = ? AND stream_sequence = 1")
+            .bind(&proj_stream)
+            .fetch_optional(&ctx.pool)
+            .await
+            .map_err(storage_unavailable)?;
+
+    let row = match proj_row {
+        Some(r) => r,
+        None => return Err("PROJECT_NOT_FOUND: project stream does not exist".to_string()),
+    };
+
+    if let Some(expected_ws) = workspace_id {
+        let actual_ws: Option<String> = row.get("workspace_id");
+        if actual_ws.as_deref() != Some(expected_ws) {
+            return Err(
+                "CONTEXT_MISMATCH: project does not belong to specified workspace".to_string(),
+            );
+        }
+    }
+    let rows: Vec<(Vec<u8>, i64)> = sqlx::query_as(
+        "SELECT payload_json, occurred_at_us FROM events
+         WHERE event_type = 'SessionCreated' AND project_id = ?
+         ORDER BY global_position DESC LIMIT ?",
+    )
+    .bind(proj_id.to_string())
+    .bind(LIST_LIMIT + 1)
+    .fetch_all(&ctx.pool)
+    .await
+    .map_err(storage_unavailable)?;
+    let truncated = rows.len() as i64 > LIST_LIMIT;
+    let mut sessions = Vec::with_capacity(rows.len().min(LIST_LIMIT as usize));
+    for (payload_json, occurred_at_us) in rows.into_iter().take(LIST_LIMIT as usize) {
+        let created: SessionCreatedV1 = serde_json::from_slice(&payload_json)
+            .map_err(|_| "STORAGE_REPAIR_REQUIRED: session record unparseable".to_string())?;
+        sessions.push(SessionSummary {
+            session_id: created.session_id.to_string(),
+            project_id: created.project_id.to_string(),
+            title: created.title,
+            created_at: occurred_iso(occurred_at_us),
+        });
+    }
+    Ok(SessionList {
+        project_id: proj_id.to_string(),
+        sessions,
+        truncated,
+    })
+}

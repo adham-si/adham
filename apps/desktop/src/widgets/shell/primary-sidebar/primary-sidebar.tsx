@@ -17,6 +17,10 @@ export interface PrimarySidebarProps {
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: () => void;
   className?: string;
+  error?: string | null;
+  onRetry?: () => void;
+  truncated?: boolean;
+  creatingSession?: boolean;
   /**
    * Deliberate scope-selection UI (workspace/project discovery). When
    * provided it replaces the static workspace/project labels, which remain
@@ -37,6 +41,10 @@ export function PrimarySidebar({
   onSelectSession,
   onNewSession,
   className = '',
+  error,
+  onRetry,
+  truncated,
+  creatingSession,
   selectionMenu,
 }: PrimarySidebarProps) {
   const { t } = useTranslation();
@@ -134,6 +142,7 @@ export function PrimarySidebar({
           variant="secondary"
           size="sm"
           onClick={onNewSession}
+          disabled={creatingSession}
           className="w-full justify-start text-xs"
         >
           <AdhamIcon size="sm" label={t('compose.newSession')}>
@@ -166,7 +175,23 @@ export function PrimarySidebar({
           {t('sessions')}
         </div>
 
-        {filteredSessions.length === 0 ? (
+        {error ? (
+          <div
+            role="alert"
+            className="m-2 flex flex-col gap-2 rounded-md border border-status-danger/30 bg-status-danger/10 p-2.5 text-xs text-status-danger"
+          >
+            <span>{error}</span>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="self-start font-medium underline hover:opacity-80"
+              >
+                {t('common.retry', 'Retry')}
+              </button>
+            )}
+          </div>
+        ) : filteredSessions.length === 0 ? (
           <div className="px-2 py-4 text-center text-xs text-foreground-muted">
             {searchFilter ? 'No sessions found' : t('compose.emptyHistory')}
           </div>
@@ -184,6 +209,11 @@ export function PrimarySidebar({
                 <span className="truncate">{session.title}</span>
               </SidebarItem>
             ))}
+            {truncated && (
+              <div className="px-2 py-1 text-[11px] italic text-foreground-muted">
+                Showing latest 100 sessions (truncated)
+              </div>
+            )}
           </nav>
         )}
       </div>

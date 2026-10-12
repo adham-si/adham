@@ -2,7 +2,7 @@ use adham_core_types::{ActorKind, EventActor, EventScope};
 use adham_desktop_api::{
     BootstrapState, CommandContext, ConversationMessageDto, ConversationPage, CreateProjectPayload,
     CreateSessionPayload, CreateWorkspacePayload, PlatformInfo, ProjectList, ProjectSummary,
-    RebuildProjectionsResponse, SelectProjectPayload, SessionSummary, StorageStatus,
+    RebuildProjectionsResponse, SelectProjectPayload, SessionList, SessionSummary, StorageStatus,
     SubmitMessagePayload, SubmittedMessage, WorkspaceList, WorkspaceSummary,
 };
 use std::fs;
@@ -60,6 +60,7 @@ fn generate_contracts() -> Result<(), Box<dyn std::error::Error>> {
         ProjectList::decl(),
         CreateSessionPayload::decl(),
         SessionSummary::decl(),
+        SessionList::decl(),
         SubmitMessagePayload::decl(),
         SubmittedMessage::decl(),
         ConversationMessageDto::decl(),

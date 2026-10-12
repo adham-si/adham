@@ -16,6 +16,10 @@ import {
   type ConversationContext,
   resolveAuthoritativeSession,
 } from './conversation-scope';
+import {
+  isDurableSessionStorageAvailable,
+  writeDurableSessionPreference,
+} from './durable-session-storage';
 
 export type {
   BootstrapSnapshot,
@@ -77,6 +81,15 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [context, setContext] = React.useState<ConversationContext | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [storageWarning, setStorageWarning] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!isDurableSessionStorageAvailable()) {
+      setStorageWarning(
+        'Durable session storage is unavailable. Session selection will not persist across restarts.',
+      );
+    }
+  }, []);
   // Authoritative selection from the latest bootstrap snapshot. Surfaced so
   // provisioning can bind project creation to the backend-issued workspace
   // without re-fetching or trusting cached IDs.
@@ -89,6 +102,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   const bootPromiseRef = React.useRef<Promise<ConversationContext | null> | null>(null);
   const generationRef = React.useRef(0);
   const createdRef = React.useRef<ConversationContext | null>(null);
+  const installationIdRef = React.useRef<string | null>(null);
   // Read ordering: every history load captures the load sequence and the
   // mutation sequence at issue time, and applies only if neither moved.
   // A confirmed submit (mutation) invalidates older in-flight histories;
@@ -197,6 +211,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       }
 
       setActiveWorkspaceId(resolved.context.workspaceId);
+      if (resolved.context.installationId) {
+        installationIdRef.current = resolved.context.installationId;
+      }
       const ctx = resolved.context;
       const seq = freshSeq();
       const loaded = await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq, true);
@@ -205,7 +222,34 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (resolved.kind === 'resumed') {
           writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx));
         }
+        const instId = ctx.installationId ?? installationIdRef.current;
+        if (instId) {
+          const written = writeDurableSessionPreference({
+            installationId: instId,
+            workspaceId: ctx.workspaceId,
+            projectId: ctx.projectId,
+            sessionId: ctx.sessionId,
+          });
+          if (!written) {
+            setStorageWarning(
+              'Durable session storage is unavailable. Session selection will not persist across restarts.',
+            );
+          }
+        }
         scopeStaleRef.current = false;
+        try {
+          window.dispatchEvent(
+            new CustomEvent('adham:session-active', {
+              detail: {
+                workspaceId: ctx.workspaceId,
+                projectId: ctx.projectId,
+                sessionId: ctx.sessionId,
+              },
+            }),
+          );
+        } catch {
+          // ignore
+        }
         return ctx;
       }
       if (superseded(seq)) return null;
@@ -332,10 +376,59 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       setError(null);
       if ((await loadHistory(next, generation, seq.loadSeq, seq.mutationSeq)) !== null) {
         writeStorage(SESSION_CACHE_KEY, JSON.stringify(next));
+        const instId = base.installationId ?? installationIdRef.current;
+        if (instId) {
+          const written = writeDurableSessionPreference({
+            installationId: instId,
+            workspaceId: next.workspaceId,
+            projectId: next.projectId,
+            sessionId: next.sessionId,
+          });
+          if (!written) {
+            setStorageWarning(
+              'Durable session storage is unavailable. Session selection will not persist across restarts.',
+            );
+          }
+        }
+        try {
+          window.dispatchEvent(
+            new CustomEvent('adham:session-active', {
+              detail: {
+                workspaceId: next.workspaceId,
+                projectId: next.projectId,
+                sessionId: next.sessionId,
+              },
+            }),
+          );
+        } catch {
+          // ignore
+        }
       }
     },
     [backend, bootstrap, context, loadHistory],
   );
+
+  React.useEffect(() => {
+    const onSelect = (e: Event) => {
+      const custom = e as CustomEvent<{
+        workspaceId?: string;
+        projectId?: string;
+        sessionId: string;
+      }>;
+      if (!custom.detail?.sessionId) return;
+      if (
+        (custom.detail.workspaceId &&
+          context &&
+          custom.detail.workspaceId !== context.workspaceId) ||
+        (custom.detail.projectId && context && custom.detail.projectId !== context.projectId)
+      ) {
+        return;
+      }
+      void openSession(custom.detail.sessionId);
+    };
+    window.addEventListener('adham:session-select', onSelect);
+    return () => window.removeEventListener('adham:session-select', onSelect);
+  }, [context, openSession]);
 
   const submit = React.useCallback(
     async (text: string): Promise<SubmitOutcome> => {
@@ -477,6 +570,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     sessionId: context?.sessionId ?? null,
     activeWorkspaceId,
     error,
+    storageWarning,
     pendingSend,
     submit,
     retry,

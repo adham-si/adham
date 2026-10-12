@@ -37,6 +37,9 @@ pub struct BootstrapState {
     pub is_initialized: bool,
     pub active_workspace_id: Option<String>,
     pub active_project_id: Option<String>,
+    #[ts(optional = nullable)]
+    #[serde(default)]
+    pub installation_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -132,6 +135,15 @@ pub struct SessionSummary {
     pub project_id: String,
     pub title: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionList {
+    pub project_id: String,
+    pub sessions: Vec<SessionSummary>,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

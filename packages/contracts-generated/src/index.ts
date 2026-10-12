@@ -33,7 +33,7 @@ export type EventScope = { installation_id: InstallationId, workspace_id: Worksp
 
 export type CommandContext = { workspaceId: string | null, projectId: string | null, sessionId: string | null, };
 
-export type BootstrapState = { isInitialized: boolean, activeWorkspaceId: string | null, activeProjectId: string | null, };
+export type BootstrapState = { isInitialized: boolean, activeWorkspaceId: string | null, activeProjectId: string | null, installationId?: string | null, };
 
 export type PlatformInfo = { os: string, arch: string, hasNativeTitlebarControls: boolean, };
 
@@ -54,6 +54,8 @@ export type ProjectList = { workspaceId: string, projects: Array<ProjectSummary>
 export type CreateSessionPayload = { title: string | null, };
 
 export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, };
+
+export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, };
 
 export type SubmitMessagePayload = { text: string, };
 
