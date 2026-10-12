@@ -117,6 +117,7 @@ export function persistAndAnnounceActiveSession(
     workspaceId: string;
     projectId: string;
     sessionId: string | null;
+    title?: string | null;
   },
   installationId?: string | null,
 ): boolean {
@@ -138,6 +139,7 @@ export function persistAndAnnounceActiveSession(
           workspaceId: ctx.workspaceId,
           projectId: ctx.projectId,
           sessionId: ctx.sessionId,
+          title: ctx.title ?? null,
         },
       }),
     );

@@ -203,6 +203,7 @@ describe('lazy session creation regressions', () => {
       createRequestId: 'req-c-frozen-1',
       messageRequestId: 'req-m-frozen-1',
       text: 'frozen first text',
+      title: 'frozen custom title',
       workspaceId: 'ws-1',
       projectId: 'proj-1',
       sessionId: null,
@@ -214,7 +215,7 @@ describe('lazy session creation regressions', () => {
     backend.createSession.mockResolvedValueOnce({
       sessionId: 'sess-recovered-1',
       projectId: 'proj-1',
-      title: null,
+      title: 'frozen custom title',
       createdAt: '2026-10-12T00:00:00Z',
     });
     backend.submitMessage.mockResolvedValueOnce({
@@ -241,7 +242,7 @@ describe('lazy session creation regressions', () => {
     expect(backend.createSession).toHaveBeenCalledWith(
       'ws-1',
       'proj-1',
-      { title: null },
+      { title: 'frozen custom title' },
       { requestId: 'req-c-frozen-1' },
     );
     expect(backend.submitMessage).toHaveBeenCalledWith(
@@ -260,6 +261,7 @@ describe('lazy session creation regressions', () => {
       createRequestId: 'req-c-persist',
       messageRequestId: 'req-m-persist',
       text: 'important first thought',
+      title: 'important first thought',
       workspaceId: 'ws-1',
       projectId: 'proj-1',
       sessionId: 'sess-confirmed-1',
@@ -333,6 +335,7 @@ describe('lazy session creation regressions', () => {
       createRequestId: 'req-c-1',
       messageRequestId: 'req-m-1',
       text: 'important first thought',
+      title: 'important first thought',
       workspaceId: 'ws-1',
       projectId: 'proj-1',
       sessionId: 'sess-half-baked',

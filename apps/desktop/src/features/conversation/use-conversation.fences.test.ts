@@ -69,7 +69,7 @@ describe('useConversation cross-scope storage fencing & late completion guards',
     expect(backend.createSession).toHaveBeenCalledWith(
       'ws-A',
       'proj-A',
-      { title: null },
+      { title: 'hello A' },
       expect.objectContaining({ requestId: expect.any(String) }),
     );
 

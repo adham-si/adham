@@ -11,9 +11,31 @@ export const PENDING_FIRST_SEND_KEY = 'adham:compose:pending-first-send';
 
 export type UiMessage = { id: string; role: string; text: string; createdAt: string };
 
+export const DEFAULT_SESSION_TITLE_MAX_LENGTH = 40;
+
+/**
+ * Derive a short, clean session title preview from the first submitted message.
+ * Normalizes all whitespace sequences into a single space and truncates safely with an ellipsis.
+ */
+export function deriveSessionTitle(
+  text: string,
+  maxLength = DEFAULT_SESSION_TITLE_MAX_LENGTH,
+): string {
+  const normalized = text.trim().replace(/\s+/g, ' ');
+  if (!normalized) return 'New Session';
+  const chars = Array.from(normalized);
+  if (chars.length <= maxLength) return normalized;
+  return `${chars
+    .slice(0, maxLength - 1)
+    .join('')
+    .trimEnd()}…`;
+}
+
 /**
  * A tracked first-send operation in an unsaved session.
  * Tracks both the session-creation request ID and the message request ID.
+ * Freezes the derived or explicit title so retries cannot alter the creation
+ * payload while reusing the createRequestId.
  * If session creation succeeds but message submission fails, `sessionId`
  * is retained so an explicit retry reuses the created session instead
  * of minting another empty session.
@@ -27,6 +49,7 @@ export interface PendingFirstSend {
   createRequestId: string;
   messageRequestId: string;
   text: string;
+  title: string;
   workspaceId: string;
   projectId: string;
   sessionId: string | null;
@@ -48,6 +71,10 @@ export function readPendingFirstSend(): PendingFirstSend | null {
         createRequestId: parsed.createRequestId,
         messageRequestId: parsed.messageRequestId,
         text: parsed.text,
+        title:
+          typeof parsed.title === 'string' && parsed.title.trim().length > 0
+            ? parsed.title
+            : deriveSessionTitle(parsed.text),
         workspaceId: parsed.workspaceId,
         projectId: parsed.projectId,
         sessionId: typeof parsed.sessionId === 'string' ? parsed.sessionId : null,
@@ -93,6 +120,7 @@ export interface LazyFirstSendParams {
   workspaceId: string;
   projectId: string;
   text: string;
+  title?: string | null;
   installationId?: string | null;
   isStale: () => boolean;
 }
@@ -101,6 +129,7 @@ export type LazyFirstSendOutcome =
   | {
       ok: true;
       context: ConversationContext;
+      title: string;
       message: UiMessage;
     }
   | {
@@ -113,10 +142,10 @@ export type LazyFirstSendOutcome =
 /**
  * Execute a tracked lazy session creation and first-message send.
  *
- * Captures request identities before any backend call. If createSession succeeds
- * but submitMessage fails, createdSessionId is stored in PendingFirstSend so that
- * an explicit retry continues into the created session without creating a second
- * empty session (addressing the non-atomic two-command limitation).
+ * Captures request identities and derived/explicit title before any backend call.
+ * If createSession succeeds but submitMessage fails, createdSessionId is stored
+ * in PendingFirstSend so that an explicit retry continues into the created session
+ * without creating a second empty session (addressing the non-atomic two-command limitation).
  */
 export async function performLazyFirstSend(
   params: LazyFirstSendParams,
@@ -132,6 +161,7 @@ export async function performLazyFirstSend(
   let createRequestId: string;
   let messageRequestId: string;
   let createdSessionId: string | null = null;
+  let title: string;
   let reusedFrozenIdentity = false;
 
   if (pending) {
@@ -140,10 +170,11 @@ export async function performLazyFirstSend(
       pending.projectId === projectId &&
       pending.text === trimmed
     ) {
-      // Explicit retry with same text and scope
+      // Explicit retry with same text and scope: reuse frozen identities and title
       createRequestId = pending.createRequestId;
       messageRequestId = pending.messageRequestId;
       createdSessionId = pending.sessionId;
+      title = pending.title;
       reusedFrozenIdentity = true;
     } else {
       return {
@@ -156,6 +187,7 @@ export async function performLazyFirstSend(
   } else {
     createRequestId = crypto.randomUUID();
     messageRequestId = crypto.randomUUID();
+    title = params.title?.trim() || deriveSessionTitle(trimmed);
   }
 
   if (!reusedFrozenIdentity) {
@@ -163,6 +195,7 @@ export async function performLazyFirstSend(
       createRequestId,
       messageRequestId,
       text: trimmed,
+      title,
       workspaceId,
       projectId,
       sessionId: null,
@@ -182,7 +215,7 @@ export async function performLazyFirstSend(
       const created = await backend.createSession(
         workspaceId,
         projectId,
-        { title: null },
+        { title },
         { requestId: createRequestId },
       );
       createdSessionId = created.sessionId;
@@ -207,6 +240,7 @@ export async function performLazyFirstSend(
       createRequestId,
       messageRequestId,
       text: trimmed,
+      title,
       workspaceId,
       projectId,
       sessionId: createdSessionId,
@@ -257,6 +291,7 @@ export async function performLazyFirstSend(
     return {
       ok: true,
       context: createdCtx,
+      title,
       message: {
         id: submitted.messageId,
         role: 'user',

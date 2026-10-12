@@ -91,6 +91,9 @@ export function useProjectSessions({
     return () => window.removeEventListener(SCOPE_CHANGED_EVENT, onScope);
   }, [fetchSessions]);
 
+  const fetchSessionsRef = React.useRef(fetchSessions);
+  fetchSessionsRef.current = fetchSessions;
+
   React.useEffect(() => {
     const onActive = (e: Event) => {
       const custom = e as CustomEvent<{
@@ -107,6 +110,7 @@ export function useProjectSessions({
         return;
       }
       setActiveSessionId(custom.detail.sessionId);
+      void fetchSessionsRef.current();
     };
     window.addEventListener('adham:session-active', onActive);
     return () => window.removeEventListener('adham:session-active', onActive);

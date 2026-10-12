@@ -518,7 +518,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
               prev.some((m) => m.id === outcome.message.id) ? prev : [...prev, outcome.message],
             );
             const instId = outcome.context.installationId ?? installationIdRef.current;
-            if (!persistAndAnnounceActiveSession(outcome.context, instId)) {
+            if (
+              !persistAndAnnounceActiveSession({ ...outcome.context, title: outcome.title }, instId)
+            ) {
               setStorageWarning(
                 'Durable session storage is unavailable. Session selection will not persist across restarts.',
               );
