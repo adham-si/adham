@@ -16,7 +16,30 @@
       "plan": "Plan",
       "execute": "Execute",
       "code": "Code"
-    }
+    },
+    "newSession": "New Session",
+    "emptyHistory": "No sessions yet",
+    "srStreaming": "Agent is streaming response",
+    "srAwaitingApproval": "Agent requires approval to proceed",
+    "inputLabel": "Message composer input",
+    "stop": "Stop generation",
+    "modeLabel": "Execution mode",
+    "modelsHeading": "Models & Privacy Boundary",
+    "attach": "Attach files, images or folders",
+    "attachFile": "Attach File",
+    "attachImage": "Attach Image",
+    "attachFolder": "Attach Folder Scope",
+    "approvalRequired": "Approval Required",
+    "reviewDiff": "Review",
+    "deny": "Deny",
+    "approve": "Approve",
+    "telemetryUnknown": "Unknown",
+    "scopeUnknown": "No project directory reported by the backend",
+    "policyUnknown": "No approval policy reported by the backend",
+    "standingApproval": "Standing Approval",
+    "alwaysAsk": "Always Ask",
+    "tokensUnknown": "No token usage reported by the backend",
+    "budgetUnknown": "No budget usage reported by the backend"
   },
   "status": {
     "ready": "Ready",
@@ -172,5 +195,40 @@
       "labelled": "Accessible icon",
       "mirrored": "Mirrored (RTL)"
     }
+  },
+  "sessions": "Sessions",
+  "selectScope": "Select workspace / project",
+  "noWorkspaces": "No workspaces yet",
+  "loading": "Loading…",
+  "projectsLoadFailed": "Projects failed to load",
+  "createFirstProject": "Create first project…",
+  "noProjects": "No projects yet",
+  "truncatedProjects": "Showing first 100 projects",
+  "truncatedWorkspaces": "Showing first 100 workspaces",
+  "retry": "Retry",
+  "provision": {
+    "workspaceTitle": "Create your workspace",
+    "projectTitle": "Create your project",
+    "workspaceHint": "A personal workspace holds your isolated projects.",
+    "projectHint": "Projects use Adham-owned isolated storage.",
+    "workspaceLabel": "Workspace name",
+    "projectLabel": "Project name",
+    "createWorkspace": "Create workspace",
+    "createProject": "Create project",
+    "refreshFailed": "Change saved. Reload failed.",
+    "retryLoad": "Retry loading"
+  },
+  "firstProjectIn": "First project in {{name}}",
+  "allWorkspaces": "All workspaces",
+  "conversation": {
+    "starting": "Starting conversation…",
+    "saving": "Saving message…",
+    "uncertainHint": "If this message may not have saved, reload history before resending.",
+    "reloadHistory": "Reload history",
+    "executionUnavailable": "Execution is unavailable in this build. Messages are saved as text only.",
+    "stopUnavailable": "Stop is unavailable: there is no running operation to cancel."
+  },
+  "common": {
+    "retry": "Retry"
   }
 }
