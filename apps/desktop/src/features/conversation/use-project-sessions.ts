@@ -2,7 +2,7 @@ import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { SessionSummary as ContractSessionSummary } from '@adham/contracts-generated';
 import type { SessionSummary as SidebarSessionSummary } from '@/widgets/shell/primary-sidebar/primary-sidebar';
-import { SCOPE_CHANGED_EVENT } from './conversation-identity';
+import { SCOPE_CHANGED_EVENT, readPendingSend } from './conversation-identity';
 import { readPendingFirstSend } from './lazy-session-creation';
 
 export interface UseProjectSessionsOptions {
@@ -128,13 +128,24 @@ export function useProjectSessions({
   const newSession = React.useCallback(async () => {
     if (!workspaceId || !projectId) return;
 
-    // Block a different creation while another scope has an unresolved first send
+    // Block starting a new session while a send is unresolved (in this or another scope)
     const pendingFirst = readPendingFirstSend();
+    if (pendingFirst) {
+      setError(
+        'A first-message save is pending resolution. Resend or resolve it before starting another session.',
+      );
+      return;
+    }
+
+    const pendingSend = readPendingSend();
     if (
-      pendingFirst &&
-      (pendingFirst.workspaceId !== workspaceId || pendingFirst.projectId !== projectId)
+      pendingSend &&
+      pendingSend.workspaceId === workspaceId &&
+      pendingSend.projectId === projectId
     ) {
-      setError('A session creation for another scope is pending resolution.');
+      setError(
+        'A previous message save is pending resolution. Resend or reload before starting a new session.',
+      );
       return;
     }
 

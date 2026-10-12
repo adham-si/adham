@@ -13,6 +13,7 @@ import {
   writeDurableSessionPreference,
 } from './durable-session-storage';
 import { readSessionCache } from './conversation-identity';
+import { useProjectSessions } from './use-project-sessions';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -137,7 +138,7 @@ describe('lazy session creation regressions', () => {
   });
 
   // Regression 3: Creation success followed by message failure (two-command limitation)
-  it('retains created session on message failure and retries into it without creating second session', async () => {
+  it('creation-success/message-failure retry: retains created session on message failure and retries into it without creating second session', async () => {
     const backend = fakeBackend();
     backend.listSessions.mockResolvedValueOnce({ sessions: [], truncated: false });
     backend.createSession.mockResolvedValueOnce({
@@ -196,7 +197,137 @@ describe('lazy session creation regressions', () => {
     expect(readPendingFirstSend()).toBeNull();
   });
 
-  // Regression 4: New Session/open-session actions while a send is unresolved
+  // Regression 4: Remount recovery with frozen request identities
+  it('remount recovery: preserves pending first send across unmount and reuses frozen identities on retry', async () => {
+    const frozenRecord: PendingFirstSend = {
+      createRequestId: 'req-c-frozen-1',
+      messageRequestId: 'req-m-frozen-1',
+      text: 'frozen first text',
+      workspaceId: 'ws-1',
+      projectId: 'proj-1',
+      sessionId: null,
+    };
+    writePendingFirstSend(frozenRecord);
+
+    const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({ sessions: [], truncated: false });
+    backend.createSession.mockResolvedValueOnce({
+      sessionId: 'sess-recovered-1',
+      projectId: 'proj-1',
+      title: null,
+      createdAt: '2026-10-12T00:00:00Z',
+    });
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-recovered-1',
+      sessionId: 'sess-recovered-1',
+      text: 'frozen first text',
+      createdAt: '2026-10-12T00:00:01Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+
+    // Mount hook after remount
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error).toMatch(/previous first-message save is pending resolution/i);
+
+    // Retrying with the same payload succeeds and reuses frozen identities
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('frozen first text');
+    });
+
+    expect(outcome).toEqual({ ok: true });
+    expect(backend.createSession).toHaveBeenCalledWith(
+      'ws-1',
+      'proj-1',
+      { title: null },
+      { requestId: 'req-c-frozen-1' },
+    );
+    expect(backend.submitMessage).toHaveBeenCalledWith(
+      'ws-1',
+      'proj-1',
+      'sess-recovered-1',
+      { text: 'frozen first text' },
+      { requestId: 'req-m-frozen-1' },
+    );
+    expect(readPendingFirstSend()).toBeNull();
+  });
+
+  // Regression 5: New Session while send is unresolved preserves pending operation and sidebar selection
+  it('clicking New Session while a send is unresolved does not clear the pending operation or falsely clear confirmed sidebar selection', async () => {
+    const unresolved: PendingFirstSend = {
+      createRequestId: 'req-c-persist',
+      messageRequestId: 'req-m-persist',
+      text: 'important first thought',
+      workspaceId: 'ws-1',
+      projectId: 'proj-1',
+      sessionId: 'sess-confirmed-1',
+    };
+    writePendingFirstSend(unresolved);
+
+    const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-confirmed-1',
+          projectId: 'proj-1',
+          title: 'Confirmed Session',
+          createdAt: '2026-10-12T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    });
+
+    const sessionsBackend = {
+      listSessions: vi.fn(async () => ({
+        sessions: [
+          {
+            sessionId: 'sess-confirmed-1',
+            projectId: 'proj-1',
+            title: 'Confirmed Session',
+            createdAt: '2026-10-12T00:00:00Z',
+          },
+        ],
+      })),
+      createSession: backend.createSession,
+    };
+
+    const sidebarHook = renderHook(() =>
+      useProjectSessions({
+        workspaceId: 'ws-1',
+        projectId: 'proj-1',
+        backend: sessionsBackend,
+      }),
+    );
+
+    // Confirm session is active in sidebar
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('adham:session-active', {
+          detail: { workspaceId: 'ws-1', projectId: 'proj-1', sessionId: 'sess-confirmed-1' },
+        }),
+      );
+    });
+    expect(sidebarHook.result.current.activeSessionId).toBe('sess-confirmed-1');
+
+    // Click New Session while send is unresolved
+    await act(async () => {
+      await sidebarHook.result.current.newSession();
+    });
+
+    // 1. Error is reported
+    expect(sidebarHook.result.current.error).toMatch(/first-message save is pending resolution/i);
+    // 2. Confirmed sidebar selection is NOT falsely cleared to null
+    expect(sidebarHook.result.current.activeSessionId).toBe('sess-confirmed-1');
+    // 3. Pending operation in storage is NOT discarded
+    expect(readPendingFirstSend()).toEqual(unresolved);
+
+    // Cleanup
+    removePendingFirstSend();
+  });
+
+  // Regression 6: New Session/open-session actions while a send is unresolved
   it('preserves unresolved first send across New Session, openSession, and remount', async () => {
     const unresolved: PendingFirstSend = {
       createRequestId: 'req-c-1',

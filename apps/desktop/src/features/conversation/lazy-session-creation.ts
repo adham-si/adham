@@ -203,7 +203,7 @@ export async function performLazyFirstSend(
     }
 
     // Update pending record with created sessionId
-    writePendingFirstSend({
+    const recorded = writePendingFirstSend({
       createRequestId,
       messageRequestId,
       text: trimmed,
@@ -211,6 +211,14 @@ export async function performLazyFirstSend(
       projectId,
       sessionId: createdSessionId,
     });
+    if (!recorded) {
+      return {
+        ok: false,
+        error:
+          'Session created, but save identity could not be recorded. Reload history before resending.',
+        uncertain: true,
+      };
+    }
 
     if (isStale()) {
       return { ok: false, error: 'Session changed while sending.', uncertain: false };
