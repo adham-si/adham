@@ -81,12 +81,15 @@ export function DialogRoot({
   const descriptionId = `${reactId}-description`;
 
   const open = controlledOpen ?? uncontrolledOpen;
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+
   const setOpen = React.useCallback(
     (next: boolean) => {
       if (controlledOpen === undefined) setUncontrolledOpen(next);
-      onOpenChange?.(next);
+      onOpenChangeRef.current?.(next);
     },
-    [controlledOpen, onOpenChange],
+    [controlledOpen],
   );
 
   const context = React.useMemo<DialogContextValue>(
@@ -153,20 +156,30 @@ export interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement>
  */
 export function DialogContent({ size, label, className, children, ...props }: DialogContentProps) {
   const { open, setOpen, contentId, titleId, descriptionId, contentRef, triggerRef } = useDialog();
+  const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
-    if (!open) return;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
+    if (!open) {
+      previouslyFocusedRef.current = null;
+      return;
+    }
+
+    if (!previouslyFocusedRef.current) {
+      previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    }
 
     // Move focus in: the container itself, so a screen reader reads the label
-    // before the first control rather than skipping to it.
-    contentRef.current?.focus();
+    // before the first control rather than skipping to it. Only move focus
+    // if focus is not already inside the dialog container.
+    if (!contentRef.current?.contains(document.activeElement)) {
+      contentRef.current?.focus();
+    }
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         setOpen(false);
-        (triggerRef.current ?? previouslyFocused)?.focus();
+        (triggerRef.current ?? previouslyFocusedRef.current)?.focus();
         return;
       }
       if (event.key !== 'Tab') return;
@@ -195,9 +208,17 @@ export function DialogContent({ size, label, className, children, ...props }: Di
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
-      (triggerRef.current ?? previouslyFocused)?.focus();
     };
   }, [open, setOpen, contentRef, triggerRef]);
+
+  // Restore focus to trigger or previous element when dialog closes or unmounts
+  React.useEffect(() => {
+    return () => {
+      if (open) {
+        (triggerRef.current ?? previouslyFocusedRef.current)?.focus();
+      }
+    };
+  }, [open, triggerRef]);
 
   if (!open) return null;
 
