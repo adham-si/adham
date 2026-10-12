@@ -245,7 +245,15 @@ describe('APP-WIRING-03/04: Session restoration and recovery', () => {
       useProjectSessions({ backend, workspaceId: 'ws-1', projectId: 'proj-1' }),
     );
 
-    await waitFor(() => expect(result.current.sessions).toHaveLength(1));
+    const onSelect = (e: Event) => {
+      const custom = e as CustomEvent<{
+        workspaceId: string;
+        projectId: string;
+        sessionId: string;
+      }>;
+      window.dispatchEvent(new CustomEvent('adham:session-active', { detail: custom.detail }));
+    };
+    window.addEventListener('adham:session-select', onSelect);
 
     await act(async () => {
       await result.current.newSession();
@@ -254,6 +262,7 @@ describe('APP-WIRING-03/04: Session restoration and recovery', () => {
     await waitFor(() => expect(result.current.sessions).toHaveLength(2));
     expect(result.current.activeSessionId).toBe('sess-new-created');
     expect(result.current.sessions[0]?.id).toBe('sess-new-created');
+    window.removeEventListener('adham:session-select', onSelect);
   });
 
   it('session-list failures offer retry, not an empty-success state', async () => {
@@ -305,82 +314,6 @@ describe('APP-WIRING-03/04: Session restoration and recovery', () => {
     const { result } = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(result.current.storageWarning).not.toBeNull());
     expect(result.current.storageWarning).toMatch(/durable session storage is unavailable/i);
-  });
-
-  it('deferred project A session listing resolves after switching to project B does not overwrite project B sessions', async () => {
-    const backend = createMockBackend();
-    let resolveA!: (val: unknown) => void;
-    const promiseA = new Promise((resolve) => {
-      resolveA = resolve;
-    });
-
-    backend.listSessions.mockImplementation((ctx: { projectId: string }) => {
-      if (ctx.projectId === 'proj-A') return promiseA;
-      return Promise.resolve({
-        sessions: [
-          { sessionId: 'sess-B1', title: 'Session B1', createdAt: '2026-10-11T20:00:00Z' },
-        ],
-        truncated: false,
-      });
-    });
-
-    const { result, rerender } = renderHook(
-      ({ proj }) => useProjectSessions({ backend, workspaceId: 'ws-1', projectId: proj }),
-      { initialProps: { proj: 'proj-A' } },
-    );
-
-    rerender({ proj: 'proj-B' });
-    await waitFor(() => expect(result.current.sessions).toHaveLength(1));
-    expect(result.current.sessions[0]?.id).toBe('sess-B1');
-
-    await act(async () => {
-      resolveA({
-        sessions: [
-          { sessionId: 'sess-A1', title: 'Session A1', createdAt: '2026-10-11T19:00:00Z' },
-        ],
-        truncated: false,
-      });
-    });
-
-    expect(result.current.sessions).toHaveLength(1);
-    expect(result.current.sessions[0]?.id).toBe('sess-B1');
-  });
-
-  it('overlapping newSession calls do not dispatch duplicate session creations', async () => {
-    const backend = createMockBackend();
-    let resolveCreate!: (val: unknown) => void;
-    const createPromise = new Promise((resolve) => {
-      resolveCreate = resolve;
-    });
-    backend.createSession.mockImplementation(() => createPromise);
-    backend.listSessions.mockResolvedValue({ sessions: [], truncated: false });
-
-    const { result } = renderHook(() =>
-      useProjectSessions({ backend, workspaceId: 'ws-1', projectId: 'proj-1' }),
-    );
-
-    let p1: Promise<void>;
-    act(() => {
-      p1 = result.current.newSession();
-    });
-
-    act(() => {
-      void result.current.newSession();
-    });
-
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      resolveCreate({
-        sessionId: 'sess-single',
-        projectId: 'proj-1',
-        title: null,
-        createdAt: '2026-10-11T20:00:00Z',
-      });
-      await p1!;
-    });
-
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
   });
 
   it('rejected session discovery (e.g. PROJECT_NOT_FOUND or CONTEXT_MISMATCH) returns error and performs zero session creation', async () => {

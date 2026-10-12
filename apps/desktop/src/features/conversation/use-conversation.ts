@@ -239,7 +239,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         scopeStaleRef.current = false;
         try {
           window.dispatchEvent(
-            new CustomEvent('adham:session-active', { detail: { sessionId: ctx.sessionId } }),
+            new CustomEvent('adham:session-active', {
+              detail: {
+                workspaceId: ctx.workspaceId,
+                projectId: ctx.projectId,
+                sessionId: ctx.sessionId,
+              },
+            }),
           );
         } catch {
           // ignore
@@ -386,7 +392,13 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         }
         try {
           window.dispatchEvent(
-            new CustomEvent('adham:session-active', { detail: { sessionId: next.sessionId } }),
+            new CustomEvent('adham:session-active', {
+              detail: {
+                workspaceId: next.workspaceId,
+                projectId: next.projectId,
+                sessionId: next.sessionId,
+              },
+            }),
           );
         } catch {
           // ignore
@@ -398,14 +410,25 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
 
   React.useEffect(() => {
     const onSelect = (e: Event) => {
-      const custom = e as CustomEvent<{ sessionId: string }>;
-      if (custom.detail?.sessionId) {
-        void openSession(custom.detail.sessionId);
+      const custom = e as CustomEvent<{
+        workspaceId?: string;
+        projectId?: string;
+        sessionId: string;
+      }>;
+      if (!custom.detail?.sessionId) return;
+      if (
+        (custom.detail.workspaceId &&
+          context &&
+          custom.detail.workspaceId !== context.workspaceId) ||
+        (custom.detail.projectId && context && custom.detail.projectId !== context.projectId)
+      ) {
+        return;
       }
+      void openSession(custom.detail.sessionId);
     };
     window.addEventListener('adham:session-select', onSelect);
     return () => window.removeEventListener('adham:session-select', onSelect);
-  }, [openSession]);
+  }, [context, openSession]);
 
   const submit = React.useCallback(
     async (text: string): Promise<SubmitOutcome> => {

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { SessionSummary as ContractSessionSummary } from '@adham/contracts-generated';
 import type { SessionSummary as SidebarSessionSummary } from '@/widgets/shell/primary-sidebar/primary-sidebar';
-import { SCOPE_CHANGED_EVENT } from './conversation-identity';
+import { SCOPE_CHANGED_EVENT, isDefinitePreEffectRejection } from './conversation-identity';
 
 export interface UseProjectSessionsOptions {
   backend?: {
@@ -21,6 +21,12 @@ export interface UseProjectSessionsOptions {
   projectId: string | null;
 }
 
+interface UnresolvedNewSessionIntent {
+  requestId: string;
+  workspaceId: string;
+  projectId: string;
+}
+
 export function useProjectSessions({
   backend = adhamClient,
   workspaceId,
@@ -35,8 +41,22 @@ export function useProjectSessions({
 
   const fetchSeqRef = React.useRef(0);
   const creatingRef = React.useRef(false);
+  const currentWorkspaceRef = React.useRef<string | null>(workspaceId);
+  currentWorkspaceRef.current = workspaceId;
   const currentProjectRef = React.useRef<string | null>(projectId);
   currentProjectRef.current = projectId;
+  const scopeGenerationRef = React.useRef(0);
+
+  // Unresolved New Session intent across unknown outcomes
+  const unresolvedIntentRef = React.useRef<UnresolvedNewSessionIntent | null>(null);
+
+  // Clear incompatible sidebar rows and active session during scope changes
+  React.useEffect(() => {
+    scopeGenerationRef.current += 1;
+    setSessions([]);
+    setActiveSessionId(null);
+    setError(null);
+  }, [workspaceId, projectId]);
 
   const fetchSessions = React.useCallback(async () => {
     fetchSeqRef.current += 1;
@@ -82,28 +102,66 @@ export function useProjectSessions({
 
   React.useEffect(() => {
     const onActive = (e: Event) => {
-      const custom = e as CustomEvent<{ sessionId: string }>;
-      if (custom.detail?.sessionId) {
-        setActiveSessionId(custom.detail.sessionId);
+      const custom = e as CustomEvent<{
+        workspaceId?: string;
+        projectId?: string;
+        sessionId: string;
+      }>;
+      if (!custom.detail?.sessionId) return;
+      // Validate workspace/project identity in consumer
+      if (
+        (custom.detail.workspaceId && custom.detail.workspaceId !== currentWorkspaceRef.current) ||
+        (custom.detail.projectId && custom.detail.projectId !== currentProjectRef.current)
+      ) {
+        return;
       }
+      setActiveSessionId(custom.detail.sessionId);
     };
     window.addEventListener('adham:session-active', onActive);
     return () => window.removeEventListener('adham:session-active', onActive);
   }, []);
 
-  const selectSession = React.useCallback((sessionId: string) => {
-    setActiveSessionId(sessionId);
-    window.dispatchEvent(new CustomEvent('adham:session-select', { detail: { sessionId } }));
-  }, []);
+  const selectSession = React.useCallback(
+    (sessionId: string) => {
+      if (!workspaceId || !projectId) return;
+      // Highlight selection only after confirmed opening: do not setActiveSessionId eagerly here
+      window.dispatchEvent(
+        new CustomEvent('adham:session-select', {
+          detail: { workspaceId, projectId, sessionId },
+        }),
+      );
+    },
+    [workspaceId, projectId],
+  );
 
   const newSession = React.useCallback(async () => {
     if (!workspaceId || !projectId) return;
     if (creatingRef.current) return;
+
+    // Block a different creation while unresolved
+    if (
+      unresolvedIntentRef.current &&
+      (unresolvedIntentRef.current.workspaceId !== workspaceId ||
+        unresolvedIntentRef.current.projectId !== projectId)
+    ) {
+      setError('A session creation for another scope is pending resolution.');
+      return;
+    }
+
     creatingRef.current = true;
     setCreating(true);
     const targetWs = workspaceId;
     const targetProj = projectId;
-    const requestId = crypto.randomUUID();
+    const currentGen = scopeGenerationRef.current;
+
+    // Retain request identity across unknown outcomes; explicit retry reuses them.
+    const requestId = unresolvedIntentRef.current?.requestId ?? crypto.randomUUID();
+    unresolvedIntentRef.current = {
+      requestId,
+      workspaceId: targetWs,
+      projectId: targetProj,
+    };
+
     try {
       const created = await backend.createSession(
         targetWs,
@@ -111,12 +169,49 @@ export function useProjectSessions({
         { title: null },
         { requestId },
       );
-      if (currentProjectRef.current !== targetProj) return;
+
+      // Recheck scope/generation after createSession
+      if (
+        currentWorkspaceRef.current !== targetWs ||
+        currentProjectRef.current !== targetProj ||
+        scopeGenerationRef.current !== currentGen
+      ) {
+        unresolvedIntentRef.current = null;
+        return;
+      }
+
+      // Await list refresh and recheck scope/generation
       await fetchSessions();
+      if (
+        currentWorkspaceRef.current !== targetWs ||
+        currentProjectRef.current !== targetProj ||
+        scopeGenerationRef.current !== currentGen
+      ) {
+        unresolvedIntentRef.current = null;
+        return;
+      }
+
+      // Confirmed success: clear intent and select session
+      unresolvedIntentRef.current = null;
       selectSession(created.sessionId);
     } catch (err) {
-      if (currentProjectRef.current === targetProj) {
-        setError(err instanceof Error ? err.message : 'Failed to create session.');
+      // Clear intent only on proven pre-effect rejection.
+      // Unknown outcomes retain the intent so explicit retry reuses it.
+      if (isDefinitePreEffectRejection(err)) {
+        unresolvedIntentRef.current = null;
+      }
+      if (
+        currentWorkspaceRef.current === targetWs &&
+        currentProjectRef.current === targetProj &&
+        scopeGenerationRef.current === currentGen
+      ) {
+        const msg =
+          typeof err === 'string'
+            ? err
+            : err instanceof Error
+              ? err.message
+              : 'Failed to create session.';
+        setError(msg);
       }
     } finally {
       creatingRef.current = false;

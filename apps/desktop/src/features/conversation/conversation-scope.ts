@@ -67,6 +67,39 @@ export type ScopeResolutionOutcome =
   | { kind: 'created'; context: ConversationContext }
   | { kind: 'error'; message: string };
 
+export function isSessionMissingOrMismatched(err: unknown): boolean {
+  if (typeof err === 'string') {
+    return (
+      err.startsWith('SESSION_NOT_FOUND') ||
+      err.startsWith('SessionNotFound') ||
+      err.startsWith('CONTEXT_MISMATCH') ||
+      err.startsWith('ContextMismatch') ||
+      err.includes('session stream does not exist') ||
+      err.includes('session does not belong')
+    );
+  }
+  if (typeof err === 'object' && err !== null) {
+    const code = (err as { code?: unknown }).code;
+    if (
+      code === 'SessionNotFound' ||
+      code === 'SESSION_NOT_FOUND' ||
+      code === 'ContextMismatch' ||
+      code === 'CONTEXT_MISMATCH'
+    ) {
+      return true;
+    }
+    const messageKey = (err as { messageKey?: unknown }).messageKey;
+    if (messageKey === 'error.sessionNotFound' || messageKey === 'error.contextMismatch') {
+      return true;
+    }
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string') {
+      return isSessionMissingOrMismatched(message);
+    }
+  }
+  return false;
+}
+
 /// Resolve authoritative selection from the backend bootstrap state and acquire
 /// a durable session identity (resuming a validated preference, recovering existing project
 /// sessions, or creating a new session with idempotent request identity).
@@ -116,14 +149,16 @@ export async function resolveAuthoritativeSession(
         };
       } catch (err) {
         if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
-        if (isDefinitePreEffectRejection(err)) {
-          // Stored preference is invalid (session stream missing or mismatched).
+        if (isSessionMissingOrMismatched(err)) {
+          // Stored preference is explicitly missing or mismatched: invalidate preference.
           clearDurableSessionPreference(instId, ws, proj);
         } else {
-          // Transient/storage read failure: offer retry rather than creating replacement session.
+          // Other errors (e.g. storage unavailable, transient failures) remain errors,
+          // not evidence that the preference is invalid.
+          const rawMsg = typeof err === 'string' ? err : err instanceof Error ? err.message : null;
           return {
             kind: 'error',
-            message: `${err instanceof Error ? err.message : 'Saved conversation could not be loaded.'} Retry once connectivity returns.`,
+            message: `${rawMsg ?? 'Saved conversation could not be loaded.'} Retry once connectivity returns.`,
           };
         }
       }
