@@ -356,6 +356,10 @@ describe('provisioning journey', () => {
         title: null,
         createdAt: '2026-10-09T00:00:02Z',
       }),
+      listSessions: vi.fn(async () => ({
+        sessions: [],
+        truncated: false,
+      })),
       submitMessage: vi.fn(),
       getConversation: vi.fn().mockResolvedValue({
         items: [],
@@ -417,7 +421,8 @@ describe('provisioning journey', () => {
       { requestId: expect.any(String) },
     );
 
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(screen.queryByText(/create your project/i)).toBeNull();
     expect(backend.createWorkspace).toHaveBeenCalledTimes(1);
     expect(selectionBackend.selectProject).not.toHaveBeenCalled();
@@ -498,7 +503,8 @@ describe('provisioning journey', () => {
     await act(async () => {
       resolveRefresh(undefined);
     });
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(backend.createProject).toHaveBeenCalledTimes(1);
     expect(backend.createWorkspace).not.toHaveBeenCalled();
   });
@@ -521,7 +527,8 @@ describe('provisioning journey', () => {
     expect(backend.createWorkspace).not.toHaveBeenCalled();
     const readsBefore = backend.getBootstrapState.mock.calls.length;
     await user.click(screen.getByRole('button', { name: /retry loading/i }));
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(backend.getBootstrapState.mock.calls.length).toBeGreaterThan(readsBefore);
     expect(backend.createProject).toHaveBeenCalledTimes(1);
     expect(backend.createWorkspace).not.toHaveBeenCalled();

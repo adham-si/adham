@@ -101,6 +101,10 @@ describe('selection journey', () => {
         title: null,
         createdAt: '2026-10-09T00:00:02Z',
       }),
+      listSessions: vi.fn(async () => ({
+        sessions: [],
+        truncated: false,
+      })),
       submitMessage: vi.fn(),
       getConversation: vi.fn().mockResolvedValue({
         items: [],
@@ -133,7 +137,8 @@ describe('selection journey', () => {
       { projectId: 'proj-9' },
       { requestId: expect.any(String) },
     );
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(backend.createWorkspace).not.toHaveBeenCalled();
     expect(backend.createProject).not.toHaveBeenCalled();
   });
@@ -163,7 +168,8 @@ describe('selection journey', () => {
       (call) => (call[2] as { requestId?: string } | undefined)?.requestId,
     );
     expect(ids[0]).not.toBe(ids[1]);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
   });
 
   it('holds a confirmed selection while bootstrap loads and dispatches once', async () => {
@@ -186,7 +192,8 @@ describe('selection journey', () => {
     await act(async () => {
       resolveRefresh(undefined);
     });
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(backend.selectProject).toHaveBeenCalledTimes(1);
     expect(backend.createWorkspace).not.toHaveBeenCalled();
     expect(backend.createProject).not.toHaveBeenCalled();
@@ -206,7 +213,8 @@ describe('selection journey', () => {
     expect(backend.createProject).not.toHaveBeenCalled();
     const readsBefore = backend.getBootstrapState.mock.calls.length;
     await user.click(screen.getByRole('button', { name: /retry loading/i }));
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(backend.getBootstrapState.mock.calls.length).toBeGreaterThan(readsBefore);
     expect(backend.selectProject).toHaveBeenCalledTimes(1);
   });
@@ -241,7 +249,8 @@ describe('selection journey', () => {
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: 'Proj' }));
     await waitFor(() => expect(backend.selectProject).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(backend.createProject).not.toHaveBeenCalled();
   });
 
@@ -276,7 +285,8 @@ describe('selection journey', () => {
       { requestId: expect.any(String) },
     );
     expect(backend.createWorkspace).not.toHaveBeenCalled();
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
   });
 
   it('restores the selected scope across remount', async () => {
@@ -287,7 +297,8 @@ describe('selection journey', () => {
     );
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: 'Proj' }));
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(backend.createSession).not.toHaveBeenCalled();
     first.unmount();
 
     render(<ConversationPanel backend={backend} provisioning={backend} selection={backend} />);

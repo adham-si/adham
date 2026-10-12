@@ -178,24 +178,33 @@ describe('useConversation scope-change guards', () => {
       activeWorkspaceId: 'ws-A',
       activeProjectId: 'proj-A',
     });
-    backend.createSession.mockResolvedValueOnce({
-      sessionId: 'sess-A',
-      projectId: 'proj-A',
-      title: null,
-      createdAt: '2026-10-09T00:00:00Z',
-    });
-    backend.getConversation.mockResolvedValueOnce({
-      items: [
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
         {
-          messageId: 'msg-A',
-          role: 'user',
-          text: 'existing A message',
-          createdAt: '2026-10-09T00:00:01Z',
-          sourceEventId: 'evt-A',
+          sessionId: 'sess-A',
+          title: null,
+          createdAt: '2026-10-09T00:00:00Z',
         },
       ],
-      nextCursor: null,
-      projectionPosition: '1',
+      truncated: false,
+    });
+    backend.getConversation.mockImplementation(async (_ws, _proj, sessId) => {
+      if (sessId === 'sess-A') {
+        return {
+          items: [
+            {
+              messageId: 'msg-A',
+              role: 'user',
+              text: 'existing A message',
+              createdAt: '2026-10-09T00:00:01Z',
+              sourceEventId: 'evt-A',
+            },
+          ],
+          nextCursor: null,
+          projectionPosition: '1',
+        };
+      }
+      return { items: [], nextCursor: null, projectionPosition: '0' };
     });
 
     const { result } = renderHook(() => useConversation({ backend }));
@@ -272,11 +281,15 @@ describe('useConversation scope-change guards', () => {
       activeWorkspaceId: 'ws-B',
       activeProjectId: 'proj-B',
     });
-    backend.createSession.mockResolvedValueOnce({
-      sessionId: 'sess-B',
-      projectId: 'proj-B',
-      title: null,
-      createdAt: '2026-10-09T00:00:02Z',
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-B',
+          title: null,
+          createdAt: '2026-10-09T00:00:02Z',
+        },
+      ],
+      truncated: false,
     });
     backend.getConversation.mockResolvedValueOnce({
       items: [],
@@ -326,11 +339,15 @@ describe('useConversation scope-change guards', () => {
       activeWorkspaceId: 'ws-B',
       activeProjectId: 'proj-B',
     });
-    backend.createSession.mockResolvedValueOnce({
-      sessionId: 'sess-B',
-      projectId: 'proj-B',
-      title: null,
-      createdAt: '2026-10-09T00:00:02Z',
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-B',
+          title: null,
+          createdAt: '2026-10-09T00:00:02Z',
+        },
+      ],
+      truncated: false,
     });
     backend.getConversation.mockResolvedValueOnce({
       items: [],
@@ -339,14 +356,18 @@ describe('useConversation scope-change guards', () => {
     });
   }
 
-  it('fences superseded bootstrap creation against storage side effects: cannot overwrite newer session cache, remove newer create intent, or unlock old sends', async () => {
+  it('fences superseded first-send creation against storage side effects: cannot overwrite newer session cache, remove newer create intent, or unlock old sends', async () => {
     const backend = fakeBackend();
 
-    // 1. Initial bootstrap for Scope A begins, but createSession for Scope A hangs
+    // 1. Scope A starts in ready-no-session (empty session list)
     backend.getBootstrapState.mockResolvedValueOnce({
       isInitialized: true,
       activeWorkspaceId: 'ws-A',
       activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [],
+      truncated: false,
     });
     let resolveCreateA!: (value: unknown) => void;
     backend.createSession.mockImplementationOnce(
@@ -357,6 +378,14 @@ describe('useConversation scope-change guards', () => {
     );
 
     const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBeNull();
+
+    // Scope A starts first send, which begins backend.createSession
+    let sendPromiseA: Promise<unknown>;
+    act(() => {
+      sendPromiseA = result.current.submit('hello A');
+    });
     await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
     expect(backend.createSession).toHaveBeenCalledWith(
       'ws-A',
@@ -399,6 +428,7 @@ describe('useConversation scope-change guards', () => {
         title: null,
         createdAt: '2026-10-09T00:00:01Z',
       });
+      await sendPromiseA!;
     });
 
     // 4. Assert: Scope A DID NOT overwrite SESSION_CACHE_KEY
@@ -485,14 +515,8 @@ describe('useConversation scope-change guards', () => {
       });
     });
 
-    // 4. Assert: Scope A NEVER dispatched createSession
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
-    expect(backend.createSession).not.toHaveBeenCalledWith(
-      'ws-A',
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-    );
+    // 4. Assert: Scope A NEVER dispatched createSession (lazy creation on send only)
+    expect(backend.createSession).not.toHaveBeenCalled();
 
     // Assert: Scope B cache and intent remain intact
     const cache = JSON.parse(sessionStorage.getItem('adham:compose:session') ?? '{}');
@@ -512,11 +536,15 @@ describe('useConversation scope-change guards', () => {
   it('late A creation rejection: neither overwrites B’s cache nor clears B’s intent', async () => {
     const backend = fakeBackend();
 
-    // 1. Initial bootstrap for Scope A begins, but createSession for Scope A hangs
+    // 1. Initial bootstrap for Scope A resolves to ready-no-session
     backend.getBootstrapState.mockResolvedValueOnce({
       isInitialized: true,
       activeWorkspaceId: 'ws-A',
       activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [],
+      truncated: false,
     });
     let rejectCreateA!: (err: unknown) => void;
     backend.createSession.mockImplementationOnce(
@@ -527,6 +555,14 @@ describe('useConversation scope-change guards', () => {
     );
 
     const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBeNull();
+
+    // Scope A starts first send, which begins backend.createSession
+    let sendPromiseA: Promise<unknown>;
+    act(() => {
+      sendPromiseA = result.current.submit('hello A');
+    });
     await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
 
     // 2. Out-of-band scope change to Scope B occurs
@@ -554,6 +590,7 @@ describe('useConversation scope-change guards', () => {
         code: 'VALIDATION_FAILED',
         messageKey: 'error.validationFailed',
       });
+      await sendPromiseA!;
     });
 
     // 4. Assert: Scope B cache and intent remain intact

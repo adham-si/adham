@@ -2,7 +2,8 @@ import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { SessionSummary as ContractSessionSummary } from '@adham/contracts-generated';
 import type { SessionSummary as SidebarSessionSummary } from '@/widgets/shell/primary-sidebar/primary-sidebar';
-import { SCOPE_CHANGED_EVENT, isDefinitePreEffectRejection } from './conversation-identity';
+import { SCOPE_CHANGED_EVENT } from './conversation-identity';
+import { readPendingFirstSend } from './lazy-session-creation';
 
 export interface UseProjectSessionsOptions {
   backend?: {
@@ -21,12 +22,6 @@ export interface UseProjectSessionsOptions {
   projectId: string | null;
 }
 
-interface UnresolvedNewSessionIntent {
-  requestId: string;
-  workspaceId: string;
-  projectId: string;
-}
-
 export function useProjectSessions({
   backend = adhamClient,
   workspaceId,
@@ -35,20 +30,16 @@ export function useProjectSessions({
   const [sessions, setSessions] = React.useState<SidebarSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
-  const [creating, setCreating] = React.useState(false);
+  const [creating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [truncated, setTruncated] = React.useState(false);
 
   const fetchSeqRef = React.useRef(0);
-  const creatingRef = React.useRef(false);
   const currentWorkspaceRef = React.useRef<string | null>(workspaceId);
   currentWorkspaceRef.current = workspaceId;
   const currentProjectRef = React.useRef<string | null>(projectId);
   currentProjectRef.current = projectId;
   const scopeGenerationRef = React.useRef(0);
-
-  // Unresolved New Session intent across unknown outcomes
-  const unresolvedIntentRef = React.useRef<UnresolvedNewSessionIntent | null>(null);
 
   // Clear incompatible sidebar rows and active session during scope changes
   React.useEffect(() => {
@@ -136,88 +127,25 @@ export function useProjectSessions({
 
   const newSession = React.useCallback(async () => {
     if (!workspaceId || !projectId) return;
-    if (creatingRef.current) return;
 
-    // Block a different creation while unresolved
+    // Block a different creation while another scope has an unresolved first send
+    const pendingFirst = readPendingFirstSend();
     if (
-      unresolvedIntentRef.current &&
-      (unresolvedIntentRef.current.workspaceId !== workspaceId ||
-        unresolvedIntentRef.current.projectId !== projectId)
+      pendingFirst &&
+      (pendingFirst.workspaceId !== workspaceId || pendingFirst.projectId !== projectId)
     ) {
       setError('A session creation for another scope is pending resolution.');
       return;
     }
 
-    creatingRef.current = true;
-    setCreating(true);
-    const targetWs = workspaceId;
-    const targetProj = projectId;
-    const currentGen = scopeGenerationRef.current;
-
-    // Retain request identity across unknown outcomes; explicit retry reuses them.
-    const requestId = unresolvedIntentRef.current?.requestId ?? crypto.randomUUID();
-    unresolvedIntentRef.current = {
-      requestId,
-      workspaceId: targetWs,
-      projectId: targetProj,
-    };
-
-    try {
-      const created = await backend.createSession(
-        targetWs,
-        targetProj,
-        { title: null },
-        { requestId },
-      );
-
-      // Recheck scope/generation after createSession
-      if (
-        currentWorkspaceRef.current !== targetWs ||
-        currentProjectRef.current !== targetProj ||
-        scopeGenerationRef.current !== currentGen
-      ) {
-        unresolvedIntentRef.current = null;
-        return;
-      }
-
-      // Await list refresh and recheck scope/generation
-      await fetchSessions();
-      if (
-        currentWorkspaceRef.current !== targetWs ||
-        currentProjectRef.current !== targetProj ||
-        scopeGenerationRef.current !== currentGen
-      ) {
-        unresolvedIntentRef.current = null;
-        return;
-      }
-
-      // Confirmed success: clear intent and select session
-      unresolvedIntentRef.current = null;
-      selectSession(created.sessionId);
-    } catch (err) {
-      // Clear intent only on proven pre-effect rejection.
-      // Unknown outcomes retain the intent so explicit retry reuses it.
-      if (isDefinitePreEffectRejection(err)) {
-        unresolvedIntentRef.current = null;
-      }
-      if (
-        currentWorkspaceRef.current === targetWs &&
-        currentProjectRef.current === targetProj &&
-        scopeGenerationRef.current === currentGen
-      ) {
-        const msg =
-          typeof err === 'string'
-            ? err
-            : err instanceof Error
-              ? err.message
-              : 'Failed to create session.';
-        setError(msg);
-      }
-    } finally {
-      creatingRef.current = false;
-      setCreating(false);
-    }
-  }, [backend, fetchSessions, projectId, selectSession, workspaceId]);
+    setError(null);
+    setActiveSessionId(null);
+    window.dispatchEvent(
+      new CustomEvent('adham:session-select', {
+        detail: { workspaceId, projectId, sessionId: null },
+      }),
+    );
+  }, [projectId, workspaceId]);
 
   return {
     sessions,

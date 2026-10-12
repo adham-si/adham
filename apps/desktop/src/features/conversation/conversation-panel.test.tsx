@@ -43,6 +43,16 @@ function fakeBackend() {
       nextCursor: null,
       projectionPosition: '1',
     }),
+    listSessions: vi.fn().mockResolvedValue({
+      sessions: [
+        {
+          sessionId: 'sess-1',
+          title: null,
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    }),
   };
 }
 
@@ -58,7 +68,7 @@ describe('ConversationPanel', () => {
   it('renders telemetry as unknown and discloses the model gap in production', async () => {
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+    await screen.findByRole('textbox', { name: /composer input/i });
 
     expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/model selection is not applied/i)).toBeDefined();
@@ -75,9 +85,8 @@ describe('ConversationPanel', () => {
       projectionPosition: '0',
     });
     render(<ConversationPanel backend={backend} />);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+    const box = await screen.findByRole('textbox', { name: /composer input/i });
 
-    const box = screen.getByRole('textbox', { name: /composer input/i });
     await user.type(box, 'hello backend');
     await user.keyboard('{Enter}');
 
@@ -96,9 +105,10 @@ describe('ConversationPanel', () => {
     });
     backend.submitMessage.mockRejectedValueOnce(new Error('IPC offline'));
     render(<ConversationPanel backend={backend} />);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
 
-    const box = screen.getByRole('textbox', { name: /composer input/i }) as HTMLTextAreaElement;
     await user.type(box, 'unsaved words');
     await user.keyboard('{Enter}');
 
@@ -112,7 +122,7 @@ describe('ConversationPanel', () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+    await screen.findByRole('textbox', { name: /composer input/i });
 
     expect(screen.queryByText(/execution.*unavailable|unavailable.*execution/i)).toBeNull();
     // Switch to execute mode via the mode radiogroup.
@@ -125,7 +135,7 @@ describe('ConversationPanel', () => {
   it('never renders a Stop button because no stop command exists', async () => {
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+    await screen.findByRole('textbox', { name: /composer input/i });
 
     expect(screen.queryByRole('button', { name: /stop generation/i })).toBeNull();
   });
@@ -134,9 +144,8 @@ describe('ConversationPanel', () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+    const box = await screen.findByRole('textbox', { name: /composer input/i });
 
-    const box = screen.getByRole('textbox', { name: /composer input/i });
     await user.click(box);
     await user.paste('A'.repeat(2500));
 
@@ -153,9 +162,7 @@ describe('ConversationPanel', () => {
     });
     backend.submitMessage.mockRejectedValueOnce(new Error('IPC offline'));
     render(<ConversationPanel backend={backend} />);
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
-
-    const box = screen.getByRole('textbox', { name: /composer input/i });
+    const box = await screen.findByRole('textbox', { name: /composer input/i });
     await user.type(box, 'unsaved words');
     await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.getByText(/IPC offline/i)).toBeDefined());
@@ -203,10 +210,11 @@ describe('ConversationPanel', () => {
     await act(async () => {
       resolveBootstrap();
     });
-    await waitFor(() => expect(backend.createSession).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+    );
 
     expect(box.value).toBe('early thought');
-    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
   });
 
   it('restores text typed before bootstrap across unmount and remount', async () => {
@@ -230,9 +238,10 @@ describe('ConversationPanel', () => {
     // Restored from the pending bucket on mount, and kept once the
     // resolved session adopts it.
     expect(restored.value).toBe('early thought');
-    await waitFor(() => expect(secondBackend.createSession).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+    );
     expect(restored.value).toBe('early thought');
-    expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
   });
 
   it('never turns failed or unknown project discovery into an empty-project creation offer', async () => {

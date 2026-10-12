@@ -222,7 +222,7 @@ describe('APP-WIRING-03/04: Session restoration and recovery', () => {
     expect(updatedPref?.sessionId).toBe('sess-existing-2');
   });
 
-  it('new session deliberately creates session and updates list and selection', async () => {
+  it('new session starts an unsaved conversation and creates zero persisted sessions before a send', async () => {
     const backend = createMockBackend();
     const sessions: Array<{ sessionId: string; title: string | null; createdAt: string }> = [
       { sessionId: 'sess-1', title: 'First', createdAt: '2026-10-11T19:00:00Z' },
@@ -230,28 +230,19 @@ describe('APP-WIRING-03/04: Session restoration and recovery', () => {
     backend.listSessions.mockImplementation(() =>
       Promise.resolve({ sessions: [...sessions], truncated: false }),
     );
-    backend.createSession.mockImplementationOnce(() => {
-      const created = {
-        sessionId: 'sess-new-created',
-        projectId: 'proj-1',
-        title: null,
-        createdAt: '2026-10-11T20:30:00Z',
-      };
-      sessions.unshift(created);
-      return Promise.resolve(created);
-    });
 
     const { result } = renderHook(() =>
       useProjectSessions({ backend, workspaceId: 'ws-1', projectId: 'proj-1' }),
     );
 
+    const selectEvents: unknown[] = [];
     const onSelect = (e: Event) => {
       const custom = e as CustomEvent<{
         workspaceId: string;
         projectId: string;
-        sessionId: string;
+        sessionId: string | null;
       }>;
-      window.dispatchEvent(new CustomEvent('adham:session-active', { detail: custom.detail }));
+      selectEvents.push(custom.detail);
     };
     window.addEventListener('adham:session-select', onSelect);
 
@@ -259,9 +250,14 @@ describe('APP-WIRING-03/04: Session restoration and recovery', () => {
       await result.current.newSession();
     });
 
-    await waitFor(() => expect(result.current.sessions).toHaveLength(2));
-    expect(result.current.activeSessionId).toBe('sess-new-created');
-    expect(result.current.sessions[0]?.id).toBe('sess-new-created');
+    // Zero backend sessions were created
+    expect(backend.createSession).not.toHaveBeenCalled();
+    // Selection set to null (unsaved conversation)
+    expect(result.current.activeSessionId).toBeNull();
+    // Session list unchanged
+    expect(result.current.sessions).toHaveLength(1);
+    // Announced session-select event with sessionId: null
+    expect(selectEvents).toEqual([{ workspaceId: 'ws-1', projectId: 'proj-1', sessionId: null }]);
     window.removeEventListener('adham:session-select', onSelect);
   });
 
