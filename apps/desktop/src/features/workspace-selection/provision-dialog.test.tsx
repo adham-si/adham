@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -212,11 +213,195 @@ describe('ProvisionDialog', () => {
     );
 
     const input = screen.getByLabelText(/project name/i);
-    fireEvent.change(input, { target: { value: 'Duplicate Project' } });
+    await user.type(input, 'Duplicate Project');
     await user.click(screen.getByRole('button', { name: /create project/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeDefined();
+    });
+  });
+
+  it('keeps workspace input focused throughout continuous typing (TEST-WS-A)', async () => {
+    const user = userEvent.setup();
+    const backend = {
+      createWorkspace: vi.fn(),
+      createProject: vi.fn(),
+    };
+
+    render(
+      <ProvisionDialog
+        open={true}
+        target={{ type: 'workspace' }}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        backend={backend}
+      />,
+    );
+
+    const input = screen.getByLabelText(/workspace name/i);
+    expect(document.activeElement).toBe(input);
+
+    await user.type(input, 'TEST-WS-A');
+    expect((input as HTMLInputElement).value).toBe('TEST-WS-A');
+    expect(document.activeElement).toBe(input);
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('keeps project input focused throughout continuous typing (Project Alpha 1)', async () => {
+    const user = userEvent.setup();
+    const backend = {
+      createWorkspace: vi.fn(),
+      createProject: vi.fn(),
+    };
+
+    render(
+      <ProvisionDialog
+        open={true}
+        target={{
+          type: 'project',
+          workspaceId: 'ws-123',
+          workspaceName: 'Acme Corp',
+        }}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        backend={backend}
+      />,
+    );
+
+    const input = screen.getByLabelText(/project name/i);
+    expect(document.activeElement).toBe(input);
+
+    await user.type(input, 'Project Alpha 1');
+    expect((input as HTMLInputElement).value).toBe('Project Alpha 1');
+    expect(document.activeElement).toBe(input);
+    expect(backend.createProject).not.toHaveBeenCalled();
+  });
+
+  it('supports cursor editing, backspace, and pasting without losing focus', async () => {
+    const user = userEvent.setup();
+    const backend = {
+      createWorkspace: vi.fn(),
+      createProject: vi.fn(),
+    };
+
+    render(
+      <ProvisionDialog
+        open={true}
+        target={{ type: 'workspace' }}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        backend={backend}
+      />,
+    );
+
+    const input = screen.getByLabelText(/workspace name/i) as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+
+    // Type initial string
+    await user.type(input, 'TEST-WRONG');
+    expect(input.value).toBe('TEST-WRONG');
+    expect(document.activeElement).toBe(input);
+
+    // Backspace 5 characters ('WRONG')
+    await user.keyboard('{Backspace>5/}');
+    expect(input.value).toBe('TEST-');
+    expect(document.activeElement).toBe(input);
+
+    // Paste replacement text
+    await user.paste('WS-A');
+    expect(input.value).toBe('TEST-WS-A');
+    expect(document.activeElement).toBe(input);
+
+    // Move cursor left 4 positions and insert prefix
+    await user.keyboard('{ArrowLeft>4}COOL-{ArrowRight>4}');
+    expect(input.value).toBe('TEST-COOL-WS-A');
+    expect(document.activeElement).toBe(input);
+
+    // Verify typing alone dispatched zero creation commands
+    expect(backend.createWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('handles workspace -> project dialog transition and gives project field initial focus', async () => {
+    const user = userEvent.setup();
+    const backend = {
+      createWorkspace: vi.fn(async ({ name }: { name: string }) => ({
+        workspaceId: 'ws-created-999',
+        name,
+        kind: 'personal',
+        preferredLanguage: 'en',
+        createdAt: '2026-10-12T00:00:00Z',
+      })),
+      createProject: vi.fn(async (wsId: string, payload: { name: string }) => ({
+        projectId: 'proj-created-888',
+        workspaceId: wsId,
+        name: payload.name,
+        storageKind: 'isolated',
+        createdAt: '2026-10-12T00:00:00Z',
+      })),
+    };
+
+    function ChainedProvisioning() {
+      const [target, setTarget] = React.useState<ProvisionDialogTarget | null>({
+        type: 'workspace',
+      });
+      return (
+        <ProvisionDialog
+          open={target !== null}
+          target={target}
+          onClose={() => setTarget(null)}
+          onSuccess={(tgt, id, name) => {
+            if (tgt.type === 'workspace') {
+              setTarget({
+                type: 'project',
+                workspaceId: id,
+                workspaceName: name ?? 'New Workspace',
+              });
+            } else {
+              setTarget(null);
+            }
+          }}
+          backend={backend}
+        />
+      );
+    }
+
+    render(<ChainedProvisioning />);
+
+    // 1. Workspace step: input receives initial focus and types continuously
+    const wsInput = screen.getByLabelText(/workspace name/i);
+    expect(document.activeElement).toBe(wsInput);
+    await user.type(wsInput, 'TEST-WS-A');
+    expect((wsInput as HTMLInputElement).value).toBe('TEST-WS-A');
+    expect(document.activeElement).toBe(wsInput);
+
+    // Submit workspace creation
+    await user.click(screen.getByRole('button', { name: /create workspace/i }));
+
+    // 2. Transition to project step
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /create your project/i })).toBeDefined();
+    });
+    expect(screen.getByText('TEST-WS-A')).toBeDefined();
+    expect(screen.getByText('ws-created-999')).toBeDefined();
+
+    // Project field has initial focus immediately after transition
+    const projInput = screen.getByLabelText(/project name/i);
+    expect(document.activeElement).toBe(projInput);
+
+    // Continuous typing in project field works without losing focus
+    await user.type(projInput, 'A1');
+    expect((projInput as HTMLInputElement).value).toBe('A1');
+    expect(document.activeElement).toBe(projInput);
+
+    // Submit project creation
+    await user.click(screen.getByRole('button', { name: /create project/i }));
+
+    await waitFor(() => {
+      expect(backend.createProject).toHaveBeenCalledWith(
+        'ws-created-999',
+        { name: 'A1', storageKind: 'isolated' },
+        expect.objectContaining({ requestId: expect.any(String) }),
+      );
     });
   });
 });

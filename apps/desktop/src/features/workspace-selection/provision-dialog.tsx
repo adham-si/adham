@@ -44,6 +44,7 @@ export function ProvisionDialog({
       ? 'workspace'
       : `project:${target.workspaceId}`
     : null;
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
   const prevOpenRef = React.useRef(false);
   const prevKeyRef = React.useRef<string | null>(null);
 
@@ -51,10 +52,23 @@ export function ProvisionDialog({
     if (open && (!prevOpenRef.current || prevKeyRef.current !== targetKey)) {
       setName('');
       setLocalError(null);
+      inputRef.current?.focus();
     }
     prevOpenRef.current = open;
     prevKeyRef.current = targetKey;
   }, [open, targetKey]);
+
+  const handleCancel = React.useCallback(() => {
+    if (prov.working) return;
+    onClose();
+  }, [onClose, prov.working]);
+
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (!next) handleCancel();
+    },
+    [handleCancel],
+  );
 
   if (!open || !target) return null;
 
@@ -99,20 +113,10 @@ export function ProvisionDialog({
     }
   };
 
-  const handleCancel = () => {
-    if (prov.working) return;
-    onClose();
-  };
-
   const errorMessage = localError ?? prov.error;
 
   return (
-    <DialogRoot
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) handleCancel();
-      }}
-    >
+    <DialogRoot open={open} onOpenChange={handleOpenChange}>
       <DialogContent size="sm" label={title}>
         <div className="flex flex-col gap-4">
           <div>
@@ -135,6 +139,7 @@ export function ProvisionDialog({
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium text-foreground">{label}</span>
             <Input
+              ref={inputRef}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
