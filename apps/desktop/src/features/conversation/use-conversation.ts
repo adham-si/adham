@@ -1,29 +1,33 @@
 import * as React from 'react';
-import type { ConversationMessageDto } from '@/shared/api/adham-client';
 import {
-  CREATE_INTENT_KEY,
   SESSION_CACHE_KEY,
   isDefinitePreEffectRejection,
-  readCreateIntent,
   readPendingSend,
-  readSessionCache,
   rejectionMessage,
   removePendingSend,
-  removeStorage,
   sameScope,
+  sendBlockedReason,
   type PendingSend,
   writePendingSend,
   writeStorage,
 } from './conversation-identity';
+import {
+  type ConversationBackend,
+  type ConversationContext,
+  resolveAuthoritativeSession,
+} from './conversation-scope';
 
+export type {
+  BootstrapSnapshot,
+  ConversationBackend,
+  ConversationContext,
+  ConversationSnapshot,
+  SessionSnapshot,
+  SubmittedSnapshot,
+} from './conversation-scope';
 export type { PendingSend } from './conversation-identity';
 
-export interface UiMessage {
-  id: string;
-  role: string;
-  text: string;
-  createdAt: string;
-}
+export type UiMessage = { id: string; role: string; text: string; createdAt: string };
 
 export type ConversationStatus =
   | 'bootstrapping'
@@ -44,67 +48,29 @@ export const conversationCapabilities = {
   stop: false,
 } as const;
 
-export interface ConversationContext {
-  workspaceId: string;
-  projectId: string;
-  sessionId: string;
-}
-
-interface BootstrapSnapshot {
-  isInitialized: boolean;
-  activeWorkspaceId: string | null;
-  activeProjectId: string | null;
-}
-
-interface SessionSnapshot {
-  sessionId: string;
-}
-
-interface SubmittedSnapshot {
-  messageId: string;
-  text: string;
-  createdAt: string;
-}
-
-interface ConversationSnapshot {
-  items: ConversationMessageDto[];
-}
-
-export interface ConversationBackend {
-  getBootstrapState(): Promise<BootstrapSnapshot>;
-  createSession(
-    workspaceId: string,
-    projectId: string,
-    payload: { title: string | null },
-    options?: { requestId?: string },
-  ): Promise<SessionSnapshot>;
-  submitMessage(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
-    payload: { text: string },
-    options?: { requestId?: string },
-  ): Promise<SubmittedSnapshot>;
-  getConversation(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
-  ): Promise<ConversationSnapshot>;
-}
-
-function toUiMessage(dto: {
+const toUiMessage = (dto: {
   messageId: string;
   role?: string;
   text: string;
   createdAt: string;
-}): UiMessage {
-  return {
-    id: dto.messageId,
-    role: dto.role ?? 'user',
-    text: dto.text,
-    createdAt: dto.createdAt,
-  };
-}
+}): UiMessage => ({
+  id: dto.messageId,
+  role: dto.role ?? 'user',
+  text: dto.text,
+  createdAt: dto.createdAt,
+});
+
+const switchUnresolved = (
+  req: ConversationContext | null,
+  curId: string | undefined,
+): SubmitOutcome | null =>
+  req && req.sessionId !== curId
+    ? {
+        ok: false,
+        error: 'Session switch has not completed. Retry the switch before sending.',
+        uncertain: false,
+      }
+    : null;
 
 export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [status, setStatus] = React.useState<ConversationStatus>('bootstrapping');
@@ -133,6 +99,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // only superseded by a newer request. Retries and reloads target the
   // requested session, never silently the previous one.
   const requestedRef = React.useRef<ConversationContext | null>(null);
+  // Stale-scope latch: set by refreshScope, cleared only when a fresh
+  // bootstrap resolves to ready. While latched, sends are refused.
+  const scopeStaleRef = React.useRef(false);
   // Controller-boundary submit guard: overlapping submits are rejected
   // before any dispatch, not merely hidden by a later busy render. Held
   // across the bootstrap await so two early submits cannot both proceed.
@@ -145,46 +114,48 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     };
   }, []);
 
+  const isStale = React.useCallback(
+    (gen: number, load: number, mut: number, sessId?: string) =>
+      !mountedRef.current ||
+      generationRef.current !== gen ||
+      loadSeqRef.current !== load ||
+      mutationSeqRef.current !== mut ||
+      (requestedRef.current !== null &&
+        sessId !== undefined &&
+        requestedRef.current.sessionId !== sessId),
+    [],
+  );
+
   const loadHistory = React.useCallback(
     async (
       ctx: ConversationContext,
       generation: number,
       loadSeq: number,
       mutationSeq: number,
+      // True only for a history load issued by bootstrap for the scope it
+      // just resolved authoritatively. Retained-context reloads, retries,
+      // and session switches must never release the stale-scope latch: the
+      // retained scope is not proof of the durable selection.
+      verifiedScope = false,
     ): Promise<UiMessage[] | null> => {
       try {
         const page = await backend.getConversation(ctx.workspaceId, ctx.projectId, ctx.sessionId);
-        if (
-          !mountedRef.current ||
-          generationRef.current !== generation ||
-          loadSeqRef.current !== loadSeq ||
-          mutationSeqRef.current !== mutationSeq ||
-          (requestedRef.current !== null && requestedRef.current.sessionId !== ctx.sessionId)
-        ) {
-          return null;
-        }
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
         const items = page.items.map(toUiMessage);
         setContext(ctx);
         setMessages(items);
         setError(null);
         setStatus('ready');
+        if (verifiedScope) scopeStaleRef.current = false;
         return items;
       } catch (err) {
-        if (
-          !mountedRef.current ||
-          generationRef.current !== generation ||
-          loadSeqRef.current !== loadSeq ||
-          mutationSeqRef.current !== mutationSeq ||
-          (requestedRef.current !== null && requestedRef.current.sessionId !== ctx.sessionId)
-        ) {
-          return null;
-        }
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
         setError(err instanceof Error ? err.message : 'Conversation history failed to load.');
         setStatus('error');
         return null;
       }
     },
-    [backend],
+    [backend, isStale],
   );
 
   const bootstrap = React.useCallback(async (): Promise<ConversationContext | null> => {
@@ -204,122 +175,47 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         generationRef.current !== generation ||
         loadSeqRef.current !== seq.loadSeq ||
         mutationSeqRef.current !== seq.mutationSeq;
-      // 1. Trusted selection: the bootstrap snapshot is the authority for
-      //    the active workspace/project. A cached session may only be
-      //    resumed when it still belongs to that selection, so a stale
-      //    cache can never bypass a newer choice.
-      let snapshot: BootstrapSnapshot;
-      try {
-        snapshot = await backend.getBootstrapState();
-      } catch (err) {
-        if (mountedRef.current && generationRef.current === generation) {
-          fail(
-            `${err instanceof Error ? err.message : 'Bootstrap state failed to load.'} Retry once connectivity returns.`,
-          );
-        }
+
+      const isCurrentGen = () => !mountedRef.current || generationRef.current !== generation;
+      const resolved = await resolveAuthoritativeSession(backend, isCurrentGen);
+      if (isCurrentGen()) return null;
+
+      if (resolved.kind === 'needs-workspace') {
+        setActiveWorkspaceId(resolved.activeWorkspaceId);
+        setStatus('needs-workspace');
         return null;
       }
-      // Partial provisioning is a state, not a fatal error: a workspace
-      // without a project must reach the project step, never a session.
-      setActiveWorkspaceId(snapshot.activeWorkspaceId);
-      if (!snapshot.isInitialized || !snapshot.activeWorkspaceId) {
-        if (mountedRef.current && generationRef.current === generation) {
-          setStatus('needs-workspace');
-        }
+      if (resolved.kind === 'needs-project') {
+        setActiveWorkspaceId(resolved.activeWorkspaceId);
+        setStatus('needs-project');
         return null;
       }
-      if (!snapshot.activeProjectId) {
-        if (mountedRef.current && generationRef.current === generation) {
-          setStatus('needs-project');
-        }
+      if (resolved.kind === 'error') {
+        bootPromiseRef.current = null;
+        fail(resolved.message);
         return null;
       }
-      const ws = snapshot.activeWorkspaceId;
-      const proj = snapshot.activeProjectId;
-      // 2. Resume a cached session only within the trusted selection. A
-      //    history failure is an outage, never evidence the session is
-      //    gone: the cache and session identity are retained and nothing
-      //    is recreated.
-      const cached = readSessionCache();
-      if (cached && cached.workspaceId === ws && cached.projectId === proj) {
-        const seq = freshSeq();
-        if ((await loadHistory(cached, generation, seq.loadSeq, seq.mutationSeq)) !== null) {
-          createdRef.current = cached;
-          writeStorage(SESSION_CACHE_KEY, JSON.stringify(cached));
-          return cached;
-        }
-        if (superseded(seq)) return null;
-        fail('Saved conversation could not be loaded. Retry once connectivity returns.');
-        return null;
-      }
-      if (cached) {
-        removeStorage(SESSION_CACHE_KEY);
-      }
-      // 3. Deliberate creation with a stable request identity persisted
-      // across remounts and retries, so an uncertain creation never forks
-      // a duplicate session: the backend receipt replays the original.
-      try {
-        let intent = readCreateIntent(ws, proj);
-        if (!intent) {
-          intent = { requestId: crypto.randomUUID(), workspaceId: ws, projectId: proj };
-          // A create intent that cannot be persisted must block the
-          // dispatch: without a durable identity a retry would mint a
-          // second session.
-          if (!writeStorage(CREATE_INTENT_KEY, JSON.stringify(intent))) {
-            fail(
-              'Session creation identity could not be recorded. Retry once storage is available.',
-            );
-            return null;
-          }
-        }
-        let session: SessionSnapshot;
-        try {
-          session = await backend.createSession(
-            ws,
-            proj,
-            { title: null },
-            {
-              requestId: intent.requestId,
-            },
-          );
-        } catch (err) {
-          // Only proven pre-effect rejections clear the identity; unknown
-          // or storage errors may have committed and must retry with the
-          // same request identity.
-          if (isDefinitePreEffectRejection(err)) removeStorage(CREATE_INTENT_KEY);
-          throw err;
-        }
-        const ctx: ConversationContext = {
-          workspaceId: ws,
-          projectId: proj,
-          sessionId: session.sessionId,
-        };
-        // Durable identity first: the backend has issued the session, so
-        // the cache is written before history verification and the create
-        // intent is cleared only once the cache holds the identity. A
-        // history outage after a successful create can then never cause a
-        // second creation on remount. If the cache write itself fails the
-        // intent stays, so a remount replays creation with the same
-        // request identity instead of forking a duplicate.
+
+      setActiveWorkspaceId(resolved.context.workspaceId);
+      const ctx = resolved.context;
+      const seq = freshSeq();
+      const loaded = await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq, true);
+      if (loaded !== null) {
         createdRef.current = ctx;
-        if (writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx))) {
-          removeStorage(CREATE_INTENT_KEY);
+        if (resolved.kind === 'resumed') {
+          writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx));
         }
-        const seq = freshSeq();
-        await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq);
+        scopeStaleRef.current = false;
         return ctx;
-      } catch (err) {
-        if (mountedRef.current && generationRef.current === generation) {
-          if (isDefinitePreEffectRejection(err)) {
-            fail(rejectionMessage(err));
-          } else {
-            fail(
-              `${err instanceof Error ? err.message : 'Conversation failed to start.'} Reload or retry once connectivity returns.`,
-            );
-          }
-        }
-        return null;
       }
+      if (superseded(seq)) return null;
+      bootPromiseRef.current = null;
+      fail(
+        resolved.kind === 'resumed'
+          ? 'Saved conversation could not be loaded. Retry once connectivity returns.'
+          : 'Conversation failed to start. Reload or retry once connectivity returns.',
+      );
+      return null;
     })();
     bootPromiseRef.current = run;
     return run;
@@ -329,13 +225,18 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     void bootstrap();
   }, [bootstrap]);
 
-  /// Re-run bootstrap after out-of-band provisioning (workspace/project
-  /// creation): drops the settled run so the fresh snapshot drives scope.
-  /// Sets a transitioning status so the old creation form cannot dispatch
-  /// again while the authoritative read is in flight. A read failure retries
-  /// the read, never a fresh creation.
+  /// Re-run bootstrap after an out-of-band scope change (creation or
+  /// selection): drops the settled run, bumps generation to discard
+  /// old-scope history, and clears pending session switches. A read failure
+  /// retries the read, never a fresh creation.
   const refreshScope = React.useCallback(() => {
     bootPromiseRef.current = null;
+    generationRef.current += 1;
+    requestedRef.current = null;
+    createdRef.current = null;
+    setContext(null);
+    setMessages([]);
+    scopeStaleRef.current = true;
     setStatus('bootstrapping');
     setError(null);
     void bootstrap();
@@ -349,8 +250,14 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// so the request identity is never cleared here. It resolves only
   /// through the response or receipt replay for that exact request.
   const reload = React.useCallback(async () => {
+    if (scopeStaleRef.current || !context) {
+      bootPromiseRef.current = null;
+      await bootstrap();
+      return;
+    }
     const ctx = requestedRef.current ?? context ?? createdRef.current;
     if (!ctx) {
+      bootPromiseRef.current = null;
       await bootstrap();
       return;
     }
@@ -381,6 +288,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// requested switch target when one is pending.
   const retry = React.useCallback(async () => {
     bootPromiseRef.current = null;
+    if (scopeStaleRef.current || !context) {
+      await bootstrap();
+      return;
+    }
     const resumed = requestedRef.current ?? createdRef.current;
     setStatus('bootstrapping');
     setError(null);
@@ -390,7 +301,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       return;
     }
     await bootstrap();
-  }, [backend, bootstrap, loadHistory]);
+  }, [backend, bootstrap, context, loadHistory]);
 
   /// Switch to another session of the same workspace/project. Records the
   /// requested target immediately so retries and reloads cannot fall back
@@ -398,8 +309,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// the previous session are ignored.
   const openSession = React.useCallback(
     async (sessionId: string) => {
+      if (scopeStaleRef.current) return;
       let base = context ?? createdRef.current;
       if (!base) {
+        bootPromiseRef.current = null;
         const ctx = await bootstrap();
         if (!ctx) return;
         base = ctx;
@@ -428,6 +341,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     async (text: string): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed) return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+      const blocked = sendBlockedReason(scopeStaleRef.current);
+      if (blocked) return { ok: false, error: blocked, uncertain: false };
       // Controller-boundary guard: overlapping submits are rejected before
       // any dispatch, not merely hidden by a later busy render. The guard
       // is acquired BEFORE the bootstrap await below, so two submits that
@@ -435,15 +350,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       if (submitInFlightRef.current) {
         return { ok: false, error: 'A message is already being saved.', uncertain: false };
       }
-      // A requested session switch that has not resolved must never fall
-      // back to the previous context for sending.
-      if (requestedRef.current && requestedRef.current.sessionId !== context?.sessionId) {
-        return {
-          ok: false,
-          error: 'Session switch has not completed. Retry the switch before sending.',
-          uncertain: false,
-        };
-      }
+      const preSwitch = switchUnresolved(requestedRef.current, context?.sessionId);
+      if (preSwitch) return preSwitch;
       submitInFlightRef.current = true;
       try {
         let ctx = context;
@@ -451,13 +359,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           setStatus('bootstrapping');
           ctx = await bootstrap();
           if (!ctx) return { ok: false, error: 'Conversation is not ready.', uncertain: false };
-          if (requestedRef.current && requestedRef.current.sessionId !== ctx.sessionId) {
-            return {
-              ok: false,
-              error: 'Session switch has not completed. Retry the switch before sending.',
-              uncertain: false,
-            };
-          }
+          const postSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
+          if (postSwitch) return postSwitch;
         }
         // Frozen logical command: the identity is frozen BEFORE dispatch, so
         // navigating away, crashing, or losing the transport mid-save can

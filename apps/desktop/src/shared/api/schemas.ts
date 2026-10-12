@@ -44,6 +44,17 @@ export const ProjectSummarySchema = z.object({
   createdAt: z.string(),
 });
 
+export const WorkspaceListSchema = z.object({
+  workspaces: z.array(WorkspaceSummarySchema),
+  truncated: z.boolean(),
+});
+
+export const ProjectListSchema = z.object({
+  workspaceId: z.string(),
+  projects: z.array(ProjectSummarySchema),
+  truncated: z.boolean(),
+});
+
 export const SessionSummarySchema = z.object({
   sessionId: z.string(),
   projectId: z.string(),

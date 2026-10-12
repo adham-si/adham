@@ -278,3 +278,97 @@ export const readProjectIntent = (): ProvisionIntent | null =>
 export const writeProjectIntent = (intent: ProvisionIntent): boolean =>
   writeProvisionIntent(PROVISION_PROJ_KEY, intent);
 export const clearProjectIntent = (): void => removeStorage(PROVISION_PROJ_KEY);
+
+/// Window event announcing a confirmed scope change (creation or
+/// selection). Carries the confirmed step and, when known, the confirmed
+/// scope IDs so every surface synchronizes without re-reading. The
+/// conversation surface refreshes its authoritative scope on it and
+/// selection lists re-read on creation. Failures never dispatch it.
+export const SCOPE_CHANGED_EVENT = 'adham:scope-changed';
+
+export interface ScopeChangedDetail {
+  step: 'workspace' | 'project';
+  origin: 'created' | 'selected';
+  workspaceId: string | null;
+  projectId: string | null;
+}
+
+export function announceScopeChanged(
+  step: 'workspace' | 'project' = 'project',
+  origin: 'created' | 'selected' = 'selected',
+  scope: { workspaceId: string | null; projectId: string | null } | null = null,
+): void {
+  try {
+    const detail: ScopeChangedDetail = {
+      step,
+      origin,
+      workspaceId: scope?.workspaceId ?? null,
+      projectId: scope?.projectId ?? null,
+    };
+    window.dispatchEvent(new CustomEvent(SCOPE_CHANGED_EVENT, { detail }));
+  } catch {
+    // ignore
+  }
+}
+
+/// Frozen selection intent: one unresolved selection at a time. A different
+/// scope is blocked (not dispatched) while one is frozen; the same scope
+/// retries with the frozen identity so a delayed original replays instead
+/// of forking. Mounts and reloads never auto-replay it — only an explicit
+/// same-scope retry dispatches.
+export interface SelectIntent {
+  requestId: string;
+  workspaceId: string;
+  projectId: string;
+}
+
+const SELECT_INTENT_KEY = 'adham:select:intent';
+
+export function readSelectIntent(): SelectIntent | null {
+  const raw = readStorage(SELECT_INTENT_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<SelectIntent>;
+    if (
+      typeof parsed.requestId === 'string' &&
+      typeof parsed.workspaceId === 'string' &&
+      typeof parsed.projectId === 'string'
+    ) {
+      return {
+        requestId: parsed.requestId,
+        workspaceId: parsed.workspaceId,
+        projectId: parsed.projectId,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeSelectIntent(intent: SelectIntent): boolean {
+  return writeStorage(SELECT_INTENT_KEY, JSON.stringify(intent));
+}
+
+export function clearSelectIntent(): void {
+  removeStorage(SELECT_INTENT_KEY);
+}
+
+/// Definite send-block while a scope selection is unresolved: the send
+/// would otherwise use the old scope. Nothing is dispatched, so the block
+/// is definite, not uncertain. Returns the message, or null when sending
+/// may proceed.
+export function unresolvedSelectionMessage(): string | null {
+  if (!readSelectIntent()) return null;
+  return 'A workspace/project selection has unknown status. Retry it before sending.';
+}
+
+/// First applicable definite pre-send block: unresolved selection, then a
+/// confirmed-but-unresolved scope change (creation/selection whose bootstrap
+/// is still pending or failed). Both protect the retained old-scope context.
+export function sendBlockedReason(scopeStale: boolean): string | null {
+  return (
+    unresolvedSelectionMessage() ??
+    (scopeStale ? 'Scope is changing. Wait for the new conversation scope before sending.' : null)
+  );
+}

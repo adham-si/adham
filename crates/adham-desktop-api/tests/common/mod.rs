@@ -70,6 +70,7 @@ pub async fn create_test_project(ctx: &ApiContext, ws_id: &str, name: &str) -> S
     res.data.project_id
 }
 
+#[allow(dead_code)]
 pub async fn create_test_session(
     ctx: &ApiContext,
     ws_id: &str,

@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConversationPanel } from './conversation-panel';
+import { ConversationSetupSlot, type ConversationSetupSlotProps } from './conversation-setup-slot';
 
 beforeEach(() => {
   localStorage.clear();
@@ -232,5 +233,138 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(secondBackend.createSession).toHaveBeenCalled());
     expect(restored.value).toBe('early thought');
     expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought');
+  });
+
+  it('never turns failed or unknown project discovery into an empty-project creation offer', async () => {
+    const backend = fakeBackend();
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: null,
+    });
+    const selection = {
+      getBootstrapState: vi.fn().mockResolvedValue({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-1',
+        activeProjectId: null,
+      }),
+      listWorkspaces: vi.fn().mockResolvedValue({
+        workspaces: [
+          {
+            workspaceId: 'ws-1',
+            name: 'WS 1',
+            kind: 'personal',
+            preferredLanguage: 'en',
+            createdAt: '2026-10-09T00:00:00Z',
+          },
+        ],
+        truncated: false,
+      }),
+      listProjects: vi.fn().mockRejectedValue(new Error('discovery outage')),
+      selectProject: vi.fn(),
+    };
+    render(<ConversationPanel backend={backend} selection={selection} />);
+
+    // Renders WorkspaceSelection error / retry notice, never the project creation form
+    await screen.findByText(/failed to load.*retry/i);
+    expect(screen.queryByLabelText(/project name/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /create project/i })).toBeNull();
+  });
+
+  it('chosen-workspace discovery: not-yet-loaded and failed lists never offer creation; successful empty discovery permits creation', () => {
+    const baseSel = {
+      workspaces: [
+        {
+          workspaceId: 'ws-chosen',
+          name: 'Chosen WS',
+          kind: 'personal' as const,
+          preferredLanguage: 'en',
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      projectsBy: {},
+      truncatedWorkspaces: false,
+      truncatedProjects: {},
+      failedProjectLists: [] as string[],
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: null,
+      loaded: true,
+      listError: null,
+      selectScope: vi.fn(),
+      reload: vi.fn(),
+      reloadProjects: vi.fn(),
+      reloadActiveProjects: vi.fn(),
+      isSelecting: false,
+      selectError: null,
+      hasRecords: true,
+      hasProjectsFor: vi.fn(),
+      hasEverSelected: true,
+    };
+    const prov = {
+      isCreatingWorkspace: false,
+      isCreatingProject: false,
+      workspaceError: null,
+      projectError: null,
+      createWorkspace: vi.fn(),
+      createProject: vi.fn(),
+    };
+
+    const commonProps = {
+      status: 'needs-workspace' as const,
+      activeWorkspaceId: 'ws-1',
+      provisionTransition: null,
+      prov: prov as unknown as ConversationSetupSlotProps['prov'],
+      formWorking: false,
+      chosenWorkspaceId: 'ws-chosen',
+      setChosenWorkspaceId: vi.fn(),
+      onProvision: vi.fn(),
+      onSelect: vi.fn(),
+    };
+
+    // 1. Not-yet-loaded chosen workspace: projectsBy has no entry for ws-chosen
+    const notLoaded = render(
+      <ConversationSetupSlot
+        {...commonProps}
+        sel={baseSel as unknown as ConversationSetupSlotProps['sel']}
+      />,
+    );
+    expect(notLoaded.queryByLabelText(/project name/i)).toBeNull();
+    expect(notLoaded.queryByRole('button', { name: /create project/i })).toBeNull();
+    notLoaded.unmount();
+
+    // 2. Failed chosen workspace: failedProjectLists includes ws-chosen
+    const failed = render(
+      <ConversationSetupSlot
+        {...commonProps}
+        sel={
+          {
+            ...baseSel,
+            failedProjectLists: ['ws-chosen'],
+            projectsBy: { 'ws-chosen': [] },
+          } as unknown as ConversationSetupSlotProps['sel']
+        }
+      />,
+    );
+    expect(failed.queryByLabelText(/project name/i)).toBeNull();
+    expect(failed.queryByRole('button', { name: /create project/i })).toBeNull();
+    failed.unmount();
+
+    // 3. Successful empty discovery: loaded, not failed, projectsBy confirmed empty array
+    const emptySuccess = render(
+      <ConversationSetupSlot
+        {...commonProps}
+        sel={
+          {
+            ...baseSel,
+            failedProjectLists: [],
+            projectsBy: { 'ws-chosen': [] },
+          } as unknown as ConversationSetupSlotProps['sel']
+        }
+      />,
+    );
+    expect(emptySuccess.getByLabelText(/project name/i)).toBeDefined();
+    expect(emptySuccess.getByRole('button', { name: /create project/i })).toBeDefined();
+    expect(emptySuccess.getByText(/first project in chosen ws/i)).toBeDefined();
+    emptySuccess.unmount();
   });
 });
