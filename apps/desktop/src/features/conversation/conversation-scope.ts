@@ -1,13 +1,10 @@
 import type { ConversationMessageDto } from '@/shared/api/adham-client';
 import {
-  CREATE_INTENT_KEY,
   SESSION_CACHE_KEY,
   isDefinitePreEffectRejection,
-  readCreateIntent,
   readSessionCache,
   rejectionMessage,
   removeStorage,
-  writeStorage,
 } from './conversation-identity';
 
 import {
@@ -56,7 +53,14 @@ export interface ConversationBackend {
 export type ConversationContext = {
   workspaceId: string;
   projectId: string;
-  sessionId: string;
+  sessionId: string | null;
+  installationId?: string | null;
+};
+
+export type ReadyNoSessionContext = {
+  workspaceId: string;
+  projectId: string;
+  sessionId: null;
   installationId?: string | null;
 };
 
@@ -65,6 +69,7 @@ export type ScopeResolutionOutcome =
   | { kind: 'needs-project'; activeWorkspaceId: string }
   | { kind: 'resumed'; context: ConversationContext }
   | { kind: 'created'; context: ConversationContext }
+  | { kind: 'ready-no-session'; context: ReadyNoSessionContext }
   | { kind: 'error'; message: string };
 
 export function isSessionMissingOrMismatched(err: unknown): boolean {
@@ -224,75 +229,53 @@ export async function resolveAuthoritativeSession(
         },
       };
     }
+
+    return {
+      kind: 'ready-no-session',
+      context: {
+        workspaceId: ws,
+        projectId: proj,
+        sessionId: null,
+        ...(instId ? { installationId: instId } : {}),
+      },
+    };
   }
 
   if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
-
-  try {
-    let intent = readCreateIntent(ws, proj);
-    if (!intent) {
-      if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
-      intent = { requestId: crypto.randomUUID(), workspaceId: ws, projectId: proj };
-      if (!writeStorage(CREATE_INTENT_KEY, JSON.stringify(intent))) {
-        return {
-          kind: 'error',
-          message:
-            'Session creation identity could not be recorded. Retry once storage is available.',
-        };
-      }
-    }
-
-    let session: SessionSnapshot;
-    try {
-      session = await backend.createSession(
-        ws,
-        proj,
-        { title: null },
-        { requestId: intent.requestId },
-      );
-    } catch (err) {
-      if (isDefinitePreEffectRejection(err) && !isStale()) {
-        const stored = readCreateIntent(ws, proj);
-        if (stored?.requestId === intent.requestId) {
-          removeStorage(CREATE_INTENT_KEY);
-        }
-      }
-      throw err;
-    }
-
-    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
-
-    const ctx: ConversationContext = {
-      workspaceId: ws,
-      projectId: proj,
-      sessionId: session.sessionId,
-      ...(instId ? { installationId: instId } : {}),
-    };
-
-    if (instId) {
-      writeDurableSessionPreference({
-        installationId: instId,
-        workspaceId: ws,
-        projectId: proj,
-        sessionId: session.sessionId,
-      });
-    }
-
-    if (writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx))) {
-      const stored = readCreateIntent(ws, proj);
-      if (stored?.requestId === intent.requestId) {
-        removeStorage(CREATE_INTENT_KEY);
-      }
-    }
-    return { kind: 'created', context: ctx };
-  } catch (err) {
-    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
-    if (isDefinitePreEffectRejection(err)) {
-      return { kind: 'error', message: rejectionMessage(err) };
-    }
-    return {
-      kind: 'error',
-      message: `${err instanceof Error ? err.message : 'Conversation failed to start.'} Reload or retry once connectivity returns.`,
-    };
-  }
+  return {
+    kind: 'error',
+    message: 'Session discovery unavailable. Retry once connectivity returns.',
+  };
 }
+
+export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain: boolean };
+
+export const conversationCapabilities = {
+  submitMessage: true,
+  execution: false,
+  stop: false,
+} as const;
+
+export const toUiMessage = (dto: {
+  messageId: string;
+  role?: string;
+  text: string;
+  createdAt: string;
+}): { id: string; role: string; text: string; createdAt: string } => ({
+  id: dto.messageId,
+  role: dto.role ?? 'user',
+  text: dto.text,
+  createdAt: dto.createdAt,
+});
+
+export const switchUnresolved = (
+  req: ConversationContext | null,
+  curId: string | null | undefined,
+): SubmitOutcome | null =>
+  req && req.sessionId !== curId
+    ? {
+        ok: false,
+        error: 'Session switch has not completed. Retry the switch before sending.',
+        uncertain: false,
+      }
+    : null;
