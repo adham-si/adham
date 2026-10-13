@@ -72,7 +72,7 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
 
       const header = container.querySelector('header');
       expect(header).not.toBeNull();
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
     });
 
     it('preserves physical traffic-light clearance on macOS in RTL direction', () => {
@@ -87,8 +87,8 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       const header = container.querySelector('header');
       expect(header).not.toBeNull();
       // On macOS, native traffic lights are physically on the left regardless of text direction.
-      // Physical pl-20 ensures that RTL layout items never encroach upon the 0..80px traffic light zone.
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      // Physical pl-[80px] ensures that RTL layout items never encroach upon the 0..80px traffic light zone.
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
 
       // Layout controls and NavRail remain accessible in RTL
       expect(screen.getByRole('button', { name: /primary sidebar/i })).not.toBeNull();
@@ -217,7 +217,7 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
 
       const header = container.querySelector('header');
       expect(header).not.toBeNull();
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
 
       // Custom caption controls remain suppressed
       expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull();
@@ -241,6 +241,117 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       // Custom caption controls remain suppressed during loading
       expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    });
+  });
+
+  describe('macOS Compact Titlebar (32px)', () => {
+    beforeEach(() => {
+      setPlatformForTesting('macos');
+    });
+
+    it('renders the 32px header on macOS instead of 40px', () => {
+      const { container } = render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const header = container.querySelector('header');
+      expect(header).not.toBeNull();
+      expect(header?.classList.contains('h-[32px]')).toBe(true);
+      expect(header?.classList.contains('h-10')).toBe(false);
+    });
+
+    it('gives macOS buttons compact 28px hit areas without boxed chrome', () => {
+      render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const navRailBtn = screen.getByRole('button', { name: /navigation rail/i });
+      for (const cls of [
+        'h-[28px]',
+        'w-[28px]',
+        'border-0',
+        'bg-transparent',
+        'hover:bg-transparent',
+      ]) {
+        expect(navRailBtn.classList.contains(cls)).toBe(true);
+      }
+      // Keyboard focus, labels, pressed semantics and icon scale stay.
+      expect(navRailBtn.className).toContain('focus-visible:outline-2');
+      expect(navRailBtn.className).toContain('size-icon-sm');
+      expect(navRailBtn.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('uses token-scale icon colors with an accent activation indicator', () => {
+      render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      // Open toggles read accent (muted base is merged away by design);
+      // closed toggles read muted. Never near-black text-foreground, never
+      // a hardcoded hex, no opacity dimming.
+      const navRailBtn = screen.getByRole('button', { name: /navigation rail/i });
+      expect(navRailBtn.className).toContain('text-action');
+      expect(navRailBtn.className).not.toContain('text-foreground-secondary');
+      // No standalone dimming class (the base variant's
+      // `disabled:not-aria-busy:opacity-60` is unrelated and stays).
+      expect(navRailBtn.className).not.toMatch(/(^|\s)opacity-60(\s|$)/);
+
+      fireEvent.click(navRailBtn);
+      expect(navRailBtn.className).toContain('text-foreground-secondary');
+      expect(navRailBtn.className).not.toContain('text-action');
+      expect(navRailBtn.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('keeps compact height, clearance and labels in RTL on macOS', () => {
+      const { container } = render(
+        <div dir="rtl">
+          <Wrapper>
+            <Titlebar />
+          </Wrapper>
+        </div>,
+      );
+
+      const header = container.querySelector('header');
+      expect(header?.classList.contains('h-[32px]')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
+      expect(screen.getByRole('button', { name: /primary sidebar/i })).not.toBeNull();
+    });
+
+    it('applies compact sizing during ambient macOS loading state', () => {
+      setAmbientForTesting(true);
+      setPlatformForTesting(null);
+
+      const { container } = render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const header = container.querySelector('header');
+      expect(header?.classList.contains('h-[32px]')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
+    });
+
+    it('keeps the standard 40px boxed treatment off macOS', () => {
+      setPlatformForTesting('windows');
+
+      const { container } = render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      const header = container.querySelector('header');
+      expect(header?.classList.contains('h-10')).toBe(true);
+      expect(header?.classList.contains('h-8')).toBe(false);
+      const navRailBtn = screen.getByRole('button', { name: /navigation rail/i });
+      expect(navRailBtn.classList.contains('h-[28px]')).toBe(false);
     });
   });
 });

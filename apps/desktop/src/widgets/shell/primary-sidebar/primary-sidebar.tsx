@@ -63,7 +63,7 @@ export function PrimarySidebar({
       isResizingRef.current = true;
 
       const isRtl = document.documentElement.dir === 'rtl';
-      const railWidth = SHELL_DIMENSIONS.navRailWidth; // 40px
+      const railWidth = SHELL_DIMENSIONS.navRailWidth;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isResizingRef.current) return;
