@@ -20,27 +20,8 @@ export async function recordDurablePendingOperation(
   options?: { requestId?: string; sessionId?: string | null },
 ): Promise<{ ok: true; operation: PendingOperationDto } | { ok: false; error: string }> {
   try {
-    if (typeof backend.recordPendingOperation === 'function') {
-      const op = await backend.recordPendingOperation(workspaceId, projectId, payload, options);
-      return { ok: true, operation: op };
-    }
-    // Fallback for minimalist test doubles without durable pending backend
-    return {
-      ok: true,
-      operation: {
-        operationId: payload.operationId,
-        kind: payload.kind,
-        workspaceId,
-        projectId,
-        sessionId: options?.sessionId ?? null,
-        createRequestId: payload.createRequestId,
-        messageRequestId: payload.messageRequestId,
-        text: payload.text,
-        title: payload.title,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      },
-    };
+    const op = await backend.recordPendingOperation(workspaceId, projectId, payload, options);
+    return { ok: true, operation: op };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
@@ -58,14 +39,9 @@ export async function listDurablePendingOperations(
     const legacy = readPendingSend();
     const legacyFirst = readPendingFirstSend();
 
-    let ops: PendingOperationDto[] = [];
-    let truncated = false;
-
-    if (typeof backend.listPendingOperations === 'function') {
-      const list = await backend.listPendingOperations();
-      ops = [...list.operations];
-      truncated = list.truncated;
-    }
+    const list = await backend.listPendingOperations();
+    const ops: PendingOperationDto[] = [...list.operations];
+    const truncated = list.truncated;
 
     // Conservative handling of existing session-scoped records: include if not already present
     if (
@@ -128,9 +104,7 @@ export async function clearDurablePendingOperation(
   options?: { requestId?: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    if (typeof backend.clearPendingOperation === 'function') {
-      await backend.clearPendingOperation(payload, options);
-    }
+    await backend.clearPendingOperation(payload, options);
     const legacy = readPendingSend();
     if (
       legacy &&

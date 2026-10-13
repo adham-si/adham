@@ -366,6 +366,9 @@ describe('provisioning journey', () => {
         nextCursor: null,
         projectionPosition: '0',
       }),
+      recordPendingOperation: vi.fn(),
+      listPendingOperations: vi.fn(async () => ({ operations: [], truncated: false })),
+      clearPendingOperation: vi.fn(),
     };
     // Selection reads go through a separate object with a plain bootstrap
     // reader: conv-side fail/delay flags belong to the authoritative refresh

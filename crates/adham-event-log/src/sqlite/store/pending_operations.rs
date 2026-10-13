@@ -344,7 +344,11 @@ impl SqliteEventStore {
         tx: &mut sqlx::Transaction<'_, Sqlite>,
         operation_id: &str,
         expected_message_request_id: &str,
+        reason: &str,
     ) -> Result<(), DomainError> {
+        if reason != "resolved" && reason != "dismissed" {
+            return Err(DomainError::Validation("reason must be resolved or dismissed".into()));
+        }
         let row = sqlx::query(
             "SELECT message_request_id, content_id, title_content_id FROM pending_operations WHERE operation_id = ?",
         )
@@ -374,25 +378,19 @@ impl SqliteEventStore {
             .await
             .map_err(|e| DomainError::Storage(e.to_string()))?;
 
-        // Safely remove only the pending-specific content records
-        sqlx::query(
-            "DELETE FROM content_records WHERE content_id = ? AND content_kind = 'pending_user_text'",
-        )
-        .bind(&cid_str)
-        .execute(&mut **tx)
-        .await
-        .map_err(|e| DomainError::Storage(e.to_string()))?;
-
-        if let Some(t_cid) = t_cid_str {
-            sqlx::query(
-                "DELETE FROM content_records WHERE content_id = ? AND content_kind = 'pending_session_title'",
-            )
-            .bind(&t_cid)
+        sqlx::query("DELETE FROM content_records WHERE content_id = ? AND content_kind = 'pending_user_text'")
+            .bind(&cid_str)
             .execute(&mut **tx)
             .await
             .map_err(|e| DomainError::Storage(e.to_string()))?;
-        }
 
+        if let Some(t_cid) = t_cid_str {
+            sqlx::query("DELETE FROM content_records WHERE content_id = ? AND content_kind = 'pending_session_title'")
+                .bind(&t_cid)
+                .execute(&mut **tx)
+                .await
+                .map_err(|e| DomainError::Storage(e.to_string()))?;
+        }
         Ok(())
     }
 }

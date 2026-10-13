@@ -56,7 +56,10 @@
       "cancelDismiss": "取消",
       "truncated": "显示 {{count}} 条未定操作。较早的操作已被截断。",
       "listFailed": "检查未定消息失败。",
-      "cleanupFailed": "消息已处理，但移除待定标记失败。请重新加载历史记录。"
+      "cleanupFailed": "消息已处理，但移除待定标记失败。请重新加载历史记录。",
+      "checkingTarget": "正在检查目标可用性…",
+      "resendFailed": "重新发送失败。",
+      "dismissFailed": "忽略失败。"
     }
   },
   "provision": {

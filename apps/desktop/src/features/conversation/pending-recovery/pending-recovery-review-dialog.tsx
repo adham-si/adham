@@ -6,8 +6,10 @@ import type { ReviewDialogProps } from './pending-recovery-types';
 export function PendingRecoveryReviewDialog({
   open,
   operation,
+  validatingTarget = false,
   targetMissing = false,
   targetLabel,
+  initialDismissConfirm = false,
   onClose,
   onResend,
   onDismiss,
@@ -16,14 +18,19 @@ export function PendingRecoveryReviewDialog({
   const [copied, setCopied] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [dismissConfirmOpen, setDismissConfirmOpen] = React.useState(false);
+  const [dialogError, setDialogError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) {
       setCopied(false);
       setSubmitting(false);
       setDismissConfirmOpen(false);
+      setDialogError(null);
+    } else {
+      setDismissConfirmOpen(Boolean(initialDismissConfirm));
+      setDialogError(null);
     }
-  }, [open]);
+  }, [open, initialDismissConfirm]);
 
   if (!operation) return null;
 
@@ -40,9 +47,20 @@ export function PendingRecoveryReviewDialog({
   const handleResendClick = async () => {
     if (submitting) return;
     setSubmitting(true);
+    setDialogError(null);
     try {
-      await onResend(operation);
+      const outcome = await onResend(operation);
+      if (outcome && !outcome.ok) {
+        setDialogError(outcome.error ?? t('conversation.recovery.resendFailed', 'Resend failed.'));
+        return;
+      }
       onClose();
+    } catch (err) {
+      setDialogError(
+        err instanceof Error
+          ? err.message
+          : t('conversation.recovery.resendFailed', 'Resend failed.'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -51,11 +69,33 @@ export function PendingRecoveryReviewDialog({
   const handleDismissConfirm = async () => {
     if (submitting) return;
     setSubmitting(true);
+    setDialogError(null);
     try {
-      await onDismiss(operation);
+      const outcome = await onDismiss(operation);
+      if (outcome && !outcome.ok) {
+        setDialogError(
+          outcome.error ?? t('conversation.recovery.dismissFailed', 'Dismissal failed.'),
+        );
+        return;
+      }
       onClose();
+    } catch (err) {
+      setDialogError(
+        err instanceof Error
+          ? err.message
+          : t('conversation.recovery.dismissFailed', 'Dismissal failed.'),
+      );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDismissCancel = () => {
+    setDialogError(null);
+    if (initialDismissConfirm) {
+      onClose();
+    } else {
+      setDismissConfirmOpen(false);
     }
   };
 
@@ -80,12 +120,17 @@ export function PendingRecoveryReviewDialog({
               )}
             </DialogDescription>
 
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                disabled={submitting}
-                onClick={() => setDismissConfirmOpen(false)}
+            {dialogError && (
+              <div
+                role="alert"
+                className="my-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive"
               >
+                {dialogError}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="secondary" disabled={submitting} onClick={handleDismissCancel}>
                 {t('conversation.recovery.cancelDismiss', 'Cancel')}
               </Button>
               <Button
@@ -109,6 +154,15 @@ export function PendingRecoveryReviewDialog({
               )}
             </DialogDescription>
 
+            {dialogError && (
+              <div
+                role="alert"
+                className="my-3 rounded border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive"
+              >
+                {dialogError}
+              </div>
+            )}
+
             <div className="my-4 space-y-3 text-sm">
               <div>
                 <span className="font-semibold text-foreground">
@@ -117,7 +171,14 @@ export function PendingRecoveryReviewDialog({
                 <span className="font-mono text-xs text-foreground-secondary">{displayTarget}</span>
               </div>
 
-              {targetMissing && (
+              {validatingTarget ? (
+                <div
+                  role="status"
+                  className="rounded border border-border bg-surface-muted p-2 text-xs text-foreground-secondary"
+                >
+                  {t('conversation.recovery.checkingTarget', 'Checking target availability…')}
+                </div>
+              ) : targetMissing ? (
                 <div
                   role="alert"
                   className="rounded border border-warning-border bg-warning-surface p-2 text-xs text-warning-foreground"
@@ -127,7 +188,7 @@ export function PendingRecoveryReviewDialog({
                     'Target workspace or project is inaccessible or missing.',
                   )}
                 </div>
-              )}
+              ) : null}
 
               {operation.title && (
                 <div>
@@ -172,7 +233,7 @@ export function PendingRecoveryReviewDialog({
                 {!targetMissing && (
                   <Button
                     variant="primary"
-                    disabled={submitting}
+                    disabled={submitting || validatingTarget}
                     onClick={() => void handleResendClick()}
                   >
                     {t('conversation.recovery.confirmResend', 'Resend to Original Target')}

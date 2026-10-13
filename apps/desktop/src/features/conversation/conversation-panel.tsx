@@ -53,25 +53,30 @@ export function ConversationPanel({
   const { t } = useTranslation();
   const conv = useConversation({ backend });
   const prov = useProvisioning({ backend: provisioning });
+  const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
+  const sel = useSelection({ backend: selection, enabled: needsProvisioning });
+
+  const handleSessionOpened = React.useCallback(
+    async (workspaceId: string, projectId: string, sessionId: string) => {
+      const isCrossProject =
+        conv.context &&
+        (conv.context.workspaceId !== workspaceId || conv.context.projectId !== projectId);
+
+      if (isCrossProject) {
+        const selectOutcome = await sel.select(workspaceId, projectId);
+        if (!selectOutcome.ok) return;
+      }
+      await conv.openSession(sessionId);
+    },
+    [conv, sel],
+  );
+
   const recovery = usePendingRecovery({
     backend,
     onSessionOpened: (workspaceId, projectId, sessionId) => {
-      if (
-        (conv.context && conv.context.workspaceId !== workspaceId) ||
-        (conv.context && conv.context.projectId !== projectId)
-      ) {
-        announceScopeChanged('project', 'selected', { workspaceId, projectId });
-      } else {
-        window.dispatchEvent(
-          new CustomEvent('adham:session-select', {
-            detail: { workspaceId, projectId, sessionId },
-          }),
-        );
-      }
-      void conv.reload();
+      void handleSessionOpened(workspaceId, projectId, sessionId);
     },
   });
-  const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
   /// Committed creation or selection awaiting authoritative bootstrap.
   /// Holds the confirmed step disabled so a second action cannot fork a
   /// duplicate while the read is in flight. Cleared only when bootstrap
@@ -95,7 +100,6 @@ export function ConversationPanel({
 
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
   const refreshScope = conv.refreshScope;
-  const sel = useSelection({ backend: selection, enabled: needsProvisioning });
   /// Workspace chosen for its first project (an existing workspace without
   /// projects). Project creation binds to it; the workspace itself is never
   /// recreated. Cleared once authoritative scope is ready.
@@ -243,7 +247,7 @@ export function ConversationPanel({
           operations={recovery.operations}
           truncated={recovery.truncated}
           onReview={recovery.openReview}
-          onDismiss={(op) => void recovery.dismissOperation(op)}
+          onDismiss={(op) => recovery.openDismiss(op)}
         />
       </div>
 
@@ -325,6 +329,14 @@ export function ConversationPanel({
             <p>{recovery.error}</p>
           </div>
         )}
+        {recovery.cleanupWarning && (
+          <div
+            role="status"
+            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
+          >
+            <p>{recovery.cleanupWarning}</p>
+          </div>
+        )}
         <p>{notice}</p>
       </div>
 
@@ -365,7 +377,9 @@ export function ConversationPanel({
       <PendingRecoveryReviewDialog
         open={recovery.reviewDialogOpen}
         operation={recovery.activeReviewOp}
+        validatingTarget={recovery.validatingTarget}
         targetMissing={recovery.targetMissing}
+        initialDismissConfirm={recovery.initialDismissConfirm}
         onClose={recovery.closeReview}
         onResend={(op) => recovery.resendOperation(op)}
         onDismiss={(op) => recovery.dismissOperation(op)}

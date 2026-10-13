@@ -495,6 +495,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
               !persistAndAnnounceActiveSession({ ...outcome.context, title: outcome.title }, instId)
             ) {
               setStorageWarning(i18n.t('conversation.storageUnavailable'));
+            } else if (outcome.cleanupWarning) {
+              setStorageWarning(outcome.cleanupWarning);
             }
             setStatus('ready');
             return { ok: true };
@@ -537,6 +539,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
               ? prev
               : [...prev, singleOutcome.message],
           );
+          if (singleOutcome.cleanupWarning) {
+            setStorageWarning(singleOutcome.cleanupWarning);
+          }
           setStatus('ready');
           return { ok: true };
         } else {

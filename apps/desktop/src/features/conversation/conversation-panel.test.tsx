@@ -53,6 +53,26 @@ function fakeBackend() {
       ],
       truncated: false,
     }),
+    recordPendingOperation: vi.fn().mockImplementation((ws, proj, payload, opts) =>
+      Promise.resolve({
+        operationId: payload.operationId,
+        kind: payload.kind,
+        workspaceId: ws,
+        projectId: proj,
+        sessionId: opts?.sessionId ?? null,
+        createRequestId: payload.createRequestId ?? null,
+        messageRequestId: payload.messageRequestId,
+        text: payload.text,
+        title: payload.title ?? null,
+        status: 'pending',
+        createdAt: '2026-10-09T00:00:00Z',
+      }),
+    ),
+    listPendingOperations: vi.fn().mockResolvedValue({
+      operations: [],
+      truncated: false,
+    }),
+    clearPendingOperation: vi.fn().mockResolvedValue(undefined),
   };
 }
 

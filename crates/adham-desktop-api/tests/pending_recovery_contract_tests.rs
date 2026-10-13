@@ -317,6 +317,7 @@ async fn test_bounded_discovery_and_truncation_disclosure() {
     let ctx = setup_ctx(&db_path).await;
     let ws_id = create_test_workspace(&ctx, "WS").await;
     let proj_id = create_test_project(&ctx, &ws_id, "Proj").await;
+    let sess_id = create_test_session(&ctx, &ws_id, &proj_id, None).await;
 
     // Insert 55 pending operations
     for i in 0..55 {
@@ -328,7 +329,7 @@ async fn test_bounded_discovery_and_truncation_disclosure() {
                 context: CommandContext {
                     workspace_id: Some(ws_id.clone()),
                     project_id: Some(proj_id.clone()),
-                    session_id: None,
+                    session_id: Some(sess_id.clone()),
                 },
                 payload: RecordPendingOperationPayload {
                     operation_id: uuid::Uuid::now_v7().to_string(),

@@ -169,6 +169,8 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
       submitMessage,
       getConversation: vi.fn(),
       recordPendingOperation: vi.fn().mockRejectedValue(new Error('SQLite write failure')),
+      listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
+      clearPendingOperation: vi.fn().mockResolvedValue(undefined),
     };
 
     const outcome = await performSingleMessageSend({
@@ -197,6 +199,8 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
       submitMessage,
       getConversation: vi.fn(),
       recordPendingOperation: vi.fn().mockRejectedValue(new Error('SQLite write failure')),
+      listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
+      clearPendingOperation: vi.fn().mockResolvedValue(undefined),
     };
 
     const outcome = await performLazyFirstSend({
@@ -222,7 +226,9 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
       createSession: vi.fn(),
       submitMessage: vi.fn(),
       getConversation: vi.fn(),
+      recordPendingOperation: vi.fn(),
       listPendingOperations: vi.fn().mockRejectedValue(new Error('Database unavailable')),
+      clearPendingOperation: vi.fn().mockResolvedValue(undefined),
     };
 
     const { result } = renderHook(() => usePendingRecovery({ backend: mockBackend }));
@@ -253,6 +259,7 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
       createSession: vi.fn(),
       submitMessage: vi.fn().mockImplementation(() => submitPromise),
       getConversation: vi.fn().mockResolvedValue({ items: [] }),
+      recordPendingOperation: vi.fn(),
       listPendingOperations: vi
         .fn()
         .mockResolvedValue({ operations: [sampleSingleOp], truncated: false }),

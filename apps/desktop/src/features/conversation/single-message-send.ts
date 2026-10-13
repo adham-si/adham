@@ -12,6 +12,7 @@ import {
 import { readPendingFirstSend, removePendingFirstSend } from './lazy-session-creation';
 import {
   clearDurablePendingOperation,
+  findPendingForScope,
   recordDurablePendingOperation,
 } from './pending-recovery/durable-pending-operations';
 
@@ -29,7 +30,7 @@ export interface SingleMessageSendParams {
 }
 
 export type SingleMessageSendOutcome =
-  | { ok: true; message: UiMessage }
+  | { ok: true; message: UiMessage; cleanupWarning?: string }
   | { ok: false; error: string; displayError?: string; uncertain: boolean };
 
 /**
@@ -55,17 +56,42 @@ export async function performSingleMessageSend(
     return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
   }
 
+  // 1. Authoritative check: query SQLite pending operations directly
+  let durablePendingOp = null;
+  try {
+    const sqliteList = await backend.listPendingOperations();
+    durablePendingOp = findPendingForScope(
+      sqliteList.operations,
+      workspaceId,
+      projectId,
+      sessionId,
+    );
+  } catch {
+    // Backend SQLite query failed or not available
+  }
+
   const pending = readPendingSend();
   const pendingFirst = readPendingFirstSend();
   let requestId: string;
-  let reusedFrozenIdentity = false;
+  let operationId: string;
+  let alreadyRecordedDurable = false;
 
   const ctxScope = { workspaceId, projectId, sessionId };
 
-  if (pending) {
+  if (durablePendingOp) {
+    if (durablePendingOp.text === trimmed) {
+      requestId = durablePendingOp.messageRequestId;
+      operationId = durablePendingOp.operationId;
+      alreadyRecordedDurable = true;
+    } else {
+      const message = i18n.t('conversation.unknownSaveReload');
+      return { ok: false, error: message, uncertain: true };
+    }
+  } else if (pending) {
     if (sameScope(pending, ctxScope) && pending.text === trimmed) {
       requestId = pending.requestId;
-      reusedFrozenIdentity = true;
+      operationId = pending.requestId;
+      alreadyRecordedDurable = false;
     } else {
       const message = i18n.t('conversation.unknownSaveReload');
       return { ok: false, error: message, uncertain: true };
@@ -77,13 +103,16 @@ export async function performSingleMessageSend(
   ) {
     if (pendingFirst.sessionId === sessionId && pendingFirst.text === trimmed) {
       requestId = pendingFirst.messageRequestId;
-      reusedFrozenIdentity = true;
+      operationId = pendingFirst.messageRequestId;
+      alreadyRecordedDurable = false;
     } else {
       const message = i18n.t('conversation.firstSendPendingReload');
       return { ok: false, error: message, uncertain: true };
     }
   } else {
     requestId = crypto.randomUUID();
+    operationId = requestId;
+    alreadyRecordedDurable = false;
   }
 
   const record: PendingSend = {
@@ -94,8 +123,7 @@ export async function performSingleMessageSend(
     sessionId,
   };
 
-  const operationId = requestId;
-  if (!reusedFrozenIdentity) {
+  if (!alreadyRecordedDurable) {
     const durableRes = await recordDurablePendingOperation(
       backend,
       workspaceId,
@@ -126,15 +154,17 @@ export async function performSingleMessageSend(
     }
   }
 
-  if (!reusedFrozenIdentity && onIdentityRecorded) {
+  if (onIdentityRecorded) {
     onIdentityRecorded(record);
   }
 
-  const clearFrozenIdentity = () => {
-    void clearDurablePendingOperation(backend, {
+  const clearFrozenIdentity = async (
+    reason: 'resolved' | 'dismissed' = 'resolved',
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const clearRes = await clearDurablePendingOperation(backend, {
       operationId,
       expectedMessageRequestId: requestId,
-      reason: 'resolved',
+      reason,
     });
     if (readPendingSend()?.requestId === requestId) {
       removePendingSend();
@@ -151,6 +181,7 @@ export async function performSingleMessageSend(
     if (onIdentityCleared) {
       onIdentityCleared();
     }
+    return clearRes;
   };
 
   try {
@@ -163,11 +194,11 @@ export async function performSingleMessageSend(
     );
 
     if (isStale()) {
-      clearFrozenIdentity();
+      await clearFrozenIdentity('resolved');
       return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
 
-    clearFrozenIdentity();
+    const clearRes = await clearFrozenIdentity('resolved');
     return {
       ok: true,
       message: {
@@ -176,15 +207,18 @@ export async function performSingleMessageSend(
         text: submitted.text,
         createdAt: submitted.createdAt,
       },
+      ...(clearRes.ok
+        ? {}
+        : { cleanupWarning: clearRes.error ?? i18n.t('conversation.recovery.cleanupFailed') }),
     };
   } catch (err) {
     const definite = isDefinitePreEffectRejection(err);
     if (isStale()) {
-      if (definite) clearFrozenIdentity();
+      if (definite) await clearFrozenIdentity('dismissed');
       return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
     if (definite) {
-      clearFrozenIdentity();
+      await clearFrozenIdentity('dismissed');
       const message = rejectionMessage(err);
       return { ok: false, error: message, uncertain: false };
     }

@@ -10,9 +10,11 @@ export interface PendingRecoveryState {
 export interface ReviewDialogProps {
   open: boolean;
   operation: PendingOperationDto | null;
+  validatingTarget?: boolean;
   targetMissing?: boolean;
   targetLabel?: string;
+  initialDismissConfirm?: boolean;
   onClose: () => void;
-  onResend: (op: PendingOperationDto) => Promise<unknown>;
-  onDismiss: (op: PendingOperationDto) => Promise<unknown>;
+  onResend: (op: PendingOperationDto) => Promise<{ ok: boolean; error?: string }>;
+  onDismiss: (op: PendingOperationDto) => Promise<{ ok: boolean; error?: string }>;
 }

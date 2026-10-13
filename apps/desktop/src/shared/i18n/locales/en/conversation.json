@@ -56,7 +56,10 @@
       "cancelDismiss": "Cancel",
       "truncated": "Showing {{count}} unresolved messages. Older unresolved operations are truncated.",
       "listFailed": "Failed to check for unresolved messages.",
-      "cleanupFailed": "Message was processed, but removing the pending marker failed. Reload history."
+      "cleanupFailed": "Message was processed, but removing the pending marker failed. Reload history.",
+      "checkingTarget": "Checking target availability…",
+      "resendFailed": "Resend failed.",
+      "dismissFailed": "Dismissal failed."
     }
   },
   "provision": {

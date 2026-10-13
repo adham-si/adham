@@ -558,8 +558,7 @@ describe('useConversation request identity', () => {
     await act(async () => {
       first = result.current.submit('one');
       second = result.current.submit('two');
-      await Promise.resolve();
-      await Promise.resolve();
+      await vi.waitFor(() => expect(typeof resolveFirst).toBe('function'));
       resolveFirst({
         messageId: 'msg-1',
         sessionId: 'sess-1',

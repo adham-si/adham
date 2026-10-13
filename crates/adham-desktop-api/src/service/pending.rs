@@ -65,6 +65,18 @@ pub async fn record_pending_operation(
         .transpose()
         .map_err(|e| e.to_string())?;
 
+    if env.payload.kind == "single_message" {
+        if sess_id.is_none() {
+            return Err("VALIDATION_FAILED: session_id context required for single_message".to_string());
+        }
+        if create_req_id.is_some() {
+            return Err("VALIDATION_FAILED: create_request_id prohibited for single_message".to_string());
+        }
+        if env.payload.title.is_some() {
+            return Err("VALIDATION_FAILED: title prohibited for single_message".to_string());
+        }
+    }
+
     let title_trimmed = env
         .payload
         .title
@@ -224,6 +236,10 @@ pub async fn clear_pending_operation(
         return Err("INVALID_PROTOCOL_VERSION: protocol_version must be 1".to_string());
     }
 
+    if env.payload.reason != "resolved" && env.payload.reason != "dismissed" {
+        return Err("VALIDATION_FAILED: reason must be resolved or dismissed".to_string());
+    }
+
     let op_id = uuid::Uuid::parse_str(&env.payload.operation_id)
         .map_err(|_| "VALIDATION_FAILED: operation_id must be UUID".to_string())?;
     let expected_req = uuid::Uuid::parse_str(&env.payload.expected_message_request_id)
@@ -239,9 +255,11 @@ pub async fn clear_pending_operation(
         &mut tx,
         &op_id.to_string(),
         &expected_req.to_string(),
+        &env.payload.reason,
     )
     .await
     .map_err(|e| match e {
+        DomainError::Validation(msg) => format!("VALIDATION_FAILED: {msg}"),
         DomainError::RequestIdConflict(msg) => format!("REQUEST_ID_CONFLICT: {msg}"),
         DomainError::Storage(msg) => format!("STORAGE_UNAVAILABLE: {msg}"),
         other => format!("STORAGE_UNAVAILABLE: {other}"),

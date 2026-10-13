@@ -136,6 +136,7 @@ export type LazyFirstSendOutcome =
       context: ConversationContext;
       title: string;
       message: UiMessage;
+      cleanupWarning?: string;
     }
   | {
       ok: false;
@@ -161,26 +162,51 @@ export async function performLazyFirstSend(
     return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
   }
 
-  // 1. Check if an unresolved first send exists
+  // 1. Check if an unresolved first send exists in SQLite first
+  let durablePendingOp = null;
+  try {
+    const sqliteList = await backend.listPendingOperations();
+    durablePendingOp =
+      sqliteList.operations.find(
+        (op) =>
+          op.kind === 'first_send' && op.workspaceId === workspaceId && op.projectId === projectId,
+      ) ?? null;
+  } catch {
+    // Backend SQLite query failed or not available
+  }
+
   const pending = readPendingFirstSend();
   let createRequestId: string;
   let messageRequestId: string;
   let createdSessionId: string | null = null;
   let title: string;
-  let reusedFrozenIdentity = false;
+  let alreadyRecordedDurable = false;
 
-  if (pending) {
+  if (durablePendingOp) {
+    if (durablePendingOp.text === trimmed) {
+      createRequestId = durablePendingOp.createRequestId ?? crypto.randomUUID();
+      messageRequestId = durablePendingOp.messageRequestId;
+      createdSessionId = durablePendingOp.sessionId;
+      title = durablePendingOp.title ?? (params.title?.trim() || deriveSessionTitle(trimmed));
+      alreadyRecordedDurable = true;
+    } else {
+      return {
+        ok: false,
+        error: i18n.t('conversation.firstSendPendingReload'),
+        uncertain: true,
+      };
+    }
+  } else if (pending) {
     if (
       pending.workspaceId === workspaceId &&
       pending.projectId === projectId &&
       pending.text === trimmed
     ) {
-      // Explicit retry with same text and scope: reuse frozen identities and title
       createRequestId = pending.createRequestId;
       messageRequestId = pending.messageRequestId;
       createdSessionId = pending.sessionId;
       title = pending.title;
-      reusedFrozenIdentity = true;
+      alreadyRecordedDurable = false;
     } else {
       return {
         ok: false,
@@ -192,10 +218,11 @@ export async function performLazyFirstSend(
     createRequestId = crypto.randomUUID();
     messageRequestId = crypto.randomUUID();
     title = params.title?.trim() || deriveSessionTitle(trimmed);
+    alreadyRecordedDurable = false;
   }
 
   const operationId = messageRequestId;
-  if (!reusedFrozenIdentity) {
+  if (!alreadyRecordedDurable) {
     const durableRes = await recordDurablePendingOperation(
       backend,
       workspaceId,
@@ -251,7 +278,7 @@ export async function performLazyFirstSend(
         return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
       }
       if (isDefinitePreEffectRejection(err)) {
-        void clearDurablePendingOperation(backend, {
+        await clearDurablePendingOperation(backend, {
           operationId,
           expectedMessageRequestId: messageRequestId,
           reason: 'dismissed',
@@ -317,7 +344,7 @@ export async function performLazyFirstSend(
     }
 
     // Success! Clear pending first send
-    void clearDurablePendingOperation(backend, {
+    const clearRes = await clearDurablePendingOperation(backend, {
       operationId,
       expectedMessageRequestId: messageRequestId,
       reason: 'resolved',
@@ -334,13 +361,14 @@ export async function performLazyFirstSend(
         text: submitted.text,
         createdAt: submitted.createdAt,
       },
+      ...(clearRes.ok
+        ? {}
+        : { cleanupWarning: clearRes.error ?? i18n.t('conversation.recovery.cleanupFailed') }),
     };
   } catch (err) {
     if (isStale()) {
       return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
-    // Two-command limitation: session exists on backend, but message failed.
-    // Retain createdSessionId in pending first send so retry reuses it!
     const rawMsg = err instanceof Error ? err.message : i18n.t('error.notSaved');
     return {
       ok: false,

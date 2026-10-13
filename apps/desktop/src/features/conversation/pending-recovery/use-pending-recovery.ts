@@ -19,13 +19,18 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
   const [truncated, setTruncated] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [cleanupWarning, setCleanupWarning] = React.useState<string | null>(null);
 
   const [activeReviewOp, setActiveReviewOp] = React.useState<PendingOperationDto | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = React.useState(false);
+  const [validatingTarget, setValidatingTarget] = React.useState(false);
   const [targetMissing, setTargetMissing] = React.useState(false);
+  const [initialDismissConfirm, setInitialDismissConfirm] = React.useState(false);
 
-  // Controller guard: prevents duplicate resend or dismiss clicks
+  // Controller guards and generation fences
   const operationInFlightRef = React.useRef(false);
+  const reviewGenerationRef = React.useRef(0);
+  const recoveryGenerationRef = React.useRef(0);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -69,19 +74,39 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
   );
 
   const openReview = React.useCallback(
-    async (op: PendingOperationDto) => {
+    async (op: PendingOperationDto, options?: { initialDismissConfirm?: boolean }) => {
+      reviewGenerationRef.current += 1;
+      const gen = reviewGenerationRef.current;
       setActiveReviewOp(op);
       setReviewDialogOpen(true);
+      setInitialDismissConfirm(options?.initialDismissConfirm ?? false);
+      setValidatingTarget(true);
+      setTargetMissing(false);
+
       const valid = await checkTargetValid(op);
+      if (reviewGenerationRef.current !== gen) return; // Discard late review validation
+
+      setValidatingTarget(false);
       setTargetMissing(!valid);
     },
     [checkTargetValid],
   );
 
+  const openDismiss = React.useCallback(
+    (op: PendingOperationDto) => {
+      void openReview(op, { initialDismissConfirm: true });
+    },
+    [openReview],
+  );
+
   const closeReview = React.useCallback(() => {
+    reviewGenerationRef.current += 1;
+    recoveryGenerationRef.current += 1;
     setReviewDialogOpen(false);
     setActiveReviewOp(null);
     setTargetMissing(false);
+    setValidatingTarget(false);
+    setInitialDismissConfirm(false);
   }, []);
 
   const resendOperation = React.useCallback(
@@ -90,12 +115,21 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
         return { ok: false, error: 'Operation already in flight.' };
       }
       operationInFlightRef.current = true;
+      recoveryGenerationRef.current += 1;
+      const gen = recoveryGenerationRef.current;
+
       try {
         let finalSessionId = op.sessionId;
 
-        // First-send recovery: replay creation request to recover or create session idempotently
+        // First-send recovery: reject malformed records missing createRequestId
         if (op.kind === 'first_send') {
-          const createReqId = op.createRequestId ?? op.messageRequestId;
+          if (!op.createRequestId) {
+            return {
+              ok: false,
+              error: 'Malformed first-send recovery record: createRequestId is required.',
+            };
+          }
+          const createReqId = op.createRequestId;
           try {
             const sessionResult = await backend.createSession(
               op.workspaceId,
@@ -140,8 +174,13 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
         });
 
         if (!clearRes.ok) {
-          // Cleanup failure must be preserved as actionable warning, not masked
-          setError(i18n.t('conversation.recovery.cleanupFailed'));
+          // Cleanup failure must be preserved as actionable warning, surviving refresh
+          setCleanupWarning(i18n.t('conversation.recovery.cleanupFailed'));
+        }
+
+        if (recoveryGenerationRef.current !== gen) {
+          // Generation fenced: user navigated or switched review context
+          return { ok: true };
         }
 
         // Open/switch to the recovered session
@@ -162,16 +201,23 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
   );
 
   const dismissOperation = React.useCallback(
-    async (op: PendingOperationDto) => {
-      if (operationInFlightRef.current) return;
+    async (op: PendingOperationDto): Promise<{ ok: boolean; error?: string }> => {
+      if (operationInFlightRef.current) return { ok: false, error: 'Operation in flight.' };
       operationInFlightRef.current = true;
       try {
-        await clearDurablePendingOperation(backend, {
+        const clearRes = await clearDurablePendingOperation(backend, {
           operationId: op.operationId,
           expectedMessageRequestId: op.messageRequestId,
           reason: 'dismissed',
         });
+        if (!clearRes.ok) {
+          return { ok: false, error: clearRes.error };
+        }
         await refresh();
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { ok: false, error: msg };
       } finally {
         operationInFlightRef.current = false;
       }
@@ -184,11 +230,16 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
     truncated,
     loading,
     error,
+    cleanupWarning,
+    clearCleanupWarning: () => setCleanupWarning(null),
     refresh,
     activeReviewOp,
     reviewDialogOpen,
+    validatingTarget,
     targetMissing,
+    initialDismissConfirm,
     openReview,
+    openDismiss,
     closeReview,
     resendOperation,
     dismissOperation,

@@ -42,6 +42,9 @@ describe('APP-WIRING-03/04: Session creation lifecycle and scope boundaries', ()
         text: 'hello',
         createdAt: '2026-10-11T20:00:00Z',
       }),
+      recordPendingOperation: vi.fn(),
+      listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
+      clearPendingOperation: vi.fn().mockResolvedValue(undefined),
     };
   }
 
