@@ -23,7 +23,8 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "small": "Small",
-    "large": "Large"
+    "large": "Large",
+    "cancel": "Cancel"
   },
   "error": {
     "validationFailed": "This name is invalid. Correct it and try again.",
@@ -34,5 +35,7 @@
     "contextMismatch": "Selection changed. Reload and try again.",
     "requestIdConflict": "Conflicting request. Try again.",
     "notSaved": "Message was not saved."
-  }
+  },
+  "newProject": "+ New Project",
+  "newWorkspace": "+ New Workspace"
 }

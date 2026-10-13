@@ -29,7 +29,14 @@
     "creationPending": "另一个范围的会话创建待处理。",
     "createFailed": "会话创建失败。",
     "unresolvedSelection": "工作区/项目选择状态未知，请重试后再发送。",
-    "scopeChanging": "范围正在更改，请等待新的对话范围后再发送。"
+    "scopeChanging": "范围正在更改，请等待新的对话范围后再发送。",
+    "firstSendPending": "上一条首消息保存待处理，请重新发送以使用相同的保存标识重试。",
+    "firstSendPendingReload": "上一条首消息保存待处理，请重新发送或重新加载后再开始新对话。",
+    "firstSendPendingSession": "首消息保存待处理，请重新发送或解决后再开始新会话。",
+    "prevMessagePending": "上一条消息保存待处理，请重新发送或重新加载后再开始新会话。",
+    "discoveryUnavailable": "会话发现不可用，网络恢复后重试。",
+    "creationFailed": "会话创建失败。",
+    "createdIdentityLost": "会话已创建，但无法记录保存标识，请先重新加载历史再重新发送。"
   },
   "provision": {
     "workspaceTitle": "创建工作区",
@@ -50,7 +57,9 @@
     "incompleteDefault": "置备未完成。",
     "retrySameName": "{{message}} 请用相同的名称重试后再开始新的。",
     "workspacePlaceholder": "个人",
-    "projectPlaceholder": "我的项目"
+    "projectPlaceholder": "我的项目",
+    "nameRequired": "名称不能为空。",
+    "targetWorkspace": "目标工作区"
   },
   "selection": {
     "listsPartial": "部分项目列表加载失败，请重试刷新。",

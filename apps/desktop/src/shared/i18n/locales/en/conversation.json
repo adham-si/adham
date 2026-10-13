@@ -29,7 +29,14 @@
     "creationPending": "A session creation for another scope is pending resolution.",
     "createFailed": "Failed to create session.",
     "unresolvedSelection": "A workspace/project selection has unknown status. Retry it before sending.",
-    "scopeChanging": "Scope is changing. Wait for the new conversation scope before sending."
+    "scopeChanging": "Scope is changing. Wait for the new conversation scope before sending.",
+    "firstSendPending": "A previous first-message save is pending resolution. Resend it to retry with the same save identity.",
+    "firstSendPendingReload": "A previous first-message save is pending resolution. Resend or reload before starting another conversation.",
+    "firstSendPendingSession": "A first-message save is pending resolution. Resend or resolve it before starting another session.",
+    "prevMessagePending": "A previous message save is pending resolution. Resend or reload before starting a new session.",
+    "discoveryUnavailable": "Session discovery unavailable. Retry once connectivity returns.",
+    "creationFailed": "Session creation failed.",
+    "createdIdentityLost": "Session created, but save identity could not be recorded. Reload history before resending."
   },
   "provision": {
     "workspaceTitle": "Create your workspace",
@@ -50,7 +57,9 @@
     "incompleteDefault": "Provisioning did not complete.",
     "retrySameName": "{{message}} Retry with the same name before starting another.",
     "workspacePlaceholder": "Personal",
-    "projectPlaceholder": "My project"
+    "projectPlaceholder": "My project",
+    "nameRequired": "Name must not be empty.",
+    "targetWorkspace": "Target Workspace"
   },
   "selection": {
     "listsPartial": "Some project lists failed to load. Retry to refresh.",

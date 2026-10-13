@@ -23,7 +23,8 @@
     "enabled": "已启用",
     "disabled": "已禁用",
     "small": "小",
-    "large": "大"
+    "large": "大",
+    "cancel": "取消"
   },
   "error": {
     "validationFailed": "此名称无效，请更正后重试。",
@@ -34,5 +35,7 @@
     "contextMismatch": "选择已更改，请重新加载后重试。",
     "requestIdConflict": "请求冲突，请重试。",
     "notSaved": "消息未保存。"
-  }
+  },
+  "newProject": "+ 新建项目",
+  "newWorkspace": "+ 新建工作区"
 }
