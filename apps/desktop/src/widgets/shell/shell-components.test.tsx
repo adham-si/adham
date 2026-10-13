@@ -27,7 +27,7 @@ describe('Shell Layout Modular Components', () => {
 
   describe('Shell Dimensions Constants', () => {
     it('defines expected dimension constraints', () => {
-      expect(SHELL_DIMENSIONS.navRailWidth).toBe(40);
+      expect(SHELL_DIMENSIONS.navRailWidth).toBe(56);
       expect(SHELL_DIMENSIONS.headerHeight).toBe(40);
       expect(SHELL_DIMENSIONS.minSidebarWidth).toBe(272);
       expect(SHELL_DIMENSIONS.maxSidebarWidth).toBe(600);
@@ -39,7 +39,7 @@ describe('Shell Layout Modular Components', () => {
   });
 
   describe('NavRail Component', () => {
-    it('renders 40px width rail and responds to actions', () => {
+    it('renders 56px width rail and responds to actions', () => {
       render(
         <TestWrapper>
           <NavRail />
@@ -48,9 +48,31 @@ describe('Shell Layout Modular Components', () => {
 
       const rail = screen.getByLabelText('Navigation Rail');
       expect(rail).not.toBeNull();
-      expect(rail.style.width).toBe('40px');
+      expect(rail.style.width).toBe('56px');
       expect(screen.getByRole('button', { name: 'Workspace' })).not.toBeNull();
       expect(screen.getByRole('button', { name: 'Settings' })).not.toBeNull();
+    });
+
+    it('sizes rail buttons to 40px with 20px icons and accent-active state', () => {
+      render(
+        <TestWrapper>
+          <NavRail />
+        </TestWrapper>,
+      );
+
+      for (const name of ['Workspace', 'Settings']) {
+        const btn = screen.getByRole('button', { name });
+        for (const cls of ['h-10', 'w-10']) {
+          expect(btn.classList.contains(cls)).toBe(true);
+        }
+        expect(btn.className).toContain('size-icon-md');
+        // Ghost treatment with visible keyboard focus and accessible names.
+        expect(btn.className).toContain('focus-visible:outline-2');
+        expect(btn.getAttribute('title')).toBe(name);
+      }
+      // Workspace toggle shows accent while the sidebar is open by default.
+      const workspaceBtn = screen.getByRole('button', { name: 'Workspace' });
+      expect(workspaceBtn.className).toContain('text-action');
     });
   });
 
