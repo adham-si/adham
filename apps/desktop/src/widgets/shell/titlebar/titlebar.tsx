@@ -196,8 +196,9 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
           title={navRailLabel}
           className={cn(
             buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-            'cursor-default select-none [&_svg]:size-icon-sm',
+            'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
             macCompactButton,
+            navRailOpen ? 'text-action' : 'text-foreground-secondary hover:text-foreground',
           )}
         >
           <HugeiconsIcon icon={startPanelIcon} />
@@ -210,7 +211,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
               title={t('titlebar.actionsTitle', 'Actions')}
               className={cn(
                 buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-                'cursor-default select-none [&_svg]:size-icon-sm',
+                'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
                 macCompactButton,
               )}
             >
@@ -271,10 +272,9 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             title={sidebarLabel}
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-              'cursor-default select-none [&_svg]:size-icon-sm',
+              'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
               macCompactButton,
-              !sidebarOpen &&
-                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              sidebarOpen ? 'text-action' : 'text-foreground-secondary hover:text-foreground',
             )}
           >
             <HugeiconsIcon icon={startPanelIcon} />
@@ -289,10 +289,9 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             title={panelLabel}
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-              'cursor-default select-none [&_svg]:size-icon-sm',
+              'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
               macCompactButton,
-              !panelOpen &&
-                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              panelOpen ? 'text-action' : 'text-foreground-secondary hover:text-foreground',
             )}
           >
             <HugeiconsIcon icon={LayoutAlignBottomIcon} />
@@ -307,10 +306,11 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             title={secondaryLabel}
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-              'cursor-default select-none [&_svg]:size-icon-sm',
+              'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
               macCompactButton,
-              !secondarySidebarOpen &&
-                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              secondarySidebarOpen
+                ? 'text-action'
+                : 'text-foreground-secondary hover:text-foreground',
             )}
           >
             <HugeiconsIcon icon={endPanelIcon} />

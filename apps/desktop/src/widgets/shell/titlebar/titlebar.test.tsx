@@ -279,6 +279,29 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       expect(navRailBtn.getAttribute('aria-pressed')).toBe('true');
     });
 
+    it('uses token-scale icon colors with an accent activation indicator', () => {
+      render(
+        <Wrapper>
+          <Titlebar />
+        </Wrapper>,
+      );
+
+      // Open toggles read accent (muted base is merged away by design);
+      // closed toggles read muted. Never near-black text-foreground, never
+      // a hardcoded hex, no opacity dimming.
+      const navRailBtn = screen.getByRole('button', { name: /navigation rail/i });
+      expect(navRailBtn.className).toContain('text-action');
+      expect(navRailBtn.className).not.toContain('text-foreground-secondary');
+      // No standalone dimming class (the base variant's
+      // `disabled:not-aria-busy:opacity-60` is unrelated and stays).
+      expect(navRailBtn.className).not.toMatch(/(^|\s)opacity-60(\s|$)/);
+
+      fireEvent.click(navRailBtn);
+      expect(navRailBtn.className).toContain('text-foreground-secondary');
+      expect(navRailBtn.className).not.toContain('text-action');
+      expect(navRailBtn.getAttribute('aria-pressed')).toBe('false');
+    });
+
     it('keeps compact height, clearance and labels in RTL on macOS', () => {
       const { container } = render(
         <div dir="rtl">
