@@ -33,7 +33,7 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
   const recoveryGenerationRef = React.useRef(0);
 
   React.useEffect(() => {
-    const onScopeChanged = () => {
+    const onNavigated = () => {
       reviewGenerationRef.current += 1;
       recoveryGenerationRef.current += 1;
       setReviewDialogOpen(false);
@@ -41,8 +41,12 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
       setValidatingTarget(false);
       setTargetMissing(false);
     };
-    window.addEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
-    return () => window.removeEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
+    window.addEventListener(SCOPE_CHANGED_EVENT, onNavigated);
+    window.addEventListener('adham:session-select', onNavigated);
+    return () => {
+      window.removeEventListener(SCOPE_CHANGED_EVENT, onNavigated);
+      window.removeEventListener('adham:session-select', onNavigated);
+    };
   }, []);
 
   const refresh = React.useCallback(async () => {
