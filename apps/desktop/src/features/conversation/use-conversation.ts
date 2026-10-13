@@ -1,27 +1,33 @@
 import * as React from 'react';
-import i18n from '@/shared/i18n';
 import {
   SESSION_CACHE_KEY,
-  isDefinitePreEffectRejection,
   readPendingSend,
-  rejectionMessage,
-  removePendingSend,
   sameScope,
   sendBlockedReason,
   type PendingSend,
-  writePendingSend,
-  writeStorage,
+  removeStorage,
 } from './conversation-identity';
+import {
+  performLazyFirstSend,
+  readPendingFirstSend,
+  pendingFirstSendBlockedReason,
+} from './lazy-session-creation';
+import { performSingleMessageSend } from './single-message-send';
 import {
   type ConversationBackend,
   type ConversationContext,
   resolveAuthoritativeSession,
+  switchUnresolved,
+  toUiMessage,
+  conversationCapabilities,
+  type SubmitOutcome,
 } from './conversation-scope';
 import {
   isDurableSessionStorageAvailable,
-  writeDurableSessionPreference,
+  persistAndAnnounceActiveSession,
 } from './durable-session-storage';
 
+export { conversationCapabilities } from './conversation-scope';
 export type {
   BootstrapSnapshot,
   ConversationBackend,
@@ -29,6 +35,7 @@ export type {
   ConversationSnapshot,
   SessionSnapshot,
   SubmittedSnapshot,
+  SubmitOutcome,
 } from './conversation-scope';
 export type { PendingSend } from './conversation-identity';
 
@@ -42,41 +49,6 @@ export type ConversationStatus =
   | 'submitting'
   | 'error';
 
-export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain: boolean };
-
-/// Backend capability report. Execution, streaming, and stop have no
-/// backend command, so the UI must render them unavailable — never simulate
-/// them. submitMessage is the only supported conversation command.
-export const conversationCapabilities = {
-  submitMessage: true,
-  execution: false,
-  stop: false,
-} as const;
-
-const toUiMessage = (dto: {
-  messageId: string;
-  role?: string;
-  text: string;
-  createdAt: string;
-}): UiMessage => ({
-  id: dto.messageId,
-  role: dto.role ?? 'user',
-  text: dto.text,
-  createdAt: dto.createdAt,
-});
-
-const switchUnresolved = (
-  req: ConversationContext | null,
-  curId: string | undefined,
-): SubmitOutcome | null =>
-  req && req.sessionId !== curId
-    ? {
-        ok: false,
-        error: i18n.t('conversation.switchPending'),
-        uncertain: false,
-      }
-    : null;
-
 export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [status, setStatus] = React.useState<ConversationStatus>('bootstrapping');
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
@@ -86,7 +58,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
-      setStorageWarning(i18n.t('conversation.storageUnavailable'));
+      setStorageWarning(
+        'Durable session storage is unavailable. Session selection will not persist across restarts.',
+      );
     }
   }, []);
   // Authoritative selection from the latest bootstrap snapshot. Surfaced so
@@ -151,6 +125,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       // retained scope is not proof of the durable selection.
       verifiedScope = false,
     ): Promise<UiMessage[] | null> => {
+      if (!ctx.sessionId) return null;
       try {
         const page = await backend.getConversation(ctx.workspaceId, ctx.projectId, ctx.sessionId);
         if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
@@ -163,7 +138,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         return items;
       } catch (err) {
         if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
-        setError(err instanceof Error ? err.message : i18n.t('conversation.historyLoadFailed'));
+        setError(err instanceof Error ? err.message : 'Conversation history failed to load.');
         setStatus('error');
         return null;
       }
@@ -213,50 +188,61 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       if (resolved.context.installationId) {
         installationIdRef.current = resolved.context.installationId;
       }
+
+      if (resolved.kind === 'ready-no-session') {
+        setContext(resolved.context);
+        createdRef.current = resolved.context;
+        setMessages([]);
+        const pendingFirst = readPendingFirstSend();
+        if (
+          pendingFirst &&
+          pendingFirst.workspaceId === resolved.context.workspaceId &&
+          pendingFirst.projectId === resolved.context.projectId
+        ) {
+          setError(
+            'A previous first-message save is pending resolution. Resend it to retry with the same save identity.',
+          );
+          setStatus('error');
+        } else {
+          setError(null);
+          setStatus('ready');
+        }
+        scopeStaleRef.current = false;
+        bootPromiseRef.current = null;
+        return resolved.context;
+      }
+
       const ctx = resolved.context;
       const seq = freshSeq();
       const loaded = await loadHistory(ctx, generation, seq.loadSeq, seq.mutationSeq, true);
       if (loaded !== null) {
         createdRef.current = ctx;
-        if (resolved.kind === 'resumed') {
-          writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx));
-        }
         const instId = ctx.installationId ?? installationIdRef.current;
-        if (instId) {
-          const written = writeDurableSessionPreference({
-            installationId: instId,
-            workspaceId: ctx.workspaceId,
-            projectId: ctx.projectId,
-            sessionId: ctx.sessionId,
-          });
-          if (!written) {
-            setStorageWarning(i18n.t('conversation.storageUnavailable'));
-          }
+        if (!persistAndAnnounceActiveSession(ctx, instId)) {
+          setStorageWarning(
+            'Durable session storage is unavailable. Session selection will not persist across restarts.',
+          );
+        }
+        const pendingFirst = readPendingFirstSend();
+        if (
+          pendingFirst &&
+          pendingFirst.workspaceId === ctx.workspaceId &&
+          pendingFirst.projectId === ctx.projectId
+        ) {
+          setError(
+            'A previous first-message save is pending resolution. Resend it to retry with the same save identity.',
+          );
+          setStatus('error');
         }
         scopeStaleRef.current = false;
-        try {
-          window.dispatchEvent(
-            new CustomEvent('adham:session-active', {
-              detail: {
-                workspaceId: ctx.workspaceId,
-                projectId: ctx.projectId,
-                sessionId: ctx.sessionId,
-              },
-            }),
-          );
-        } catch {
-          // ignore
-        }
         return ctx;
       }
       if (superseded(seq)) return null;
       bootPromiseRef.current = null;
       fail(
         resolved.kind === 'resumed'
-          ? i18n.t('conversation.retryConnectivity', {
-              message: i18n.t('conversation.historyNotLoaded'),
-            })
-          : i18n.t('conversation.reloadRetry', { message: i18n.t('conversation.startFailed') }),
+          ? 'Saved conversation could not be loaded. Retry once connectivity returns.'
+          : 'Conversation failed to start. Reload or retry once connectivity returns.',
       );
       return null;
     })();
@@ -315,11 +301,21 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     );
     if (items) {
       const pending = readPendingSend();
-      if (pending && sameScope(pending, ctx)) {
+      if (
+        pending &&
+        ctx.sessionId !== null &&
+        sameScope(pending, {
+          workspaceId: ctx.workspaceId,
+          projectId: ctx.projectId,
+          sessionId: ctx.sessionId,
+        })
+      ) {
         // The history refresh succeeded, but the save is still
         // unresolved: keep the identity and say so instead of pretending
         // the refresh verified anything.
-        setError(i18n.t('conversation.unknownSaveResend'));
+        setError(
+          'A previous message has an unknown save status. Resend it to retry with the same save identity.',
+        );
         setStatus('error');
       }
     }
@@ -349,7 +345,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// to the previous session; bumps the generation so late responses for
   /// the previous session are ignored.
   const openSession = React.useCallback(
-    async (sessionId: string) => {
+    async (sessionId: string | null) => {
       if (scopeStaleRef.current) return;
       let base = context ?? createdRef.current;
       if (!base) {
@@ -357,6 +353,35 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         const ctx = await bootstrap();
         if (!ctx) return;
         base = ctx;
+      }
+      if (sessionId === null) {
+        const next: ConversationContext = {
+          workspaceId: base.workspaceId,
+          projectId: base.projectId,
+          sessionId: null,
+          ...(base.installationId ? { installationId: base.installationId } : {}),
+        };
+        requestedRef.current = next;
+        generationRef.current += 1;
+        setContext(next);
+        createdRef.current = next;
+        setMessages([]);
+        const pendingFirst = readPendingFirstSend();
+        if (
+          pendingFirst &&
+          pendingFirst.workspaceId === next.workspaceId &&
+          pendingFirst.projectId === next.projectId
+        ) {
+          setError(
+            'A previous first-message save is pending resolution. Resend it to retry with the same save identity.',
+          );
+          setStatus('error');
+        } else {
+          setError(null);
+          setStatus('ready');
+        }
+        removeStorage(SESSION_CACHE_KEY);
+        return;
       }
       const next: ConversationContext = {
         workspaceId: base.workspaceId,
@@ -372,31 +397,11 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       setMessages([]);
       setError(null);
       if ((await loadHistory(next, generation, seq.loadSeq, seq.mutationSeq)) !== null) {
-        writeStorage(SESSION_CACHE_KEY, JSON.stringify(next));
         const instId = base.installationId ?? installationIdRef.current;
-        if (instId) {
-          const written = writeDurableSessionPreference({
-            installationId: instId,
-            workspaceId: next.workspaceId,
-            projectId: next.projectId,
-            sessionId: next.sessionId,
-          });
-          if (!written) {
-            setStorageWarning(i18n.t('conversation.storageUnavailable'));
-          }
-        }
-        try {
-          window.dispatchEvent(
-            new CustomEvent('adham:session-active', {
-              detail: {
-                workspaceId: next.workspaceId,
-                projectId: next.projectId,
-                sessionId: next.sessionId,
-              },
-            }),
+        if (!persistAndAnnounceActiveSession(next, instId)) {
+          setStorageWarning(
+            'Durable session storage is unavailable. Session selection will not persist across restarts.',
           );
-        } catch {
-          // ignore
         }
       }
     },
@@ -408,9 +413,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       const custom = e as CustomEvent<{
         workspaceId?: string;
         projectId?: string;
-        sessionId: string;
+        sessionId?: string | null;
       }>;
-      if (!custom.detail?.sessionId) return;
+      if (custom.detail?.sessionId === undefined) return;
       if (
         (custom.detail.workspaceId &&
           context &&
@@ -428,8 +433,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   const submit = React.useCallback(
     async (text: string): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
-      if (!trimmed)
-        return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
+      if (!trimmed) return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
       const blocked = sendBlockedReason(scopeStaleRef.current);
       if (blocked) return { ok: false, error: blocked, uncertain: false };
       // Controller-boundary guard: overlapping submits are rejected before
@@ -437,7 +441,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       // is acquired BEFORE the bootstrap await below, so two submits that
       // both arrive before the context exists cannot both proceed.
       if (submitInFlightRef.current) {
-        return { ok: false, error: i18n.t('conversation.alreadySaving'), uncertain: false };
+        return { ok: false, error: 'A message is already being saved.', uncertain: false };
       }
       const preSwitch = switchUnresolved(requestedRef.current, context?.sessionId);
       if (preSwitch) return preSwitch;
@@ -447,109 +451,114 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (!ctx) {
           setStatus('bootstrapping');
           ctx = await bootstrap();
-          if (!ctx) return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+          if (!ctx) return { ok: false, error: 'Conversation is not ready.', uncertain: false };
           const postSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
           if (postSwitch) return postSwitch;
         }
-        // Frozen logical command: the identity is frozen BEFORE dispatch, so
-        // navigating away, crashing, or losing the transport mid-save can
-        // never drop it. While any unresolved record exists, only a resend
-        // of the exact same text in the exact same scope may proceed (it
-        // reuses the frozen identity so the backend receipt replays the
-        // original); every other send is blocked so no second record can
-        // overwrite it and no identity can leak across scopes.
-        const pending = readPendingSend();
-        let requestId: string;
-        let reusedFrozenIdentity = false;
-        if (pending) {
-          if (sameScope(pending, ctx) && pending.text === trimmed) {
-            requestId = pending.requestId;
-            reusedFrozenIdentity = true;
-          } else {
-            const message = i18n.t('conversation.unknownSaveReload');
-            setError(message);
-            setStatus('error');
-            return { ok: false, error: message, uncertain: true };
+
+        const pendingFirstBlocked = pendingFirstSendBlockedReason(
+          ctx.workspaceId,
+          ctx.projectId,
+          trimmed,
+        );
+        if (pendingFirstBlocked) {
+          return { ok: false, error: pendingFirstBlocked, uncertain: true };
+        }
+
+        const pendingFirst = readPendingFirstSend();
+        const isPendingFirstRetryWithNullSession =
+          pendingFirst !== null &&
+          pendingFirst.workspaceId === ctx.workspaceId &&
+          pendingFirst.projectId === ctx.projectId &&
+          pendingFirst.sessionId === null &&
+          pendingFirst.text === trimmed;
+
+        if (ctx.sessionId === null || isPendingFirstRetryWithNullSession) {
+          const generation = generationRef.current;
+          setStatus('submitting');
+          setError(null);
+          const outcome = await performLazyFirstSend({
+            backend,
+            workspaceId: ctx.workspaceId,
+            projectId: ctx.projectId,
+            text: trimmed,
+            installationId: ctx.installationId ?? installationIdRef.current,
+            isStale: () => !mountedRef.current || generationRef.current !== generation,
+          });
+          if (!mountedRef.current || generationRef.current !== generation) {
+            return { ok: false, error: 'Session changed while sending.', uncertain: false };
           }
-        } else {
-          requestId = crypto.randomUUID();
+          if (outcome.ok) {
+            setContext(outcome.context);
+            createdRef.current = outcome.context;
+            requestedRef.current = outcome.context;
+            mutationSeqRef.current += 1;
+            setMessages((prev) =>
+              ctx.sessionId === outcome.context.sessionId
+                ? prev.some((m) => m.id === outcome.message.id)
+                  ? prev
+                  : [...prev, outcome.message]
+                : [outcome.message],
+            );
+            const instId = outcome.context.installationId ?? installationIdRef.current;
+            if (
+              !persistAndAnnounceActiveSession({ ...outcome.context, title: outcome.title }, instId)
+            ) {
+              setStorageWarning(
+                'Durable session storage is unavailable. Session selection will not persist across restarts.',
+              );
+            }
+            setStatus('ready');
+            return { ok: true };
+          } else {
+            if (outcome.createdContext) {
+              setContext(outcome.createdContext);
+              createdRef.current = outcome.createdContext;
+              requestedRef.current = outcome.createdContext;
+            }
+            setError(outcome.error);
+            setStatus('error');
+            return { ok: false, error: outcome.error, uncertain: outcome.uncertain };
+          }
         }
         const generation = generationRef.current;
         setStatus('submitting');
         setError(null);
-        const record: PendingSend = {
-          requestId,
-          text: trimmed,
+        const singleOutcome = await performSingleMessageSend({
+          backend,
           workspaceId: ctx.workspaceId,
           projectId: ctx.projectId,
           sessionId: ctx.sessionId,
-        };
-        if (!reusedFrozenIdentity && !writePendingSend(record)) {
-          // The identity could not be persisted: dispatching anyway would
-          // reopen the duplicate window the record exists to close.
-          const message = i18n.t('conversation.identityNotRecorded');
-          setError(message);
-          setStatus('error');
-          return { ok: false, error: message, uncertain: false };
+          text: trimmed,
+          isStale: () => !mountedRef.current || generationRef.current !== generation,
+          onIdentityRecorded: (rec) => {
+            if (mountedRef.current && generationRef.current === generation) setPendingSend(rec);
+          },
+          onIdentityCleared: () => {
+            if (mountedRef.current && generationRef.current === generation) setPendingSend(null);
+          },
+        });
+        if (!mountedRef.current || generationRef.current !== generation) {
+          return { ok: false, error: 'Session changed while sending.', uncertain: false };
         }
-        if (!reusedFrozenIdentity) {
-          setPendingSend(record);
-        }
-        // Clear the frozen identity only when this exact logical command is
-        // known to be resolved (confirmed success or proven pre-effect
-        // rejection).
-        const clearFrozenIdentity = () => {
-          if (readPendingSend()?.requestId === requestId) removePendingSend();
-          setPendingSend((prev) => (prev?.requestId === requestId ? null : prev));
-        };
-        try {
-          const submitted = await backend.submitMessage(
-            ctx.workspaceId,
-            ctx.projectId,
-            ctx.sessionId,
-            { text: trimmed },
-            { requestId },
-          );
-          if (!mountedRef.current || generationRef.current !== generation) {
-            // The write landed even though this scope is gone: the frozen
-            // identity is resolved and must not block a future send.
-            clearFrozenIdentity();
-            return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
-          }
-          const incoming = toUiMessage({ ...submitted, role: 'user' });
-          // A confirmed write invalidates older in-flight histories: they
-          // resolve against a stale mutation sequence and are discarded.
+
+        if (singleOutcome.ok) {
           mutationSeqRef.current += 1;
           setMessages((prev) =>
-            prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming],
+            prev.some((m) => m.id === singleOutcome.message.id)
+              ? prev
+              : [...prev, singleOutcome.message],
           );
-          clearFrozenIdentity();
           setStatus('ready');
           return { ok: true };
-        } catch (err) {
-          const definite = isDefinitePreEffectRejection(err);
-          if (!mountedRef.current || generationRef.current !== generation) {
-            // Proven pre-effect: nothing was stored, so drop the identity
-            // even though this scope is gone. An unknown outcome keeps the
-            // pre-frozen record for a later reload or same-text resend.
-            if (definite) clearFrozenIdentity();
-            return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
-          }
-          if (definite) {
-            // Proven pre-effect: nothing was stored, the logical identity is
-            // spent, and a future send mints a fresh one.
-            clearFrozenIdentity();
-            const message = rejectionMessage(err);
-            setError(message);
-            setStatus('error');
-            return { ok: false, error: message, uncertain: false };
-          }
-          // Unknown outcome: the record was frozen before dispatch and stays
-          // until a reload verifies it or a same-text resend replays it.
-          const message = err instanceof Error ? err.message : i18n.t('error.notSaved');
-          setError(i18n.t('conversation.saveUnknownSuffix', { message }));
+        } else {
+          setError(singleOutcome.displayError ?? singleOutcome.error);
           setStatus('error');
-          return { ok: false, error: message, uncertain: true };
+          return {
+            ok: false,
+            error: singleOutcome.error,
+            uncertain: singleOutcome.uncertain,
+          };
         }
       } finally {
         submitInFlightRef.current = false;

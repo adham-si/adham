@@ -9,6 +9,8 @@
  * falling back to ephemeral sessionStorage.
  */
 
+import { SESSION_CACHE_KEY, writeStorage } from './conversation-identity';
+
 export interface DurableSessionPreference {
   installationId: string;
   workspaceId: string;
@@ -61,6 +63,13 @@ export function readDurableSessionPreference(
 export function writeDurableSessionPreference(preference: DurableSessionPreference): boolean {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return false;
+    if (
+      !preference.sessionId ||
+      typeof preference.sessionId !== 'string' ||
+      preference.sessionId.trim().length === 0
+    ) {
+      return false;
+    }
     const key = buildSessionSelectionKey(
       preference.installationId,
       preference.workspaceId,
@@ -101,4 +110,41 @@ export function isDurableSessionStorageAvailable(): boolean {
   } catch {
     return false;
   }
+}
+
+export function persistAndAnnounceActiveSession(
+  ctx: {
+    workspaceId: string;
+    projectId: string;
+    sessionId: string | null;
+    title?: string | null;
+  },
+  installationId?: string | null,
+): boolean {
+  if (!ctx.sessionId) return true;
+  writeStorage(SESSION_CACHE_KEY, JSON.stringify(ctx));
+  let durableOk = true;
+  if (installationId) {
+    durableOk = writeDurableSessionPreference({
+      installationId,
+      workspaceId: ctx.workspaceId,
+      projectId: ctx.projectId,
+      sessionId: ctx.sessionId,
+    });
+  }
+  try {
+    window.dispatchEvent(
+      new CustomEvent('adham:session-active', {
+        detail: {
+          workspaceId: ctx.workspaceId,
+          projectId: ctx.projectId,
+          sessionId: ctx.sessionId,
+          title: ctx.title ?? null,
+        },
+      }),
+    );
+  } catch {
+    // ignore
+  }
+  return durableOk;
 }

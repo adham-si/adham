@@ -514,6 +514,7 @@ describe('useConversation request identity', () => {
 
   it('serializes concurrent submits that both wait on bootstrap', async () => {
     const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({ sessions: [] });
     const { result } = renderHook(() => useConversation({ backend }));
 
     // Both submits arrive before the context exists.

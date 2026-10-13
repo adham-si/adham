@@ -27,6 +27,7 @@ export interface ConversationFakeBackend {
     ) => any
   >;
   getConversation: Mock<(workspaceId: string, projectId: string, sessionId: string) => any>;
+  listSessions: Mock<(...args: any[]) => any>;
   getStorageStatus: Mock<(...args: any[]) => any>;
 }
 
@@ -57,6 +58,16 @@ export function fakeBackend(): ConversationFakeBackend {
       items: [],
       nextCursor: null,
       projectionPosition: '0',
+    }),
+    listSessions: vi.fn().mockResolvedValue({
+      sessions: [
+        {
+          sessionId: 'sess-1',
+          title: null,
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
     }),
     getStorageStatus: vi.fn(),
   };

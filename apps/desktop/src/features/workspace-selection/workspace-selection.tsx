@@ -24,6 +24,8 @@ export interface WorkspaceSelectionProps {
    * "no projects" text instead. */
   onChooseWorkspace?: ((workspaceId: string) => void) | undefined;
   onRetryLists?: (() => void) | undefined;
+  onCreateWorkspace?: (() => void) | undefined;
+  onCreateProject?: ((workspaceId: string) => void) | undefined;
 }
 
 function projectValue(workspaceId: string, projectId: string): string {
@@ -56,6 +58,8 @@ export function WorkspaceSelection({
   onSelectProject,
   onChooseWorkspace,
   onRetryLists,
+  onCreateWorkspace,
+  onCreateProject,
 }: WorkspaceSelectionProps) {
   const { t } = useTranslation();
 
@@ -73,6 +77,14 @@ export function WorkspaceSelection({
 
   const handleSelect = React.useCallback(
     (value: string) => {
+      if (value === 'new-workspace') {
+        onCreateWorkspace?.();
+        return;
+      }
+      if (value.startsWith('new-project:')) {
+        onCreateProject?.(value.slice('new-project:'.length));
+        return;
+      }
       if (value.startsWith('ws:')) {
         onChooseWorkspace?.(value.slice(3));
         return;
@@ -81,7 +93,7 @@ export function WorkspaceSelection({
       if (sep <= 0) return;
       onSelectProject(value.slice(0, sep), value.slice(sep + 1));
     },
-    [onChooseWorkspace, onSelectProject],
+    [onChooseWorkspace, onCreateProject, onCreateWorkspace, onSelectProject],
   );
 
   if (!loading && workspaces.length === 0 && !listError) {
@@ -132,12 +144,21 @@ export function WorkspaceSelection({
                     <MenuItem value={workspaceValue(ws.workspaceId)} disabled={disabled}>
                       {t('createFirstProject', 'Create first project…')}
                     </MenuItem>
-                  ) : (
+                  ) : !onCreateProject ? (
                     <p className="px-3 py-1 text-xs text-foreground-muted">
                       {t('noProjects', 'No projects yet')}
                     </p>
-                  )
+                  ) : null
                 ) : null}
+                {onCreateProject && !failed && (
+                  <MenuItem
+                    key={`new-proj:${ws.workspaceId}`}
+                    value={`new-project:${ws.workspaceId}`}
+                    disabled={disabled}
+                  >
+                    {t('newProject', '+ New Project')}
+                  </MenuItem>
+                )}
                 {truncatedProjects[ws.workspaceId] ? (
                   <p className="px-3 py-1 text-xs text-foreground-muted">
                     {t('truncatedProjects', 'Showing first 100 projects')}
@@ -146,6 +167,11 @@ export function WorkspaceSelection({
               </MenuGroup>
             );
           })}
+          {onCreateWorkspace && !listError && (
+            <MenuItem value="new-workspace" disabled={disabled}>
+              {t('newWorkspace', '+ New Workspace')}
+            </MenuItem>
+          )}
           {truncatedWorkspaces ? (
             <p className="px-3 py-1 text-xs text-foreground-muted">
               {t('truncatedWorkspaces', 'Showing first 100 workspaces')}

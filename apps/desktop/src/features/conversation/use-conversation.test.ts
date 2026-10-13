@@ -52,12 +52,20 @@ describe('useConversation submit', () => {
 
   it('creates the session once when mounted under StrictMode replay', async () => {
     const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({ sessions: [], truncated: false });
     const { result } = renderHook(() => useConversation({ backend }), {
       wrapper: ({ children }) => React.createElement(React.StrictMode, null, children),
     });
 
     await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(backend.createSession).not.toHaveBeenCalled();
+    expect(result.current.sessionId).toBeNull();
+
+    await act(async () => {
+      await result.current.submit('first message');
+    });
     expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(result.current.sessionId).toBe('sess-1');
   });
 
   it('reports needs-workspace without provisioning when bootstrap has no context', async () => {
@@ -100,14 +108,14 @@ describe('useConversation submit', () => {
     const { result } = renderHook(() => useConversation({ backend }));
 
     await waitFor(() => expect(result.current.status).toBe('error'));
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.retry();
     });
 
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
-    expect(backend.getConversation).toHaveBeenCalledTimes(2);
+    expect(backend.createSession).not.toHaveBeenCalled();
+    expect(backend.getConversation).toHaveBeenCalledTimes(3);
     await waitFor(() => expect(result.current.status).toBe('ready'));
   });
 
@@ -234,7 +242,7 @@ describe('useConversation session reuse', () => {
     const second = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(second.result.current.status).toBe('ready'));
 
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(second.result.current.sessionId).toBe('sess-1');
   });
 
@@ -249,7 +257,7 @@ describe('useConversation session reuse', () => {
     const second = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(second.result.current.status).toBe('error'));
 
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).not.toHaveBeenCalled();
 
     backend.getConversation.mockResolvedValueOnce({
       items: [],
@@ -260,17 +268,17 @@ describe('useConversation session reuse', () => {
       await second.result.current.retry();
     });
 
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).not.toHaveBeenCalled();
     await waitFor(() => expect(second.result.current.status).toBe('ready'));
     expect(second.result.current.sessionId).toBe('sess-1');
   });
 
-  it('creates no extra session when history fails after a successful create', async () => {
+  it('creates no extra session when history fails after a successful resume', async () => {
     const backend = fakeBackend();
     backend.getConversation.mockRejectedValueOnce(new Error('history outage'));
     const first = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(first.result.current.status).toBe('error'));
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).not.toHaveBeenCalled();
     first.unmount();
 
     backend.getConversation.mockResolvedValueOnce({
@@ -281,7 +289,7 @@ describe('useConversation session reuse', () => {
     const second = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(second.result.current.status).toBe('ready'));
 
-    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(second.result.current.sessionId).toBe('sess-1');
   });
 
@@ -299,16 +307,20 @@ describe('useConversation session reuse', () => {
       activeWorkspaceId: 'ws-1',
       activeProjectId: 'proj-2',
     });
-    backend.createSession.mockResolvedValueOnce({
-      sessionId: 'sess-2',
-      projectId: 'proj-2',
-      title: null,
-      createdAt: '2026-10-09T00:00:05Z',
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-2',
+          title: null,
+          createdAt: '2026-10-09T00:00:05Z',
+        },
+      ],
+      truncated: false,
     });
     const second = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(second.result.current.status).toBe('ready'));
 
-    expect(backend.createSession).toHaveBeenCalledTimes(2);
+    expect(backend.createSession).not.toHaveBeenCalled();
     expect(second.result.current.sessionId).toBe('sess-2');
     expect(second.result.current.context).toEqual({
       workspaceId: 'ws-1',
@@ -319,9 +331,21 @@ describe('useConversation session reuse', () => {
 
   it('retries an uncertain creation with the same request identity', async () => {
     const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({ sessions: [], truncated: false });
     backend.createSession.mockRejectedValueOnce(new Error('connection lost'));
     const { result } = renderHook(() => useConversation({ backend }));
-    await waitFor(() => expect(result.current.status).toBe('error'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBeNull();
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hello');
+    });
+    expect(outcome).toEqual({
+      ok: false,
+      uncertain: true,
+      error: expect.stringMatching(/connection lost/i),
+    });
 
     backend.createSession.mockResolvedValueOnce({
       sessionId: 'sess-1',
@@ -329,63 +353,60 @@ describe('useConversation session reuse', () => {
       title: null,
       createdAt: '2026-10-09T00:00:00Z',
     });
+    let retryOutcome: unknown;
     await act(async () => {
-      await result.current.retry();
+      retryOutcome = await result.current.submit('hello');
     });
+    expect(retryOutcome).toEqual({ ok: true });
 
     const ids = creationIds(backend);
     expect(ids).toHaveLength(2);
     expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/i);
     expect(ids[0]).toBe(ids[1]);
-    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBe('sess-1');
   });
 
   it('does not create a session when the create intent cannot be recorded', async () => {
     const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({ sessions: [], truncated: false });
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBeNull();
+
     vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
       throw new Error('quota exceeded');
     });
-    const { result } = renderHook(() => useConversation({ backend }));
-    await waitFor(() => expect(result.current.status).toBe('error'));
-
-    // Dispatch blocked: no session without a durable creation identity.
-    expect(backend.createSession).not.toHaveBeenCalled();
-    expect(result.current.sessionId).toBeNull();
-    expect(result.current.error).toMatch(/identity could not be recorded/i);
-  });
-
-  it('retains the create intent when the session cache write fails', async () => {
-    const backend = fakeBackend();
-    const originalSetItem = Storage.prototype.setItem;
-    let failCache = true;
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key: string,
-      value: string,
-    ) {
-      if (key === 'adham:compose:session' && failCache) {
-        failCache = false;
-        throw new Error('quota exceeded');
-      }
-      originalSetItem.call(this, key, value);
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hello');
     });
 
+    // Dispatch blocked: no session without a recorded creation identity.
+    expect(backend.createSession).not.toHaveBeenCalled();
+    expect(result.current.sessionId).toBeNull();
+    expect(outcome).toEqual({
+      ok: false,
+      uncertain: false,
+      error: expect.stringMatching(/identity could not be recorded/i),
+    });
+  });
+
+  it('retains pending first send when message send fails after creation', async () => {
+    const backend = fakeBackend();
+    backend.listSessions.mockResolvedValueOnce({ sessions: [], truncated: false });
+    backend.submitMessage.mockRejectedValueOnce(new Error('IPC drop'));
     const first = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(first.result.current.status).toBe('ready'));
-    // Cache write failed, so the intent must have survived.
-    expect(sessionStorage.getItem('adham:compose:session')).toBeNull();
-    expect(sessionStorage.getItem('adham:compose:create-intent')).not.toBeNull();
-    first.unmount();
 
-    // The remount replays creation with the SAME request identity, so the
-    // backend receipt cannot fork a duplicate session.
-    const second = renderHook(() => useConversation({ backend }));
-    await waitFor(() => expect(second.result.current.status).toBe('ready'));
-    expect(backend.createSession).toHaveBeenCalledTimes(2);
-    const ids = creationIds(backend);
-    expect(ids[0]).toBe(ids[1]);
-    expect(sessionStorage.getItem('adham:compose:session')).not.toBeNull();
-    expect(sessionStorage.getItem('adham:compose:create-intent')).toBeNull();
+    await act(async () => {
+      await first.result.current.submit('hello');
+    });
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+
+    const pending = JSON.parse(sessionStorage.getItem('adham:compose:pending-first-send') ?? '{}');
+    expect(pending.sessionId).toBe('sess-1');
+    expect(pending.text).toBe('hello');
   });
 
   it('resolves a submit started before unmount without applying state', async () => {
@@ -462,15 +483,18 @@ describe('useConversation read ordering', () => {
         }),
     );
     const { result } = renderHook(() => useConversation({ backend }));
-    // Drain the initial bootstrap history call.
-    await waitFor(() => expect(backend.getConversation).toHaveBeenCalled());
-    await act(async () => {
-      resolvers.shift()?.({
-        items: [],
-        nextCursor: null,
-        projectionPosition: '0',
+    // Drain initial bootstrap history calls.
+    await waitFor(() => expect(resolvers.length).toBeGreaterThanOrEqual(1));
+    while (resolvers.length > 0) {
+      const r = resolvers.shift();
+      await act(async () => {
+        r?.({
+          items: [],
+          nextCursor: null,
+          projectionPosition: '0',
+        });
       });
-    });
+    }
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     let first: Promise<void>;

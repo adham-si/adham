@@ -388,4 +388,82 @@ describe('WorkspaceSelection', () => {
     expect(screen.getByText('Showing first 100 workspaces')).toBeDefined();
     expect(screen.getByText('Showing first 100 projects')).toBeDefined();
   });
+
+  it('renders "+ New Workspace" and triggers onCreateWorkspace when clicked', async () => {
+    const user = userEvent.setup();
+    const onCreateWorkspace = vi.fn();
+    render(
+      <WorkspaceSelection
+        workspaces={[WS]}
+        projectsBy={{ 'ws-1': [PROJ] }}
+        truncatedWorkspaces={false}
+        truncatedProjects={{}}
+        failedWorkspaces={[]}
+        activeWorkspaceId="ws-1"
+        activeProjectId="proj-1"
+        loading={false}
+        listError={null}
+        selectError={null}
+        onSelectProject={vi.fn()}
+        onCreateWorkspace={onCreateWorkspace}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /select workspace/i }));
+    const newWsItem = screen.getByRole('menuitem', { name: /new workspace/i });
+    expect(newWsItem).toBeDefined();
+    await user.click(newWsItem);
+    expect(onCreateWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders "+ New Project" for workspaces and triggers onCreateProject with workspaceId', async () => {
+    const user = userEvent.setup();
+    const onCreateProject = vi.fn();
+    render(
+      <WorkspaceSelection
+        workspaces={[WS]}
+        projectsBy={{ 'ws-1': [PROJ] }}
+        truncatedWorkspaces={false}
+        truncatedProjects={{}}
+        failedWorkspaces={[]}
+        activeWorkspaceId="ws-1"
+        activeProjectId="proj-1"
+        loading={false}
+        listError={null}
+        selectError={null}
+        onSelectProject={vi.fn()}
+        onCreateProject={onCreateProject}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /select workspace/i }));
+    const newProjItem = screen.getByRole('menuitem', { name: /new project/i });
+    expect(newProjItem).toBeDefined();
+    await user.click(newProjItem);
+    expect(onCreateProject).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('does not render "+ New Project" for failed workspaces and does not render "+ New Workspace" when listError is set', async () => {
+    const user = userEvent.setup();
+    const onCreateWorkspace = vi.fn();
+    const onCreateProject = vi.fn();
+    render(
+      <WorkspaceSelection
+        workspaces={[WS]}
+        projectsBy={{}}
+        truncatedWorkspaces={false}
+        truncatedProjects={{}}
+        failedWorkspaces={['ws-1']}
+        activeWorkspaceId="ws-1"
+        activeProjectId={null}
+        loading={false}
+        listError="Network failed"
+        selectError={null}
+        onSelectProject={vi.fn()}
+        onCreateWorkspace={onCreateWorkspace}
+        onCreateProject={onCreateProject}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /select workspace/i }));
+    expect(screen.queryByRole('menuitem', { name: /new project/i })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /new workspace/i })).toBeNull();
+  });
 });
