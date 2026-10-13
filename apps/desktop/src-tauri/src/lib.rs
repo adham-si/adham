@@ -9,8 +9,6 @@ use adham_desktop_api::{
 #[cfg(target_os = "macos")]
 use tauri::Manager;
 
-mod canary;
-
 #[tauri::command]
 fn get_platform_info() -> PlatformInfo {
     adham_desktop_api::handle_get_platform_info()
@@ -184,11 +182,6 @@ pub fn run() {
             .await
             .expect("Failed to load installation identity")
     });
-
-    if let Ok(mode) = std::env::var("ADHAM_CANARY_RECOVERY_MODE") {
-        runtime.block_on(canary::run_canary_recovery_journey(&api_ctx, &mode));
-        return;
-    }
 
     let builder = tauri::Builder::default()
         .manage(api_ctx)
