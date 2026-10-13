@@ -7,6 +7,10 @@ import {
   removeStorage,
   writeStorage,
 } from './conversation-identity';
+import {
+  clearDurablePendingOperation,
+  recordDurablePendingOperation,
+} from './pending-recovery/durable-pending-operations';
 
 export const PENDING_FIRST_SEND_KEY = 'adham:compose:pending-first-send';
 
@@ -190,7 +194,30 @@ export async function performLazyFirstSend(
     title = params.title?.trim() || deriveSessionTitle(trimmed);
   }
 
+  const operationId = messageRequestId;
   if (!reusedFrozenIdentity) {
+    const durableRes = await recordDurablePendingOperation(
+      backend,
+      workspaceId,
+      projectId,
+      {
+        operationId,
+        kind: 'first_send',
+        messageRequestId,
+        createRequestId,
+        text: trimmed,
+        title,
+      },
+      { sessionId: null },
+    );
+    if (!durableRes.ok) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.identityNotRecorded'),
+        uncertain: false,
+      };
+    }
+
     const initialRecord: PendingFirstSend = {
       createRequestId,
       messageRequestId,
@@ -224,6 +251,11 @@ export async function performLazyFirstSend(
         return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
       }
       if (isDefinitePreEffectRejection(err)) {
+        void clearDurablePendingOperation(backend, {
+          operationId,
+          expectedMessageRequestId: messageRequestId,
+          reason: 'dismissed',
+        });
         removePendingFirstSend();
         return { ok: false, error: rejectionMessage(err), uncertain: false };
       }
@@ -285,6 +317,11 @@ export async function performLazyFirstSend(
     }
 
     // Success! Clear pending first send
+    void clearDurablePendingOperation(backend, {
+      operationId,
+      expectedMessageRequestId: messageRequestId,
+      reason: 'resolved',
+    });
     removePendingFirstSend();
 
     return {

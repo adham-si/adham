@@ -17,4 +17,7 @@ pub use identity::{
     load_or_create_installation, set_active_scope, set_active_scope_tx, InstallationInit,
     InstallationRecord,
 };
-pub use store::{AppendEventRequest, AppendEventResult, CommandReceiptRecord, SqliteEventStore};
+pub use store::{
+    AppendEventRequest, AppendEventResult, CommandReceiptRecord, HydratedPendingOperation,
+    PendingOperationRecord, SqliteEventStore,
+};

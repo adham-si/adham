@@ -16,6 +16,11 @@ import { useSelection, type SelectionBackend } from '../workspace-selection/use-
 import { ConversationSetupSlot } from './conversation-setup-slot';
 import { announceScopeChanged, SCOPE_CHANGED_EVENT } from './conversation-identity';
 import { submissionNotice } from './submission-notice';
+import {
+  PendingRecoveryBanner,
+  PendingRecoveryReviewDialog,
+  usePendingRecovery,
+} from './pending-recovery';
 
 const DEFAULT_MODEL_ID = 'local:qwen2.5-coder:32b';
 const PENDING_DRAFT_BUCKET = 'pending';
@@ -48,6 +53,24 @@ export function ConversationPanel({
   const { t } = useTranslation();
   const conv = useConversation({ backend });
   const prov = useProvisioning({ backend: provisioning });
+  const recovery = usePendingRecovery({
+    backend,
+    onSessionOpened: (workspaceId, projectId, sessionId) => {
+      if (
+        (conv.context && conv.context.workspaceId !== workspaceId) ||
+        (conv.context && conv.context.projectId !== projectId)
+      ) {
+        announceScopeChanged('project', 'selected', { workspaceId, projectId });
+      } else {
+        window.dispatchEvent(
+          new CustomEvent('adham:session-select', {
+            detail: { workspaceId, projectId, sessionId },
+          }),
+        );
+      }
+      void conv.reload();
+    },
+  });
   const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
   /// Committed creation or selection awaiting authoritative bootstrap.
   /// Holds the confirmed step disabled so a second action cannot fork a
@@ -214,6 +237,16 @@ export function ConversationPanel({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent">
+      {/* Pending recovery banner (unresolved message recovery) */}
+      <div className="px-4 pt-2">
+        <PendingRecoveryBanner
+          operations={recovery.operations}
+          truncated={recovery.truncated}
+          onReview={recovery.openReview}
+          onDismiss={(op) => void recovery.dismissOperation(op)}
+        />
+      </div>
+
       {/* Conversation Timeline (smoothly expands when messages exist) */}
       <div
         className={`flex flex-col overflow-y-auto transition-all duration-500 ease-in-out ${
@@ -287,6 +320,11 @@ export function ConversationPanel({
             )}
           </p>
         )}
+        {recovery.error && (
+          <div role="alert" className="p-2 text-xs text-destructive bg-destructive/10 rounded">
+            <p>{recovery.error}</p>
+          </div>
+        )}
         <p>{notice}</p>
       </div>
 
@@ -323,6 +361,15 @@ export function ConversationPanel({
           }}
         />
       </div>
+
+      <PendingRecoveryReviewDialog
+        open={recovery.reviewDialogOpen}
+        operation={recovery.activeReviewOp}
+        targetMissing={recovery.targetMissing}
+        onClose={recovery.closeReview}
+        onResend={(op) => recovery.resendOperation(op)}
+        onDismiss={(op) => recovery.dismissOperation(op)}
+      />
     </div>
   );
 }

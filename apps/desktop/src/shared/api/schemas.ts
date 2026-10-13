@@ -97,3 +97,22 @@ export const StorageStatusSchema = z.object({
   journalMode: z.string(),
   schemaVersion: z.number().int(),
 });
+
+export const PendingOperationDtoSchema = z.object({
+  operationId: z.string(),
+  kind: z.string(),
+  workspaceId: z.string(),
+  projectId: z.string(),
+  sessionId: z.string().nullable(),
+  createRequestId: z.string().nullable(),
+  messageRequestId: z.string(),
+  text: z.string(),
+  title: z.string().nullable(),
+  status: z.string(),
+  createdAt: z.string(),
+});
+
+export const PendingOperationListSchema = z.object({
+  operations: z.array(PendingOperationDtoSchema),
+  truncated: z.boolean(),
+});

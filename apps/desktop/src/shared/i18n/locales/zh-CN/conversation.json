@@ -36,7 +36,28 @@
     "prevMessagePending": "上一条消息保存待处理，请重新发送或重新加载后再开始新会话。",
     "discoveryUnavailable": "会话发现不可用，网络恢复后重试。",
     "creationFailed": "会话创建失败。",
-    "createdIdentityLost": "会话已创建，但无法记录保存标识，请先重新加载历史再重新发送。"
+    "createdIdentityLost": "会话已创建，但无法记录保存标识，请先重新加载历史再重新发送。",
+    "recovery": {
+      "bannerTitle": "{{target}} 中的未定消息",
+      "bannerDescription": "先前运行期间有一条消息的保存状态未知。",
+      "reviewAction": "检查并重新发送",
+      "dismissAction": "忽略",
+      "modalTitle": "未定消息恢复",
+      "targetLabel": "原始目标",
+      "targetMissing": "目标工作区或项目无法访问或不存在。",
+      "messagePreview": "消息内容",
+      "titlePreview": "会话标题",
+      "confirmResend": "重新发送至原始目标",
+      "copyText": "复制文本",
+      "textCopied": "已复制到剪贴板",
+      "dismissWarningTitle": "忽略未定消息？",
+      "dismissWarning": "忽略将移除此恢复提醒。如果服务器已保存此消息，它将保留在历史记录中；否则，此草稿将不会被发送。",
+      "confirmDismiss": "忽略提醒",
+      "cancelDismiss": "取消",
+      "truncated": "显示 {{count}} 条未定操作。较早的操作已被截断。",
+      "listFailed": "检查未定消息失败。",
+      "cleanupFailed": "消息已处理，但移除待定标记失败。请重新加载历史记录。"
+    }
   },
   "provision": {
     "workspaceTitle": "创建工作区",

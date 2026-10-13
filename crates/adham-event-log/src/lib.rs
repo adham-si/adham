@@ -5,7 +5,8 @@ pub use checksum::ChecksumCalculator;
 pub use sqlite::{
     create_sqlite_pool, load_or_create_installation, request_fingerprint, scope_fingerprint,
     set_active_scope, set_active_scope_tx, verify_storage_health, AppendEventRequest,
-    AppendEventResult, CommandReceiptRecord, ContentKeyProvider, InMemoryProvider,
-    InstallationInit, InstallationRecord, OsKeyringProvider, SqliteEventStore, StorageHealthReport,
-    UnavailableKeyProvider, ENCODING_ENCRYPTED, PROTECTION_AEAD_V1,
+    AppendEventResult, CommandReceiptRecord, ContentKeyProvider, HydratedPendingOperation,
+    InMemoryProvider, InstallationInit, InstallationRecord, OsKeyringProvider,
+    PendingOperationRecord, SqliteEventStore, StorageHealthReport, UnavailableKeyProvider,
+    ENCODING_ENCRYPTED, PROTECTION_AEAD_V1,
 };

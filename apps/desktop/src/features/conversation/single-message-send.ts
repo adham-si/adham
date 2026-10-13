@@ -10,6 +10,10 @@ import {
   writePendingSend,
 } from './conversation-identity';
 import { readPendingFirstSend, removePendingFirstSend } from './lazy-session-creation';
+import {
+  clearDurablePendingOperation,
+  recordDurablePendingOperation,
+} from './pending-recovery/durable-pending-operations';
 
 export type UiMessage = { id: string; role: string; text: string; createdAt: string };
 
@@ -90,12 +94,36 @@ export async function performSingleMessageSend(
     sessionId,
   };
 
-  if (!reusedFrozenIdentity && !writePendingSend(record)) {
-    return {
-      ok: false,
-      error: i18n.t('conversation.identityNotRecorded'),
-      uncertain: false,
-    };
+  const operationId = requestId;
+  if (!reusedFrozenIdentity) {
+    const durableRes = await recordDurablePendingOperation(
+      backend,
+      workspaceId,
+      projectId,
+      {
+        operationId,
+        kind: 'single_message',
+        messageRequestId: requestId,
+        createRequestId: null,
+        text: trimmed,
+        title: null,
+      },
+      { sessionId },
+    );
+    if (!durableRes.ok) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.identityNotRecorded'),
+        uncertain: false,
+      };
+    }
+    if (!writePendingSend(record)) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.identityNotRecorded'),
+        uncertain: false,
+      };
+    }
   }
 
   if (!reusedFrozenIdentity && onIdentityRecorded) {
@@ -103,6 +131,11 @@ export async function performSingleMessageSend(
   }
 
   const clearFrozenIdentity = () => {
+    void clearDurablePendingOperation(backend, {
+      operationId,
+      expectedMessageRequestId: requestId,
+      reason: 'resolved',
+    });
     if (readPendingSend()?.requestId === requestId) {
       removePendingSend();
     }

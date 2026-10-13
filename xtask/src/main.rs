@@ -1,9 +1,11 @@
 use adham_core_types::{ActorKind, EventActor, EventScope};
 use adham_desktop_api::{
-    BootstrapState, CommandContext, ConversationMessageDto, ConversationPage, CreateProjectPayload,
-    CreateSessionPayload, CreateWorkspacePayload, PlatformInfo, ProjectList, ProjectSummary,
-    RebuildProjectionsResponse, SelectProjectPayload, SessionList, SessionSummary, StorageStatus,
-    SubmitMessagePayload, SubmittedMessage, WorkspaceList, WorkspaceSummary,
+    BootstrapState, ClearPendingOperationPayload, CommandContext, ConversationMessageDto,
+    ConversationPage, CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
+    PendingOperationDto, PendingOperationList, PlatformInfo, ProjectList, ProjectSummary,
+    RebuildProjectionsResponse, RecordPendingOperationPayload, SelectProjectPayload, SessionList,
+    SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage, WorkspaceList,
+    WorkspaceSummary,
 };
 use std::fs;
 use std::path::Path;
@@ -67,6 +69,10 @@ fn generate_contracts() -> Result<(), Box<dyn std::error::Error>> {
         ConversationPage::decl(),
         StorageStatus::decl(),
         RebuildProjectionsResponse::decl(),
+        RecordPendingOperationPayload::decl(),
+        PendingOperationDto::decl(),
+        PendingOperationList::decl(),
+        ClearPendingOperationPayload::decl(),
     ];
 
     let id_types = [
