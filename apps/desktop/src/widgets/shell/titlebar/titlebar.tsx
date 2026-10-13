@@ -39,13 +39,22 @@ function useLabels() {
 
 /**
  * Chromium / Brave style Titlebar component.
- * - Fixed height: 40px (Chrome/Chromium/VS Code standard)
+ * - Fixed height: 40px (Chrome/Chromium/VS Code standard); 32px on macOS
+ *   (compact native adaptation, gated by platform.isMac — true during the
+ *   loading fallback on ambient macOS, so no height flash on startup)
+ * - macOS buttons: 28×28 hit areas, 16px icons, vertically centered; the
+ *   permanent boxed chrome (border, background, hover backplate) is removed
+ *   titlebar-locally via overrides below — shared button styles untouched.
+ *   Keyboard focus-visible, labels, pressed semantics and contrast stay.
  * - Top: Chrome-style secondary icon button with animated chevron (vertical
  *   open/close state, direction-neutral on purpose — no RTL mirroring)
  * - Navigation rail toggle button side by side
  * - No app name or title text
  * - Draggable middle region with data-tauri-drag-region and double-click maximize/restore
  * - End side: Layout toggles (primary sidebar, panel, secondary sidebar), vertical separator, and window action controls
+ * - Native traffic lights: untouched size/placement/hover; physical-left
+ *   clearance (pl-20) applies in LTR and RTL; no added bottom margin, so the
+ *   shell's 4px content separation is preserved, not doubled.
  */
 export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarProps) {
   const {
@@ -153,11 +162,23 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
     ? t('titlebar.hideSecondary', 'Hide secondary sidebar')
     : t('titlebar.showSecondary', 'Show secondary sidebar');
 
+  // macOS compact treatment, titlebar-local only (shared button styles
+  // untouched). 28×28 hit area; 16px icons come from the existing
+  // `[&_svg]:size-icon-sm` (=16px) kept below. Removes the permanent boxed
+  // chrome; keyboard focus-visible, pressed semantics and contrast come from
+  // the untouched base variant. Gated by platform.isMac, which is already
+  // true during the loading fallback on ambient macOS.
+  const isMacCompact = platform.isMac;
+  const macCompactButton = isMacCompact
+    ? 'h-7 min-h-7 w-7 border-0 bg-transparent hover:bg-transparent'
+    : '';
+
   return (
     <header
       aria-label={t('titlebar.appTitlebar', 'Application Titlebar')}
       className={cn(
-        'relative z-menu flex h-10 min-h-10 max-h-10 w-full shrink-0 items-center justify-between bg-background select-none',
+        'relative z-menu flex w-full shrink-0 items-center justify-between bg-background select-none',
+        isMacCompact ? 'h-8 min-h-8 max-h-8' : 'h-10 min-h-10 max-h-10',
         platform.layout.hasNativeTitlebarControls &&
           !isFullscreen &&
           platform.layout.trafficLightClearanceClass,
@@ -176,6 +197,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
           className={cn(
             buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
             'cursor-default select-none [&_svg]:size-icon-sm',
+            macCompactButton,
           )}
         >
           <HugeiconsIcon icon={startPanelIcon} />
@@ -188,7 +210,8 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
               title={t('titlebar.actionsTitle', 'Actions')}
               className={cn(
                 buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-                'cursor-default select-none',
+                'cursor-default select-none [&_svg]:size-icon-sm',
+                macCompactButton,
               )}
             >
               {/* Arrow icon that smoothly animates between bottom and top on open/close */}
@@ -249,6 +272,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
               'cursor-default select-none [&_svg]:size-icon-sm',
+              macCompactButton,
               !sidebarOpen &&
                 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
             )}
@@ -266,6 +290,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
               'cursor-default select-none [&_svg]:size-icon-sm',
+              macCompactButton,
               !panelOpen &&
                 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
             )}
@@ -283,6 +308,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
               'cursor-default select-none [&_svg]:size-icon-sm',
+              macCompactButton,
               !secondarySidebarOpen &&
                 'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
             )}
