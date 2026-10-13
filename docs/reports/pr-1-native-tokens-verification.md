@@ -3,7 +3,7 @@
 - **Branch:** `refactor/frontend-native-tokens`
 - **Draft PR:** [#6](https://github.com/adham-si/adham/pull/6) targeting `main`
 - **Parent Base SHA:** `237720e665a925f5744da1045356d37a996aae3e`
-- **Merged Head SHA:** `2158296 (integrated origin/main at b01d84d)`
+- **Merged Head SHA:** `394e63d (integrated origin/main at 823d63b)`
 - **Initial Implementation Commit:** `f7647a6fe94ab4eaf5c8f9b1342f208533cbb9cd`
 - **Documentation Update Commit:** `e3b234a166c277a4f2e09dba304e8fe0e0c489a1`
 - **Evidence Refinement Commit:** `a922a068b090d10c482bc539993400a2b2263097`
@@ -93,15 +93,14 @@ Inspecting compiled rules confirms that Tailwind v4 emits identical CSS property
 
 ```bash
 $ pnpm format:check
-Checked 189 files in 28ms. No fixes applied.
+Checked 196 files. No fixes applied.
 
 $ pnpm lint
-Found 0 warnings and 0 errors. Finished in 11ms on 171 files with 96 rules.
+Found 0 warnings and 0 errors. Finished on 179 files.
 
 $ pnpm check
-Test Files  22 passed (22)
-Tests       352 passed (352)
-Duration    4.2s
+Test Files  45 passed (45)
+Tests       533 passed (533)
 
 $ pnpm check:magic-values
 Magic-value check passed: 25/25 cases passed.
@@ -162,7 +161,7 @@ Investigation of visual anomalies visible during the native check confirmed they
 1. **Visible Raw Translation Keys (`compose.newSession`, `compose.emptyHistory`):**
    - In `apps/desktop/src/widgets/shell/primary-sidebar/primary-sidebar.tsx`, lines 126, 129, and 158 call `t('compose.newSession')` and `t('compose.emptyHistory')`.
    - In `locales/en/messages.json` and `locales/ar/messages.json`, these keys are defined under `"sidebar"` as `"newTask"` and `"noSessions"`.
-   - Inspection of baseline commit `237720e` confirms this mismatch was present before PR #6 was branched. It is a pre-existing localization defect, not introduced by token separation.
+   - Inspection of baseline commit `237720e` confirms this mismatch was present before PR #6 was branched. Upstream `main` resolved these keys via the merged modular i18n localization delivery.
 2. **Inspector Activity Feed (`Session created Now`, `SQLite WAL checkpoint verified 1 min ago`):**
    - In `apps/desktop/src/widgets/shell/panel/panel.tsx`, lines 248–260 render hardcoded static JSX markup without backend event subscriptions or IPC queries.
    - Inspection of baseline commit `237720e` confirms this static mock was present in the baseline.
