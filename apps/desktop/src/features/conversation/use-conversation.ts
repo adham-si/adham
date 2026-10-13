@@ -338,19 +338,26 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   /// to the previous session; bumps the generation so late responses for
   /// the previous session are ignored.
   const openSession = React.useCallback(
-    async (sessionId: string | null) => {
-      if (scopeStaleRef.current) return;
-      let base = context ?? createdRef.current;
+    async (sessionId: string | null, targetScope?: { workspaceId: string; projectId: string }) => {
+      if (scopeStaleRef.current && !targetScope) return;
+      if (targetScope) {
+        scopeStaleRef.current = false;
+        bootPromiseRef.current = null;
+      }
+      let base =
+        (targetScope ? { ...targetScope, sessionId: null } : context) ?? createdRef.current;
       if (!base) {
         bootPromiseRef.current = null;
         const ctx = await bootstrap();
         if (!ctx) return;
         base = ctx;
       }
+      const wsId = targetScope ? targetScope.workspaceId : base.workspaceId;
+      const projId = targetScope ? targetScope.projectId : base.projectId;
       if (sessionId === null) {
         const next: ConversationContext = {
-          workspaceId: base.workspaceId,
-          projectId: base.projectId,
+          workspaceId: wsId,
+          projectId: projId,
           sessionId: null,
           ...(base.installationId ? { installationId: base.installationId } : {}),
         };
@@ -375,9 +382,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         return;
       }
       const next: ConversationContext = {
-        workspaceId: base.workspaceId,
-        projectId: base.projectId,
+        workspaceId: wsId,
+        projectId: projId,
         sessionId,
+        ...(base.installationId ? { installationId: base.installationId } : {}),
       };
       requestedRef.current = next;
       generationRef.current += 1;

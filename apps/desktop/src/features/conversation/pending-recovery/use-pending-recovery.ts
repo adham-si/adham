@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { PendingOperationDto } from '@adham/contracts-generated';
 import type { ConversationBackend } from '../conversation-scope';
-import { isDefinitePreEffectRejection } from '../conversation-identity';
+import { isDefinitePreEffectRejection, SCOPE_CHANGED_EVENT } from '../conversation-identity';
 import { isSessionMissingOrMismatched } from '../conversation-scope';
 import {
   clearDurablePendingOperation,
@@ -31,6 +31,19 @@ export function usePendingRecovery({ backend, onSessionOpened }: UsePendingRecov
   const operationInFlightRef = React.useRef(false);
   const reviewGenerationRef = React.useRef(0);
   const recoveryGenerationRef = React.useRef(0);
+
+  React.useEffect(() => {
+    const onScopeChanged = () => {
+      reviewGenerationRef.current += 1;
+      recoveryGenerationRef.current += 1;
+      setReviewDialogOpen(false);
+      setActiveReviewOp(null);
+      setValidatingTarget(false);
+      setTargetMissing(false);
+    };
+    window.addEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
+    return () => window.removeEventListener(SCOPE_CHANGED_EVENT, onScopeChanged);
+  }, []);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);

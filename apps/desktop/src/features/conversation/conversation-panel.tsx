@@ -66,7 +66,7 @@ export function ConversationPanel({
         const selectOutcome = await sel.select(workspaceId, projectId);
         if (!selectOutcome.ok) return;
       }
-      await conv.openSession(sessionId);
+      await conv.openSession(sessionId, { workspaceId, projectId });
     },
     [conv, sel],
   );

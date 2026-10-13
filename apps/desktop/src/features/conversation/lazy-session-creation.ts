@@ -171,8 +171,9 @@ export async function performLazyFirstSend(
         (op) =>
           op.kind === 'first_send' && op.workspaceId === workspaceId && op.projectId === projectId,
       ) ?? null;
-  } catch {
-    // Backend SQLite query failed or not available
+  } catch (err) {
+    const message = err instanceof Error ? err.message : i18n.t('conversation.identityNotRecorded');
+    return { ok: false, error: message, uncertain: false };
   }
 
   const pending = readPendingFirstSend();

@@ -214,7 +214,7 @@ async fn test_cleanup_does_not_tombstone_saved_message_content() {
 }
 
 #[tokio::test]
-async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
+async fn test_context_reopen_recovers_pending_operation_and_resend_zero_duplicates() {
     let db_path = test_db_path();
     let key_provider: std::sync::Arc<dyn adham_event_log::ContentKeyProvider> =
         std::sync::Arc::new(adham_event_log::InMemoryProvider::generate());
