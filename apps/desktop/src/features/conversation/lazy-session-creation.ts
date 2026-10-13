@@ -171,6 +171,13 @@ export async function performLazyFirstSend(
         (op) =>
           op.kind === 'first_send' && op.workspaceId === workspaceId && op.projectId === projectId,
       ) ?? null;
+    if (!durablePendingOp && sqliteList.truncated) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.firstSendPendingReload'),
+        uncertain: true,
+      };
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : i18n.t('conversation.identityNotRecorded');
     return { ok: false, error: message, uncertain: false };
@@ -185,7 +192,14 @@ export async function performLazyFirstSend(
 
   if (durablePendingOp) {
     if (durablePendingOp.text === trimmed) {
-      createRequestId = durablePendingOp.createRequestId ?? crypto.randomUUID();
+      if (!durablePendingOp.createRequestId) {
+        return {
+          ok: false,
+          error: i18n.t('conversation.firstSendPendingReload'),
+          uncertain: true,
+        };
+      }
+      createRequestId = durablePendingOp.createRequestId;
       messageRequestId = durablePendingOp.messageRequestId;
       createdSessionId = durablePendingOp.sessionId;
       title = durablePendingOp.title ?? (params.title?.trim() || deriveSessionTitle(trimmed));

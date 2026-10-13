@@ -66,6 +66,13 @@ export async function performSingleMessageSend(
       projectId,
       sessionId,
     );
+    if (!durablePendingOp && sqliteList.truncated) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.unknownSaveReload'),
+        uncertain: true,
+      };
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : i18n.t('conversation.identityNotRecorded');
     return { ok: false, error: message, uncertain: false };
