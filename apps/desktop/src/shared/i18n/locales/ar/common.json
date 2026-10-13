@@ -1,0 +1,41 @@
+{
+  "appName": "أدهم",
+  "tagline": "تطبيق الذكاء الاصطناعي الوحيد الذي تحتاجه",
+  "welcome": "ما الذي ترغب في العمل عليه؟",
+  "workspace": "مساحة العمل",
+  "project": "المشروع",
+  "session": "الجلسة",
+  "sessions": "الجلسات",
+  "selectScope": "اختيار مساحة العمل / المشروع",
+  "noWorkspaces": "لا توجد مساحات عمل بعد",
+  "loading": "جارٍ التحميل…",
+  "projectsLoadFailed": "تعذّر تحميل المشاريع",
+  "createFirstProject": "إنشاء المشروع الأول…",
+  "noProjects": "لا توجد مشاريع بعد",
+  "truncatedProjects": "عرض أول 100 مشروع",
+  "truncatedWorkspaces": "عرض أول 100 مساحة عمل",
+  "retry": "إعادة المحاولة",
+  "firstProjectIn": "المشروع الأول في {{name}}",
+  "allWorkspaces": "جميع مساحات العمل",
+  "common": {
+    "retry": "إعادة المحاولة",
+    "systemDefault": "افتراضي النظام",
+    "enabled": "مفعّل",
+    "disabled": "معطّل",
+    "small": "صغير",
+    "large": "كبير",
+    "cancel": "إلغاء"
+  },
+  "error": {
+    "validationFailed": "هذا الاسم غير صالح. صحّحه وحاول مجددًا.",
+    "invalidProtocolVersion": "إصدار التطبيق هذا غير مدعوم. حدّث وحاول مجددًا.",
+    "workspaceNotFound": "لم يتم العثور على مساحة العمل.",
+    "projectNotFound": "لم يتم العثور على المشروع.",
+    "sessionNotFound": "لم يتم العثور على الجلسة.",
+    "contextMismatch": "تغيّر الاختيار. أعد التحميل وحاول مجددًا.",
+    "requestIdConflict": "طلب متعارض. حاول مجددًا.",
+    "notSaved": "لم تُحفَظ الرسالة."
+  },
+  "newProject": "+ مشروع جديد",
+  "newWorkspace": "+ مساحة عمل جديدة"
+}

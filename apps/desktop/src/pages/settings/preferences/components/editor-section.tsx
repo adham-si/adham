@@ -1,6 +1,8 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function EditorSection() {
+  const { t } = useTranslation();
   const [enterToSend, setEnterToSend] = React.useState(true);
   const [hardwareAcceleration, setHardwareAcceleration] = React.useState(true);
 
@@ -9,7 +11,7 @@ export function EditorSection() {
       {/* Section Header with Notion-style separator line */}
       <div className="border-b border-border-subtle pb-2.5">
         <h3 id="editor-section-heading" className="text-sm font-semibold text-foreground">
-          Editor & input
+          {t('settings.preferences.editorTitle', 'Editor & input')}
         </h3>
       </div>
 
@@ -17,16 +19,21 @@ export function EditorSection() {
         {/* Send message on Enter */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-foreground">Send message on Enter</div>
+            <div className="text-sm font-medium text-foreground">
+              {t('settings.preferences.enterToSendLabel', 'Send message on Enter')}
+            </div>
             <div className="text-xs text-foreground-secondary mt-0.5">
-              Press Enter to submit messages immediately. Press Shift + Enter to add a new line.
+              {t(
+                'settings.preferences.enterToSendHint',
+                'Press Enter to submit messages immediately. Press Shift + Enter to add a new line.',
+              )}
             </div>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={enterToSend}
-            aria-label="Send message on Enter"
+            aria-label={t('settings.preferences.enterToSendLabel', 'Send message on Enter')}
             onClick={() => setEnterToSend(!enterToSend)}
             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
               enterToSend ? 'bg-action' : 'bg-surface-muted'
@@ -43,16 +50,21 @@ export function EditorSection() {
         {/* Hardware acceleration */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-foreground">Hardware acceleration</div>
+            <div className="text-sm font-medium text-foreground">
+              {t('settings.preferences.hardwareAccelLabel', 'Hardware acceleration')}
+            </div>
             <div className="text-xs text-foreground-secondary mt-0.5">
-              Use GPU rendering to optimize interface smoothness, transitions, and scrolling.
+              {t(
+                'settings.preferences.hardwareAccelHint',
+                'Use GPU rendering to optimize interface smoothness, transitions, and scrolling.',
+              )}
             </div>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={hardwareAcceleration}
-            aria-label="Hardware acceleration"
+            aria-label={t('settings.preferences.hardwareAccelLabel', 'Hardware acceleration')}
             onClick={() => setHardwareAcceleration(!hardwareAcceleration)}
             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
               hardwareAcceleration ? 'bg-action' : 'bg-surface-muted'

@@ -1,4 +1,5 @@
-import * as React from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/shared/i18n/format';
 
 export type SkillFilterTab = 'all' | 'active' | 'available';
 
@@ -21,20 +22,29 @@ function MetricBadge({ count, isActive }: { count: number; isActive: boolean }) 
           : 'bg-brand/10 text-brand border-brand/30 dark:bg-brand/20 dark:text-brand dark:border-brand/40'
       }`}
     >
-      {count}
+      {formatNumber(count)}
     </span>
   );
 }
 
 export function SkillFilterTabs({ activeTab, onTabChange, counts }: SkillFilterTabsProps) {
+  const { t } = useTranslation();
   const tabs: Array<{ id: SkillFilterTab; label: string; count: number }> = [
-    { id: 'all', label: 'All skills', count: counts.all },
-    { id: 'active', label: 'Active', count: counts.active },
-    { id: 'available', label: 'Available', count: counts.available },
+    { id: 'all', label: t('settings.skills.allTab', 'All skills'), count: counts.all },
+    { id: 'active', label: t('settings.skills.activeTab', 'Active'), count: counts.active },
+    {
+      id: 'available',
+      label: t('settings.skills.availableTab', 'Available'),
+      count: counts.available,
+    },
   ];
 
   return (
-    <div role="tablist" aria-label="Skill filters" className="flex items-center gap-2">
+    <div
+      role="tablist"
+      aria-label={t('settings.skills.tabsLabel', 'Skill filters')}
+      className="flex items-center gap-2"
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}

@@ -1,4 +1,5 @@
-import * as React from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/shared/i18n/format';
 
 export type ModelFilterTab = 'all' | 'local' | 'cloud';
 
@@ -21,20 +22,25 @@ function MetricBadge({ count, isActive }: { count: number; isActive: boolean }) 
           : 'bg-brand/10 text-brand border-brand/30 dark:bg-brand/20 dark:text-brand dark:border-brand/40'
       }`}
     >
-      {count}
+      {formatNumber(count)}
     </span>
   );
 }
 
 export function ModelFilterTabs({ activeTab, onTabChange, counts }: ModelFilterTabsProps) {
+  const { t } = useTranslation();
   const tabs: Array<{ id: ModelFilterTab; label: string; count: number }> = [
-    { id: 'all', label: 'All models', count: counts.all },
-    { id: 'local', label: 'Local models', count: counts.local },
-    { id: 'cloud', label: 'Cloud models', count: counts.cloud },
+    { id: 'all', label: t('settings.models.allTab', 'All models'), count: counts.all },
+    { id: 'local', label: t('settings.models.localTab', 'Local models'), count: counts.local },
+    { id: 'cloud', label: t('settings.models.cloudTab', 'Cloud models'), count: counts.cloud },
   ];
 
   return (
-    <div role="tablist" aria-label="Model filters" className="flex items-center gap-2">
+    <div
+      role="tablist"
+      aria-label={t('settings.models.tabsLabel', 'Model filters')}
+      className="flex items-center gap-2"
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}

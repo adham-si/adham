@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 
 export interface ProviderItem {
@@ -16,6 +17,7 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider, isConnected, onToggleConnect }: ProviderCardProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface p-3 transition-colors hover:bg-surface-subtle/40">
       <div className="flex items-center gap-3 min-w-0">
@@ -27,7 +29,7 @@ export function ProviderCard({ provider, isConnected, onToggleConnect }: Provide
             <span className="text-sm font-semibold text-foreground truncate">{provider.name}</span>
             {isConnected && (
               <span className="rounded bg-success-surface px-1.5 py-0.2 text-[10px] font-medium text-success-foreground">
-                Connected
+                {t('settings.providers.badgeConnected', 'Connected')}
               </span>
             )}
           </div>
@@ -42,7 +44,9 @@ export function ProviderCard({ provider, isConnected, onToggleConnect }: Provide
         onClick={() => onToggleConnect(provider.id)}
         className="ms-3 shrink-0"
       >
-        {isConnected ? 'Disconnect' : 'Connect'}
+        {isConnected
+          ? t('settings.providers.disconnect', 'Disconnect')
+          : t('settings.providers.connect', 'Connect')}
       </Button>
     </div>
   );

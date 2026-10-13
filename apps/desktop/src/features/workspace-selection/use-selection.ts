@@ -1,4 +1,5 @@
 import * as React from 'react';
+import i18n from '@/shared/i18n';
 import { adhamClient } from '@/shared/api/adham-client';
 import type {
   BootstrapState,
@@ -111,13 +112,11 @@ export function useSelection({
       setProjectsBy(grouped);
       setTruncatedProjects(truncatedBy);
       setFailedProjectLists(unreadable);
-      setListError(
-        unreadable.length > 0 ? 'Some project lists failed to load. Retry to refresh.' : null,
-      );
+      setListError(unreadable.length > 0 ? i18n.t('selection.listsPartial') : null);
       setLoaded(true);
     } catch (err) {
       if (loadSeqRef.current !== seq) return;
-      setListError(err instanceof Error ? err.message : 'Workspace list failed to load.');
+      setListError(err instanceof Error ? err.message : i18n.t('selection.workspacesFailed'));
     } finally {
       if (loadSeqRef.current === seq) setLoading(false);
     }
@@ -150,7 +149,7 @@ export function useSelection({
   const select = React.useCallback(
     async (workspaceId: string, projectId: string): Promise<SelectOutcome> => {
       if (workingRef.current) {
-        return { ok: false, error: 'Selection already in progress.', uncertain: false };
+        return { ok: false, error: i18n.t('selection.alreadyWorking'), uncertain: false };
       }
       workingRef.current = true;
       setWorking(true);
@@ -162,8 +161,7 @@ export function useSelection({
         // This guard is storage-backed, so two live hook instances (panel
         // slot + sidebar) cannot dispatch competing selections either.
         if (frozen && (frozen.workspaceId !== workspaceId || frozen.projectId !== projectId)) {
-          const message =
-            'A previous selection has an unknown status. Retry it before selecting another scope.';
+          const message = i18n.t('selection.unknownStatus');
           setError(message);
           return { ok: false, error: message, uncertain: true };
         }
@@ -173,7 +171,7 @@ export function useSelection({
           projectId,
         };
         if (!frozen && !writeSelectIntent(intent)) {
-          const message = 'Selection identity could not be recorded. Nothing was sent.';
+          const message = i18n.t('selection.identityNotRecorded');
           setError(message);
           return { ok: false, error: message, uncertain: false };
         }
@@ -186,7 +184,11 @@ export function useSelection({
           // Apply only while this intent is still current: a stale success
           // must never overwrite newer selection state.
           if (readSelectIntent()?.requestId !== intent.requestId) {
-            return { ok: false, error: 'Selection changed while confirming.', uncertain: false };
+            return {
+              ok: false,
+              error: i18n.t('selection.changedWhileConfirming'),
+              uncertain: false,
+            };
           }
           clearSelectIntent();
           scopeSeqRef.current += 1;
@@ -207,8 +209,9 @@ export function useSelection({
             setError(message);
             return { ok: false, error: message, uncertain: false };
           }
-          const message = err instanceof Error ? err.message : 'Selection did not complete.';
-          setError(`${message} Retry the same scope before selecting another.`);
+          const message =
+            err instanceof Error ? err.message : i18n.t('selection.incompleteDefault');
+          setError(i18n.t('selection.retrySameScope', { message }));
           return { ok: false, error: message, uncertain: true };
         }
       } finally {

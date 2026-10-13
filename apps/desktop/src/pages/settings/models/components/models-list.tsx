@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ModelCard, type ModelItem } from './model-card';
 
 interface ModelsListProps {
@@ -16,12 +16,15 @@ export function ModelsList({
   onSetDefault,
   onSetFallback,
 }: ModelsListProps) {
+  const { t } = useTranslation();
   if (models.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border-subtle p-8 text-center">
-        <p className="text-sm font-medium text-foreground">No models found</p>
+        <p className="text-sm font-medium text-foreground">
+          {t('settings.models.emptyTitle', 'No models found')}
+        </p>
         <p className="text-xs text-foreground-secondary mt-1">
-          Try selecting another filter or pull a local model.
+          {t('settings.models.emptyHint', 'Try selecting another filter or pull a local model.')}
         </p>
       </div>
     );

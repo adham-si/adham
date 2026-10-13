@@ -9,6 +9,7 @@ import {
   type ComposeMode,
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
+import { formatTime } from '@/shared/i18n/format';
 import { useConversation, type ConversationBackend } from './use-conversation';
 import { useProvisioning, type ProvisioningBackend } from './use-provisioning';
 import { useSelection, type SelectionBackend } from '../workspace-selection/use-selection';
@@ -22,7 +23,7 @@ const PENDING_DRAFT_BUCKET = 'pending';
 function formatTimestamp(createdAt: string): string {
   const parsed = new Date(createdAt);
   if (Number.isNaN(parsed.getTime())) return createdAt;
-  return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return formatTime(parsed);
 }
 
 export interface ConversationPanelProps {

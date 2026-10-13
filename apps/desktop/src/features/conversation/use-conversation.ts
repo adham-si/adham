@@ -1,4 +1,5 @@
 import * as React from 'react';
+import i18n from '@/shared/i18n';
 import {
   SESSION_CACHE_KEY,
   readPendingSend,
@@ -58,9 +59,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
-      setStorageWarning(
-        'Durable session storage is unavailable. Session selection will not persist across restarts.',
-      );
+      setStorageWarning(i18n.t('conversation.storageUnavailable'));
     }
   }, []);
   // Authoritative selection from the latest bootstrap snapshot. Surfaced so
@@ -138,7 +137,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         return items;
       } catch (err) {
         if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
-        setError(err instanceof Error ? err.message : 'Conversation history failed to load.');
+        setError(err instanceof Error ? err.message : i18n.t('conversation.historyLoadFailed'));
         setStatus('error');
         return null;
       }
@@ -199,9 +198,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           pendingFirst.workspaceId === resolved.context.workspaceId &&
           pendingFirst.projectId === resolved.context.projectId
         ) {
-          setError(
-            'A previous first-message save is pending resolution. Resend it to retry with the same save identity.',
-          );
+          setError(i18n.t('conversation.firstSendPending'));
           setStatus('error');
         } else {
           setError(null);
@@ -219,9 +216,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         createdRef.current = ctx;
         const instId = ctx.installationId ?? installationIdRef.current;
         if (!persistAndAnnounceActiveSession(ctx, instId)) {
-          setStorageWarning(
-            'Durable session storage is unavailable. Session selection will not persist across restarts.',
-          );
+          setStorageWarning(i18n.t('conversation.storageUnavailable'));
         }
         const pendingFirst = readPendingFirstSend();
         if (
@@ -229,9 +224,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           pendingFirst.workspaceId === ctx.workspaceId &&
           pendingFirst.projectId === ctx.projectId
         ) {
-          setError(
-            'A previous first-message save is pending resolution. Resend it to retry with the same save identity.',
-          );
+          setError(i18n.t('conversation.firstSendPending'));
           setStatus('error');
         }
         scopeStaleRef.current = false;
@@ -241,8 +234,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       bootPromiseRef.current = null;
       fail(
         resolved.kind === 'resumed'
-          ? 'Saved conversation could not be loaded. Retry once connectivity returns.'
-          : 'Conversation failed to start. Reload or retry once connectivity returns.',
+          ? i18n.t('conversation.retryConnectivity', {
+              message: i18n.t('conversation.historyNotLoaded'),
+            })
+          : i18n.t('conversation.reloadRetry', { message: i18n.t('conversation.startFailed') }),
       );
       return null;
     })();
@@ -313,9 +308,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         // The history refresh succeeded, but the save is still
         // unresolved: keep the identity and say so instead of pretending
         // the refresh verified anything.
-        setError(
-          'A previous message has an unknown save status. Resend it to retry with the same save identity.',
-        );
+        setError(i18n.t('conversation.unknownSaveResend'));
         setStatus('error');
       }
     }
@@ -372,9 +365,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           pendingFirst.workspaceId === next.workspaceId &&
           pendingFirst.projectId === next.projectId
         ) {
-          setError(
-            'A previous first-message save is pending resolution. Resend it to retry with the same save identity.',
-          );
+          setError(i18n.t('conversation.firstSendPending'));
           setStatus('error');
         } else {
           setError(null);
@@ -399,9 +390,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       if ((await loadHistory(next, generation, seq.loadSeq, seq.mutationSeq)) !== null) {
         const instId = base.installationId ?? installationIdRef.current;
         if (!persistAndAnnounceActiveSession(next, instId)) {
-          setStorageWarning(
-            'Durable session storage is unavailable. Session selection will not persist across restarts.',
-          );
+          setStorageWarning(i18n.t('conversation.storageUnavailable'));
         }
       }
     },
@@ -433,7 +422,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   const submit = React.useCallback(
     async (text: string): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
-      if (!trimmed) return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+      if (!trimmed)
+        return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
       const blocked = sendBlockedReason(scopeStaleRef.current);
       if (blocked) return { ok: false, error: blocked, uncertain: false };
       // Controller-boundary guard: overlapping submits are rejected before
@@ -441,7 +431,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       // is acquired BEFORE the bootstrap await below, so two submits that
       // both arrive before the context exists cannot both proceed.
       if (submitInFlightRef.current) {
-        return { ok: false, error: 'A message is already being saved.', uncertain: false };
+        return { ok: false, error: i18n.t('conversation.alreadySaving'), uncertain: false };
       }
       const preSwitch = switchUnresolved(requestedRef.current, context?.sessionId);
       if (preSwitch) return preSwitch;
@@ -451,7 +441,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (!ctx) {
           setStatus('bootstrapping');
           ctx = await bootstrap();
-          if (!ctx) return { ok: false, error: 'Conversation is not ready.', uncertain: false };
+          if (!ctx) return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
           const postSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
           if (postSwitch) return postSwitch;
         }
@@ -486,7 +476,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             isStale: () => !mountedRef.current || generationRef.current !== generation,
           });
           if (!mountedRef.current || generationRef.current !== generation) {
-            return { ok: false, error: 'Session changed while sending.', uncertain: false };
+            return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
           }
           if (outcome.ok) {
             setContext(outcome.context);
@@ -504,9 +494,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             if (
               !persistAndAnnounceActiveSession({ ...outcome.context, title: outcome.title }, instId)
             ) {
-              setStorageWarning(
-                'Durable session storage is unavailable. Session selection will not persist across restarts.',
-              );
+              setStorageWarning(i18n.t('conversation.storageUnavailable'));
             }
             setStatus('ready');
             return { ok: true };
@@ -539,7 +527,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           },
         });
         if (!mountedRef.current || generationRef.current !== generation) {
-          return { ok: false, error: 'Session changed while sending.', uncertain: false };
+          return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
         }
 
         if (singleOutcome.ok) {

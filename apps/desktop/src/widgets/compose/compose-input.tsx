@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/shared/i18n/format';
 import type { ComposeAttachment } from './compose-context-chips';
 
 export interface ComposeInputProps {
@@ -60,11 +61,18 @@ export function ComposeInput({
     const pastedText = e.clipboardData.getData('text');
     if (pastedText && pastedText.length > 2000 && onAttachPastedBlob) {
       e.preventDefault();
-      const firstLine = pastedText.trim().split('\n')[0]?.slice(0, 30) || 'Pasted text';
+      const firstLine =
+        pastedText.trim().split('\n')[0]?.slice(0, 30) || t('compose.pastedText', 'Pasted text');
       const attachment: ComposeAttachment = {
         id: `paste-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         type: 'pasted-text',
-        name: `${firstLine}... (${pastedText.length.toLocaleString()} chars)`,
+        // Isolate the user-authored excerpt so mixed-script pastes render
+        // correctly in RTL layouts; the surrounding template is translated.
+        name: t('compose.pastedChars', {
+          count: pastedText.length,
+          formatted: formatNumber(pastedText.length),
+          firstLine: `\u2066${firstLine}\u2069`,
+        }),
         charCount: pastedText.length,
       };
       onAttachPastedBlob(attachment);

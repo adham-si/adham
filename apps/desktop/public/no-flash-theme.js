@@ -37,11 +37,38 @@
     // Same fallback as above.
   }
 
-  if (language === null) {
-    var navigatorLanguage = window.navigator.language || 'en';
-    language = navigatorLanguage.toLowerCase().indexOf('ar') === 0 ? 'ar' : navigatorLanguage;
+  // Supported set mirrors SUPPORTED_LANGUAGES in
+  // apps/desktop/src/shared/i18n/languages.ts (kept inline: this classic
+  // script cannot import modules). normalizeLanguage() there is authoritative.
+  var SUPPORTED = { en: 1, ar: 1, 'zh-CN': 1, ru: 1 };
+  function normalize(tag) {
+    var lower = String(tag || '')
+      .toLowerCase()
+      .replace('_', '-');
+    if (SUPPORTED[lower]) return lower;
+    var base = lower.split('-')[0];
+    if (base === 'ar') return 'ar';
+    if (base === 'zh') return 'zh-CN';
+    if (base === 'ru') return 'ru';
+    return 'en';
+  }
+
+  if (language === null || !SUPPORTED[language]) {
+    var tags =
+      window.navigator.languages && window.navigator.languages.length > 0
+        ? window.navigator.languages
+        : [window.navigator.language || 'en'];
+    language = 'en';
+    for (var i = 0; i < tags.length; i++) {
+      var code = normalize(tags[i]);
+      if (code !== 'en') {
+        language = code;
+        break;
+      }
+    }
+    if (language === 'en' && tags.length > 0) language = normalize(tags[0]);
   }
 
   root.setAttribute('lang', language);
-  root.setAttribute('dir', language.toLowerCase().indexOf('ar') === 0 ? 'rtl' : 'ltr');
+  root.setAttribute('dir', language === 'ar' ? 'rtl' : 'ltr');
 })();

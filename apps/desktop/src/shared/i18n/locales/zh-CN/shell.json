@@ -1,0 +1,92 @@
+{
+  "sidebar": {
+    "newTask": "新建任务",
+    "recentSessions": "历史会话",
+    "noSessions": "暂无会话",
+    "collapse": "折叠侧边栏",
+    "expand": "展开侧边栏",
+    "regionLabel": "主侧栏",
+    "resizeLabel": "调整主侧栏大小",
+    "defaultWorkspace": "个人工作区",
+    "defaultProject": "默认项目",
+    "sessionsTruncated": "显示最新的 100 个会话（已截断）"
+  },
+  "rail": {
+    "compose": "主工作台",
+    "search": "搜索",
+    "projects": "项目",
+    "agents": "智能体",
+    "activity": "动态",
+    "marketplace": "插件广场",
+    "settings": "设置",
+    "toggleSidebar": "切换侧边栏",
+    "focusMode": "专注模式",
+    "toggleTheme": "切换主题",
+    "navRail": "导航栏"
+  },
+  "titlebar": {
+    "appTitlebar": "应用标题栏",
+    "hideNavRail": "隐藏导航栏",
+    "showNavRail": "显示导航栏",
+    "windowActions": "窗口和标签页操作",
+    "actionsTitle": "操作",
+    "windowActionsLabel": "窗口操作",
+    "openProject": "打开项目",
+    "reloadWindow": "重新加载窗口",
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "还原",
+    "closeWindow": "关闭窗口",
+    "close": "关闭",
+    "hideSidebar": "隐藏主侧栏",
+    "showSidebar": "显示主侧栏",
+    "hidePanel": "隐藏面板",
+    "showPanel": "显示面板",
+    "hideSecondary": "隐藏副侧栏",
+    "showSecondary": "显示副侧栏"
+  },
+  "contextPanel": {
+    "title": "检查面板",
+    "close": "关闭面板",
+    "tabs": {
+      "plan": "执行计划",
+      "activity": "活动日志",
+      "graph": "任务关系图",
+      "agents": "协同智能体",
+      "context": "环境上下文",
+      "artifacts": "产出物"
+    },
+    "regionLabel": "上下文面板",
+    "resizePanel": "调整面板大小",
+    "planHeading": "执行计划",
+    "planInitialize": "初始化项目工作区",
+    "planExecute": "执行桌面 Shell 集成",
+    "planVerify": "验证证据和遥测",
+    "activityHeading": "最近动态",
+    "activitySessionCreated": "已创建会话",
+    "activityNow": "刚刚",
+    "activityCheckpoint": "SQLite WAL 检查点已验证",
+    "activityMinuteAgo": "1 分钟前",
+    "graphHeading": "任务图",
+    "graphDemo": "根 [任务 1] → 隔离子智能体 [节点 A]",
+    "agentsHeading": "活动智能体",
+    "agentsOrchestrator": "编排器 / 管理器",
+    "agentsRunning": "运行中 • 本地沙盒",
+    "contextHeading": "上下文来源",
+    "contextActive": "活动工作区文件：隔离边界",
+    "artifactsHeading": "已生成的工件",
+    "artifactsEmpty": "尚未生成工件"
+  },
+  "shell": {
+    "secondaryTitle": "资源管理器",
+    "secondaryRegion": "副侧栏",
+    "secondaryClose": "关闭副侧栏",
+    "secondaryResize": "调整副侧栏大小",
+    "headerRegion": "应用标题头"
+  },
+  "status": {
+    "ready": "就绪",
+    "loading": "加载中...",
+    "error": "发生错误"
+  }
+}

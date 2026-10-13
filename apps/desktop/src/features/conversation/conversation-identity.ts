@@ -111,7 +111,7 @@ export function rejectionMessage(err: unknown): string {
     return (err as { message: string }).message;
   }
   if (err instanceof Error) return err.message;
-  return 'Message was not saved.';
+  return i18n.t('error.notSaved');
 }
 
 export const SESSION_CACHE_KEY = 'adham:compose:session';
@@ -360,15 +360,12 @@ export function clearSelectIntent(): void {
 /// may proceed.
 export function unresolvedSelectionMessage(): string | null {
   if (!readSelectIntent()) return null;
-  return 'A workspace/project selection has unknown status. Retry it before sending.';
+  return i18n.t('conversation.unresolvedSelection');
 }
 
 /// First applicable definite pre-send block: unresolved selection, then a
 /// confirmed-but-unresolved scope change (creation/selection whose bootstrap
 /// is still pending or failed). Both protect the retained old-scope context.
 export function sendBlockedReason(scopeStale: boolean): string | null {
-  return (
-    unresolvedSelectionMessage() ??
-    (scopeStale ? 'Scope is changing. Wait for the new conversation scope before sending.' : null)
-  );
+  return unresolvedSelectionMessage() ?? (scopeStale ? i18n.t('conversation.scopeChanging') : null);
 }

@@ -1,3 +1,4 @@
+import i18n from '@/shared/i18n';
 import type { ConversationBackend, ConversationContext } from './conversation-scope';
 import {
   isDefinitePreEffectRejection,
@@ -22,7 +23,7 @@ export function deriveSessionTitle(
   maxLength = DEFAULT_SESSION_TITLE_MAX_LENGTH,
 ): string {
   const normalized = text.trim().replace(/\s+/g, ' ');
-  if (!normalized) return 'New Session';
+  if (!normalized) return i18n.t('compose.newSession');
   const chars = Array.from(normalized);
   if (chars.length <= maxLength) return normalized;
   return `${chars
@@ -110,7 +111,7 @@ export function pendingFirstSendBlockedReason(
     if (pending.text === text) {
       return null; // Same scope and text: explicit retry allowed
     }
-    return 'A previous first-message save is pending resolution. Resend or reload before starting another conversation.';
+    return i18n.t('conversation.firstSendPendingReload');
   }
   return null;
 }
@@ -153,7 +154,7 @@ export async function performLazyFirstSend(
   const { backend, workspaceId, projectId, text, installationId, isStale } = params;
   const trimmed = text.trim();
   if (!trimmed) {
-    return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+    return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
   }
 
   // 1. Check if an unresolved first send exists
@@ -179,8 +180,7 @@ export async function performLazyFirstSend(
     } else {
       return {
         ok: false,
-        error:
-          'A previous first-message save is pending resolution. Resend or reload before starting another conversation.',
+        error: i18n.t('conversation.firstSendPendingReload'),
         uncertain: true,
       };
     }
@@ -203,7 +203,7 @@ export async function performLazyFirstSend(
     if (!writePendingFirstSend(initialRecord)) {
       return {
         ok: false,
-        error: 'Save identity could not be recorded. The message was not sent.',
+        error: i18n.t('conversation.identityNotRecorded'),
         uncertain: false,
       };
     }
@@ -221,13 +221,13 @@ export async function performLazyFirstSend(
       createdSessionId = created.sessionId;
     } catch (err) {
       if (isStale()) {
-        return { ok: false, error: 'Session changed while sending.', uncertain: false };
+        return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
       }
       if (isDefinitePreEffectRejection(err)) {
         removePendingFirstSend();
         return { ok: false, error: rejectionMessage(err), uncertain: false };
       }
-      const rawMsg = err instanceof Error ? err.message : 'Session creation failed.';
+      const rawMsg = err instanceof Error ? err.message : i18n.t('conversation.creationFailed');
       return {
         ok: false,
         error: `${rawMsg} Save status is unknown. Reload history before resending.`,
@@ -248,19 +248,18 @@ export async function performLazyFirstSend(
     if (!recorded) {
       return {
         ok: false,
-        error:
-          'Session created, but save identity could not be recorded. Reload history before resending.',
+        error: i18n.t('conversation.createdIdentityLost'),
         uncertain: true,
       };
     }
 
     if (isStale()) {
-      return { ok: false, error: 'Session changed while sending.', uncertain: false };
+      return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
   }
 
   if (isStale()) {
-    return { ok: false, error: 'Session changed while sending.', uncertain: false };
+    return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
   }
 
   const createdCtx: ConversationContext = {
@@ -282,7 +281,7 @@ export async function performLazyFirstSend(
 
     if (isStale()) {
       removePendingFirstSend();
-      return { ok: false, error: 'Session changed while sending.', uncertain: false };
+      return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
 
     // Success! Clear pending first send
@@ -301,11 +300,11 @@ export async function performLazyFirstSend(
     };
   } catch (err) {
     if (isStale()) {
-      return { ok: false, error: 'Session changed while sending.', uncertain: false };
+      return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
     // Two-command limitation: session exists on backend, but message failed.
     // Retain createdSessionId in pending first send so retry reuses it!
-    const rawMsg = err instanceof Error ? err.message : 'Message was not saved.';
+    const rawMsg = err instanceof Error ? err.message : i18n.t('error.notSaved');
     return {
       ok: false,
       error: `${rawMsg} Message was not saved. Retry to save into this session.`,

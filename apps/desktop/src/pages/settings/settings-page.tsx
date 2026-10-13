@@ -57,37 +57,37 @@ export function SettingsPage() {
     pages: Array<{ id: SettingsPageId; label: string; icon: React.ReactNode }>;
   }> = [
     {
-      name: 'Personal',
+      name: t('settings.nav.personal', 'Personal'),
       pages: [
         {
           id: 'preferences',
-          label: 'Preferences',
+          label: t('settings.nav.preferences', 'Preferences'),
           icon: <HugeiconsIcon icon={PreferenceHorizontalIcon} />,
         },
       ],
     },
     {
-      name: 'Intelligence',
+      name: t('settings.nav.intelligence', 'Intelligence'),
       pages: [
         {
           id: 'models',
-          label: 'AI Models',
+          label: t('settings.nav.models', 'AI Models'),
           icon: <HugeiconsIcon icon={AiMagicIcon} />,
         },
         {
           id: 'providers',
-          label: 'AI Providers',
+          label: t('settings.nav.providers', 'AI Providers'),
           icon: <HugeiconsIcon icon={AiArtIcon} />,
         },
         {
           id: 'routing',
-          label: 'Routing',
+          label: t('settings.nav.routing', 'Routing'),
           icon: <HugeiconsIcon icon={Route01Icon} />,
         },
       ],
     },
     {
-      name: 'Extensions',
+      name: t('settings.nav.extensions', 'Extensions'),
       pages: [
         {
           id: 'mcp',
@@ -96,47 +96,47 @@ export function SettingsPage() {
         },
         {
           id: 'skills',
-          label: 'Skills',
+          label: t('settings.nav.skills', 'Skills'),
           icon: <HugeiconsIcon icon={AiDrawingIcon} />,
         },
         {
           id: 'plugins',
-          label: 'Plugins',
+          label: t('settings.nav.plugins', 'Plugins'),
           icon: <HugeiconsIcon icon={PuzzleIcon} />,
         },
       ],
     },
     {
-      name: 'Operations & Policy',
+      name: t('settings.nav.operations', 'Operations & Policy'),
       pages: [
         {
           id: 'security',
-          label: 'Security',
+          label: t('settings.nav.security', 'Security'),
           icon: <HugeiconsIcon icon={BrickWallFireIcon} />,
         },
         {
           id: 'budget',
-          label: 'Budget',
+          label: t('settings.nav.budget', 'Budget'),
           icon: <HugeiconsIcon icon={Coins01Icon} />,
         },
         {
           id: 'usage',
-          label: 'Usage',
+          label: t('settings.nav.usage', 'Usage'),
           icon: <HugeiconsIcon icon={ChartAnalysisIcon} />,
         },
       ],
     },
     {
-      name: 'System',
+      name: t('settings.nav.system', 'System'),
       pages: [
         {
           id: 'data',
-          label: 'Data',
+          label: t('settings.nav.data', 'Data'),
           icon: <HugeiconsIcon icon={ServerStack03Icon} />,
         },
         {
           id: 'info',
-          label: 'About',
+          label: t('settings.nav.about', 'About'),
           icon: <HugeiconsIcon icon={CircleQuestionMarkIcon} />,
         },
       ],
@@ -156,7 +156,7 @@ export function SettingsPage() {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={t('settings.title')}
+      aria-label={t('settings.title', 'Settings')}
       className="fixed inset-0 z-dialog flex items-center justify-center p-4 sm:p-6 md:p-8"
     >
       {/* Scrim backdrop */}
@@ -166,7 +166,7 @@ export function SettingsPage() {
       <div className="relative flex flex-col md:flex-row w-full max-w-5xl xl:max-w-6xl h-[85vh] max-h-[880px] min-h-[580px] rounded-xl border border-border bg-surface-raised shadow-floating overflow-hidden">
         {/* Left Settings Pages Navigation (272px) */}
         <aside
-          aria-label="Settings Categories"
+          aria-label={t('settings.nav.categoriesLabel', 'Settings Categories')}
           className="flex w-full md:w-[272px] shrink-0 flex-col border-e border-border-subtle bg-surface-subtle p-3 select-none"
         >
           {/* Search Header without title */}
@@ -176,7 +176,7 @@ export function SettingsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('settings.search')}
+                placeholder={t('settings.search', 'Search settings')}
                 className="w-full min-h-control-md rounded-md border border-border-subtle bg-surface ps-9 pe-3 text-sm text-foreground placeholder:text-foreground-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               />
               <span className="pointer-events-none absolute start-3 flex items-center justify-center text-foreground-muted [&_svg]:size-icon-sm">
@@ -233,7 +233,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={closeSettings}
-              aria-label={t('settings.close')}
+              aria-label={t('settings.close', 'Close settings')}
               className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-sm"
             >
               <HugeiconsIcon icon={Cancel01Icon} />

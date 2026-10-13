@@ -10,30 +10,30 @@ export interface ComposeModeSelectorProps {
   className?: string;
 }
 
-const MODES: Array<{ id: ComposeMode; labelKey: string; defaultLabel: string; hint: string }> = [
+const MODES: Array<{ id: ComposeMode; labelKey: string; defaultLabel: string; hintKey: string }> = [
   {
     id: 'ask',
     labelKey: 'compose.modes.ask',
     defaultLabel: 'Ask',
-    hint: 'Read-only answers and guidance',
+    hintKey: 'compose.modeHintAsk',
   },
   {
     id: 'plan',
     labelKey: 'compose.modes.plan',
     defaultLabel: 'Plan',
-    hint: 'Structured plan before execution',
+    hintKey: 'compose.modeHintPlan',
   },
   {
     id: 'execute',
     labelKey: 'compose.modes.execute',
     defaultLabel: 'Execute',
-    hint: 'Direct agent actions & tools',
+    hintKey: 'compose.modeHintExecute',
   },
   {
     id: 'code',
     labelKey: 'compose.modes.code',
     defaultLabel: 'Code',
-    hint: 'Software development focus',
+    hintKey: 'compose.modeHintCode',
   },
 ];
 
@@ -61,7 +61,7 @@ export function ComposeModeSelector({
             aria-checked={isSelected}
             disabled={disabled}
             onClick={() => onChangeMode(item.id)}
-            title={item.hint}
+            title={t(item.hintKey)}
             className={`flex min-h-6 items-center rounded-md px-2 py-0.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50 ${
               isSelected
                 ? 'bg-selection text-action'

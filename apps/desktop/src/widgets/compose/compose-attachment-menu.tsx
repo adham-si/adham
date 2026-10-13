@@ -109,7 +109,7 @@ export function ComposeAttachmentMenu({
       {isOpen && (
         <div
           role="menu"
-          aria-label="Attachment options"
+          aria-label={t('compose.attachMenuLabel', 'Attachment options')}
           className="absolute bottom-full mb-1.5 start-0 z-menu min-w-44 rounded-xl border border-border-subtle bg-surface p-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           <button
@@ -132,7 +132,9 @@ export function ComposeAttachmentMenu({
             <div className="flex flex-col text-start">
               <span>{t('compose.attachImage', 'Attach Image')}</span>
               {!supportsVision && (
-                <span className="text-[10px] text-warning">Active model has no vision</span>
+                <span className="text-[10px] text-warning">
+                  {t('settings.models.noVision', 'Active model has no vision')}
+                </span>
               )}
             </div>
           </button>
@@ -146,7 +148,7 @@ export function ComposeAttachmentMenu({
                 {
                   id: `folder-${Date.now()}`,
                   type: 'folder',
-                  name: 'Selected project folder',
+                  name: t('compose.selectedFolder', 'Selected project folder'),
                 },
               ]);
               setIsOpen(false);

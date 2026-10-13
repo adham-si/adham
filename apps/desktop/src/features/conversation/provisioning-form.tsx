@@ -49,7 +49,11 @@ export function ProvisioningForm({ step, working, error, onSubmit }: Provisionin
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit();
           }}
-          placeholder={isWorkspace ? 'Personal' : 'My project'}
+          placeholder={
+            isWorkspace
+              ? t('provision.workspacePlaceholder', 'Personal')
+              : t('provision.projectPlaceholder', 'My project')
+          }
           disabled={working}
           aria-label={label}
         />

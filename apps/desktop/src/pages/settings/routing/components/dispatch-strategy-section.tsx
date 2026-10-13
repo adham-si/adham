@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Select, type SelectOption } from '@adham/ui';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
@@ -14,20 +15,6 @@ interface DispatchStrategySectionProps {
   onStreamingChange: (val: boolean) => void;
 }
 
-const STRATEGY_OPTIONS: SelectOption[] = [
-  { value: 'local-only', label: 'Local-Only (Zero Egress)' },
-  { value: 'balanced', label: 'Cost-Optimized Hybrid' },
-  { value: 'performance', label: 'Performance-First' },
-  { value: 'latency', label: 'Lowest Latency Priority' },
-];
-
-const TIMEOUT_OPTIONS: SelectOption[] = [
-  { value: '15s', label: '15 seconds' },
-  { value: '30s', label: '30 seconds' },
-  { value: '60s', label: '60 seconds' },
-  { value: '120s', label: '120 seconds' },
-];
-
 export function DispatchStrategySection({
   strategy,
   timeout,
@@ -38,14 +25,33 @@ export function DispatchStrategySection({
   onAutoRetryChange,
   onStreamingChange,
 }: DispatchStrategySectionProps) {
+  const { t } = useTranslation();
+  const strategyOptions: SelectOption[] = [
+    {
+      value: 'local-only',
+      label: t('settings.routing.strategyLocalOnly', 'Local-Only (Zero Egress)'),
+    },
+    { value: 'balanced', label: t('settings.routing.strategyBalanced', 'Cost-Optimized Hybrid') },
+    { value: 'performance', label: t('settings.routing.strategyPerformance', 'Performance-First') },
+    { value: 'latency', label: t('settings.routing.strategyLatency', 'Lowest Latency Priority') },
+  ];
+  const timeoutOptions: SelectOption[] = [
+    { value: '15s', label: t('settings.routing.seconds', { count: 15 }) },
+    { value: '30s', label: t('settings.routing.seconds', { count: 30 }) },
+    { value: '60s', label: t('settings.routing.seconds', { count: 60 }) },
+    { value: '120s', label: t('settings.routing.seconds', { count: 120 }) },
+  ];
   return (
     <section aria-labelledby="dispatch-policy-heading" className="space-y-4">
       <div className="border-b border-border-subtle pb-2.5">
         <h3 id="dispatch-policy-heading" className="text-sm font-semibold text-foreground">
-          Dispatch policy
+          {t('settings.routing.dispatchTitle', 'Dispatch policy')}
         </h3>
         <p className="text-xs text-foreground-secondary mt-0.5">
-          Define execution priority and timeout limits across local runtimes and cloud backends.
+          {t(
+            'settings.routing.dispatchHint',
+            'Define execution priority and timeout limits across local runtimes and cloud backends.',
+          )}
         </p>
       </div>
 
@@ -53,9 +59,14 @@ export function DispatchStrategySection({
         {/* Strategy Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <div className="text-sm font-medium text-foreground">Routing strategy</div>
+            <div className="text-sm font-medium text-foreground">
+              {t('settings.routing.strategyLabel', 'Routing strategy')}
+            </div>
             <div className="text-xs text-foreground-secondary mt-0.5">
-              Determine how tasks are assigned between local Ollama and cloud engines
+              {t(
+                'settings.routing.strategyHint',
+                'Determine how tasks are assigned between local Ollama and cloud engines',
+              )}
             </div>
           </div>
           <div className="w-full sm:w-64 shrink-0">
@@ -63,7 +74,7 @@ export function DispatchStrategySection({
               id="routing-strategy-select"
               size="sm"
               value={strategy}
-              options={STRATEGY_OPTIONS}
+              options={strategyOptions}
               onValueChange={onStrategyChange}
               indicator={<HugeiconsIcon icon={ArrowDown01Icon} />}
               indicatorOpen={<HugeiconsIcon icon={ArrowUp01Icon} />}
@@ -74,9 +85,14 @@ export function DispatchStrategySection({
         {/* Timeout Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <div className="text-sm font-medium text-foreground">Inference timeout</div>
+            <div className="text-sm font-medium text-foreground">
+              {t('settings.routing.timeoutLabel', 'Inference timeout')}
+            </div>
             <div className="text-xs text-foreground-secondary mt-0.5">
-              Maximum elapsed time before triggering fallback or halting execution
+              {t(
+                'settings.routing.timeoutHint',
+                'Maximum elapsed time before triggering fallback or halting execution',
+              )}
             </div>
           </div>
           <div className="w-full sm:w-64 shrink-0">
@@ -84,7 +100,7 @@ export function DispatchStrategySection({
               id="inference-timeout-select"
               size="sm"
               value={timeout}
-              options={TIMEOUT_OPTIONS}
+              options={timeoutOptions}
               onValueChange={onTimeoutChange}
               indicator={<HugeiconsIcon icon={ArrowDown01Icon} />}
               indicatorOpen={<HugeiconsIcon icon={ArrowUp01Icon} />}
@@ -95,16 +111,21 @@ export function DispatchStrategySection({
         {/* Auto-retry Row */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-foreground">Auto-retry on error</div>
+            <div className="text-sm font-medium text-foreground">
+              {t('settings.routing.autoRetryLabel', 'Auto-retry on error')}
+            </div>
             <div className="text-xs text-foreground-secondary mt-0.5">
-              Automatically attempt secondary model when primary endpoint fails or times out
+              {t(
+                'settings.routing.autoRetryHint',
+                'Automatically attempt secondary model when primary endpoint fails or times out',
+              )}
             </div>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={autoRetry}
-            aria-label="Auto-retry on error"
+            aria-label={t('settings.routing.autoRetryLabel', 'Auto-retry on error')}
             onClick={() => onAutoRetryChange(!autoRetry)}
             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-2 focus-visible:outline-focus ${
               autoRetry ? 'bg-brand' : 'bg-surface-muted'
@@ -122,16 +143,21 @@ export function DispatchStrategySection({
         {/* Streaming Row */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-foreground">Stream token responses</div>
+            <div className="text-sm font-medium text-foreground">
+              {t('settings.routing.streamingLabel', 'Stream token responses')}
+            </div>
             <div className="text-xs text-foreground-secondary mt-0.5">
-              Render partial model generations token-by-token in the chat interface
+              {t(
+                'settings.routing.streamingHint',
+                'Render partial model generations token-by-token in the chat interface',
+              )}
             </div>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={streaming}
-            aria-label="Stream token responses"
+            aria-label={t('settings.routing.streamingLabel', 'Stream token responses')}
             onClick={() => onStreamingChange(!streaming)}
             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-2 focus-visible:outline-focus ${
               streaming ? 'bg-brand' : 'bg-surface-muted'
