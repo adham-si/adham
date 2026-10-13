@@ -49,6 +49,17 @@ export interface ConversationBackend {
     workspaceId?: string;
     projectId: string;
   }): Promise<{ sessions: Array<{ sessionId: string; title: string | null; createdAt: string }> }>;
+  recordPendingOperation(
+    workspaceId: string,
+    projectId: string,
+    payload: import('@adham/contracts-generated').RecordPendingOperationPayload,
+    options?: { requestId?: string; sessionId?: string | null },
+  ): Promise<import('@adham/contracts-generated').PendingOperationDto>;
+  listPendingOperations(): Promise<import('@adham/contracts-generated').PendingOperationList>;
+  clearPendingOperation(
+    payload: import('@adham/contracts-generated').ClearPendingOperationPayload,
+    options?: { requestId?: string },
+  ): Promise<void>;
 }
 
 export type ConversationContext = {

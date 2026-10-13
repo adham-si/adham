@@ -7,6 +7,10 @@ import {
   removeStorage,
   writeStorage,
 } from './conversation-identity';
+import {
+  clearDurablePendingOperation,
+  recordDurablePendingOperation,
+} from './pending-recovery/durable-pending-operations';
 
 export const PENDING_FIRST_SEND_KEY = 'adham:compose:pending-first-send';
 
@@ -132,6 +136,7 @@ export type LazyFirstSendOutcome =
       context: ConversationContext;
       title: string;
       message: UiMessage;
+      cleanupWarning?: string;
     }
   | {
       ok: false;
@@ -157,26 +162,66 @@ export async function performLazyFirstSend(
     return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
   }
 
-  // 1. Check if an unresolved first send exists
+  // 1. Check if an unresolved first send exists in SQLite first
+  let durablePendingOp = null;
+  try {
+    const sqliteList = await backend.listPendingOperations();
+    durablePendingOp =
+      sqliteList.operations.find(
+        (op) =>
+          op.kind === 'first_send' && op.workspaceId === workspaceId && op.projectId === projectId,
+      ) ?? null;
+    if (!durablePendingOp && sqliteList.truncated) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.firstSendPendingReload'),
+        uncertain: true,
+      };
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : i18n.t('conversation.identityNotRecorded');
+    return { ok: false, error: message, uncertain: false };
+  }
+
   const pending = readPendingFirstSend();
   let createRequestId: string;
   let messageRequestId: string;
   let createdSessionId: string | null = null;
   let title: string;
-  let reusedFrozenIdentity = false;
+  let alreadyRecordedDurable = false;
 
-  if (pending) {
+  if (durablePendingOp) {
+    if (durablePendingOp.text === trimmed) {
+      if (!durablePendingOp.createRequestId) {
+        return {
+          ok: false,
+          error: i18n.t('conversation.firstSendPendingReload'),
+          uncertain: true,
+        };
+      }
+      createRequestId = durablePendingOp.createRequestId;
+      messageRequestId = durablePendingOp.messageRequestId;
+      createdSessionId = durablePendingOp.sessionId;
+      title = durablePendingOp.title ?? (params.title?.trim() || deriveSessionTitle(trimmed));
+      alreadyRecordedDurable = true;
+    } else {
+      return {
+        ok: false,
+        error: i18n.t('conversation.firstSendPendingReload'),
+        uncertain: true,
+      };
+    }
+  } else if (pending) {
     if (
       pending.workspaceId === workspaceId &&
       pending.projectId === projectId &&
       pending.text === trimmed
     ) {
-      // Explicit retry with same text and scope: reuse frozen identities and title
       createRequestId = pending.createRequestId;
       messageRequestId = pending.messageRequestId;
       createdSessionId = pending.sessionId;
       title = pending.title;
-      reusedFrozenIdentity = true;
+      alreadyRecordedDurable = false;
     } else {
       return {
         ok: false,
@@ -188,9 +233,33 @@ export async function performLazyFirstSend(
     createRequestId = crypto.randomUUID();
     messageRequestId = crypto.randomUUID();
     title = params.title?.trim() || deriveSessionTitle(trimmed);
+    alreadyRecordedDurable = false;
   }
 
-  if (!reusedFrozenIdentity) {
+  const operationId = messageRequestId;
+  if (!alreadyRecordedDurable) {
+    const durableRes = await recordDurablePendingOperation(
+      backend,
+      workspaceId,
+      projectId,
+      {
+        operationId,
+        kind: 'first_send',
+        messageRequestId,
+        createRequestId,
+        text: trimmed,
+        title,
+      },
+      { sessionId: null },
+    );
+    if (!durableRes.ok) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.identityNotRecorded'),
+        uncertain: false,
+      };
+    }
+
     const initialRecord: PendingFirstSend = {
       createRequestId,
       messageRequestId,
@@ -224,6 +293,11 @@ export async function performLazyFirstSend(
         return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
       }
       if (isDefinitePreEffectRejection(err)) {
+        await clearDurablePendingOperation(backend, {
+          operationId,
+          expectedMessageRequestId: messageRequestId,
+          reason: 'dismissed',
+        });
         removePendingFirstSend();
         return { ok: false, error: rejectionMessage(err), uncertain: false };
       }
@@ -285,6 +359,11 @@ export async function performLazyFirstSend(
     }
 
     // Success! Clear pending first send
+    const clearRes = await clearDurablePendingOperation(backend, {
+      operationId,
+      expectedMessageRequestId: messageRequestId,
+      reason: 'resolved',
+    });
     removePendingFirstSend();
 
     return {
@@ -297,13 +376,14 @@ export async function performLazyFirstSend(
         text: submitted.text,
         createdAt: submitted.createdAt,
       },
+      ...(clearRes.ok
+        ? {}
+        : { cleanupWarning: clearRes.error ?? i18n.t('conversation.recovery.cleanupFailed') }),
     };
   } catch (err) {
     if (isStale()) {
       return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
-    // Two-command limitation: session exists on backend, but message failed.
-    // Retain createdSessionId in pending first send so retry reuses it!
     const rawMsg = err instanceof Error ? err.message : i18n.t('error.notSaved');
     return {
       ok: false,

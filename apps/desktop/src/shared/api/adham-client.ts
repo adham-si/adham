@@ -2,13 +2,17 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   BootstrapState,
   CommandContext,
+  ClearPendingOperationPayload,
   CommandEnvelope,
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  PendingOperationDto,
+  PendingOperationList,
   ProjectList,
   PlatformInfo,
   ProjectSummary,
+  RecordPendingOperationPayload,
   SelectProjectPayload,
   SessionList,
   SessionSummary,
@@ -20,6 +24,8 @@ import type {
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
+  PendingOperationDtoSchema,
+  PendingOperationListSchema,
   ProjectListSchema,
   PlatformInfoSchema,
   ProjectSummarySchema,
@@ -41,6 +47,10 @@ export type {
   PlatformInfo,
   ProjectSummary,
   SessionList,
+  ClearPendingOperationPayload,
+  PendingOperationDto,
+  PendingOperationList,
+  RecordPendingOperationPayload,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -106,6 +116,17 @@ export interface AdhamClient {
   ): Promise<ConversationPage>;
   getStorageStatus(): Promise<StorageStatus>;
   getPlatformInfo(): Promise<PlatformInfo>;
+  recordPendingOperation(
+    workspaceId: string,
+    projectId: string,
+    payload: RecordPendingOperationPayload,
+    options?: { requestId?: string; sessionId?: string | null },
+  ): Promise<PendingOperationDto>;
+  listPendingOperations(): Promise<PendingOperationList>;
+  clearPendingOperation(
+    payload: ClearPendingOperationPayload,
+    options?: { requestId?: string },
+  ): Promise<void>;
 }
 
 export class AdhamApiClient implements AdhamClient {
@@ -283,6 +304,40 @@ export class AdhamApiClient implements AdhamClient {
   async getPlatformInfo(): Promise<PlatformInfo> {
     const raw = await invoke('get_platform_info');
     return PlatformInfoSchema.parse(raw);
+  }
+
+  async recordPendingOperation(
+    workspaceId: string,
+    projectId: string,
+    payload: RecordPendingOperationPayload,
+    options?: { requestId?: string; sessionId?: string | null },
+  ): Promise<PendingOperationDto> {
+    const raw = (await invoke('record_pending_operation', {
+      request: this.wrapCommand(
+        payload,
+        {
+          workspaceId,
+          projectId,
+          sessionId: options?.sessionId ?? null,
+        },
+        options?.requestId,
+      ),
+    })) as { data: unknown };
+    return PendingOperationDtoSchema.parse(raw.data);
+  }
+
+  async listPendingOperations(): Promise<PendingOperationList> {
+    const raw = await invoke('list_pending_operations');
+    return PendingOperationListSchema.parse(raw);
+  }
+
+  async clearPendingOperation(
+    payload: ClearPendingOperationPayload,
+    options?: { requestId?: string },
+  ): Promise<void> {
+    await invoke('clear_pending_operation', {
+      request: this.wrapCommand(payload, undefined, options?.requestId),
+    });
   }
 }
 

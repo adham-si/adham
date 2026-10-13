@@ -1,9 +1,10 @@
 use adham_desktop_api::{
-    ApiContext, BootstrapState, CommandContext, CommandEnvelope, CommandResult, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope,
-    PlatformInfo, ProjectList, ProjectSummary, RebuildProjectionsResponse, SelectProjectPayload,
-    SessionList, SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage,
-    WorkspaceList, WorkspaceSummary,
+    ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
+    CommandResult, ConversationPage, CreateProjectPayload, CreateSessionPayload,
+    CreateWorkspacePayload, ErrorEnvelope, PendingOperationDto, PendingOperationList, PlatformInfo,
+    ProjectList, ProjectSummary, RebuildProjectionsResponse, RecordPendingOperationPayload,
+    SelectProjectPayload, SessionList, SessionSummary, StorageStatus, SubmitMessagePayload,
+    SubmittedMessage, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -129,6 +130,35 @@ async fn admin_rebuild_projections(
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
+#[tauri::command]
+async fn record_pending_operation(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<RecordPendingOperationPayload>,
+) -> Result<CommandResult<PendingOperationDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_record_pending_operation(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_pending_operations(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<PendingOperationList, ErrorEnvelope> {
+    adham_desktop_api::handle_list_pending_operations(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn clear_pending_operation(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<ClearPendingOperationPayload>,
+) -> Result<CommandResult<()>, ErrorEnvelope> {
+    adham_desktop_api::handle_clear_pending_operation(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
 pub fn run() {
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info,sqlx=warn")
@@ -202,6 +232,9 @@ pub fn run() {
             submit_message,
             get_conversation,
             admin_rebuild_projections,
+            record_pending_operation,
+            list_pending_operations,
+            clear_pending_operation,
         ]);
 
     let app = builder

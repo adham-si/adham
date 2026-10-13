@@ -55,6 +55,7 @@ describe('lazy session creation regressions', () => {
       uncertain: false,
     });
 
+    await vi.waitFor(() => expect(typeof resolveCreate).toBe('function'));
     await act(async () => {
       resolveCreate({
         sessionId: 'sess-created-1',

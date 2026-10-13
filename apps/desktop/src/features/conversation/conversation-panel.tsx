@@ -16,6 +16,11 @@ import { useSelection, type SelectionBackend } from '../workspace-selection/use-
 import { ConversationSetupSlot } from './conversation-setup-slot';
 import { announceScopeChanged, SCOPE_CHANGED_EVENT } from './conversation-identity';
 import { submissionNotice } from './submission-notice';
+import {
+  PendingRecoveryBanner,
+  PendingRecoveryReviewDialog,
+  usePendingRecovery,
+} from './pending-recovery';
 
 const DEFAULT_MODEL_ID = 'local:qwen2.5-coder:32b';
 const PENDING_DRAFT_BUCKET = 'pending';
@@ -49,6 +54,29 @@ export function ConversationPanel({
   const conv = useConversation({ backend });
   const prov = useProvisioning({ backend: provisioning });
   const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
+  const sel = useSelection({ backend: selection, enabled: needsProvisioning });
+
+  const handleSessionOpened = React.useCallback(
+    async (workspaceId: string, projectId: string, sessionId: string) => {
+      const isCrossProject =
+        conv.context &&
+        (conv.context.workspaceId !== workspaceId || conv.context.projectId !== projectId);
+
+      if (isCrossProject) {
+        const selectOutcome = await sel.select(workspaceId, projectId);
+        if (!selectOutcome.ok) return;
+      }
+      await conv.openSession(sessionId, { workspaceId, projectId });
+    },
+    [conv, sel],
+  );
+
+  const recovery = usePendingRecovery({
+    backend,
+    onSessionOpened: (workspaceId, projectId, sessionId) => {
+      void handleSessionOpened(workspaceId, projectId, sessionId);
+    },
+  });
   /// Committed creation or selection awaiting authoritative bootstrap.
   /// Holds the confirmed step disabled so a second action cannot fork a
   /// duplicate while the read is in flight. Cleared only when bootstrap
@@ -72,7 +100,6 @@ export function ConversationPanel({
 
   const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
   const refreshScope = conv.refreshScope;
-  const sel = useSelection({ backend: selection, enabled: needsProvisioning });
   /// Workspace chosen for its first project (an existing workspace without
   /// projects). Project creation binds to it; the workspace itself is never
   /// recreated. Cleared once authoritative scope is ready.
@@ -214,6 +241,16 @@ export function ConversationPanel({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent">
+      {/* Pending recovery banner (unresolved message recovery) */}
+      <div className="px-4 pt-2">
+        <PendingRecoveryBanner
+          operations={recovery.operations}
+          truncated={recovery.truncated}
+          onReview={recovery.openReview}
+          onDismiss={(op) => recovery.openDismiss(op)}
+        />
+      </div>
+
       {/* Conversation Timeline (smoothly expands when messages exist) */}
       <div
         className={`flex flex-col overflow-y-auto transition-all duration-500 ease-in-out ${
@@ -287,6 +324,19 @@ export function ConversationPanel({
             )}
           </p>
         )}
+        {recovery.error && (
+          <div role="alert" className="p-2 text-xs text-destructive bg-destructive/10 rounded">
+            <p>{recovery.error}</p>
+          </div>
+        )}
+        {recovery.cleanupWarning && (
+          <div
+            role="status"
+            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
+          >
+            <p>{recovery.cleanupWarning}</p>
+          </div>
+        )}
         <p>{notice}</p>
       </div>
 
@@ -323,6 +373,17 @@ export function ConversationPanel({
           }}
         />
       </div>
+
+      <PendingRecoveryReviewDialog
+        open={recovery.reviewDialogOpen}
+        operation={recovery.activeReviewOp}
+        validatingTarget={recovery.validatingTarget}
+        targetMissing={recovery.targetMissing}
+        initialDismissConfirm={recovery.initialDismissConfirm}
+        onClose={recovery.closeReview}
+        onResend={(op) => recovery.resendOperation(op)}
+        onDismiss={(op) => recovery.dismissOperation(op)}
+      />
     </div>
   );
 }

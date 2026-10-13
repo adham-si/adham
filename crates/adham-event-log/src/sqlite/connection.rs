@@ -8,6 +8,8 @@ use tracing::info;
 const SCHEMA_SQL: &str = include_str!("../../migrations/20261006000000_initial_schema.sql");
 const INSTALLATION_SQL: &str = include_str!("../../migrations/20261008000000_installation.sql");
 const RECEIPT_ACTOR_SQL: &str = include_str!("../../migrations/20261008000001_receipt_actor.sql");
+const PENDING_OPERATIONS_SQL: &str =
+    include_str!("../../migrations/20261014000000_pending_operations.sql");
 
 pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(&format!("sqlite://{}", db_path.display()))?
@@ -28,6 +30,7 @@ pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Er
     ensure_installation_scope_columns(&pool).await?;
     ensure_receipt_actor_column(&pool).await?;
     ensure_content_scope_columns(&pool).await?;
+    pool.execute(PENDING_OPERATIONS_SQL).await?;
     info!("Database schema initialized successfully.");
 
     Ok(pool)

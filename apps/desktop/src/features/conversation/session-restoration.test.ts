@@ -55,6 +55,9 @@ describe('APP-WIRING-03/04: Session restoration and recovery', () => {
           ],
         }),
       ),
+      recordPendingOperation: vi.fn(),
+      listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
+      clearPendingOperation: vi.fn().mockResolvedValue(undefined),
     };
   }
 

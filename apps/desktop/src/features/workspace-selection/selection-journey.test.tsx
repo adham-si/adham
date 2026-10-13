@@ -111,6 +111,9 @@ describe('selection journey', () => {
         nextCursor: null,
         projectionPosition: '0',
       }),
+      recordPendingOperation: vi.fn(),
+      listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
+      clearPendingOperation: vi.fn().mockResolvedValue(undefined),
     };
     return { backend, state };
   }

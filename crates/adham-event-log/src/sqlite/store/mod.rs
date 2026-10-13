@@ -1,6 +1,9 @@
 mod content;
 mod events;
+mod pending_operations;
 mod receipts;
+
+pub use pending_operations::{HydratedPendingOperation, PendingOperationRecord};
 
 use adham_core_types::*;
 use sqlx::{Pool, Sqlite};

@@ -36,7 +36,31 @@
     "prevMessagePending": "A previous message save is pending resolution. Resend or reload before starting a new session.",
     "discoveryUnavailable": "Session discovery unavailable. Retry once connectivity returns.",
     "creationFailed": "Session creation failed.",
-    "createdIdentityLost": "Session created, but save identity could not be recorded. Reload history before resending."
+    "createdIdentityLost": "Session created, but save identity could not be recorded. Reload history before resending.",
+    "recovery": {
+      "bannerTitle": "Unresolved message in {{target}}",
+      "bannerDescription": "A message had an unknown save status during a previous run.",
+      "reviewAction": "Review & Resend",
+      "dismissAction": "Dismiss",
+      "modalTitle": "Unresolved Message Recovery",
+      "targetLabel": "Original Target",
+      "targetMissing": "Target workspace or project is inaccessible or missing.",
+      "messagePreview": "Message Content",
+      "titlePreview": "Session Title",
+      "confirmResend": "Resend to Original Target",
+      "copyText": "Copy Text",
+      "textCopied": "Copied to clipboard",
+      "dismissWarningTitle": "Dismiss unresolved message?",
+      "dismissWarning": "Dismissing will remove this recovery reminder. If the server already committed this message, it will remain in history; if not, this draft will not be sent.",
+      "confirmDismiss": "Dismiss Reminder",
+      "cancelDismiss": "Cancel",
+      "truncated": "Showing {{count}} unresolved messages. Older unresolved operations are truncated.",
+      "listFailed": "Failed to check for unresolved messages.",
+      "cleanupFailed": "Message was processed, but removing the pending marker failed. Reload history.",
+      "checkingTarget": "Checking target availability…",
+      "resendFailed": "Resend failed.",
+      "dismissFailed": "Dismissal failed."
+    }
   },
   "provision": {
     "workspaceTitle": "Create your workspace",

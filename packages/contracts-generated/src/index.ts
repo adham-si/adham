@@ -69,3 +69,11 @@ export type StorageStatus = { status: string, journalMode: string, schemaVersion
 
 export type RebuildProjectionsResponse = { replayedCount: bigint, };
 
+export type RecordPendingOperationPayload = { operationId: string, kind: string, messageRequestId: string, createRequestId: string | null, text: string, title: string | null, };
+
+export type PendingOperationDto = { operationId: string, kind: string, workspaceId: string, projectId: string, sessionId: string | null, createRequestId: string | null, messageRequestId: string, text: string, title: string | null, status: string, createdAt: string, };
+
+export type PendingOperationList = { operations: Array<PendingOperationDto>, truncated: boolean, };
+
+export type ClearPendingOperationPayload = { operationId: string, expectedMessageRequestId: string, reason: string, };
+
