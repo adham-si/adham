@@ -32,9 +32,10 @@ impl PlatformStoragePolicy {
     }
 
     pub fn resolve() -> Result<Self, PlatformError> {
-        let base = Self::resolve_base(
+        let base = Self::resolve_base_with_xdg(
             std::env::var("LOCALAPPDATA").ok().as_deref(),
             std::env::var("HOME").ok().as_deref(),
+            std::env::var("XDG_DATA_HOME").ok().as_deref(),
         )?;
         Self::new(base)
     }
@@ -45,20 +46,39 @@ impl PlatformStoragePolicy {
         local_app_data: Option<&str>,
         home: Option<&str>,
     ) -> Result<PathBuf, PlatformError> {
+        Self::resolve_base_with_xdg(local_app_data, home, None)
+    }
+
+    /// Pure, testable base-directory selection including XDG data home.
+    pub fn resolve_base_with_xdg(
+        local_app_data: Option<&str>,
+        home: Option<&str>,
+        xdg_data_home: Option<&str>,
+    ) -> Result<PathBuf, PlatformError> {
         #[cfg(windows)]
         {
-            let _ = home;
+            let _ = (home, xdg_data_home);
             validate_root_var("LOCALAPPDATA", local_app_data).map(|p| p.join("Adham"))
         }
         #[cfg(target_os = "macos")]
         {
-            let _ = local_app_data;
+            let _ = (local_app_data, xdg_data_home);
             validate_root_var("HOME", home)
                 .map(|p| p.join("Library").join("Application Support").join("Adham"))
         }
-        #[cfg(not(any(windows, target_os = "macos")))]
+        #[cfg(target_os = "linux")]
         {
-            let _ = (local_app_data, home);
+            let _ = local_app_data;
+            if let Some(xdg) = xdg_data_home {
+                if !xdg.trim().is_empty() {
+                    return validate_root_var("XDG_DATA_HOME", Some(xdg)).map(|p| p.join("adham"));
+                }
+            }
+            validate_root_var("HOME", home).map(|p| p.join(".local").join("share").join("adham"))
+        }
+        #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (local_app_data, home, xdg_data_home);
             Err(PlatformError::InvalidPath(
                 "unsupported platform for application data directory".to_string(),
             ))
