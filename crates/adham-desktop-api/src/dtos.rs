@@ -37,6 +37,9 @@ pub struct BootstrapState {
     pub is_initialized: bool,
     pub active_workspace_id: Option<String>,
     pub active_project_id: Option<String>,
+    #[ts(optional = nullable)]
+    #[serde(default)]
+    pub installation_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -87,6 +90,36 @@ pub struct ProjectSummary {
     pub created_at: String,
 }
 
+/// Selection target. The owning workspace travels in the command context
+/// (like `create_project`); no creation command or receipt replay may
+/// substitute for this explicit selection.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SelectProjectPayload {
+    pub project_id: String,
+}
+
+/// Bounded workspace listing. `truncated` discloses a clamped tail;
+/// cursor pagination arrives with its own contract when lists outgrow this.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct WorkspaceList {
+    pub workspaces: Vec<WorkspaceSummary>,
+    pub truncated: bool,
+}
+
+/// Bounded per-workspace project listing with the same truncation disclosure.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProjectList {
+    pub workspace_id: String,
+    pub projects: Vec<ProjectSummary>,
+    pub truncated: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -102,6 +135,15 @@ pub struct SessionSummary {
     pub project_id: String,
     pub title: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionList {
+    pub project_id: String,
+    pub sessions: Vec<SessionSummary>,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

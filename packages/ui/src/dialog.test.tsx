@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -184,5 +185,26 @@ describe('Dialog', () => {
 
   it('refuses to render parts outside a DialogRoot', () => {
     expect(() => render(<DialogContent label="orphan">x</DialogContent>)).toThrow(/DialogRoot/);
+  });
+
+  it('does not steal focus from an input when re-rendered while open', async () => {
+    const user = userEvent.setup();
+    function ControlledDialog() {
+      const [name, setName] = React.useState('');
+      return (
+        <DialogRoot open={true} onOpenChange={() => {}}>
+          <DialogContent label="Controlled">
+            <input aria-label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          </DialogContent>
+        </DialogRoot>
+      );
+    }
+    render(<ControlledDialog />);
+    const input = screen.getByLabelText('Name');
+    await user.click(input);
+    expect(document.activeElement).toBe(input);
+    await user.type(input, 'TEST-WS-A');
+    expect((input as HTMLInputElement).value).toBe('TEST-WS-A');
+    expect(document.activeElement).toBe(input);
   });
 });

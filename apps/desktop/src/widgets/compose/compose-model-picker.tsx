@@ -16,6 +16,8 @@ export interface ModelOption {
   provider: string;
   boundary: ModelBoundary;
   description?: string | undefined;
+  /** Resource key for the translated description; falls back to description. */
+  descKey?: string | undefined;
   supportsReasoning?: boolean | undefined;
 }
 
@@ -25,6 +27,7 @@ export const DEFAULT_MODELS: ModelOption[] = [
     name: 'Qwen 2.5 Coder 32B',
     provider: 'Ollama',
     boundary: 'local',
+    descKey: 'compose.modelDescQwen32',
     description: 'Offline, private, high code intelligence',
     supportsReasoning: false,
   },
@@ -33,6 +36,7 @@ export const DEFAULT_MODELS: ModelOption[] = [
     name: 'DeepSeek R1 14B',
     provider: 'Ollama',
     boundary: 'local',
+    descKey: 'compose.modelDescDeepseek14',
     description: 'Offline reasoning model running on local GPU',
     supportsReasoning: true,
   },
@@ -41,6 +45,7 @@ export const DEFAULT_MODELS: ModelOption[] = [
     name: 'Claude 3.7 Sonnet',
     provider: 'Anthropic',
     boundary: 'cloud',
+    descKey: 'compose.modelDescClaude',
     description: 'High capacity hybrid thinking model (requires API transfer)',
     supportsReasoning: true,
   },
@@ -49,6 +54,7 @@ export const DEFAULT_MODELS: ModelOption[] = [
     name: 'GPT-4o',
     provider: 'OpenAI',
     boundary: 'cloud',
+    descKey: 'compose.modelDescGpt4o',
     description: 'Fast cloud multimodal model',
     supportsReasoning: false,
   },
@@ -74,6 +80,16 @@ export function ComposeModelPicker({
   className = '',
 }: ComposeModelPickerProps) {
   const { t } = useTranslation();
+  const effortLabels = {
+    low: t('settings.models.effortLow', 'low effort'),
+    medium: t('settings.models.effortMedium', 'medium effort'),
+    high: t('settings.models.effortHigh', 'high effort'),
+  } as const;
+  const tierLabels = {
+    low: t('settings.models.tierLow', 'Low'),
+    medium: t('settings.models.tierMedium', 'Medium'),
+    high: t('settings.models.tierHigh', 'High'),
+  } as const;
   const [isOpen, setIsOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -125,18 +141,18 @@ export function ComposeModelPicker({
           }`}
           title={
             isLocal
-              ? 'Zero data leaves this machine'
-              : `Outbound request to ${selectedModel.provider}`
+              ? t('compose.localBoundaryNote', 'Zero data leaves this machine')
+              : t('compose.cloudBoundaryNote', { provider: selectedModel.provider })
           }
         >
           <HugeiconsIcon icon={isLocal ? CpuIcon : AiCloud01Icon} className="size-3" />
-          <span>{isLocal ? 'Local' : selectedModel.provider}</span>
+          <span>{isLocal ? t('compose.localBadge', 'Local') : selectedModel.provider}</span>
         </span>
 
         {/* Reasoning tag if active */}
         {selectedModel.supportsReasoning && (
           <span className="hidden sm:inline-block rounded bg-surface px-1 py-0.2 text-[10px] text-foreground-muted border border-border-subtle">
-            {reasoningEffort} effort
+            {effortLabels[reasoningEffort]}
           </span>
         )}
 
@@ -150,7 +166,7 @@ export function ComposeModelPicker({
       {isOpen && (
         <div
           role="listbox"
-          aria-label="Available models"
+          aria-label={t('compose.modelsAria', 'Available models')}
           className="absolute bottom-full mb-1.5 end-0 z-popover w-72 rounded-xl border border-border-subtle bg-surface p-1.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           <div className="px-2 py-1 text-[11px] font-semibold text-foreground-muted">
@@ -193,12 +209,16 @@ export function ComposeModelPicker({
                           modelLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
                         }`}
                       >
-                        {modelLocal ? 'Local' : 'Cloud'}
+                        {modelLocal
+                          ? t('compose.localBadge', 'Local')
+                          : t('compose.cloudBadge', 'Cloud')}
                       </span>
                     </div>
-                    {model.description && (
+                    {(model.descKey ?? model.description) && (
                       <p className="mt-0.5 truncate text-[11px] text-foreground-muted">
-                        {model.description}
+                        {model.descKey
+                          ? t(model.descKey, model.description ?? '')
+                          : model.description}
                       </p>
                     )}
                   </div>
@@ -217,7 +237,7 @@ export function ComposeModelPicker({
           {selectedModel.supportsReasoning && onChangeReasoningEffort && (
             <div className="mt-2 border-t border-border-subtle pt-2 px-1">
               <div className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-1">
-                Reasoning Effort
+                {t('settings.models.effortHeading', 'Reasoning Effort')}
               </div>
               <div className="grid grid-cols-3 gap-1">
                 {(['low', 'medium', 'high'] as const).map((tier) => (
@@ -231,7 +251,7 @@ export function ComposeModelPicker({
                         : 'bg-surface-subtle text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
                     }`}
                   >
-                    {tier}
+                    {tierLabels[tier]}
                   </button>
                 ))}
               </div>

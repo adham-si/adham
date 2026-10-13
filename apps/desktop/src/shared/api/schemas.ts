@@ -20,6 +20,7 @@ export const BootstrapStateSchema = z.object({
   isInitialized: z.boolean(),
   activeWorkspaceId: z.string().nullable(),
   activeProjectId: z.string().nullable(),
+  installationId: z.string().nullable().default(null),
 });
 
 export const PlatformInfoSchema = z.object({
@@ -44,11 +45,28 @@ export const ProjectSummarySchema = z.object({
   createdAt: z.string(),
 });
 
+export const WorkspaceListSchema = z.object({
+  workspaces: z.array(WorkspaceSummarySchema),
+  truncated: z.boolean(),
+});
+
+export const ProjectListSchema = z.object({
+  workspaceId: z.string(),
+  projects: z.array(ProjectSummarySchema),
+  truncated: z.boolean(),
+});
+
 export const SessionSummarySchema = z.object({
   sessionId: z.string(),
   projectId: z.string(),
   title: z.string().nullable(),
   createdAt: z.string(),
+});
+
+export const SessionListSchema = z.object({
+  projectId: z.string(),
+  sessions: z.array(SessionSummarySchema),
+  truncated: z.boolean(),
 });
 
 export const SubmittedMessageSchema = z.object({
@@ -78,4 +96,23 @@ export const StorageStatusSchema = z.object({
   status: z.string(),
   journalMode: z.string(),
   schemaVersion: z.number().int(),
+});
+
+export const PendingOperationDtoSchema = z.object({
+  operationId: z.string(),
+  kind: z.string(),
+  workspaceId: z.string(),
+  projectId: z.string(),
+  sessionId: z.string().nullable(),
+  createRequestId: z.string().nullable(),
+  messageRequestId: z.string(),
+  text: z.string(),
+  title: z.string().nullable(),
+  status: z.string(),
+  createdAt: z.string(),
+});
+
+export const PendingOperationListSchema = z.object({
+  operations: z.array(PendingOperationDtoSchema),
+  truncated: z.boolean(),
 });

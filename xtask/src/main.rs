@@ -1,9 +1,11 @@
 use adham_core_types::{ActorKind, EventActor, EventScope};
 use adham_desktop_api::{
-    BootstrapState, CommandContext, ConversationMessageDto, ConversationPage, CreateProjectPayload,
-    CreateSessionPayload, CreateWorkspacePayload, PlatformInfo, ProjectSummary,
-    RebuildProjectionsResponse, SessionSummary, StorageStatus, SubmitMessagePayload,
-    SubmittedMessage, WorkspaceSummary,
+    BootstrapState, ClearPendingOperationPayload, CommandContext, ConversationMessageDto,
+    ConversationPage, CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
+    PendingOperationDto, PendingOperationList, PlatformInfo, ProjectList, ProjectSummary,
+    RebuildProjectionsResponse, RecordPendingOperationPayload, SelectProjectPayload, SessionList,
+    SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage, WorkspaceList,
+    WorkspaceSummary,
 };
 use std::fs;
 use std::path::Path;
@@ -55,14 +57,22 @@ fn generate_contracts() -> Result<(), Box<dyn std::error::Error>> {
         WorkspaceSummary::decl(),
         CreateProjectPayload::decl(),
         ProjectSummary::decl(),
+        SelectProjectPayload::decl(),
+        WorkspaceList::decl(),
+        ProjectList::decl(),
         CreateSessionPayload::decl(),
         SessionSummary::decl(),
+        SessionList::decl(),
         SubmitMessagePayload::decl(),
         SubmittedMessage::decl(),
         ConversationMessageDto::decl(),
         ConversationPage::decl(),
         StorageStatus::decl(),
         RebuildProjectionsResponse::decl(),
+        RecordPendingOperationPayload::decl(),
+        PendingOperationDto::decl(),
+        PendingOperationList::decl(),
+        ClearPendingOperationPayload::decl(),
     ];
 
     let id_types = [

@@ -23,7 +23,9 @@ export type SettingsPageId =
 export type SettingsTab = SettingsPageId;
 
 export const SHELL_DIMENSIONS = {
-  navRailWidth: 40,
+  // Single source of truth for the rail width: nav-rail.tsx sizes itself
+  // from this constant and primary-sidebar resize math subtracts it.
+  navRailWidth: 56,
   headerHeight: 40,
   minSidebarWidth: 272,
   maxSidebarWidth: 600,

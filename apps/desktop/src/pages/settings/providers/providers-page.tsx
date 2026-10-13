@@ -3,6 +3,7 @@ import { Button } from '@adham/ui';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Add01Icon } from '@hugeicons/core-free-icons';
 import { useTheme } from '@/theme/use-theme';
+import { useTranslation } from 'react-i18next';
 import {
   ProviderFilterTabs,
   type ProviderFilterTab,
@@ -11,6 +12,7 @@ import {
 } from './components';
 
 export function ProvidersPage() {
+  const { t } = useTranslation();
   const { resolvedAppearance } = useTheme();
   const isDark = resolvedAppearance === 'dark';
 
@@ -22,7 +24,10 @@ export function ProvidersPage() {
     {
       id: 'ollama',
       name: 'Ollama',
-      desc: 'Local Llama 3.3, DeepSeek-R1, and Qwen 2.5 with zero network egress.',
+      desc: t(
+        'settings.providers.descOllama',
+        'Local Llama 3.3, DeepSeek-R1, and Qwen 2.5 with zero network egress.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/ollama.svg' : '/media/provider/ollama-light.svg'}
@@ -35,7 +40,7 @@ export function ProvidersPage() {
     {
       id: 'openai',
       name: 'OpenAI',
-      desc: 'GPT-4o, o1, o3-mini, and Realtime API.',
+      desc: t('settings.providers.descOpenai', 'GPT-4o, o1, o3-mini, and Realtime API.'),
       icon: (
         <img
           src={isDark ? '/media/provider/openai-def.svg' : '/media/provider/openai-light.svg'}
@@ -48,7 +53,10 @@ export function ProvidersPage() {
     {
       id: 'anthropic',
       name: 'Anthropic',
-      desc: 'Claude 3.7 Sonnet, Claude 3.5 Sonnet, and Claude 3.5 Haiku.',
+      desc: t(
+        'settings.providers.descAnthropic',
+        'Claude 3.7 Sonnet, Claude 3.5 Sonnet, and Claude 3.5 Haiku.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/anthropic-def.svg' : '/media/provider/anthropic-light.svg'}
@@ -61,14 +69,17 @@ export function ProvidersPage() {
     {
       id: 'google',
       name: 'Google',
-      desc: 'Gemini 2.0 Flash, Gemini 2.0 Pro, and Gemini 1.5 Pro.',
+      desc: t(
+        'settings.providers.descGoogle',
+        'Gemini 2.0 Flash, Gemini 2.0 Pro, and Gemini 1.5 Pro.',
+      ),
       icon: <img src="/media/provider/google.svg" alt="Google" className="size-5 object-contain" />,
       category: 'cloud',
     },
     {
       id: 'deepseek',
       name: 'DeepSeek',
-      desc: 'DeepSeek-R1, DeepSeek-V3, and DeepSeek Coder.',
+      desc: t('settings.providers.descDeepseek', 'DeepSeek-R1, DeepSeek-V3, and DeepSeek Coder.'),
       icon: (
         <img src="/media/provider/deepseek.svg" alt="DeepSeek" className="size-5 object-contain" />
       ),
@@ -77,7 +88,10 @@ export function ProvidersPage() {
     {
       id: 'moonshot',
       name: 'Moonshot AI',
-      desc: 'Kimi k1.5, Kimi k0-math, and Moonshot long-context reasoning.',
+      desc: t(
+        'settings.providers.descMoonshot',
+        'Kimi k1.5, Kimi k0-math, and Moonshot long-context reasoning.',
+      ),
       icon: (
         <img
           src="/media/provider/moonshot-mono.svg"
@@ -90,7 +104,7 @@ export function ProvidersPage() {
     {
       id: 'qwen',
       name: 'Qwen',
-      desc: 'Qwen 2.5-Max, Qwen 2.5-Coder 32B, and QwQ-32B.',
+      desc: t('settings.providers.descQwen', 'Qwen 2.5-Max, Qwen 2.5-Coder 32B, and QwQ-32B.'),
       icon: (
         <img
           src={isDark ? '/media/provider/qwen.svg' : '/media/provider/qwen-light.svg'}
@@ -103,7 +117,10 @@ export function ProvidersPage() {
     {
       id: 'nvidia',
       name: 'NVIDIA AI',
-      desc: 'Nemotron-4 340B, Llama 3.1 Nemotron-70B, and NIM microservices.',
+      desc: t(
+        'settings.providers.descNvidia',
+        'Nemotron-4 340B, Llama 3.1 Nemotron-70B, and NIM microservices.',
+      ),
       icon: (
         <img
           src={
@@ -120,7 +137,10 @@ export function ProvidersPage() {
     {
       id: 'opencode',
       name: 'OpenCode',
-      desc: 'Local and remote coding agent engine with ACP protocols.',
+      desc: t(
+        'settings.providers.descOpencode',
+        'Local and remote coding agent engine with ACP protocols.',
+      ),
       icon: (
         <img
           src="/media/provider/opencode.svg"
@@ -133,7 +153,10 @@ export function ProvidersPage() {
     {
       id: 'mistral',
       name: 'Mistral AI',
-      desc: 'Mistral Large 2, Codestral 2501, and Pixtral 12B.',
+      desc: t(
+        'settings.providers.descMistral',
+        'Mistral Large 2, Codestral 2501, and Pixtral 12B.',
+      ),
       icon: (
         <img
           src="/media/provider/mistral-color.svg"
@@ -146,7 +169,7 @@ export function ProvidersPage() {
     {
       id: 'xai',
       name: 'xAI',
-      desc: 'Grok 2, Grok 3, and real-time reasoning completions.',
+      desc: t('settings.providers.descXai', 'Grok 2, Grok 3, and real-time reasoning completions.'),
       icon: (
         <img
           src={isDark ? '/media/provider/xai-grok.svg' : '/media/provider/xai-grok-light.svg'}
@@ -159,7 +182,10 @@ export function ProvidersPage() {
     {
       id: 'aws-bedrock',
       name: 'AWS Bedrock',
-      desc: 'Claude 3.7 Sonnet, Amazon Nova Pro, and Llama 3.3 via AWS IAM.',
+      desc: t(
+        'settings.providers.descAws',
+        'Claude 3.7 Sonnet, Amazon Nova Pro, and Llama 3.3 via AWS IAM.',
+      ),
       icon: (
         <img
           src="/media/provider/bedrock-aws.svg"
@@ -172,7 +198,10 @@ export function ProvidersPage() {
     {
       id: 'cloudflare',
       name: 'Cloudflare Workers AI',
-      desc: 'Cloudflare Workers AI running Llama 3.3, Mistral, and Whisper.',
+      desc: t(
+        'settings.providers.descCloudflare',
+        'Cloudflare Workers AI running Llama 3.3, Mistral, and Whisper.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/cloudflare.svg' : '/media/provider/cloudflare-mono.svg'}
@@ -185,7 +214,10 @@ export function ProvidersPage() {
     {
       id: 'vercel',
       name: 'Vercel AI',
-      desc: 'Vercel AI SDK, AI Gateway routing, and edge inference.',
+      desc: t(
+        'settings.providers.descVercel',
+        'Vercel AI SDK, AI Gateway routing, and edge inference.',
+      ),
       icon: (
         <img
           src="/media/provider/vercel.svg"
@@ -198,7 +230,10 @@ export function ProvidersPage() {
     {
       id: 'openrouter',
       name: 'OpenRouter',
-      desc: 'Unified multi-model gateway routing across 200+ global models.',
+      desc: t(
+        'settings.providers.descOpenrouter',
+        'Unified multi-model gateway routing across 200+ global models.',
+      ),
       icon: (
         <img
           src="/media/provider/openrouter.svg"
@@ -211,7 +246,10 @@ export function ProvidersPage() {
     {
       id: 'minimax',
       name: 'MiniMax',
-      desc: 'MiniMax-01, Hailuo, and text-to-video multimodal models.',
+      desc: t(
+        'settings.providers.descMinimax',
+        'MiniMax-01, Hailuo, and text-to-video multimodal models.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/minimax.svg' : '/media/provider/minimax-mono.svg'}
@@ -224,7 +262,10 @@ export function ProvidersPage() {
     {
       id: 'vllm',
       name: 'vLLM / Self-Hosted',
-      desc: 'Private self-hosted OpenAI-compatible inference servers.',
+      desc: t(
+        'settings.providers.descVllm',
+        'Private self-hosted OpenAI-compatible inference servers.',
+      ),
       icon: <img src="/media/provider/vllm.svg" alt="vLLM" className="size-5 object-contain" />,
       category: 'local',
     },
@@ -251,9 +292,14 @@ export function ProvidersPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">AI Providers</h2>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">
+          {t('settings.providers.title', 'AI Providers')}
+        </h2>
         <p className="text-xs text-foreground-secondary mt-1">
-          Connect local runtimes and cloud model providers to use across your workspace.
+          {t(
+            'settings.providers.desc',
+            'Connect local runtimes and cloud model providers to use across your workspace.',
+          )}
         </p>
       </div>
 
@@ -269,11 +315,11 @@ export function ProvidersPage() {
       <section aria-labelledby="providers-section-heading" className="space-y-4">
         <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
           <h3 id="providers-section-heading" className="text-sm font-semibold text-foreground">
-            Providers
+            {t('settings.providers.listTitle', 'Providers')}
           </h3>
           <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
             <HugeiconsIcon icon={Add01Icon} />
-            <span>Add provider</span>
+            <span>{t('settings.providers.addProvider', 'Add provider')}</span>
           </Button>
         </div>
 

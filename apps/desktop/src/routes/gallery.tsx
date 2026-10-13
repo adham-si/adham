@@ -24,8 +24,13 @@ export function GalleryPage() {
     <main className="h-full w-full overflow-y-auto bg-background">
       <div className="mx-auto max-w-4xl p-4 sm:p-6">
         <header className="mb-6">
-          <h1 className="text-xl font-semibold">{t('gallery.title')}</h1>
-          <p className="mt-1 text-sm text-foreground-secondary">{t('gallery.note')}</p>
+          <h1 className="text-xl font-semibold">{t('gallery.title', 'Component Gallery')}</h1>
+          <p className="mt-1 text-sm text-foreground-secondary">
+            {t(
+              'gallery.note',
+              'Design-system quality surface. Renders every @adham/ui component across variants, sizes, and states.',
+            )}
+          </p>
         </header>
         <div className="flex flex-col gap-6">
           <ButtonSection />

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { AdhamIcon } from '@adham/ui';
+import { useTranslation } from 'react-i18next';
 import { useShellLayout, SHELL_DIMENSIONS } from '../context';
 
 export interface SecondarySidebarProps {
@@ -16,13 +17,15 @@ export interface SecondarySidebarProps {
  * Constrained between min 272px and max 600px.
  */
 export function SecondarySidebar({
-  title = 'Explorer',
+  title = undefined,
   isOpen,
   onClose,
   actions,
   children,
   className = '',
 }: SecondarySidebarProps) {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('shell.secondaryTitle', 'Explorer');
   const {
     secondarySidebarOpen,
     secondarySidebarWidth,
@@ -75,7 +78,7 @@ export function SecondarySidebar({
 
   return (
     <aside
-      aria-label="Secondary Sidebar"
+      aria-label={t('shell.secondaryRegion', 'Secondary Sidebar')}
       style={{
         width: `${secondarySidebarWidth}px`,
         minWidth: `${SHELL_DIMENSIONS.minSecondarySidebarWidth}px`,
@@ -88,17 +91,17 @@ export function SecondarySidebar({
       {/* Secondary Sidebar Header: Height matches 40px base */}
       <div className="flex h-10 min-h-10 max-h-10 items-center justify-between border-b border-border-subtle px-3 py-1">
         <span className="truncate text-xs font-semibold text-foreground tracking-tight">
-          {title}
+          {resolvedTitle}
         </span>
         <div className="flex items-center gap-1">
           {actions}
           <button
             type="button"
             onClick={handleClose}
-            aria-label="Close secondary sidebar"
+            aria-label={t('shell.secondaryClose', 'Close secondary sidebar')}
             className="flex min-h-control-sm w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
-            <AdhamIcon size="sm" label="Close secondary sidebar">
+            <AdhamIcon size="sm" label={t('shell.secondaryClose', 'Close secondary sidebar')}>
               <path d="M18 6L6 18M6 6l12 12" />
             </AdhamIcon>
           </button>
@@ -112,7 +115,7 @@ export function SecondarySidebar({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize secondary sidebar"
+        aria-label={t('shell.secondaryResize', 'Resize secondary sidebar')}
         onMouseDown={handleMouseDown}
         className="absolute top-0 bottom-0 end-0 w-1 cursor-col-resize transition-colors hover:bg-action"
       />

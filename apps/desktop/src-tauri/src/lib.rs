@@ -1,8 +1,10 @@
 use adham_desktop_api::{
-    ApiContext, BootstrapState, CommandContext, CommandEnvelope, CommandResult, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, ErrorEnvelope,
-    PlatformInfo, ProjectSummary, RebuildProjectionsResponse, SessionSummary, StorageStatus,
-    SubmitMessagePayload, SubmittedMessage, WorkspaceSummary,
+    ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
+    CommandResult, ConversationPage, CreateProjectPayload, CreateSessionPayload,
+    CreateWorkspacePayload, ErrorEnvelope, PendingOperationDto, PendingOperationList, PlatformInfo,
+    ProjectList, ProjectSummary, RebuildProjectionsResponse, RecordPendingOperationPayload,
+    SelectProjectPayload, SessionList, SessionSummary, StorageStatus, SubmitMessagePayload,
+    SubmittedMessage, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -51,11 +53,50 @@ async fn create_project(
 }
 
 #[tauri::command]
+async fn list_workspaces(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<WorkspaceList, ErrorEnvelope> {
+    adham_desktop_api::handle_list_workspaces(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_projects(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+) -> Result<ProjectList, ErrorEnvelope> {
+    adham_desktop_api::handle_list_projects(&state, context)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn select_project(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SelectProjectPayload>,
+) -> Result<CommandResult<BootstrapState>, ErrorEnvelope> {
+    adham_desktop_api::handle_select_project(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn create_session(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<CreateSessionPayload>,
 ) -> Result<CommandResult<SessionSummary>, ErrorEnvelope> {
     adham_desktop_api::handle_create_session(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_sessions(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+) -> Result<SessionList, ErrorEnvelope> {
+    adham_desktop_api::handle_list_sessions(&state, context)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -85,6 +126,35 @@ async fn admin_rebuild_projections(
     state: tauri::State<'_, ApiContext>,
 ) -> Result<RebuildProjectionsResponse, ErrorEnvelope> {
     adham_desktop_api::handle_admin_rebuild_projections(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn record_pending_operation(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<RecordPendingOperationPayload>,
+) -> Result<CommandResult<PendingOperationDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_record_pending_operation(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_pending_operations(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<PendingOperationList, ErrorEnvelope> {
+    adham_desktop_api::handle_list_pending_operations(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn clear_pending_operation(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<ClearPendingOperationPayload>,
+) -> Result<CommandResult<()>, ErrorEnvelope> {
+    adham_desktop_api::handle_clear_pending_operation(&state, request)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -154,10 +224,17 @@ pub fn run() {
             get_platform_info,
             create_workspace,
             create_project,
+            list_workspaces,
+            list_projects,
+            select_project,
             create_session,
+            list_sessions,
             submit_message,
             get_conversation,
             admin_rebuild_projections,
+            record_pending_operation,
+            list_pending_operations,
+            clear_pending_operation,
         ]);
 
     let app = builder

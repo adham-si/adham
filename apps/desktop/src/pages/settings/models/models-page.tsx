@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Add01Icon } from '@hugeicons/core-free-icons';
@@ -12,6 +13,7 @@ import {
 } from './components';
 
 export function ModelsPage() {
+  const { t } = useTranslation();
   const { resolvedAppearance } = useTheme();
   const isDark = resolvedAppearance === 'dark';
 
@@ -27,7 +29,10 @@ export function ModelsPage() {
       provider: 'Anthropic',
       providerId: 'anthropic',
       contextWindow: '200k context',
-      desc: 'High-performance reasoning, coding synthesis, and autonomous harness tasks.',
+      desc: t(
+        'settings.models.descClaude37',
+        'High-performance reasoning, coding synthesis, and autonomous harness tasks.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/anthropic-def.svg' : '/media/provider/anthropic-light.svg'}
@@ -44,7 +49,10 @@ export function ModelsPage() {
       provider: 'OpenAI',
       providerId: 'openai',
       contextWindow: '128k context',
-      desc: 'Multimodal flagship with high-throughput tool calling and structured outputs.',
+      desc: t(
+        'settings.models.descGpt4o',
+        'Multimodal flagship with high-throughput tool calling and structured outputs.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/openai-def.svg' : '/media/provider/openai-light.svg'}
@@ -61,7 +69,10 @@ export function ModelsPage() {
       provider: 'OpenAI',
       providerId: 'openai',
       contextWindow: '200k context',
-      desc: 'Cost-efficient STEM and code reasoning with configurable effort tiers.',
+      desc: t(
+        'settings.models.descO3Mini',
+        'Cost-efficient STEM and code reasoning with configurable effort tiers.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/openai-def.svg' : '/media/provider/openai-light.svg'}
@@ -78,7 +89,10 @@ export function ModelsPage() {
       provider: 'Google',
       providerId: 'google',
       contextWindow: '1M context',
-      desc: 'Sub-second multimodal intelligence with expansive 1-million-token context.',
+      desc: t(
+        'settings.models.descGeminiFlash',
+        'Sub-second multimodal intelligence with expansive 1-million-token context.',
+      ),
       icon: <img src="/media/provider/google.svg" alt="Google" className="size-5 object-contain" />,
       type: 'cloud',
       capabilities: ['1M Context', 'Speed', 'Vision'],
@@ -89,7 +103,10 @@ export function ModelsPage() {
       provider: 'DeepSeek',
       providerId: 'deepseek',
       contextWindow: '64k context',
-      desc: 'Open-weight reasoning model matching frontier performance on math and code.',
+      desc: t(
+        'settings.models.descDeepseekR1',
+        'Open-weight reasoning model matching frontier performance on math and code.',
+      ),
       icon: (
         <img src="/media/provider/deepseek.svg" alt="DeepSeek" className="size-5 object-contain" />
       ),
@@ -102,7 +119,10 @@ export function ModelsPage() {
       provider: 'Qwen',
       providerId: 'qwen',
       contextWindow: '32k context',
-      desc: 'Specialized full-repo coding model optimized for terminal agent execution.',
+      desc: t(
+        'settings.models.descQwenCoder',
+        'Specialized full-repo coding model optimized for terminal agent execution.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/qwen.svg' : '/media/provider/qwen-light.svg'}
@@ -119,7 +139,10 @@ export function ModelsPage() {
       provider: 'Moonshot AI',
       providerId: 'moonshot',
       contextWindow: '128k context',
-      desc: 'Long-context multimodal reasoning with deep document analysis and planning.',
+      desc: t(
+        'settings.models.descKimi',
+        'Long-context multimodal reasoning with deep document analysis and planning.',
+      ),
       icon: (
         <img
           src="/media/provider/moonshot-mono.svg"
@@ -136,7 +159,10 @@ export function ModelsPage() {
       provider: 'Mistral AI',
       providerId: 'mistral',
       contextWindow: '256k context',
-      desc: 'Fill-in-the-middle code synthesis engine supporting 80+ programming languages.',
+      desc: t(
+        'settings.models.descCodestral',
+        'Fill-in-the-middle code synthesis engine supporting 80+ programming languages.',
+      ),
       icon: (
         <img
           src="/media/provider/mistral-color.svg"
@@ -153,7 +179,10 @@ export function ModelsPage() {
       provider: 'Ollama Local',
       providerId: 'ollama',
       contextWindow: '128k context',
-      desc: 'High-capability local weights running fully offline on localhost:11434.',
+      desc: t(
+        'settings.models.descLlamaLocal',
+        'High-capability local weights running fully offline on localhost:11434.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/ollama.svg' : '/media/provider/ollama-light.svg'}
@@ -170,7 +199,10 @@ export function ModelsPage() {
       provider: 'Ollama Local',
       providerId: 'ollama',
       contextWindow: '64k context',
-      desc: 'Quantized reasoning engine with zero telemetry or network egress.',
+      desc: t(
+        'settings.models.descDeepseekLocal',
+        'Quantized reasoning engine with zero telemetry or network egress.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/ollama.svg' : '/media/provider/ollama-light.svg'}
@@ -187,7 +219,10 @@ export function ModelsPage() {
       provider: 'Ollama Local',
       providerId: 'ollama',
       contextWindow: '32k context',
-      desc: 'Fast local coder for autocomplete, inline edits, and diff reviews.',
+      desc: t(
+        'settings.models.descQwenLocal',
+        'Fast local coder for autocomplete, inline edits, and diff reviews.',
+      ),
       icon: (
         <img
           src={isDark ? '/media/provider/ollama.svg' : '/media/provider/ollama-light.svg'}
@@ -204,7 +239,10 @@ export function ModelsPage() {
       provider: 'NVIDIA AI',
       providerId: 'nvidia',
       contextWindow: '4k context',
-      desc: 'Synthetic data generation and model-based verification pipeline.',
+      desc: t(
+        'settings.models.descNemotron',
+        'Synthetic data generation and model-based verification pipeline.',
+      ),
       icon: (
         <img
           src={
@@ -237,9 +275,14 @@ export function ModelsPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">AI Models</h2>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">
+          {t('settings.models.pageTitle', 'AI Models')}
+        </h2>
         <p className="text-xs text-foreground-secondary mt-1">
-          Configure default intelligence runtimes, model parameters, and automatic fallback chains.
+          {t(
+            'settings.models.pageDesc',
+            'Configure default intelligence runtimes, model parameters, and automatic fallback chains.',
+          )}
         </p>
       </div>
 
@@ -261,11 +304,11 @@ export function ModelsPage() {
       <section aria-labelledby="models-section-heading" className="space-y-4">
         <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
           <h3 id="models-section-heading" className="text-sm font-semibold text-foreground">
-            Available Models
+            {t('settings.models.listTitle', 'Available Models')}
           </h3>
           <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
             <HugeiconsIcon icon={Add01Icon} />
-            <span>Add custom model</span>
+            <span>{t('settings.models.addModel', 'Add custom model')}</span>
           </Button>
         </div>
 

@@ -1,4 +1,5 @@
-import * as React from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/shared/i18n/format';
 
 export type ProviderFilterTab = 'all' | 'configured';
 
@@ -18,7 +19,7 @@ function MetricBadge({ count, isActive }: { count: number; isActive: boolean }) 
           : 'bg-brand/10 text-brand border-brand/30 dark:bg-brand/20 dark:text-brand dark:border-brand/40'
       }`}
     >
-      {count}
+      {formatNumber(count)}
     </span>
   );
 }
@@ -29,8 +30,13 @@ export function ProviderFilterTabs({
   configuredCount = 0,
   totalCount,
 }: ProviderFilterTabsProps) {
+  const { t } = useTranslation();
   return (
-    <div role="tablist" aria-label="Provider filters" className="flex items-center gap-2">
+    <div
+      role="tablist"
+      aria-label={t('settings.providers.tabsLabel', 'Provider filters')}
+      className="flex items-center gap-2"
+    >
       <button
         type="button"
         role="tab"
@@ -42,7 +48,7 @@ export function ProviderFilterTabs({
             : 'text-foreground-secondary hover:text-foreground hover:bg-surface-hover'
         }`}
       >
-        <span>All providers</span>
+        <span>{t('settings.providers.allTab', 'All providers')}</span>
         {totalCount !== undefined && totalCount > 0 && (
           <MetricBadge count={totalCount} isActive={activeTab === 'all'} />
         )}
@@ -58,7 +64,7 @@ export function ProviderFilterTabs({
             : 'text-foreground-secondary hover:text-foreground hover:bg-surface-hover'
         }`}
       >
-        <span>Configured</span>
+        <span>{t('settings.providers.configuredTab', 'Configured')}</span>
         <MetricBadge count={configuredCount} isActive={activeTab === 'configured'} />
       </button>
     </div>

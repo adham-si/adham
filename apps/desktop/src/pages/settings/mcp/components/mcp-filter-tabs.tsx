@@ -1,4 +1,5 @@
-import * as React from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/shared/i18n/format';
 
 export type McpFilterTab = 'all' | 'configured' | 'available';
 
@@ -21,20 +22,29 @@ function MetricBadge({ count, isActive }: { count: number; isActive: boolean }) 
           : 'bg-brand/10 text-brand border-brand/30 dark:bg-brand/20 dark:text-brand dark:border-brand/40'
       }`}
     >
-      {count}
+      {formatNumber(count)}
     </span>
   );
 }
 
 export function McpFilterTabs({ activeTab, onTabChange, counts }: McpFilterTabsProps) {
+  const { t } = useTranslation();
   const tabs: Array<{ id: McpFilterTab; label: string; count: number }> = [
-    { id: 'all', label: 'All servers', count: counts.all },
-    { id: 'configured', label: 'Configured', count: counts.configured },
-    { id: 'available', label: 'Discover', count: counts.available },
+    { id: 'all', label: t('settings.mcp.allTab', 'All servers'), count: counts.all },
+    {
+      id: 'configured',
+      label: t('settings.mcp.configuredTab', 'Configured'),
+      count: counts.configured,
+    },
+    { id: 'available', label: t('settings.mcp.discoverTab', 'Discover'), count: counts.available },
   ];
 
   return (
-    <div role="tablist" aria-label="MCP server filters" className="flex items-center gap-2">
+    <div
+      role="tablist"
+      aria-label={t('settings.mcp.tabsLabel', 'MCP server filters')}
+      className="flex items-center gap-2"
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}

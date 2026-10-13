@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
@@ -16,6 +17,7 @@ import {
   cn,
 } from '@adham/ui';
 import { usePlatform } from '@/shared/platform';
+import { isRTL } from '@/shared/i18n';
 import { useShellLayout } from '../context';
 
 export interface TitlebarProps extends React.HTMLAttributes<HTMLElement> {
@@ -23,14 +25,36 @@ export interface TitlebarProps extends React.HTMLAttributes<HTMLElement> {
   className?: string;
 }
 
+function useLabels() {
+  const { t, i18n } = useTranslation();
+  const rtl = isRTL(i18n.language);
+  return {
+    t,
+    // Panel icons depict docked regions; mirror them with the layout so the
+    // glyph still points at the panel it toggles (deliberate, not decorative).
+    startPanelIcon: rtl ? LayoutAlignRightIcon : LayoutAlignLeftIcon,
+    endPanelIcon: rtl ? LayoutAlignLeftIcon : LayoutAlignRightIcon,
+  };
+}
+
 /**
  * Chromium / Brave style Titlebar component.
- * - Fixed height: 40px (Chrome/Chromium/VS Code standard)
- * - Top-left: Chrome-style secondary icon button with animated chevron (pointing down, animates to top on open)
- * - Navigation rail toggle button (<HugeiconsIcon icon={LayoutAlignLeftIcon} />) side by side
+ * - Fixed height: 40px (Chrome/Chromium/VS Code standard); 32px on macOS
+ *   (compact native adaptation, gated by platform.isMac — true during the
+ *   loading fallback on ambient macOS, so no height flash on startup)
+ * - macOS buttons: 28×28 hit areas, 16px icons, vertically centered; the
+ *   permanent boxed chrome (border, background, hover backplate) is removed
+ *   titlebar-locally via overrides below — shared button styles untouched.
+ *   Keyboard focus-visible, labels, pressed semantics and contrast stay.
+ * - Top: Chrome-style secondary icon button with animated chevron (vertical
+ *   open/close state, direction-neutral on purpose — no RTL mirroring)
+ * - Navigation rail toggle button side by side
  * - No app name or title text
  * - Draggable middle region with data-tauri-drag-region and double-click maximize/restore
- * - Top-right: Layout toggles (primary sidebar, panel, secondary sidebar), vertical separator, and window action controls
+ * - End side: Layout toggles (primary sidebar, panel, secondary sidebar), vertical separator, and window action controls
+ * - Native traffic lights: untouched size/placement/hover; physical-left
+ *   clearance (pl-20) applies in LTR and RTL; no added bottom margin, so the
+ *   shell's 4px content separation is preserved, not doubled.
  */
 export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarProps) {
   const {
@@ -43,6 +67,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
     secondarySidebarOpen,
     toggleSecondarySidebar,
   } = useShellLayout();
+  const { t, startPanelIcon, endPanelIcon } = useLabels();
   const platform = usePlatform();
   const [isMaximized, setIsMaximized] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -124,42 +149,71 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
     if (value === 'reload') window.location.reload();
   };
 
+  const navRailLabel = navRailOpen
+    ? t('titlebar.hideNavRail', 'Hide navigation rail')
+    : t('titlebar.showNavRail', 'Show navigation rail');
+  const sidebarLabel = sidebarOpen
+    ? t('titlebar.hideSidebar', 'Hide primary sidebar')
+    : t('titlebar.showSidebar', 'Show primary sidebar');
+  const panelLabel = panelOpen
+    ? t('titlebar.hidePanel', 'Hide panel')
+    : t('titlebar.showPanel', 'Show panel');
+  const secondaryLabel = secondarySidebarOpen
+    ? t('titlebar.hideSecondary', 'Hide secondary sidebar')
+    : t('titlebar.showSecondary', 'Show secondary sidebar');
+
+  // macOS compact treatment, titlebar-local only (shared button styles
+  // untouched). 28×28 hit area; 16px icons come from the existing
+  // `[&_svg]:size-icon-sm` (=16px) kept below. Removes the permanent boxed
+  // chrome; keyboard focus-visible, pressed semantics and contrast come from
+  // the untouched base variant. Gated by platform.isMac, which is already
+  // true during the loading fallback on ambient macOS.
+  const isMacCompact = platform.isMac;
+  const macCompactButton = isMacCompact
+    ? 'h-[28px] min-h-[28px] w-[28px] border-0 bg-transparent hover:bg-transparent'
+    : '';
+
   return (
     <header
-      aria-label="Application Titlebar"
+      aria-label={t('titlebar.appTitlebar', 'Application Titlebar')}
       className={cn(
-        'relative z-menu flex h-10 min-h-10 max-h-10 w-full shrink-0 items-center justify-between bg-background select-none',
+        'relative z-menu flex w-full shrink-0 items-center justify-between bg-background select-none',
+        isMacCompact ? 'h-[32px] min-h-[32px] max-h-[32px]' : 'h-10 min-h-10 max-h-10',
         platform.layout.hasNativeTitlebarControls &&
           !isFullscreen &&
           platform.layout.trafficLightClearanceClass,
+        isMacCompact && 'pl-[80px]',
         className,
       )}
       {...props}
     >
-      {/* Top-Left: NavRail toggle and Chrome tab-search style actions menu button */}
+      {/* Start: NavRail toggle and Chrome tab-search style actions menu button */}
       <div className={cn('flex items-center gap-1', platform.layout.titlebarStartPaddingClass)}>
         <button
           type="button"
           onClick={toggleNavRail}
-          aria-label={navRailOpen ? 'Hide navigation rail' : 'Show navigation rail'}
+          aria-label={navRailLabel}
           aria-pressed={navRailOpen}
-          title={navRailOpen ? 'Hide navigation rail' : 'Show navigation rail'}
+          title={navRailLabel}
           className={cn(
             buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-            'cursor-default select-none [&_svg]:size-icon-sm',
+            'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
+            macCompactButton,
+            navRailOpen ? 'text-action' : 'text-foreground-secondary hover:text-foreground',
           )}
         >
-          <HugeiconsIcon icon={LayoutAlignLeftIcon} />
+          <HugeiconsIcon icon={startPanelIcon} />
         </button>
 
         <div className="relative inline-flex">
           <MenuRoot open={menuOpen} onOpenChange={setMenuOpen}>
             <MenuTrigger
-              aria-label="Window and tab actions"
-              title="Actions"
+              aria-label={t('titlebar.windowActions', 'Window and tab actions')}
+              title={t('titlebar.actionsTitle', 'Actions')}
               className={cn(
                 buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-                'cursor-default select-none',
+                'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
+                macCompactButton,
               )}
             >
               {/* Arrow icon that smoothly animates between bottom and top on open/close */}
@@ -175,16 +229,20 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             </MenuTrigger>
 
             <MenuContent
-              label="Window Actions"
+              label={t('titlebar.windowActionsLabel', 'Window Actions')}
               onSelect={handleMenuSelect}
               className="start-0 top-full mt-1 z-menu min-w-44"
             >
-              <MenuItem value="new-session">New Session</MenuItem>
-              <MenuItem value="open-project">Open Project</MenuItem>
-              <MenuItem value="reload">Reload Window</MenuItem>
-              <MenuItem value="minimize">Minimize</MenuItem>
-              <MenuItem value="maximize">{isMaximized ? 'Restore' : 'Maximize'}</MenuItem>
-              <MenuItem value="close">Close Window</MenuItem>
+              <MenuItem value="new-session">{t('compose.newSession', 'New Session')}</MenuItem>
+              <MenuItem value="open-project">{t('titlebar.openProject', 'Open Project')}</MenuItem>
+              <MenuItem value="reload">{t('titlebar.reloadWindow', 'Reload Window')}</MenuItem>
+              <MenuItem value="minimize">{t('titlebar.minimize', 'Minimize')}</MenuItem>
+              <MenuItem value="maximize">
+                {isMaximized
+                  ? t('titlebar.restore', 'Restore')
+                  : t('titlebar.maximize', 'Maximize')}
+              </MenuItem>
+              <MenuItem value="close">{t('titlebar.closeWindow', 'Close Window')}</MenuItem>
             </MenuContent>
           </MenuRoot>
         </div>
@@ -197,7 +255,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
         className="flex h-full flex-1 cursor-default items-center justify-center"
       />
 
-      {/* Top-Right: Layout toggles, vertical separator, and window controls */}
+      {/* End: Layout toggles, vertical separator, and window controls */}
       <div
         className={cn(
           'flex h-full items-center',
@@ -210,31 +268,31 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
           <button
             type="button"
             onClick={toggleSidebar}
-            aria-label={sidebarOpen ? 'Hide primary sidebar' : 'Show primary sidebar'}
+            aria-label={sidebarLabel}
             aria-pressed={sidebarOpen}
-            title={sidebarOpen ? 'Hide primary sidebar' : 'Show primary sidebar'}
+            title={sidebarLabel}
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-              'cursor-default select-none [&_svg]:size-icon-sm',
-              !sidebarOpen &&
-                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
+              macCompactButton,
+              sidebarOpen ? 'text-action' : 'text-foreground-secondary hover:text-foreground',
             )}
           >
-            <HugeiconsIcon icon={LayoutAlignLeftIcon} />
+            <HugeiconsIcon icon={startPanelIcon} />
           </button>
 
           {/* Panel toggle */}
           <button
             type="button"
             onClick={togglePanel}
-            aria-label={panelOpen ? 'Hide panel' : 'Show panel'}
+            aria-label={panelLabel}
             aria-pressed={panelOpen}
-            title={panelOpen ? 'Hide panel' : 'Show panel'}
+            title={panelLabel}
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-              'cursor-default select-none [&_svg]:size-icon-sm',
-              !panelOpen &&
-                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
+              macCompactButton,
+              panelOpen ? 'text-action' : 'text-foreground-secondary hover:text-foreground',
             )}
           >
             <HugeiconsIcon icon={LayoutAlignBottomIcon} />
@@ -244,17 +302,19 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
           <button
             type="button"
             onClick={toggleSecondarySidebar}
-            aria-label={secondarySidebarOpen ? 'Hide secondary sidebar' : 'Show secondary sidebar'}
+            aria-label={secondaryLabel}
             aria-pressed={secondarySidebarOpen}
-            title={secondarySidebarOpen ? 'Hide secondary sidebar' : 'Show secondary sidebar'}
+            title={secondaryLabel}
             className={cn(
               buttonVariants({ variant: 'secondary', size: 'sm', iconOnly: true }),
-              'cursor-default select-none [&_svg]:size-icon-sm',
-              !secondarySidebarOpen &&
-                'text-foreground-secondary opacity-60 hover:opacity-100 hover:text-foreground',
+              'cursor-default select-none text-foreground-secondary [&_svg]:size-icon-sm',
+              macCompactButton,
+              secondarySidebarOpen
+                ? 'text-action'
+                : 'text-foreground-secondary hover:text-foreground',
             )}
           >
-            <HugeiconsIcon icon={LayoutAlignRightIcon} />
+            <HugeiconsIcon icon={endPanelIcon} />
           </button>
         </div>
 
@@ -272,8 +332,8 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             <button
               type="button"
               onClick={handleMinimize}
-              aria-label="Minimize"
-              title="Minimize"
+              aria-label={t('titlebar.minimize', 'Minimize')}
+              title={t('titlebar.minimize', 'Minimize')}
               className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
             >
               <AdhamIcon size="sm">
@@ -285,8 +345,12 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             <button
               type="button"
               onClick={handleToggleMaximize}
-              aria-label={isMaximized ? 'Restore' : 'Maximize'}
-              title={isMaximized ? 'Restore' : 'Maximize'}
+              aria-label={
+                isMaximized ? t('titlebar.restore', 'Restore') : t('titlebar.maximize', 'Maximize')
+              }
+              title={
+                isMaximized ? t('titlebar.restore', 'Restore') : t('titlebar.maximize', 'Maximize')
+              }
               className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
             >
               <AdhamIcon size="sm">
@@ -305,8 +369,8 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
             <button
               type="button"
               onClick={handleClose}
-              aria-label="Close"
-              title="Close"
+              aria-label={t('titlebar.close', 'Close')}
+              title={t('titlebar.close', 'Close')}
               className="flex h-full w-11 items-center justify-center text-foreground-secondary transition-colors hover:bg-danger hover:text-action-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
             >
               <AdhamIcon size="sm">

@@ -15,7 +15,7 @@ export function InfoPage() {
       ? 'Windows'
       : currentPlatform.isLinux
         ? 'Linux'
-        : 'Unknown Platform';
+        : t('settings.info.unknownPlatform', 'Unknown Platform');
   const platformLabel = currentPlatform.arch ? `${osLabel} (${currentPlatform.arch})` : osLabel;
 
   const sysInfo = {
@@ -52,16 +52,18 @@ export function InfoPage() {
       <section aria-labelledby="app-details-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="app-details-heading" className="text-sm font-semibold text-foreground">
-            Application details
+            {t('settings.info.detailsTitle', 'Application details')}
           </h3>
         </div>
         <div className="space-y-4">
           {/* Version */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">App version</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.info.versionLabel', 'App version')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Current installed client release
+                {t('settings.info.versionHint', 'Current installed client release')}
               </div>
             </div>
             <span className="font-mono text-xs font-semibold text-foreground">
@@ -72,9 +74,11 @@ export function InfoPage() {
           {/* Build */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Build identifier</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.info.buildLabel', 'Build identifier')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Git revision and compiler pipeline
+                {t('settings.info.buildHint', 'Git revision and compiler pipeline')}
               </div>
             </div>
             <span className="font-mono text-xs text-foreground-secondary">{sysInfo.build}</span>
@@ -83,9 +87,11 @@ export function InfoPage() {
           {/* Runtime Engine */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Runtime architecture</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.info.runtimeLabel', 'Runtime architecture')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Native process isolation and backend bindings
+                {t('settings.info.runtimeHint', 'Native process isolation and backend bindings')}
               </div>
             </div>
             <span className="text-xs text-foreground-secondary">{sysInfo.engine}</span>
@@ -94,9 +100,11 @@ export function InfoPage() {
           {/* Platform */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Host platform</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.info.platformLabel', 'Host platform')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Operating system and target architecture
+                {t('settings.info.platformHint', 'Operating system and target architecture')}
               </div>
             </div>
             <span className="text-xs text-foreground-secondary">{sysInfo.platform}</span>
@@ -108,7 +116,7 @@ export function InfoPage() {
       <section aria-labelledby="diagnostics-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="diagnostics-heading" className="text-sm font-semibold text-foreground">
-            Diagnostics & updates
+            {t('settings.info.diagnosticsTitle', 'Diagnostics & updates')}
           </h3>
         </div>
         <div className="space-y-4">
@@ -116,17 +124,20 @@ export function InfoPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
-                Check for updates automatically
+                {t('settings.info.autoUpdateLabel', 'Check for updates automatically')}
               </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Notify when new releases or security patches are available
+                {t(
+                  'settings.info.autoUpdateHint',
+                  'Notify when new releases or security patches are available',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={autoUpdate}
-              aria-label="Check for updates automatically"
+              aria-label={t('settings.info.autoUpdateLabel', 'Check for updates automatically')}
               onClick={() => setAutoUpdate(!autoUpdate)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 autoUpdate ? 'bg-action' : 'bg-surface-muted'
@@ -143,13 +154,20 @@ export function InfoPage() {
           {/* Copy Diagnostics Button */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Copy diagnostic report</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.info.copyReportLabel', 'Copy diagnostic report')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Export sanitized environment info for troubleshooting
+                {t(
+                  'settings.info.copyReportHint',
+                  'Export sanitized environment info for troubleshooting',
+                )}
               </div>
             </div>
             <Button size="sm" variant="secondary" onClick={handleCopyDiagnostics}>
-              {copied ? 'Copied ✓' : 'Copy JSON'}
+              {copied
+                ? t('settings.info.copied', 'Copied ✓')
+                : t('settings.info.copyJson', 'Copy JSON')}
             </Button>
           </div>
         </div>

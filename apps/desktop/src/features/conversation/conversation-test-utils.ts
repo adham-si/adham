@@ -27,7 +27,11 @@ export interface ConversationFakeBackend {
     ) => any
   >;
   getConversation: Mock<(workspaceId: string, projectId: string, sessionId: string) => any>;
+  listSessions: Mock<(...args: any[]) => any>;
   getStorageStatus: Mock<(...args: any[]) => any>;
+  recordPendingOperation: Mock<(...args: any[]) => any>;
+  listPendingOperations: Mock<() => any>;
+  clearPendingOperation: Mock<(...args: any[]) => any>;
 }
 
 export function fakeBackend(): ConversationFakeBackend {
@@ -58,7 +62,37 @@ export function fakeBackend(): ConversationFakeBackend {
       nextCursor: null,
       projectionPosition: '0',
     }),
+    listSessions: vi.fn().mockResolvedValue({
+      sessions: [
+        {
+          sessionId: 'sess-1',
+          title: null,
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    }),
     getStorageStatus: vi.fn(),
+    recordPendingOperation: vi.fn().mockImplementation((ws, proj, payload, opts) =>
+      Promise.resolve({
+        operationId: payload.operationId,
+        kind: payload.kind,
+        workspaceId: ws,
+        projectId: proj,
+        sessionId: opts?.sessionId ?? null,
+        createRequestId: payload.createRequestId ?? null,
+        messageRequestId: payload.messageRequestId,
+        text: payload.text,
+        title: payload.title ?? null,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      }),
+    ),
+    listPendingOperations: vi.fn().mockResolvedValue({
+      operations: [],
+      truncated: false,
+    }),
+    clearPendingOperation: vi.fn().mockResolvedValue(undefined),
   };
 }
 

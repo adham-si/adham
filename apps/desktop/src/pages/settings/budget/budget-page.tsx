@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/shared/i18n/format';
 
 export function BudgetPage() {
   const { t } = useTranslation();
@@ -28,15 +29,22 @@ export function BudgetPage() {
       {/* Spend Guardrails Section */}
       <div className="space-y-4">
         <div className="border-b border-border-subtle/40 pb-2">
-          <h3 className="text-sm font-semibold text-foreground">Spend guardrails</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            {t('settings.budget.spendTitle', 'Spend guardrails')}
+          </h3>
         </div>
         <div className="space-y-4">
           {/* Monthly Spend Limit */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Monthly API spend limit</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.budget.monthlyLabel', 'Monthly API spend limit')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Maximum dollar allowance across all connected cloud model providers
+                {t(
+                  'settings.budget.monthlyHint',
+                  'Maximum dollar allowance across all connected cloud model providers',
+                )}
               </div>
             </div>
             <select
@@ -44,20 +52,27 @@ export function BudgetPage() {
               onChange={(e) => setMonthlySpend(e.target.value)}
               className="min-h-control-sm rounded-md border border-border-subtle bg-surface px-3 py-1 text-xs text-foreground cursor-pointer hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <option value="20">$20.00 / month</option>
-              <option value="50">$50.00 / month</option>
-              <option value="100">$100.00 / month</option>
-              <option value="250">$250.00 / month</option>
-              <option value="unlimited">Unlimited (No cap)</option>
+              <option value="20">{t('settings.budget.perMonth', { amount: '$20.00' })}</option>
+              <option value="50">{t('settings.budget.perMonth', { amount: '$50.00' })}</option>
+              <option value="100">{t('settings.budget.perMonth', { amount: '$100.00' })}</option>
+              <option value="250">{t('settings.budget.perMonth', { amount: '$250.00' })}</option>
+              <option value="unlimited">
+                {t('settings.budget.unlimitedNoCap', 'Unlimited (No cap)')}
+              </option>
             </select>
           </div>
 
           {/* Daily Token Allowance */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Daily token allowance</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.budget.dailyLabel', 'Daily token allowance')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Target ceiling for total prompt and completion tokens per 24 hours
+                {t(
+                  'settings.budget.dailyHint',
+                  'Target ceiling for total prompt and completion tokens per 24 hours',
+                )}
               </div>
             </div>
             <select
@@ -65,19 +80,39 @@ export function BudgetPage() {
               onChange={(e) => setDailyTokens(e.target.value)}
               className="min-h-control-sm rounded-md border border-border-subtle bg-surface px-3 py-1 text-xs text-foreground cursor-pointer hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <option value="100k">100,000 tokens</option>
-              <option value="500k">500,000 tokens</option>
-              <option value="1m">1,000,000 tokens</option>
-              <option value="unlimited">Unlimited</option>
+              <option value="100k">
+                {t('settings.budget.tokensAllowed', {
+                  count: 100000,
+                  formatted: formatNumber(100000),
+                })}
+              </option>
+              <option value="500k">
+                {t('settings.budget.tokensAllowed', {
+                  count: 500000,
+                  formatted: formatNumber(500000),
+                })}
+              </option>
+              <option value="1m">
+                {t('settings.budget.tokensAllowed', {
+                  count: 1000000,
+                  formatted: formatNumber(1000000),
+                })}
+              </option>
+              <option value="unlimited">{t('settings.budget.unlimited', 'Unlimited')}</option>
             </select>
           </div>
 
           {/* Alert Threshold */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Warning threshold</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.budget.thresholdLabel', 'Warning threshold')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Trigger in-app notification before reaching hard cap
+                {t(
+                  'settings.budget.thresholdHint',
+                  'Trigger in-app notification before reaching hard cap',
+                )}
               </div>
             </div>
             <select
@@ -85,9 +120,9 @@ export function BudgetPage() {
               onChange={(e) => setAlertThreshold(e.target.value)}
               className="min-h-control-sm rounded-md border border-border-subtle bg-surface px-3 py-1 text-xs text-foreground cursor-pointer hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <option value="75">At 75% of limit</option>
-              <option value="80">At 80% of limit</option>
-              <option value="90">At 90% of limit</option>
+              <option value="75">{t('settings.budget.thresholdAt', { percent: 75 })}</option>
+              <option value="80">{t('settings.budget.thresholdAt', { percent: 80 })}</option>
+              <option value="90">{t('settings.budget.thresholdAt', { percent: 90 })}</option>
             </select>
           </div>
         </div>
@@ -96,22 +131,29 @@ export function BudgetPage() {
       {/* Enforcement Actions Section */}
       <div className="space-y-4">
         <div className="border-b border-border-subtle/40 pb-2">
-          <h3 className="text-sm font-semibold text-foreground">Enforcement actions</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            {t('settings.budget.enforcementTitle', 'Enforcement actions')}
+          </h3>
         </div>
         <div className="space-y-4">
           {/* Hard Stop Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Hard stop at limit</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.budget.hardStopLabel', 'Hard stop at limit')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Halt agent invocations immediately when monthly limit is reached
+                {t(
+                  'settings.budget.hardStopHint',
+                  'Halt agent invocations immediately when monthly limit is reached',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={hardStop}
-              aria-label="Hard stop at limit"
+              aria-label={t('settings.budget.hardStopLabel', 'Hard stop at limit')}
               onClick={() => setHardStop(!hardStop)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 hardStop ? 'bg-action' : 'bg-surface-muted'
@@ -129,17 +171,20 @@ export function BudgetPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
-                Automatic fallback to local Ollama
+                {t('settings.budget.fallbackLabel', 'Automatic fallback to local Ollama')}
               </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Switch seamlessly to local $0.00 models rather than aborting active work
+                {t(
+                  'settings.budget.fallbackHint',
+                  'Switch seamlessly to local $0.00 models rather than aborting active work',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={fallbackToLocal}
-              aria-label="Automatic fallback to local Ollama"
+              aria-label={t('settings.budget.fallbackLabel', 'Automatic fallback to local Ollama')}
               onClick={() => setFallbackToLocal(!fallbackToLocal)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 fallbackToLocal ? 'bg-action' : 'bg-surface-muted'
@@ -156,16 +201,21 @@ export function BudgetPage() {
           {/* Desktop Notifications Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Desktop budget alerts</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.budget.alertsLabel', 'Desktop budget alerts')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Display native Windows notifications when spending reaches threshold
+                {t(
+                  'settings.budget.alertsHint',
+                  'Display native Windows notifications when spending reaches threshold',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={desktopNotify}
-              aria-label="Desktop budget alerts"
+              aria-label={t('settings.budget.alertsLabel', 'Desktop budget alerts')}
               onClick={() => setDesktopNotify(!desktopNotify)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 desktopNotify ? 'bg-action' : 'bg-surface-muted'

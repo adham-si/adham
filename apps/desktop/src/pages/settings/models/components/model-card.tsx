@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 
 export interface ModelItem {
@@ -28,6 +29,7 @@ export function ModelCard({
   onSetDefault,
   onSetFallback,
 }: ModelCardProps) {
+  const { t } = useTranslation();
   return (
     <div
       className={`flex flex-col justify-between rounded-lg border p-3.5 transition-colors gap-3 ${
@@ -47,12 +49,12 @@ export function ModelCard({
               <span className="text-sm font-semibold text-foreground truncate">{model.name}</span>
               {isDefault && (
                 <span className="rounded bg-brand/15 border border-brand/30 px-1.5 py-0.5 text-[10px] font-semibold text-brand">
-                  Default
+                  {t('settings.models.badgeDefault', 'Default')}
                 </span>
               )}
               {isFallback && !isDefault && (
                 <span className="rounded bg-info-surface px-1.5 py-0.5 text-[10px] font-semibold text-info-foreground">
-                  Fallback
+                  {t('settings.models.badgeFallback', 'Fallback')}
                 </span>
               )}
             </div>
@@ -87,7 +89,7 @@ export function ModelCard({
               onClick={() => onSetDefault(model.id)}
               className="text-xs"
             >
-              Make default
+              {t('settings.models.makeDefault', 'Make default')}
             </Button>
           )}
           {!isFallback && !isDefault && (
@@ -97,7 +99,7 @@ export function ModelCard({
               onClick={() => onSetFallback(model.id)}
               className="text-xs text-foreground-secondary hover:text-foreground"
             >
-              Set fallback
+              {t('settings.models.setFallback', 'Set fallback')}
             </Button>
           )}
         </div>

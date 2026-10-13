@@ -27,23 +27,28 @@ export function PrivacyPage() {
       <section aria-labelledby="telemetry-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="telemetry-heading" className="text-sm font-semibold text-foreground">
-            Telemetry & analytics
+            {t('settings.privacy.telemetryTitle', 'Telemetry & analytics')}
           </h3>
         </div>
         <div className="space-y-4">
           {/* Crash Reports */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Anonymous crash reports</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.privacy.crashReportsLabel', 'Anonymous crash reports')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Automatically send anonymized crash dumps to improve system stability
+                {t(
+                  'settings.privacy.crashReportsHint',
+                  'Automatically send anonymized crash dumps to improve system stability',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={crashReports}
-              aria-label="Anonymous crash reports"
+              aria-label={t('settings.privacy.crashReportsLabel', 'Anonymous crash reports')}
               onClick={() => setCrashReports(!crashReports)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 crashReports ? 'bg-action' : 'bg-surface-muted'
@@ -60,16 +65,21 @@ export function PrivacyPage() {
           {/* Diagnostic Metrics */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Share usage analytics</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.privacy.usageAnalyticsLabel', 'Share usage analytics')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Help improve Adham by sharing anonymous feature interaction counts
+                {t(
+                  'settings.privacy.usageAnalyticsHint',
+                  'Help improve Adham by sharing anonymous feature interaction counts',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={diagnostics}
-              aria-label="Share usage analytics"
+              aria-label={t('settings.privacy.usageAnalyticsLabel', 'Share usage analytics')}
               onClick={() => setDiagnostics(!diagnostics)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 diagnostics ? 'bg-action' : 'bg-surface-muted'
@@ -89,23 +99,28 @@ export function PrivacyPage() {
       <section aria-labelledby="isolation-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="isolation-heading" className="text-sm font-semibold text-foreground">
-            Isolation & egress
+            {t('settings.privacy.isolationTitle', 'Isolation & egress')}
           </h3>
         </div>
         <div className="space-y-4">
           {/* Sandbox Isolation */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Strict sandbox containment</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.privacy.sandboxLabel', 'Strict sandbox containment')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Execute subagent tools in bounded staging directories without ambient host secrets
+                {t(
+                  'settings.privacy.sandboxHint',
+                  'Execute subagent tools in bounded staging directories without ambient host secrets',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={sandboxBoundary}
-              aria-label="Strict sandbox containment"
+              aria-label={t('settings.privacy.sandboxLabel', 'Strict sandbox containment')}
               onClick={() => setSandboxBoundary(!sandboxBoundary)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 sandboxBoundary ? 'bg-action' : 'bg-surface-muted'
@@ -122,16 +137,21 @@ export function PrivacyPage() {
           {/* Block Tool Network Egress */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Block tool network egress</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.privacy.blockEgressLabel', 'Block tool network egress')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Prevent sandboxed tools from making external HTTP/TCP requests
+                {t(
+                  'settings.privacy.blockEgressHint',
+                  'Prevent sandboxed tools from making external HTTP/TCP requests',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={blockOutbound}
-              aria-label="Block tool network egress"
+              aria-label={t('settings.privacy.blockEgressLabel', 'Block tool network egress')}
               onClick={() => setBlockOutbound(!blockOutbound)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 blockOutbound ? 'bg-action' : 'bg-surface-muted'

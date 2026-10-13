@@ -1,11 +1,15 @@
 pub mod conversation;
 pub mod message;
+pub mod pending;
+pub mod selection;
 pub mod session;
 pub mod system;
 pub mod workspace;
 
 pub use conversation::*;
 pub use message::*;
+pub use pending::*;
+pub use selection::*;
 pub use session::*;
 pub use system::*;
 pub use workspace::*;

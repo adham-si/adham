@@ -33,7 +33,7 @@ export type EventScope = { installation_id: InstallationId, workspace_id: Worksp
 
 export type CommandContext = { workspaceId: string | null, projectId: string | null, sessionId: string | null, };
 
-export type BootstrapState = { isInitialized: boolean, activeWorkspaceId: string | null, activeProjectId: string | null, };
+export type BootstrapState = { isInitialized: boolean, activeWorkspaceId: string | null, activeProjectId: string | null, installationId?: string | null, };
 
 export type PlatformInfo = { os: string, arch: string, hasNativeTitlebarControls: boolean, };
 
@@ -45,9 +45,17 @@ export type CreateProjectPayload = { name: string, storageKind: string, };
 
 export type ProjectSummary = { projectId: string, workspaceId: string, name: string, storageKind: string, createdAt: string, };
 
+export type SelectProjectPayload = { projectId: string, };
+
+export type WorkspaceList = { workspaces: Array<WorkspaceSummary>, truncated: boolean, };
+
+export type ProjectList = { workspaceId: string, projects: Array<ProjectSummary>, truncated: boolean, };
+
 export type CreateSessionPayload = { title: string | null, };
 
 export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, };
+
+export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, };
 
 export type SubmitMessagePayload = { text: string, };
 
@@ -60,4 +68,12 @@ export type ConversationPage = { items: Array<ConversationMessageDto>, nextCurso
 export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, };
 
 export type RebuildProjectionsResponse = { replayedCount: bigint, };
+
+export type RecordPendingOperationPayload = { operationId: string, kind: string, messageRequestId: string, createRequestId: string | null, text: string, title: string | null, };
+
+export type PendingOperationDto = { operationId: string, kind: string, workspaceId: string, projectId: string, sessionId: string | null, createRequestId: string | null, messageRequestId: string, text: string, title: string | null, status: string, createdAt: string, };
+
+export type PendingOperationList = { operations: Array<PendingOperationDto>, truncated: boolean, };
+
+export type ClearPendingOperationPayload = { operationId: string, expectedMessageRequestId: string, reason: string, };
 

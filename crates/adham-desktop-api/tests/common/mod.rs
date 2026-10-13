@@ -3,12 +3,14 @@ use adham_desktop_api::*;
 use adham_event_log::create_sqlite_pool;
 use std::path::{Path, PathBuf};
 
+#[allow(dead_code)]
 pub fn test_db_path() -> PathBuf {
     let mut path = std::env::temp_dir();
     path.push(format!("adham_p0_01_test_{}.db", uuid::Uuid::now_v7()));
     path
 }
 
+#[allow(dead_code)]
 pub async fn setup_ctx(db_path: &Path) -> ApiContext {
     let pool = create_sqlite_pool(db_path).await.expect("create pool");
     let provider: std::sync::Arc<dyn adham_event_log::ContentKeyProvider> =
@@ -70,6 +72,7 @@ pub async fn create_test_project(ctx: &ApiContext, ws_id: &str, name: &str) -> S
     res.data.project_id
 }
 
+#[allow(dead_code)]
 pub async fn create_test_session(
     ctx: &ApiContext,
     ws_id: &str,

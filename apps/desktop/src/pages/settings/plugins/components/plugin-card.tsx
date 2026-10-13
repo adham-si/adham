@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 
 export interface PluginItem {
@@ -16,6 +17,7 @@ interface PluginCardProps {
 }
 
 export function PluginCard({ plugin, isInstalled, onToggle }: PluginCardProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface p-3 transition-colors hover:bg-surface-subtle/40">
       <div className="flex items-center gap-3 min-w-0">
@@ -27,7 +29,7 @@ export function PluginCard({ plugin, isInstalled, onToggle }: PluginCardProps) {
             <span className="text-sm font-semibold text-foreground truncate">{plugin.name}</span>
             {isInstalled && (
               <span className="rounded bg-success-surface px-1.5 py-0.5 text-2xs font-medium text-success-foreground">
-                Installed
+                {t('settings.plugins.badgeInstalled', 'Installed')}
               </span>
             )}
             <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-2xs font-mono text-foreground-secondary uppercase">
@@ -45,7 +47,9 @@ export function PluginCard({ plugin, isInstalled, onToggle }: PluginCardProps) {
         onClick={() => onToggle(plugin.id)}
         className="ms-3 shrink-0"
       >
-        {isInstalled ? 'Installed' : 'Install'}
+        {isInstalled
+          ? t('settings.plugins.installedButton', 'Installed')
+          : t('settings.plugins.installButton', 'Install')}
       </Button>
     </div>
   );

@@ -70,8 +70,10 @@ export function RoutingPage() {
 
       {/* Footer Note */}
       <div className="pt-2 text-xs text-foreground-secondary">
-        Autonomous routing guarantee: Adham honors your workspace privacy baseline and never
-        silently charges or escalates beyond configured boundaries.
+        {t(
+          'settings.routing.footerNote',
+          'Autonomous routing guarantee: Adham honors your workspace privacy baseline and never silently charges or escalates beyond configured boundaries.',
+        )}
       </div>
     </div>
   );

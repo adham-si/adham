@@ -1,0 +1,597 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { useConversation } from './use-conversation';
+import { fakeBackend } from './conversation-test-utils';
+import { readPendingFirstSend, writePendingFirstSend } from './lazy-session-creation';
+
+beforeEach(() => {
+  sessionStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+function mockScopeB(backend: ReturnType<typeof fakeBackend>) {
+  backend.getBootstrapState.mockResolvedValueOnce({
+    isInitialized: true,
+    activeWorkspaceId: 'ws-B',
+    activeProjectId: 'proj-B',
+  });
+  backend.listSessions.mockResolvedValueOnce({
+    sessions: [
+      {
+        sessionId: 'sess-B',
+        title: null,
+        createdAt: '2026-10-09T00:00:02Z',
+      },
+    ],
+    truncated: false,
+  });
+  backend.getConversation.mockResolvedValueOnce({
+    items: [],
+    nextCursor: null,
+    projectionPosition: '0',
+  });
+}
+
+describe('useConversation cross-scope storage fencing & late completion guards', () => {
+  it('fences superseded first-send creation against storage side effects: cannot overwrite newer session cache, remove newer create intent, or unlock old sends', async () => {
+    const backend = fakeBackend();
+
+    // 1. Scope A starts in ready-no-session (empty session list)
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [],
+      truncated: false,
+    });
+    let resolveCreateA!: (value: unknown) => void;
+    backend.createSession.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCreateA = resolve as (value: unknown) => void;
+        }),
+    );
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBeNull();
+
+    // Scope A starts first send, which begins backend.createSession
+    let sendPromiseA: Promise<unknown>;
+    act(() => {
+      sendPromiseA = result.current.submit('hello A');
+    });
+    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+    expect(backend.createSession).toHaveBeenCalledWith(
+      'ws-A',
+      'proj-A',
+      { title: 'hello A' },
+      expect.objectContaining({ requestId: expect.any(String) }),
+    );
+
+    // 2. Before Scope A completes creation, out-of-band scope change to Scope B occurs
+    mockScopeB(backend);
+    await act(async () => {
+      result.current.refreshScope();
+    });
+
+    // Scope B resolves to ready and stores Scope B session cache
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    const cacheAfterB = JSON.parse(sessionStorage.getItem('adham:compose:session') ?? '{}');
+    expect(cacheAfterB).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+
+    // Write a mock Scope B create intent to ensure it is not wiped by superseded Scope A
+    sessionStorage.setItem(
+      'adham:compose:create-intent',
+      JSON.stringify({ requestId: 'intent-B', workspaceId: 'ws-B', projectId: 'proj-B' }),
+    );
+
+    // 3. Now, Scope A's createSession finally resolves late
+    await act(async () => {
+      resolveCreateA({
+        sessionId: 'sess-A-late',
+        projectId: 'proj-A',
+        title: null,
+        createdAt: '2026-10-09T00:00:01Z',
+      });
+      await sendPromiseA!;
+    });
+
+    // Assert: Scope B's context, messages, status, and error remain untouched
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+
+    // 4. Assert: Scope A DID NOT overwrite SESSION_CACHE_KEY
+    const cacheAfterLateA = JSON.parse(sessionStorage.getItem('adham:compose:session') ?? '{}');
+    expect(cacheAfterLateA).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+
+    // Assert: Scope A DID NOT clear Scope B's create intent
+    const intentAfterLateA = JSON.parse(
+      sessionStorage.getItem('adham:compose:create-intent') ?? '{}',
+    );
+    expect(intentAfterLateA).toEqual({
+      requestId: 'intent-B',
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+    });
+
+    // Assert: Senders cannot send to Scope A
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-B1',
+      sessionId: 'sess-B',
+      text: 'hello B',
+      createdAt: '2026-10-09T00:00:03Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('hello B');
+    });
+    expect(outcome).toEqual({ ok: true });
+    expect(backend.submitMessage).toHaveBeenCalledWith(
+      'ws-B',
+      'proj-B',
+      'sess-B',
+      { text: 'hello B' },
+      expect.any(Object),
+    );
+    expect(backend.submitMessage.mock.calls.some((call) => call[0] === 'ws-A')).toBe(false);
+  });
+
+  it('late A bootstrap after B becomes current: no stale creation dispatch or storage mutation', async () => {
+    const backend = fakeBackend();
+
+    // 1. Initial bootstrap for Scope A hangs
+    let resolveBootstrapA!: (value: unknown) => void;
+    backend.getBootstrapState.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveBootstrapA = resolve as (value: unknown) => void;
+        }),
+    );
+
+    const { result } = renderHook(() => useConversation({ backend }));
+
+    // 2. Out-of-band scope change to Scope B occurs
+    mockScopeB(backend);
+    await act(async () => {
+      result.current.refreshScope();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+
+    // Write a mock Scope B create intent
+    sessionStorage.setItem(
+      'adham:compose:create-intent',
+      JSON.stringify({ requestId: 'intent-B', workspaceId: 'ws-B', projectId: 'proj-B' }),
+    );
+
+    // 3. Scope A bootstrap resolves late
+    await act(async () => {
+      resolveBootstrapA({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-A',
+        activeProjectId: 'proj-A',
+      });
+    });
+
+    // 4. Assert: Scope A NEVER dispatched createSession (lazy creation on send only)
+    expect(backend.createSession).not.toHaveBeenCalled();
+
+    // Assert: Scope B cache and intent remain intact
+    const cache = JSON.parse(sessionStorage.getItem('adham:compose:session') ?? '{}');
+    expect(cache).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    const intent = JSON.parse(sessionStorage.getItem('adham:compose:create-intent') ?? '{}');
+    expect(intent).toEqual({
+      requestId: 'intent-B',
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+    });
+  });
+
+  it('late A creation rejection: neither overwrites B’s cache nor clears B’s intent', async () => {
+    const backend = fakeBackend();
+
+    // 1. Initial bootstrap for Scope A resolves to ready-no-session
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [],
+      truncated: false,
+    });
+    let rejectCreateA!: (err: unknown) => void;
+    backend.createSession.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectCreateA = reject;
+        }),
+    );
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBeNull();
+
+    // Scope A starts first send, which begins backend.createSession
+    let sendPromiseA: Promise<unknown>;
+    act(() => {
+      sendPromiseA = result.current.submit('hello A');
+    });
+    await waitFor(() => expect(backend.createSession).toHaveBeenCalledTimes(1));
+
+    // 2. Out-of-band scope change to Scope B occurs
+    mockScopeB(backend);
+    await act(async () => {
+      result.current.refreshScope();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+
+    // Write a mock Scope B create intent
+    sessionStorage.setItem(
+      'adham:compose:create-intent',
+      JSON.stringify({ requestId: 'intent-B', workspaceId: 'ws-B', projectId: 'proj-B' }),
+    );
+
+    // 3. Scope A's createSession rejects late with a definite pre-effect rejection
+    await act(async () => {
+      rejectCreateA({
+        code: 'VALIDATION_FAILED',
+        messageKey: 'error.validationFailed',
+      });
+      await sendPromiseA!;
+    });
+
+    // Assert: Scope B's context, messages, status, and error remain untouched
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+
+    // 4. Assert: Scope B cache and intent remain intact
+    const cache = JSON.parse(sessionStorage.getItem('adham:compose:session') ?? '{}');
+    expect(cache).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    const intent = JSON.parse(sessionStorage.getItem('adham:compose:create-intent') ?? '{}');
+    expect(intent).toEqual({
+      requestId: 'intent-B',
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+    });
+  });
+
+  it('late A message send failure: does not put Scope B into error state or overwrite context/messages', async () => {
+    const backend = fakeBackend();
+
+    // 1. Initial bootstrap for Scope A with existing session
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-A',
+          title: 'Session A',
+          createdAt: '2026-10-09T00:00:01Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+
+    let rejectSubmitA!: (err: unknown) => void;
+    backend.submitMessage.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectSubmitA = reject;
+        }),
+    );
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBe('sess-A');
+
+    // Scope A starts sending message
+    let sendPromiseA: Promise<unknown>;
+    act(() => {
+      sendPromiseA = result.current.submit('message A');
+    });
+    await waitFor(() => expect(backend.submitMessage).toHaveBeenCalledTimes(1));
+
+    // 2. Out-of-band scope change to Scope B occurs
+    mockScopeB(backend);
+    await act(async () => {
+      result.current.refreshScope();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+
+    // 3. Scope A's submitMessage rejects late with error
+    let outcomeA: unknown;
+    await act(async () => {
+      rejectSubmitA(new Error('Network connection dropped'));
+      outcomeA = await sendPromiseA!;
+    });
+    expect(outcomeA).toEqual({
+      ok: false,
+      error: 'Session changed while sending.',
+      uncertain: false,
+    });
+
+    // 4. Assert: Scope B's context, messages, status, and error remain completely untouched
+    expect(result.current.context).toEqual({
+      workspaceId: 'ws-B',
+      projectId: 'proj-B',
+      sessionId: 'sess-B',
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('does not treat pending first send with sessionId: null as permission to adopt existing session', async () => {
+    const backend = fakeBackend();
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-existing',
+          title: 'Existing Session',
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+
+    writePendingFirstSend({
+      workspaceId: 'ws-A',
+      projectId: 'proj-A',
+      sessionId: null,
+      text: 'Pending first message',
+      title: 'Pending first message',
+      createRequestId: 'req-create-1',
+      messageRequestId: 'req-msg-1',
+    });
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-existing'));
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('Arbitrary message in existing session');
+    });
+
+    expect(outcome).toEqual({
+      ok: false,
+      error:
+        'A previous first-message save is pending resolution. Resend or reload before starting another conversation.',
+      uncertain: true,
+    });
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+    const stored = readPendingFirstSend();
+    expect(stored?.sessionId).toBeNull();
+    expect(stored?.messageRequestId).toBe('req-msg-1');
+  });
+
+  it('creation committed but response lost recovers via explicit retry replaying original creation receipt', async () => {
+    const backend = fakeBackend();
+    // 1. Discovery initially loads existing session on mount
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-existing',
+          title: 'Existing Session',
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValue({
+      items: [
+        {
+          messageId: 'msg-existing-1',
+          role: 'user',
+          text: 'Existing message',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-1',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    });
+
+    // Pending first send recorded before mount with sessionId: null (response lost)
+    writePendingFirstSend({
+      workspaceId: 'ws-A',
+      projectId: 'proj-A',
+      sessionId: null,
+      text: 'First message text',
+      title: 'First message text',
+      createRequestId: 'create-req-123',
+      messageRequestId: 'msg-req-456',
+    });
+
+    // 2. Mount/remount: discovery opens the existing session
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(result.current.sessionId).toBe('sess-existing');
+
+    // Mock backend createSession replaying creation receipt idempotently
+    backend.createSession.mockResolvedValueOnce({
+      sessionId: 'sess-recovered-1',
+      projectId: 'proj-A',
+      title: 'First message text',
+      createdAt: '2026-10-09T00:00:01Z',
+    });
+    // Mock backend submitMessage saving message into the recovered session
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-recovered-1',
+      sessionId: 'sess-recovered-1',
+      text: 'First message text',
+      createdAt: '2026-10-09T00:00:01Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+
+    // 3. Explicit retry with original text
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('First message text');
+    });
+
+    // 4. Assert: replayed original creation receipt, saved into recovered session, cleared pending send
+    expect(outcome).toEqual({ ok: true });
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).toHaveBeenCalledWith(
+      'ws-A',
+      'proj-A',
+      { title: 'First message text' },
+      { requestId: 'create-req-123' },
+    );
+
+    expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+    expect(backend.submitMessage).toHaveBeenCalledWith(
+      'ws-A',
+      'proj-A',
+      'sess-recovered-1',
+      { text: 'First message text' },
+      { requestId: 'msg-req-456' },
+    );
+
+    expect(result.current.sessionId).toBe('sess-recovered-1');
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.text).toBe('First message text');
+    expect(readPendingFirstSend()).toBeNull();
+  });
+
+  it('unrelated successful message send in project B does not clear project A pending first send', async () => {
+    const backend = fakeBackend();
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-B',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-B-1',
+          title: 'Project B Session',
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-b-1',
+      sessionId: 'sess-B-1',
+      text: 'Hello from B',
+      createdAt: '2026-10-09T00:00:01Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+
+    const pendingA = {
+      workspaceId: 'ws-A',
+      projectId: 'proj-A',
+      sessionId: 'sess-A-created',
+      text: 'Pending in A',
+      title: 'Pending in A',
+      createRequestId: 'req-create-A',
+      messageRequestId: 'req-msg-A',
+    };
+    writePendingFirstSend(pendingA);
+
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.sessionId).toBe('sess-B-1');
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('Hello from B');
+    });
+
+    expect(outcome).toEqual({ ok: true });
+    expect(readPendingFirstSend()).toEqual(pendingA);
+  });
+});

@@ -17,6 +17,16 @@ export interface PrimarySidebarProps {
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: () => void;
   className?: string;
+  error?: string | null;
+  onRetry?: () => void;
+  truncated?: boolean;
+  creatingSession?: boolean;
+  /**
+   * Deliberate scope-selection UI (workspace/project discovery). When
+   * provided it replaces the static workspace/project labels, which remain
+   * as the unconfigured fallback.
+   */
+  selectionMenu?: React.ReactNode;
 }
 
 /**
@@ -24,15 +34,24 @@ export interface PrimarySidebarProps {
  * Constrained between min 272px and max 600px.
  */
 export function PrimarySidebar({
-  workspaceName = 'Personal Workspace',
-  projectName = 'Default Project',
+  workspaceName,
+  projectName,
   sessions = [],
   activeSessionId,
   onSelectSession,
   onNewSession,
   className = '',
+  error,
+  onRetry,
+  truncated,
+  creatingSession,
+  selectionMenu,
 }: PrimarySidebarProps) {
   const { t } = useTranslation();
+  // App-generated fallback names when no scope is configured yet.
+  const resolvedWorkspaceName =
+    workspaceName ?? t('sidebar.defaultWorkspace', 'Personal Workspace');
+  const resolvedProjectName = projectName ?? t('sidebar.defaultProject', 'Default Project');
   const { sidebarOpen, sidebarWidth, setSidebarWidth } = useShellLayout();
   const [searchFilter, setSearchFilter] = React.useState('');
   const isResizingRef = React.useRef(false);
@@ -44,7 +63,7 @@ export function PrimarySidebar({
       isResizingRef.current = true;
 
       const isRtl = document.documentElement.dir === 'rtl';
-      const railWidth = SHELL_DIMENSIONS.navRailWidth; // 40px
+      const railWidth = SHELL_DIMENSIONS.navRailWidth;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isResizingRef.current) return;
@@ -83,7 +102,7 @@ export function PrimarySidebar({
 
   return (
     <aside
-      aria-label="Primary Sidebar"
+      aria-label={t('sidebar.regionLabel', 'Primary Sidebar')}
       style={{
         width: `${sidebarWidth}px`,
         minWidth: `${SHELL_DIMENSIONS.minSidebarWidth}px`,
@@ -95,45 +114,52 @@ export function PrimarySidebar({
     >
       {/* Workspace Switcher & Context Header */}
       <div className="flex flex-col gap-1 border-b border-border-subtle p-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <span className="flex size-5 shrink-0 items-center justify-center rounded bg-selection font-bold text-xs text-action">
-              W
-            </span>
-            <span className="truncate text-xs font-semibold text-foreground">{workspaceName}</span>
-          </div>
-          <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] text-foreground-muted">
-            {t('compose.privacy')}
-          </span>
-        </div>
+        {selectionMenu ?? (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded bg-selection font-bold text-xs text-action">
+                  W
+                </span>
+                <span className="truncate text-xs font-semibold text-foreground">
+                  {resolvedWorkspaceName}
+                </span>
+              </div>
+              <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] text-foreground-muted">
+                {t('compose.privacy', 'Local')}
+              </span>
+            </div>
 
-        {/* Current Project & New Action */}
-        <div className="flex items-center justify-between gap-1">
-          <div className="flex items-center gap-1.5 overflow-hidden text-xs text-foreground-secondary">
-            <AdhamIcon size="sm" label={t('project')}>
-              <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </AdhamIcon>
-            <span className="truncate">{projectName}</span>
-          </div>
-        </div>
+            {/* Current Project & New Action */}
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1.5 overflow-hidden text-xs text-foreground-secondary">
+                <AdhamIcon size="sm" label={t('project', 'Project')}>
+                  <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </AdhamIcon>
+                <span className="truncate">{resolvedProjectName}</span>
+              </div>
+            </div>
+          </>
+        )}
 
         <Button
           variant="secondary"
           size="sm"
           onClick={onNewSession}
+          disabled={creatingSession}
           className="w-full justify-start text-xs"
         >
-          <AdhamIcon size="sm" label={t('compose.newSession')}>
+          <AdhamIcon size="sm" label={t('compose.newSession', 'New Session')}>
             <path d="M12 4v16m8-8H4" />
           </AdhamIcon>
-          <span className="truncate">{t('compose.newSession')}</span>
+          <span className="truncate">{t('compose.newSession', 'New Session')}</span>
         </Button>
       </div>
 
       {/* Filter / Search Bar */}
       <div className="border-b border-border-subtle px-3 py-2">
         <div className="flex items-center gap-1.5 rounded-md bg-surface-subtle px-2 py-1 text-xs text-foreground-secondary">
-          <AdhamIcon size="sm" label={t('rail.search')}>
+          <AdhamIcon size="sm" label={t('rail.search', 'Search')}>
             <path d="M21 21l-4.35-4.35" />
             <circle cx="11" cy="11" r="7" />
           </AdhamIcon>
@@ -141,7 +167,7 @@ export function PrimarySidebar({
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder={t('rail.search')}
+            placeholder={t('rail.search', 'Search')}
             className="w-full bg-transparent text-xs text-foreground placeholder:text-foreground-muted focus:outline-none"
           />
         </div>
@@ -150,15 +176,33 @@ export function PrimarySidebar({
       {/* Session History List */}
       <div className="flex-1 overflow-y-auto p-2">
         <div className="mb-1 px-2 py-1 text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
-          {t('sessions')}
+          {t('sessions', 'Sessions')}
         </div>
 
-        {filteredSessions.length === 0 ? (
+        {error ? (
+          <div
+            role="alert"
+            className="m-2 flex flex-col gap-2 rounded-md border border-status-danger/30 bg-status-danger/10 p-2.5 text-xs text-status-danger"
+          >
+            <span>{error}</span>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="self-start font-medium underline hover:opacity-80"
+              >
+                {t('common.retry', 'Retry')}
+              </button>
+            )}
+          </div>
+        ) : filteredSessions.length === 0 ? (
           <div className="px-2 py-4 text-center text-xs text-foreground-muted">
-            {searchFilter ? 'No sessions found' : t('compose.emptyHistory')}
+            {searchFilter
+              ? t('compose.noMatchingSessions', 'No sessions found')
+              : t('compose.emptyHistory', 'No sessions yet')}
           </div>
         ) : (
-          <nav aria-label="Sessions" className="flex flex-col gap-1">
+          <nav aria-label={t('sessions', 'Sessions')} className="flex flex-col gap-1">
             {filteredSessions.map((session) => (
               <SidebarItem
                 key={session.id}
@@ -171,6 +215,11 @@ export function PrimarySidebar({
                 <span className="truncate">{session.title}</span>
               </SidebarItem>
             ))}
+            {truncated && (
+              <div className="px-2 py-1 text-[11px] italic text-foreground-muted">
+                {t('sidebar.sessionsTruncated', 'Showing latest 100 sessions (truncated)')}
+              </div>
+            )}
           </nav>
         )}
       </div>
@@ -179,7 +228,7 @@ export function PrimarySidebar({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize primary sidebar"
+        aria-label={t('sidebar.resizeLabel', 'Resize primary sidebar')}
         onMouseDown={handleMouseDown}
         className="absolute top-0 bottom-0 end-0 w-1 cursor-col-resize transition-colors hover:bg-action"
       />

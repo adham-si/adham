@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { PluginCard, type PluginItem } from './plugin-card';
 
 interface PluginsListProps {
@@ -8,12 +8,18 @@ interface PluginsListProps {
 }
 
 export function PluginsList({ plugins, installedIds, onToggle }: PluginsListProps) {
+  const { t } = useTranslation();
   if (plugins.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border-subtle p-8 text-center">
-        <p className="text-sm font-medium text-foreground">No plugins match filter</p>
+        <p className="text-sm font-medium text-foreground">
+          {t('settings.plugins.emptyTitle', 'No plugins match filter')}
+        </p>
         <p className="text-xs text-foreground-secondary mt-1">
-          Switch to another tab or browse available extensions in the catalog.
+          {t(
+            'settings.plugins.emptyHint',
+            'Switch to another tab or browse available extensions in the catalog.',
+          )}
         </p>
       </div>
     );
