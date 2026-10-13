@@ -72,7 +72,7 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
 
       const header = container.querySelector('header');
       expect(header).not.toBeNull();
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
     });
 
     it('preserves physical traffic-light clearance on macOS in RTL direction', () => {
@@ -87,8 +87,8 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       const header = container.querySelector('header');
       expect(header).not.toBeNull();
       // On macOS, native traffic lights are physically on the left regardless of text direction.
-      // Physical pl-20 ensures that RTL layout items never encroach upon the 0..80px traffic light zone.
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      // Physical pl-[80px] ensures that RTL layout items never encroach upon the 0..80px traffic light zone.
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
 
       // Layout controls and NavRail remain accessible in RTL
       expect(screen.getByRole('button', { name: /primary sidebar/i })).not.toBeNull();
@@ -217,7 +217,7 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
 
       const header = container.querySelector('header');
       expect(header).not.toBeNull();
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
 
       // Custom caption controls remain suppressed
       expect(screen.queryByRole('button', { name: 'Minimize' })).toBeNull();
@@ -258,7 +258,7 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
 
       const header = container.querySelector('header');
       expect(header).not.toBeNull();
-      expect(header?.classList.contains('h-8')).toBe(true);
+      expect(header?.classList.contains('h-[32px]')).toBe(true);
       expect(header?.classList.contains('h-10')).toBe(false);
     });
 
@@ -270,7 +270,13 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       );
 
       const navRailBtn = screen.getByRole('button', { name: /navigation rail/i });
-      for (const cls of ['h-7', 'w-7', 'border-0', 'bg-transparent', 'hover:bg-transparent']) {
+      for (const cls of [
+        'h-[28px]',
+        'w-[28px]',
+        'border-0',
+        'bg-transparent',
+        'hover:bg-transparent',
+      ]) {
         expect(navRailBtn.classList.contains(cls)).toBe(true);
       }
       // Keyboard focus, labels, pressed semantics and icon scale stay.
@@ -312,8 +318,8 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       );
 
       const header = container.querySelector('header');
-      expect(header?.classList.contains('h-8')).toBe(true);
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      expect(header?.classList.contains('h-[32px]')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
       expect(screen.getByRole('button', { name: /primary sidebar/i })).not.toBeNull();
     });
 
@@ -328,8 +334,8 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       );
 
       const header = container.querySelector('header');
-      expect(header?.classList.contains('h-8')).toBe(true);
-      expect(header?.classList.contains('pl-20')).toBe(true);
+      expect(header?.classList.contains('h-[32px]')).toBe(true);
+      expect(header?.classList.contains('pl-[80px]')).toBe(true);
     });
 
     it('keeps the standard 40px boxed treatment off macOS', () => {
@@ -345,7 +351,7 @@ describe('Titlebar Platform-Chrome Adaptation', () => {
       expect(header?.classList.contains('h-10')).toBe(true);
       expect(header?.classList.contains('h-8')).toBe(false);
       const navRailBtn = screen.getByRole('button', { name: /navigation rail/i });
-      expect(navRailBtn.classList.contains('h-7')).toBe(false);
+      expect(navRailBtn.classList.contains('h-[28px]')).toBe(false);
     });
   });
 });

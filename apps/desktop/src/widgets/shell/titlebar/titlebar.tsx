@@ -170,7 +170,7 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
   // true during the loading fallback on ambient macOS.
   const isMacCompact = platform.isMac;
   const macCompactButton = isMacCompact
-    ? 'h-7 min-h-7 w-7 border-0 bg-transparent hover:bg-transparent'
+    ? 'h-[28px] min-h-[28px] w-[28px] border-0 bg-transparent hover:bg-transparent'
     : '';
 
   return (
@@ -178,10 +178,11 @@ export function Titlebar({ onActionSelect, className = '', ...props }: TitlebarP
       aria-label={t('titlebar.appTitlebar', 'Application Titlebar')}
       className={cn(
         'relative z-menu flex w-full shrink-0 items-center justify-between bg-background select-none',
-        isMacCompact ? 'h-8 min-h-8 max-h-8' : 'h-10 min-h-10 max-h-10',
+        isMacCompact ? 'h-[32px] min-h-[32px] max-h-[32px]' : 'h-10 min-h-10 max-h-10',
         platform.layout.hasNativeTitlebarControls &&
           !isFullscreen &&
           platform.layout.trafficLightClearanceClass,
+        isMacCompact && 'pl-[80px]',
         className,
       )}
       {...props}
