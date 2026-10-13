@@ -429,7 +429,7 @@ describe('useConversation cross-scope storage fencing & late completion guards',
 
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.submit('Pending first message');
+      outcome = await result.current.submit('Arbitrary message in existing session');
     });
 
     expect(outcome).toEqual({
@@ -442,6 +442,102 @@ describe('useConversation cross-scope storage fencing & late completion guards',
     const stored = readPendingFirstSend();
     expect(stored?.sessionId).toBeNull();
     expect(stored?.messageRequestId).toBe('req-msg-1');
+  });
+
+  it('creation committed but response lost recovers via explicit retry replaying original creation receipt', async () => {
+    const backend = fakeBackend();
+    // 1. Discovery initially loads existing session on mount
+    backend.getBootstrapState.mockResolvedValueOnce({
+      isInitialized: true,
+      activeWorkspaceId: 'ws-A',
+      activeProjectId: 'proj-A',
+    });
+    backend.listSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          sessionId: 'sess-existing',
+          title: 'Existing Session',
+          createdAt: '2026-10-09T00:00:00Z',
+        },
+      ],
+      truncated: false,
+    });
+    backend.getConversation.mockResolvedValue({
+      items: [
+        {
+          messageId: 'msg-existing-1',
+          role: 'user',
+          text: 'Existing message',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-1',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    });
+
+    // Pending first send recorded before mount with sessionId: null (response lost)
+    writePendingFirstSend({
+      workspaceId: 'ws-A',
+      projectId: 'proj-A',
+      sessionId: null,
+      text: 'First message text',
+      title: 'First message text',
+      createRequestId: 'create-req-123',
+      messageRequestId: 'msg-req-456',
+    });
+
+    // 2. Mount/remount: discovery opens the existing session
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(result.current.sessionId).toBe('sess-existing');
+
+    // Mock backend createSession replaying creation receipt idempotently
+    backend.createSession.mockResolvedValueOnce({
+      sessionId: 'sess-recovered-1',
+      projectId: 'proj-A',
+      title: 'First message text',
+      createdAt: '2026-10-09T00:00:01Z',
+    });
+    // Mock backend submitMessage saving message into the recovered session
+    backend.submitMessage.mockResolvedValueOnce({
+      messageId: 'msg-recovered-1',
+      sessionId: 'sess-recovered-1',
+      text: 'First message text',
+      createdAt: '2026-10-09T00:00:01Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    });
+
+    // 3. Explicit retry with original text
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.submit('First message text');
+    });
+
+    // 4. Assert: replayed original creation receipt, saved into recovered session, cleared pending send
+    expect(outcome).toEqual({ ok: true });
+    expect(backend.createSession).toHaveBeenCalledTimes(1);
+    expect(backend.createSession).toHaveBeenCalledWith(
+      'ws-A',
+      'proj-A',
+      { title: 'First message text' },
+      { requestId: 'create-req-123' },
+    );
+
+    expect(backend.submitMessage).toHaveBeenCalledTimes(1);
+    expect(backend.submitMessage).toHaveBeenCalledWith(
+      'ws-A',
+      'proj-A',
+      'sess-recovered-1',
+      { text: 'First message text' },
+      { requestId: 'msg-req-456' },
+    );
+
+    expect(result.current.sessionId).toBe('sess-recovered-1');
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.text).toBe('First message text');
+    expect(readPendingFirstSend()).toBeNull();
   });
 
   it('unrelated successful message send in project B does not clear project A pending first send', async () => {

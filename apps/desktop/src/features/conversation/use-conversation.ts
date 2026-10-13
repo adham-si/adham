@@ -465,7 +465,15 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           return { ok: false, error: pendingFirstBlocked, uncertain: true };
         }
 
-        if (ctx.sessionId === null) {
+        const pendingFirst = readPendingFirstSend();
+        const isPendingFirstRetryWithNullSession =
+          pendingFirst !== null &&
+          pendingFirst.workspaceId === ctx.workspaceId &&
+          pendingFirst.projectId === ctx.projectId &&
+          pendingFirst.sessionId === null &&
+          pendingFirst.text === trimmed;
+
+        if (ctx.sessionId === null || isPendingFirstRetryWithNullSession) {
           const generation = generationRef.current;
           setStatus('submitting');
           setError(null);
@@ -486,7 +494,11 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             requestedRef.current = outcome.context;
             mutationSeqRef.current += 1;
             setMessages((prev) =>
-              prev.some((m) => m.id === outcome.message.id) ? prev : [...prev, outcome.message],
+              ctx.sessionId === outcome.context.sessionId
+                ? prev.some((m) => m.id === outcome.message.id)
+                  ? prev
+                  : [...prev, outcome.message]
+                : [outcome.message],
             );
             const instId = outcome.context.installationId ?? installationIdRef.current;
             if (
