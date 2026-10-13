@@ -1,3 +1,4 @@
+import i18n from '@/shared/i18n';
 import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { SessionSummary as ContractSessionSummary } from '@adham/contracts-generated';
@@ -73,7 +74,7 @@ export function useProjectSessions({
       setSessions(mapped);
     } catch (err) {
       if (seq !== fetchSeqRef.current) return;
-      setError(err instanceof Error ? err.message : 'Failed to list sessions.');
+      setError(err instanceof Error ? err.message : i18n.t('conversation.listFailed'));
     } finally {
       if (seq === fetchSeqRef.current) {
         setLoading(false);
@@ -135,9 +136,7 @@ export function useProjectSessions({
     // Block starting a new session while a send is unresolved (in this or another scope)
     const pendingFirst = readPendingFirstSend();
     if (pendingFirst) {
-      setError(
-        'A first-message save is pending resolution. Resend or resolve it before starting another session.',
-      );
+      setError(i18n.t('conversation.firstSendPendingSession'));
       return;
     }
 
@@ -147,9 +146,7 @@ export function useProjectSessions({
       pendingSend.workspaceId === workspaceId &&
       pendingSend.projectId === projectId
     ) {
-      setError(
-        'A previous message save is pending resolution. Resend or reload before starting a new session.',
-      );
+      setError(i18n.t('conversation.prevMessagePending'));
       return;
     }
 

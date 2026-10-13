@@ -148,7 +148,11 @@ export function ProvisionDialog({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void handleSubmit();
               }}
-              placeholder={isWorkspace ? 'Personal' : 'My project'}
+              placeholder={
+                isWorkspace
+                  ? t('provision.workspacePlaceholder')
+                  : t('provision.projectPlaceholder')
+              }
               disabled={prov.working}
               aria-label={label}
             />

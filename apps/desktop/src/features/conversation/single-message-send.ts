@@ -1,3 +1,4 @@
+import i18n from '@/shared/i18n';
 import type { ConversationBackend } from './conversation-scope';
 import {
   isDefinitePreEffectRejection,
@@ -47,7 +48,7 @@ export async function performSingleMessageSend(
 
   const trimmed = text.trim();
   if (!trimmed) {
-    return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+    return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
   }
 
   const pending = readPendingSend();
@@ -62,8 +63,7 @@ export async function performSingleMessageSend(
       requestId = pending.requestId;
       reusedFrozenIdentity = true;
     } else {
-      const message =
-        'A previous message has an unknown save status. Reload history or resend it before sending another message.';
+      const message = i18n.t('conversation.unknownSaveReload');
       return { ok: false, error: message, uncertain: true };
     }
   } else if (
@@ -75,8 +75,7 @@ export async function performSingleMessageSend(
       requestId = pendingFirst.messageRequestId;
       reusedFrozenIdentity = true;
     } else {
-      const message =
-        'A previous first-message save is pending resolution. Resend or reload before starting another conversation.';
+      const message = i18n.t('conversation.firstSendPendingReload');
       return { ok: false, error: message, uncertain: true };
     }
   } else {
@@ -94,7 +93,7 @@ export async function performSingleMessageSend(
   if (!reusedFrozenIdentity && !writePendingSend(record)) {
     return {
       ok: false,
-      error: 'Save identity could not be recorded. The message was not sent.',
+      error: i18n.t('conversation.identityNotRecorded'),
       uncertain: false,
     };
   }
@@ -132,7 +131,7 @@ export async function performSingleMessageSend(
 
     if (isStale()) {
       clearFrozenIdentity();
-      return { ok: false, error: 'Session changed while sending.', uncertain: false };
+      return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
 
     clearFrozenIdentity();
@@ -149,18 +148,18 @@ export async function performSingleMessageSend(
     const definite = isDefinitePreEffectRejection(err);
     if (isStale()) {
       if (definite) clearFrozenIdentity();
-      return { ok: false, error: 'Session changed while sending.', uncertain: false };
+      return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
     }
     if (definite) {
       clearFrozenIdentity();
       const message = rejectionMessage(err);
       return { ok: false, error: message, uncertain: false };
     }
-    const message = err instanceof Error ? err.message : 'Message was not saved.';
+    const message = err instanceof Error ? err.message : i18n.t('error.notSaved');
     return {
       ok: false,
       error: message,
-      displayError: `${message} Save status is unknown. Reload history before resending.`,
+      displayError: i18n.t('conversation.saveUnknownSuffix', { message }),
       uncertain: true,
     };
   }
