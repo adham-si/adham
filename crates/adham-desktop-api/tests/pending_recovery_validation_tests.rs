@@ -35,7 +35,9 @@ async fn test_single_message_requires_session_and_forbids_first_send_fields() {
     )
     .await;
     assert!(res_missing_sess.is_err());
-    assert!(res_missing_sess.unwrap_err().contains("session_id context required for single_message"));
+    assert!(res_missing_sess
+        .unwrap_err()
+        .contains("session_id context required for single_message"));
 
     // 2. create_request_id present on single_message must be rejected
     let res_with_create_id = handle_record_pending_operation(
@@ -60,7 +62,9 @@ async fn test_single_message_requires_session_and_forbids_first_send_fields() {
     )
     .await;
     assert!(res_with_create_id.is_err());
-    assert!(res_with_create_id.unwrap_err().contains("create_request_id prohibited for single_message"));
+    assert!(res_with_create_id
+        .unwrap_err()
+        .contains("create_request_id prohibited for single_message"));
 
     // 3. title present on single_message must be rejected
     let res_with_title = handle_record_pending_operation(
@@ -85,7 +89,9 @@ async fn test_single_message_requires_session_and_forbids_first_send_fields() {
     )
     .await;
     assert!(res_with_title.is_err());
-    assert!(res_with_title.unwrap_err().contains("title prohibited for single_message"));
+    assert!(res_with_title
+        .unwrap_err()
+        .contains("title prohibited for single_message"));
 
     let _ = std::fs::remove_file(db_path);
 }
@@ -119,7 +125,9 @@ async fn test_first_send_requires_create_request_id() {
     )
     .await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("create_request_id required for first_send"));
+    assert!(res
+        .unwrap_err()
+        .contains("create_request_id required for first_send"));
 
     let _ = std::fs::remove_file(db_path);
 }
@@ -148,7 +156,9 @@ async fn test_clear_reason_validation() {
     )
     .await;
     assert!(res_invalid_reason.is_err());
-    assert!(res_invalid_reason.unwrap_err().contains("reason must be resolved or dismissed"));
+    assert!(res_invalid_reason
+        .unwrap_err()
+        .contains("reason must be resolved or dismissed"));
 
     let _ = std::fs::remove_file(db_path);
 }

@@ -67,10 +67,14 @@ pub async fn record_pending_operation(
 
     if env.payload.kind == "single_message" {
         if sess_id.is_none() {
-            return Err("VALIDATION_FAILED: session_id context required for single_message".to_string());
+            return Err(
+                "VALIDATION_FAILED: session_id context required for single_message".to_string(),
+            );
         }
         if create_req_id.is_some() {
-            return Err("VALIDATION_FAILED: create_request_id prohibited for single_message".to_string());
+            return Err(
+                "VALIDATION_FAILED: create_request_id prohibited for single_message".to_string(),
+            );
         }
         if env.payload.title.is_some() {
             return Err("VALIDATION_FAILED: title prohibited for single_message".to_string());

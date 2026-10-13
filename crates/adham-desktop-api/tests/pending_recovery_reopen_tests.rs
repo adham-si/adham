@@ -267,15 +267,28 @@ async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
             .await
             .expect("list pending ops on relaunch");
 
-        assert_eq!(list.operations.len(), 1, "must discover unresolved operation on relaunch");
+        assert_eq!(
+            list.operations.len(),
+            1,
+            "must discover unresolved operation on relaunch"
+        );
         let op = &list.operations[0];
         assert_eq!(op.operation_id, op_id);
         assert_eq!(op.workspace_id, ws_id);
         assert_eq!(op.project_id, proj_id);
-        assert_eq!(op.create_request_id.as_deref(), Some(original_create_req_id.as_str()));
+        assert_eq!(
+            op.create_request_id.as_deref(),
+            Some(original_create_req_id.as_str())
+        );
         assert_eq!(op.message_request_id, original_msg_req_id);
         assert_eq!(op.text, test_text);
         assert_eq!(op.title.as_deref(), Some(test_title));
+
+        let scope_ctx = CommandContext {
+            workspace_id: Some(ws_id.clone()),
+            project_id: Some(proj_id.clone()),
+            session_id: None,
+        };
 
         // 3. User performs explicit resend: replays with original request identities
         let create_res = handle_create_session(
@@ -283,11 +296,7 @@ async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
             CommandEnvelope {
                 protocol_version: 1,
                 request_id: original_create_req_id.clone(),
-                context: CommandContext {
-                    workspace_id: Some(ws_id.clone()),
-                    project_id: Some(proj_id.clone()),
-                    session_id: None,
-                },
+                context: scope_ctx.clone(),
                 payload: CreateSessionPayload {
                     title: Some(test_title.to_string()),
                 },
@@ -297,17 +306,17 @@ async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
         .expect("replay create session on resend");
 
         let recovered_session_id = create_res.data.session_id;
+        let session_ctx = CommandContext {
+            session_id: Some(recovered_session_id.clone()),
+            ..scope_ctx.clone()
+        };
 
         let submit_res = handle_submit_message(
             &relaunch_ctx,
             CommandEnvelope {
                 protocol_version: 1,
                 request_id: original_msg_req_id.clone(),
-                context: CommandContext {
-                    workspace_id: Some(ws_id.clone()),
-                    project_id: Some(proj_id.clone()),
-                    session_id: Some(recovered_session_id.clone()),
-                },
+                context: session_ctx.clone(),
                 payload: SubmitMessagePayload {
                     text: test_text.to_string(),
                 },
@@ -324,14 +333,10 @@ async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
             CommandEnvelope {
                 protocol_version: 1,
                 request_id: RequestId::new_v7().to_string(),
-                context: CommandContext {
-                    workspace_id: Some(ws_id.clone()),
-                    project_id: Some(proj_id.clone()),
-                    session_id: Some(recovered_session_id.clone()),
-                },
+                context: session_ctx.clone(),
                 payload: ClearPendingOperationPayload {
                     operation_id: op_id,
-                    expected_message_request_id: original_msg_req_id.clone(),
+                    expected_message_request_id: original_msg_req_id,
                     reason: "resolved".to_string(),
                 },
             },
@@ -339,17 +344,13 @@ async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
         .await
         .expect("clear resolved pending operation");
 
-        // 4. Verify ZERO duplicates: re-invoking create_session with original_create_req_id returns existing receipt
-        let duplicate_create_res = handle_create_session(
+        // 4. Verify ZERO duplicates: re-invoking create_session returns existing receipt
+        let dup = handle_create_session(
             &relaunch_ctx,
             CommandEnvelope {
                 protocol_version: 1,
                 request_id: original_create_req_id,
-                context: CommandContext {
-                    workspace_id: Some(ws_id.clone()),
-                    project_id: Some(proj_id.clone()),
-                    session_id: None,
-                },
+                context: scope_ctx,
                 payload: CreateSessionPayload {
                     title: Some(test_title.to_string()),
                 },
@@ -358,10 +359,7 @@ async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
         .await
         .expect("idempotent create session call");
 
-        assert_eq!(
-            duplicate_create_res.data.session_id, recovered_session_id,
-            "must return identical session_id without allocating new session"
-        );
+        assert_eq!(dup.data.session_id, recovered_session_id);
 
         // Verify conversation history has exactly 1 message
         let conv = handle_get_conversation(
@@ -375,16 +373,22 @@ async fn test_native_quit_relaunch_recovery_journey_zero_duplicates() {
         .await
         .expect("get conversation");
 
-        assert_eq!(conv.items.len(), 1, "exactly one message must exist, zero duplicates");
+        assert_eq!(
+            conv.items.len(),
+            1,
+            "exactly one message must exist, zero duplicates"
+        );
         assert_eq!(conv.items[0].text, test_text);
 
         // Verify pending operations list is empty
         let empty_list = handle_list_pending_operations(&relaunch_ctx)
             .await
             .expect("list pending ops after resolution");
-        assert!(empty_list.operations.is_empty(), "pending operations must be empty");
+        assert!(
+            empty_list.operations.is_empty(),
+            "pending operations must be empty"
+        );
     }
 
     let _ = std::fs::remove_file(db_path);
 }
-

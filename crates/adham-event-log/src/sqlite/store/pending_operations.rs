@@ -347,7 +347,9 @@ impl SqliteEventStore {
         reason: &str,
     ) -> Result<(), DomainError> {
         if reason != "resolved" && reason != "dismissed" {
-            return Err(DomainError::Validation("reason must be resolved or dismissed".into()));
+            return Err(DomainError::Validation(
+                "reason must be resolved or dismissed".into(),
+            ));
         }
         let row = sqlx::query(
             "SELECT message_request_id, content_id, title_content_id FROM pending_operations WHERE operation_id = ?",
