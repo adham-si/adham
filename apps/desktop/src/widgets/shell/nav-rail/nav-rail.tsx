@@ -39,7 +39,7 @@ export function NavRail({
         minHeight: 0,
         ...style,
       }}
-      className={`flex w-10 min-w-10 max-w-10 shrink-0 flex-col items-center justify-between rounded-xl border border-border-subtle bg-surface py-2 select-none overflow-hidden ${className}`}
+      className={`flex w-14 min-w-14 max-w-14 shrink-0 flex-col items-center justify-between rounded-xl border border-border-subtle bg-surface py-2 select-none overflow-hidden ${className}`}
       {...props}
     >
       {children ??
@@ -53,7 +53,7 @@ export function NavRail({
                 aria-label={t('workspace', 'Workspace')}
                 title={t('workspace', 'Workspace')}
                 className={cn(
-                  'flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-sm',
+                  'flex h-10 min-h-10 w-10 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-md',
                   sidebarOpen && 'bg-selection text-action',
                 )}
               >
@@ -68,7 +68,7 @@ export function NavRail({
                 onClick={() => openSettings()}
                 aria-label={t('settings.title', 'Settings')}
                 title={t('settings.title', 'Settings')}
-                className="flex min-h-control-sm w-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-sm"
+                className="flex h-10 min-h-10 w-10 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&_svg]:size-icon-md"
               >
                 <HugeiconsIcon icon={Settings01Icon} />
               </button>
