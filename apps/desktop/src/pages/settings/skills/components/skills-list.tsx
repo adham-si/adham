@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { SkillCard, type SkillItem } from './skill-card';
 
 interface SkillsListProps {
@@ -8,12 +9,18 @@ interface SkillsListProps {
 }
 
 export function SkillsList({ skills, activeIds, onToggle }: SkillsListProps) {
+  const { t } = useTranslation();
   if (skills.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border-subtle p-8 text-center">
-        <p className="text-sm font-medium text-foreground">No agent skills match filter</p>
+        <p className="text-sm font-medium text-foreground">
+          {t('settings.skills.emptyTitle', 'No agent skills match filter')}
+        </p>
         <p className="text-xs text-foreground-secondary mt-1">
-          Switch to another tab or add a new skill to your workspace.
+          {t(
+            'settings.skills.emptyHint',
+            'Switch to another tab or add a new skill to your workspace.',
+          )}
         </p>
       </div>
     );

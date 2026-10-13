@@ -50,6 +50,14 @@ function resourceValue(language: 'en' | 'ar', key: string): unknown {
   return value;
 }
 
+// Plural bases (e.g. compose.pastedChars) have only suffixed leaves;
+// probe the `other` form for those.
+function probeValue(language: 'en' | 'ar', key: string): unknown {
+  const direct = resourceValue(language, key);
+  if (typeof direct === 'string') return direct;
+  return resourceValue(language, `${key}_other`);
+}
+
 function placeholders(value: string) {
   return [...value.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)].map((match) => match[1]).sort();
 }
@@ -78,11 +86,22 @@ describe('initial journey English / Arabic localization', () => {
     async (lng) => {
       const instance = await translator(lng);
       for (const key of journeyKeys) {
-        const value = resourceValue(lng, key);
+        const value = probeValue(lng, key);
         expect(typeof value, `${lng}:${key}`).toBe('string');
         expect(String(value).trim(), `${lng}:${key}`).not.toBe('');
-        expect(instance.exists(key), `${lng}:${key}`).toBe(true);
-        expect(instance.t(key, { name: 'Synthetic project' }), `${lng}:${key}`).not.toBe(key);
+        expect(instance.exists(key, { count: 5 }), `${lng}:${key}`).toBe(true);
+        expect(
+          instance.t(key, {
+            count: 5,
+            name: 'Synthetic project',
+            formatted: '5',
+            firstLine: 'x',
+            used: '1',
+            total: '2',
+            percent: 50,
+          }),
+          `${lng}:${key}`,
+        ).not.toBe(key);
       }
     },
   );
@@ -98,10 +117,10 @@ describe('initial journey English / Arabic localization', () => {
 
   it('preserves interpolation placeholders in every audited translation', () => {
     for (const key of journeyKeys) {
-      expect(typeof resourceValue('en', key), key).toBe('string');
-      expect(typeof resourceValue('ar', key), key).toBe('string');
-      expect(placeholders(String(resourceValue('ar', key))), key).toEqual(
-        placeholders(String(resourceValue('en', key))),
+      expect(typeof probeValue('en', key), key).toBe('string');
+      expect(typeof probeValue('ar', key), key).toBe('string');
+      expect(placeholders(String(probeValue('ar', key))), key).toEqual(
+        placeholders(String(probeValue('en', key))),
       );
     }
     expect(placeholders(String(resourceValue('en', 'firstProjectIn')))).toEqual(['name']);

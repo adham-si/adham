@@ -1,0 +1,38 @@
+{
+  "appName": "Adham",
+  "tagline": "您唯一需要的 AI 工作空间",
+  "welcome": "您想开始什么工作？",
+  "workspace": "工作区",
+  "project": "项目",
+  "session": "会话",
+  "sessions": "会话",
+  "selectScope": "选择工作区 / 项目",
+  "noWorkspaces": "暂无工作区",
+  "loading": "加载中…",
+  "projectsLoadFailed": "项目加载失败",
+  "createFirstProject": "创建第一个项目…",
+  "noProjects": "暂无项目",
+  "truncatedProjects": "仅显示前 100 个项目",
+  "truncatedWorkspaces": "仅显示前 100 个工作区",
+  "retry": "重试",
+  "firstProjectIn": "{{name}} 中的第一个项目",
+  "allWorkspaces": "所有工作区",
+  "common": {
+    "retry": "重试",
+    "systemDefault": "系统默认",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "small": "小",
+    "large": "大"
+  },
+  "error": {
+    "validationFailed": "此名称无效，请更正后重试。",
+    "invalidProtocolVersion": "此应用版本不受支持，请更新后重试。",
+    "workspaceNotFound": "未找到工作区。",
+    "projectNotFound": "未找到项目。",
+    "sessionNotFound": "未找到会话。",
+    "contextMismatch": "选择已更改，请重新加载后重试。",
+    "requestIdConflict": "请求冲突，请重试。",
+    "notSaved": "消息未保存。"
+  }
+}

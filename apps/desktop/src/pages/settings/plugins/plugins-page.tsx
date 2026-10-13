@@ -26,56 +26,80 @@ export function PluginsPage() {
     {
       id: 'core-tools',
       name: 'Adham Core Tools',
-      desc: 'Foundational workspace runtime and core execution primitives.',
+      desc: t(
+        'settings.plugins.descCoreTools',
+        'Foundational workspace runtime and core execution primitives.',
+      ),
       icon: <HugeiconsIcon icon={PuzzleIcon} />,
       category: 'core',
     },
     {
       id: 'git-bridge',
       name: 'Git Automation',
-      desc: 'Inspect commit history, manage branches, and automate safe staging.',
+      desc: t(
+        'settings.plugins.descGitBridge',
+        'Inspect commit history, manage branches, and automate safe staging.',
+      ),
       icon: <HugeiconsIcon icon={GitBranchIcon} />,
       category: 'git',
     },
     {
       id: 'linter-sync',
       name: 'Diagnostic Bridge',
-      desc: 'Live linter diagnostics, type-checking, and compiler error inspection.',
+      desc: t(
+        'settings.plugins.descLinterSync',
+        'Live linter diagnostics, type-checking, and compiler error inspection.',
+      ),
       icon: <HugeiconsIcon icon={SourceCodeIcon} />,
       category: 'dx',
     },
     {
       id: 'terminal-runner',
       name: 'Terminal Sandbox',
-      desc: 'Execute shell tasks in isolated environments with safety approval.',
+      desc: t(
+        'settings.plugins.descTerminalRunner',
+        'Execute shell tasks in isolated environments with safety approval.',
+      ),
       icon: <HugeiconsIcon icon={TerminalIcon} />,
       category: 'shell',
     },
     {
       id: 'docker-env',
       name: 'Container Bridge',
-      desc: 'Orchestrate Docker containers, background services, and test runtimes.',
+      desc: t(
+        'settings.plugins.descDockerEnv',
+        'Orchestrate Docker containers, background services, and test runtimes.',
+      ),
       icon: <HugeiconsIcon icon={ComputerIcon} />,
       category: 'infra',
     },
     {
       id: 'security-guard',
       name: 'Security Guard',
-      desc: 'Verify package signatures, integrity checksums, and execution permissions.',
+      desc: t(
+        'settings.plugins.descSecurityGuard',
+        'Verify package signatures, integrity checksums, and execution permissions.',
+      ),
       icon: <HugeiconsIcon icon={ShieldIcon} />,
       category: 'security',
     },
     {
       id: 'browser-bridge',
       name: 'Browser Automation',
-      desc: 'Inspect web apps, capture DOM snapshots, and automate browser tasks.',
+      desc: t(
+        'settings.plugins.descBrowserBridge',
+        'Inspect web apps, capture DOM snapshots, and automate browser tasks.',
+      ),
       icon: <HugeiconsIcon icon={GlobalSearchIcon} />,
       category: 'browser',
     },
     {
       id: 'db-bridge',
       name: 'Database Connector',
-      desc: 'Connect databases with schema inspection and safe query execution.',
+      desc: t(
+        'settings.plugins.descDbBridge',
+        'Connect databases with schema inspection and safe query execution.',
+      ),
       icon: <HugeiconsIcon icon={Database01Icon} />,
       category: 'data',
     },
@@ -113,7 +137,10 @@ export function PluginsPage() {
           {t('settings.extensions.plugins', { defaultValue: 'Plugins' })}
         </h2>
         <p className="text-xs text-foreground-secondary mt-1">
-          Extend your agent workspace with development tools, bridges, and integrations.
+          {t(
+            'settings.plugins.desc',
+            'Extend your agent workspace with development tools, bridges, and integrations.',
+          )}
         </p>
       </div>
 
@@ -124,11 +151,11 @@ export function PluginsPage() {
       <section aria-labelledby="plugins-heading" className="space-y-4">
         <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
           <h3 id="plugins-heading" className="text-sm font-semibold text-foreground">
-            Verified Extensions
+            {t('settings.plugins.listTitle', 'Verified Extensions')}
           </h3>
           <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
             <HugeiconsIcon icon={Add01Icon} />
-            <span>Install plugin</span>
+            <span>{t('settings.plugins.addPlugin', 'Install plugin')}</span>
           </Button>
         </div>
 
@@ -142,9 +169,12 @@ export function PluginsPage() {
 
       {/* Footer Security Note */}
       <div className="pt-2 text-xs text-foreground-secondary">
-        Plugins execute in isolated subprocesses with restricted IPC access.{' '}
+        {t(
+          'settings.plugins.footerLead',
+          'Plugins execute in isolated subprocesses with restricted IPC access. ',
+        )}{' '}
         <span className="text-action cursor-pointer hover:underline">
-          Security architecture guide →
+          {t('settings.plugins.footerLink', 'Security architecture guide →')}
         </span>
       </div>
     </div>

@@ -1,0 +1,92 @@
+{
+  "sidebar": {
+    "newTask": "مهمة جديدة",
+    "recentSessions": "الجلسات",
+    "noSessions": "لا توجد جلسات بعد",
+    "collapse": "طي الشريط الجانبي",
+    "expand": "توسيع الشريط الجانبي",
+    "regionLabel": "الشريط الجانبي الأساسي",
+    "resizeLabel": "تغيير حجم الشريط الجانبي الأساسي",
+    "defaultWorkspace": "مساحة عمل شخصية",
+    "defaultProject": "المشروع الافتراضي",
+    "sessionsTruncated": "عرض أحدث 100 جلسة (مقتطع)"
+  },
+  "rail": {
+    "compose": "إنشاء",
+    "search": "بحث",
+    "projects": "المشاريع",
+    "agents": "الوكلاء",
+    "activity": "النشاط",
+    "marketplace": "المتجر",
+    "settings": "الإعدادات",
+    "toggleSidebar": "تبديل الشريط الجانبي",
+    "focusMode": "وضع التركيز",
+    "toggleTheme": "تبديل المظهر",
+    "navRail": "شريط التنقل"
+  },
+  "titlebar": {
+    "appTitlebar": "شريط عنوان التطبيق",
+    "hideNavRail": "إخفاء شريط التنقل",
+    "showNavRail": "إظهار شريط التنقل",
+    "windowActions": "إجراءات النافذة والتبويبات",
+    "actionsTitle": "إجراءات",
+    "windowActionsLabel": "إجراءات النافذة",
+    "openProject": "فتح مشروع",
+    "reloadWindow": "إعادة تحميل النافذة",
+    "minimize": "تصغير",
+    "maximize": "تكبير",
+    "restore": "استعادة",
+    "closeWindow": "إغلاق النافذة",
+    "close": "إغلاق",
+    "hideSidebar": "إخفاء الشريط الجانبي الأساسي",
+    "showSidebar": "إظهار الشريط الجانبي الأساسي",
+    "hidePanel": "إخفاء اللوحة",
+    "showPanel": "إظهار اللوحة",
+    "hideSecondary": "إخفاء الشريط الجانبي الثانوي",
+    "showSecondary": "إظهار الشريط الجانبي الثانوي"
+  },
+  "contextPanel": {
+    "title": "لوحة المعاينة",
+    "close": "إغلاق اللوحة",
+    "tabs": {
+      "plan": "الخطة",
+      "activity": "النشاط",
+      "graph": "مخطط المهام",
+      "agents": "الوكلاء",
+      "context": "السياق",
+      "artifacts": "المخرجات"
+    },
+    "regionLabel": "لوحة السياق",
+    "resizePanel": "تغيير حجم اللوحة",
+    "planHeading": "خطة التنفيذ",
+    "planInitialize": "تهيئة مساحة عمل المشروع",
+    "planExecute": "تنفيذ تكامل غلاف سطح المكتب",
+    "planVerify": "التحقق من الأدلة والقياس عن بعد",
+    "activityHeading": "النشاط الأخير",
+    "activitySessionCreated": "تم إنشاء الجلسة",
+    "activityNow": "الآن",
+    "activityCheckpoint": "تم التحقق من نقطة تفتيش WAL في SQLite",
+    "activityMinuteAgo": "قبل دقيقة",
+    "graphHeading": "مخطط المهام",
+    "graphDemo": "الجذر [المهمة 1] → وكيل فرعي معزول [العقدة أ]",
+    "agentsHeading": "الوكلاء النشطون",
+    "agentsOrchestrator": "المنسق / المدير",
+    "agentsRunning": "قيد التشغيل • معزول محليًا",
+    "contextHeading": "مصادر السياق",
+    "contextActive": "ملفات مساحة العمل النشطة: حد معزول",
+    "artifactsHeading": "المخرجات المُنتَجة",
+    "artifactsEmpty": "لم تُنتَج أي مخرجات بعد"
+  },
+  "shell": {
+    "secondaryTitle": "المستكشف",
+    "secondaryRegion": "الشريط الجانبي الثانوي",
+    "secondaryClose": "إغلاق الشريط الجانبي الثانوي",
+    "secondaryResize": "تغيير حجم الشريط الجانبي الثانوي",
+    "headerRegion": "ترويسة التطبيق"
+  },
+  "status": {
+    "ready": "جاهز",
+    "loading": "جارٍ التحميل...",
+    "error": "حدث خطأ"
+  }
+}

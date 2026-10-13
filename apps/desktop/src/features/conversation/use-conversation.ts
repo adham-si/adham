@@ -1,4 +1,5 @@
 import * as React from 'react';
+import i18n from '@/shared/i18n';
 import {
   SESSION_CACHE_KEY,
   isDefinitePreEffectRejection,
@@ -71,7 +72,7 @@ const switchUnresolved = (
   req && req.sessionId !== curId
     ? {
         ok: false,
-        error: 'Session switch has not completed. Retry the switch before sending.',
+        error: i18n.t('conversation.switchPending'),
         uncertain: false,
       }
     : null;
@@ -85,9 +86,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
-      setStorageWarning(
-        'Durable session storage is unavailable. Session selection will not persist across restarts.',
-      );
+      setStorageWarning(i18n.t('conversation.storageUnavailable'));
     }
   }, []);
   // Authoritative selection from the latest bootstrap snapshot. Surfaced so
@@ -164,7 +163,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         return items;
       } catch (err) {
         if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return null;
-        setError(err instanceof Error ? err.message : 'Conversation history failed to load.');
+        setError(err instanceof Error ? err.message : i18n.t('conversation.historyLoadFailed'));
         setStatus('error');
         return null;
       }
@@ -231,9 +230,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             sessionId: ctx.sessionId,
           });
           if (!written) {
-            setStorageWarning(
-              'Durable session storage is unavailable. Session selection will not persist across restarts.',
-            );
+            setStorageWarning(i18n.t('conversation.storageUnavailable'));
           }
         }
         scopeStaleRef.current = false;
@@ -256,8 +253,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       bootPromiseRef.current = null;
       fail(
         resolved.kind === 'resumed'
-          ? 'Saved conversation could not be loaded. Retry once connectivity returns.'
-          : 'Conversation failed to start. Reload or retry once connectivity returns.',
+          ? i18n.t('conversation.retryConnectivity', {
+              message: i18n.t('conversation.historyNotLoaded'),
+            })
+          : i18n.t('conversation.reloadRetry', { message: i18n.t('conversation.startFailed') }),
       );
       return null;
     })();
@@ -320,9 +319,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         // The history refresh succeeded, but the save is still
         // unresolved: keep the identity and say so instead of pretending
         // the refresh verified anything.
-        setError(
-          'A previous message has an unknown save status. Resend it to retry with the same save identity.',
-        );
+        setError(i18n.t('conversation.unknownSaveResend'));
         setStatus('error');
       }
     }
@@ -385,9 +382,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             sessionId: next.sessionId,
           });
           if (!written) {
-            setStorageWarning(
-              'Durable session storage is unavailable. Session selection will not persist across restarts.',
-            );
+            setStorageWarning(i18n.t('conversation.storageUnavailable'));
           }
         }
         try {
@@ -433,7 +428,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   const submit = React.useCallback(
     async (text: string): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
-      if (!trimmed) return { ok: false, error: 'Message text cannot be empty.', uncertain: false };
+      if (!trimmed)
+        return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
       const blocked = sendBlockedReason(scopeStaleRef.current);
       if (blocked) return { ok: false, error: blocked, uncertain: false };
       // Controller-boundary guard: overlapping submits are rejected before
@@ -441,7 +437,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       // is acquired BEFORE the bootstrap await below, so two submits that
       // both arrive before the context exists cannot both proceed.
       if (submitInFlightRef.current) {
-        return { ok: false, error: 'A message is already being saved.', uncertain: false };
+        return { ok: false, error: i18n.t('conversation.alreadySaving'), uncertain: false };
       }
       const preSwitch = switchUnresolved(requestedRef.current, context?.sessionId);
       if (preSwitch) return preSwitch;
@@ -451,7 +447,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (!ctx) {
           setStatus('bootstrapping');
           ctx = await bootstrap();
-          if (!ctx) return { ok: false, error: 'Conversation is not ready.', uncertain: false };
+          if (!ctx) return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
           const postSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
           if (postSwitch) return postSwitch;
         }
@@ -470,8 +466,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             requestId = pending.requestId;
             reusedFrozenIdentity = true;
           } else {
-            const message =
-              'A previous message has an unknown save status. Reload history or resend it before sending another message.';
+            const message = i18n.t('conversation.unknownSaveReload');
             setError(message);
             setStatus('error');
             return { ok: false, error: message, uncertain: true };
@@ -492,7 +487,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (!reusedFrozenIdentity && !writePendingSend(record)) {
           // The identity could not be persisted: dispatching anyway would
           // reopen the duplicate window the record exists to close.
-          const message = 'Save identity could not be recorded. The message was not sent.';
+          const message = i18n.t('conversation.identityNotRecorded');
           setError(message);
           setStatus('error');
           return { ok: false, error: message, uncertain: false };
@@ -519,7 +514,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             // The write landed even though this scope is gone: the frozen
             // identity is resolved and must not block a future send.
             clearFrozenIdentity();
-            return { ok: false, error: 'Session changed while sending.', uncertain: false };
+            return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
           }
           const incoming = toUiMessage({ ...submitted, role: 'user' });
           // A confirmed write invalidates older in-flight histories: they
@@ -538,7 +533,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             // even though this scope is gone. An unknown outcome keeps the
             // pre-frozen record for a later reload or same-text resend.
             if (definite) clearFrozenIdentity();
-            return { ok: false, error: 'Session changed while sending.', uncertain: false };
+            return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
           }
           if (definite) {
             // Proven pre-effect: nothing was stored, the logical identity is
@@ -551,8 +546,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           }
           // Unknown outcome: the record was frozen before dispatch and stays
           // until a reload verifies it or a same-text resend replays it.
-          const message = err instanceof Error ? err.message : 'Message was not saved.';
-          setError(`${message} Save status is unknown. Reload history before resending.`);
+          const message = err instanceof Error ? err.message : i18n.t('error.notSaved');
+          setError(i18n.t('conversation.saveUnknownSuffix', { message }));
           setStatus('error');
           return { ok: false, error: message, uncertain: true };
         }

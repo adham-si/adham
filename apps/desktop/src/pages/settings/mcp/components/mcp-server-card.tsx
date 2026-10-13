@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 
 export interface McpServerItem {
@@ -17,6 +18,7 @@ interface McpServerCardProps {
 }
 
 export function McpServerCard({ server, isConfigured, onToggle }: McpServerCardProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface p-3 transition-colors hover:bg-surface-subtle/40">
       <div className="flex items-center gap-3 min-w-0">
@@ -28,7 +30,7 @@ export function McpServerCard({ server, isConfigured, onToggle }: McpServerCardP
             <span className="text-sm font-semibold text-foreground truncate">{server.name}</span>
             {isConfigured && (
               <span className="rounded bg-success-surface px-1.5 py-0.5 text-2xs font-medium text-success-foreground">
-                Configured
+                {t('settings.mcp.badgeConfigured', 'Configured')}
               </span>
             )}
             <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-2xs font-mono text-foreground-secondary uppercase">
@@ -46,7 +48,7 @@ export function McpServerCard({ server, isConfigured, onToggle }: McpServerCardP
         onClick={() => onToggle(server.id)}
         className="ms-3 shrink-0"
       >
-        {isConfigured ? 'Disable' : 'Enable'}
+        {isConfigured ? t('settings.mcp.disable', 'Disable') : t('settings.mcp.enable', 'Enable')}
       </Button>
     </div>
   );

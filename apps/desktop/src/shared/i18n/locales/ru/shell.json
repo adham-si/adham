@@ -1,0 +1,92 @@
+{
+  "sidebar": {
+    "newTask": "Новая задача",
+    "recentSessions": "Сессии",
+    "noSessions": "Нет сессий",
+    "collapse": "Свернуть панель",
+    "expand": "Развернуть панель",
+    "regionLabel": "Основная боковая панель",
+    "resizeLabel": "Изменить размер основной боковой панели",
+    "defaultWorkspace": "Личное рабочее пространство",
+    "defaultProject": "Проект по умолчанию",
+    "sessionsTruncated": "Показаны последние 100 сессий (сокращено)"
+  },
+  "rail": {
+    "compose": "Создать",
+    "search": "Поиск",
+    "projects": "Проекты",
+    "agents": "Агенты",
+    "activity": "Активность",
+    "marketplace": "Каталог",
+    "settings": "Настройки",
+    "toggleSidebar": "Скрыть/показать панель",
+    "focusMode": "Режим фокуса",
+    "toggleTheme": "Переключить тему",
+    "navRail": "Навигационная панель"
+  },
+  "titlebar": {
+    "appTitlebar": "Панель заголовка приложения",
+    "hideNavRail": "Скрыть навигационную панель",
+    "showNavRail": "Показать навигационную панель",
+    "windowActions": "Действия с окном и вкладками",
+    "actionsTitle": "Действия",
+    "windowActionsLabel": "Действия окна",
+    "openProject": "Открыть проект",
+    "reloadWindow": "Перезагрузить окно",
+    "minimize": "Свернуть",
+    "maximize": "Развернуть",
+    "restore": "Восстановить",
+    "closeWindow": "Закрыть окно",
+    "close": "Закрыть",
+    "hideSidebar": "Скрыть основную боковую панель",
+    "showSidebar": "Показать основную боковую панель",
+    "hidePanel": "Скрыть панель",
+    "showPanel": "Показать панель",
+    "hideSecondary": "Скрыть вторичную боковую панель",
+    "showSecondary": "Показать вторичную боковую панель"
+  },
+  "contextPanel": {
+    "title": "Инспектор",
+    "close": "Закрыть панель",
+    "tabs": {
+      "plan": "План",
+      "activity": "Активность",
+      "graph": "Граф задач",
+      "agents": "Агенты",
+      "context": "Контекст",
+      "artifacts": "Артефакты"
+    },
+    "regionLabel": "Панель контекста",
+    "resizePanel": "Изменить размер панели",
+    "planHeading": "План выполнения",
+    "planInitialize": "Инициализация рабочего пространства проекта",
+    "planExecute": "Интеграция оболочки рабочего стола",
+    "planVerify": "Проверка доказательств и телеметрии",
+    "activityHeading": "Последние действия",
+    "activitySessionCreated": "Сессия создана",
+    "activityNow": "Сейчас",
+    "activityCheckpoint": "Контрольная точка WAL SQLite проверена",
+    "activityMinuteAgo": "1 мин. назад",
+    "graphHeading": "Граф задач",
+    "graphDemo": "Корень [Задача 1] → Изолированный субагент [Узел A]",
+    "agentsHeading": "Активные агенты",
+    "agentsOrchestrator": "Оркестратор / Менеджер",
+    "agentsRunning": "Выполняется • Локальная песочница",
+    "contextHeading": "Источники контекста",
+    "contextActive": "Файлы активного рабочего пространства: изолированная граница",
+    "artifactsHeading": "Созданные артефакты",
+    "artifactsEmpty": "Артефакты пока не созданы"
+  },
+  "shell": {
+    "secondaryTitle": "Проводник",
+    "secondaryRegion": "Вторичная боковая панель",
+    "secondaryClose": "Закрыть вторичную боковую панель",
+    "secondaryResize": "Изменить размер вторичной боковой панели",
+    "headerRegion": "Заголовок приложения"
+  },
+  "status": {
+    "ready": "Готово",
+    "loading": "Загрузка...",
+    "error": "Произошла ошибка"
+  }
+}

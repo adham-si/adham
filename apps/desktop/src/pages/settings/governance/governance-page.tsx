@@ -30,17 +30,21 @@ export function GovernancePage() {
       <section aria-labelledby="autonomy-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="autonomy-heading" className="text-sm font-semibold text-foreground">
-            Autonomy & approvals
+            {t('settings.governance.autonomyTitle', 'Autonomy & approvals')}
           </h3>
         </div>
         <div className="space-y-4">
           {/* Autonomy Level */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Agent autonomy level</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.governance.autonomyLabel', 'Agent autonomy level')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Controls whether actions are carried out automatically or require interactive
-                confirmation
+                {t(
+                  'settings.governance.autonomyHint',
+                  'Controls whether actions are carried out automatically or require interactive confirmation',
+                )}
               </div>
             </div>
             <select
@@ -48,25 +52,36 @@ export function GovernancePage() {
               onChange={(e) => setAutonomy(e.target.value)}
               className="min-h-control-sm rounded-md border border-border-subtle bg-surface px-3 py-1 text-xs text-foreground cursor-pointer hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <option value="supervised">Supervised (Default)</option>
-              <option value="strict">Strict Confirmation (All actions)</option>
-              <option value="autonomous">Autonomous (Verified playbooks)</option>
+              <option value="supervised">
+                {t('settings.governance.supervised', 'Supervised (Default)')}
+              </option>
+              <option value="strict">
+                {t('settings.governance.strictConfirm', 'Strict Confirmation (All actions)')}
+              </option>
+              <option value="autonomous">
+                {t('settings.governance.autonomous', 'Autonomous (Verified playbooks)')}
+              </option>
             </select>
           </div>
 
           {/* Confirm File Edits */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Confirm file modifications</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.governance.confirmEditsLabel', 'Confirm file modifications')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Prompt for review before writing or overwriting repository source files
+                {t(
+                  'settings.governance.confirmEditsHint',
+                  'Prompt for review before writing or overwriting repository source files',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={confirmEdits}
-              aria-label="Confirm file modifications"
+              aria-label={t('settings.governance.confirmEditsLabel', 'Confirm file modifications')}
               onClick={() => setConfirmEdits(!confirmEdits)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 confirmEdits ? 'bg-action' : 'bg-surface-muted'
@@ -83,16 +98,24 @@ export function GovernancePage() {
           {/* Confirm Terminal Commands */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Confirm terminal commands</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.governance.confirmTerminalLabel', 'Confirm terminal commands')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Prompt before executing non-git shell commands in the workspace environment
+                {t(
+                  'settings.governance.confirmTerminalHint',
+                  'Prompt before executing non-git shell commands in the workspace environment',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={confirmTerminal}
-              aria-label="Confirm terminal commands"
+              aria-label={t(
+                'settings.governance.confirmTerminalLabel',
+                'Confirm terminal commands',
+              )}
               onClick={() => setConfirmTerminal(!confirmTerminal)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 confirmTerminal ? 'bg-action' : 'bg-surface-muted'
@@ -110,17 +133,23 @@ export function GovernancePage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
-                Confirm git push & remote publish
+                {t('settings.governance.confirmPushLabel', 'Confirm git push & remote publish')}
               </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Strict human gate before pushing local commits or branch references to remote
+                {t(
+                  'settings.governance.confirmPushHint',
+                  'Strict human gate before pushing local commits or branch references to remote',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={confirmGitPush}
-              aria-label="Confirm git push & remote publish"
+              aria-label={t(
+                'settings.governance.confirmPushLabel',
+                'Confirm git push & remote publish',
+              )}
               onClick={() => setConfirmGitPush(!confirmGitPush)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 confirmGitPush ? 'bg-action' : 'bg-surface-muted'
@@ -140,16 +169,21 @@ export function GovernancePage() {
       <section aria-labelledby="sandbox-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="sandbox-heading" className="text-sm font-semibold text-foreground">
-            Sandbox boundaries
+            {t('settings.governance.sandboxTitle', 'Sandbox boundaries')}
           </h3>
         </div>
         <div className="space-y-4">
           {/* Filesystem Boundary */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Filesystem sandbox scope</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.governance.fsScopeLabel', 'Filesystem sandbox scope')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Constrain agent read and write access strictly to specified local paths
+                {t(
+                  'settings.governance.fsScopeHint',
+                  'Constrain agent read and write access strictly to specified local paths',
+                )}
               </div>
             </div>
             <select
@@ -157,25 +191,36 @@ export function GovernancePage() {
               onChange={(e) => setFsBoundary(e.target.value)}
               className="min-h-control-sm rounded-md border border-border-subtle bg-surface px-3 py-1 text-xs text-foreground cursor-pointer hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <option value="workspace">Active Workspace Only</option>
-              <option value="readonly-outside">Read-Only Outside Workspace</option>
-              <option value="isolated">Strict In-Memory Scratch Only</option>
+              <option value="workspace">
+                {t('settings.governance.fsWorkspaceOnly', 'Active Workspace Only')}
+              </option>
+              <option value="readonly-outside">
+                {t('settings.governance.fsReadonlyOutside', 'Read-Only Outside Workspace')}
+              </option>
+              <option value="isolated">
+                {t('settings.governance.fsScratchOnly', 'Strict In-Memory Scratch Only')}
+              </option>
             </select>
           </div>
 
           {/* Block Unsigned Plugins */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Block unsigned plugins</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.governance.blockUnsignedLabel', 'Block unsigned plugins')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Reject plugins lacking valid cryptographic signatures from verified publishers
+                {t(
+                  'settings.governance.blockUnsignedHint',
+                  'Reject plugins lacking valid cryptographic signatures from verified publishers',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={blockUnsigned}
-              aria-label="Block unsigned plugins"
+              aria-label={t('settings.governance.blockUnsignedLabel', 'Block unsigned plugins')}
               onClick={() => setBlockUnsigned(!blockUnsigned)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 blockUnsigned ? 'bg-action' : 'bg-surface-muted'
@@ -193,18 +238,20 @@ export function GovernancePage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">
-                Accidental data loss prevention
+                {t('settings.governance.dataLossLabel', 'Accidental data loss prevention')}
               </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Enforce mandatory verification before destructive SQL, cloud bucket deletions, or
-                purge operations
+                {t(
+                  'settings.governance.dataLossHint',
+                  'Enforce mandatory verification before destructive SQL, cloud bucket deletions, or purge operations',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={dataLossProtection}
-              aria-label="Accidental data loss prevention"
+              aria-label={t('settings.governance.dataLossLabel', 'Accidental data loss prevention')}
               onClick={() => setDataLossProtection(!dataLossProtection)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 dataLossProtection ? 'bg-action' : 'bg-surface-muted'

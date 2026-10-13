@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ShellLayoutProvider, useShellLayout } from './context';
 
 export interface ShellConfig {
@@ -34,6 +35,7 @@ function ShellInner({
   innerRef,
   ...props
 }: ShellProps & { innerRef?: React.ForwardedRef<HTMLDivElement> }) {
+  const { t } = useTranslation();
   const { navRailOpen, sidebarOpen, secondarySidebarOpen, panelOpen } = useShellLayout();
   const isFullWidthHeader = config?.headerPosition === 'full-width';
 
@@ -43,7 +45,7 @@ function ShellInner({
   const primarySidebarNode =
     primarySidebar && sidebarOpen ? (
       <aside
-        aria-label="Primary Sidebar"
+        aria-label={t('sidebar.regionLabel')}
         className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
         style={{ minWidth: '272px', maxWidth: '600px' }}
       >
@@ -54,7 +56,7 @@ function ShellInner({
   const secondarySidebarNode =
     secondarySidebar && secondarySidebarOpen ? (
       <aside
-        aria-label="Secondary Sidebar"
+        aria-label={t('shell.secondaryRegion')}
         className="flex shrink-0 flex-col border-e border-border-subtle bg-surface"
         style={{ minWidth: '272px', maxWidth: '600px' }}
       >
@@ -64,7 +66,7 @@ function ShellInner({
 
   const headerNode = header ? (
     <header
-      aria-label="Application Header"
+      aria-label={t('shell.headerRegion')}
       className="flex h-10 min-h-10 max-h-10 shrink-0 items-center border-b border-border-subtle bg-surface"
     >
       {header}

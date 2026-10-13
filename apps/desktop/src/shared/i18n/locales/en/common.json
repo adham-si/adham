@@ -1,0 +1,38 @@
+{
+  "appName": "Adham",
+  "tagline": "The only AI application you need",
+  "welcome": "What would you like to work on?",
+  "workspace": "Workspace",
+  "project": "Project",
+  "session": "Session",
+  "sessions": "Sessions",
+  "selectScope": "Select workspace / project",
+  "noWorkspaces": "No workspaces yet",
+  "loading": "Loading…",
+  "projectsLoadFailed": "Projects failed to load",
+  "createFirstProject": "Create first project…",
+  "noProjects": "No projects yet",
+  "truncatedProjects": "Showing first 100 projects",
+  "truncatedWorkspaces": "Showing first 100 workspaces",
+  "retry": "Retry",
+  "firstProjectIn": "First project in {{name}}",
+  "allWorkspaces": "All workspaces",
+  "common": {
+    "retry": "Retry",
+    "systemDefault": "System default",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "small": "Small",
+    "large": "Large"
+  },
+  "error": {
+    "validationFailed": "This name is invalid. Correct it and try again.",
+    "invalidProtocolVersion": "This app version is unsupported. Update and try again.",
+    "workspaceNotFound": "Workspace was not found.",
+    "projectNotFound": "Project was not found.",
+    "sessionNotFound": "Session was not found.",
+    "contextMismatch": "Selection changed. Reload and try again.",
+    "requestIdConflict": "Conflicting request. Try again.",
+    "notSaved": "Message was not saved."
+  }
+}

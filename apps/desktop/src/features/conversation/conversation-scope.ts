@@ -1,3 +1,4 @@
+import i18n from '@/shared/i18n';
 import type { ConversationMessageDto } from '@/shared/api/adham-client';
 import {
   CREATE_INTENT_KEY,
@@ -111,14 +112,16 @@ export async function resolveAuthoritativeSession(
   try {
     snapshot = await backend.getBootstrapState();
   } catch (err) {
-    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+    if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
     return {
       kind: 'error',
-      message: `${err instanceof Error ? err.message : 'Bootstrap state failed to load.'} Retry once connectivity returns.`,
+      message: i18n.t('conversation.retryConnectivity', {
+        message: err instanceof Error ? err.message : i18n.t('conversation.bootstrapFailed'),
+      }),
     };
   }
 
-  if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+  if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
 
   if (!snapshot.isInitialized || !snapshot.activeWorkspaceId) {
     return { kind: 'needs-workspace', activeWorkspaceId: snapshot.activeWorkspaceId };
@@ -137,7 +140,8 @@ export async function resolveAuthoritativeSession(
     if (pref) {
       try {
         await backend.getConversation(ws, proj, pref.sessionId);
-        if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+        if (isStale())
+          return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
         return {
           kind: 'resumed',
           context: {
@@ -148,7 +152,8 @@ export async function resolveAuthoritativeSession(
           },
         };
       } catch (err) {
-        if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+        if (isStale())
+          return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
         if (isSessionMissingOrMismatched(err)) {
           // Stored preference is explicitly missing or mismatched: invalidate preference.
           clearDurableSessionPreference(instId, ws, proj);
@@ -158,7 +163,9 @@ export async function resolveAuthoritativeSession(
           const rawMsg = typeof err === 'string' ? err : err instanceof Error ? err.message : null;
           return {
             kind: 'error',
-            message: `${rawMsg ?? 'Saved conversation could not be loaded.'} Retry once connectivity returns.`,
+            message: i18n.t('conversation.retryConnectivity', {
+              message: rawMsg ?? i18n.t('conversation.historyNotLoaded'),
+            }),
           };
         }
       }
@@ -180,32 +187,37 @@ export async function resolveAuthoritativeSession(
     try {
       list = await backend.listSessions({ workspaceId: ws, projectId: proj });
     } catch (err) {
-      if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+      if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
       const rawMsg = typeof err === 'string' ? err : err instanceof Error ? err.message : null;
       return {
         kind: 'error',
         message: isDefinitePreEffectRejection(err)
           ? (rawMsg ?? rejectionMessage(err))
-          : `${rawMsg ?? 'Session discovery failed.'} Retry once connectivity returns.`,
+          : i18n.t('conversation.retryConnectivity', {
+              message: rawMsg ?? i18n.t('conversation.discoveryFailed'),
+            }),
       };
     }
-    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+    if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
     const firstSession = list.sessions[0];
     if (firstSession) {
       const mostRecent = firstSession.sessionId;
       try {
         await backend.getConversation(ws, proj, mostRecent);
       } catch (err) {
-        if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+        if (isStale())
+          return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
         const rawMsg = typeof err === 'string' ? err : err instanceof Error ? err.message : null;
         return {
           kind: 'error',
           message: isDefinitePreEffectRejection(err)
             ? (rawMsg ?? rejectionMessage(err))
-            : `${rawMsg ?? 'Saved conversation could not be loaded.'} Retry once connectivity returns.`,
+            : i18n.t('conversation.retryConnectivity', {
+                message: rawMsg ?? i18n.t('conversation.historyNotLoaded'),
+              }),
         };
       }
-      if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+      if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
       if (instId) {
         writeDurableSessionPreference({
           installationId: instId,
@@ -226,18 +238,17 @@ export async function resolveAuthoritativeSession(
     }
   }
 
-  if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+  if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
 
   try {
     let intent = readCreateIntent(ws, proj);
     if (!intent) {
-      if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+      if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
       intent = { requestId: crypto.randomUUID(), workspaceId: ws, projectId: proj };
       if (!writeStorage(CREATE_INTENT_KEY, JSON.stringify(intent))) {
         return {
           kind: 'error',
-          message:
-            'Session creation identity could not be recorded. Retry once storage is available.',
+          message: i18n.t('conversation.identityStorageRetry'),
         };
       }
     }
@@ -260,7 +271,7 @@ export async function resolveAuthoritativeSession(
       throw err;
     }
 
-    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+    if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
 
     const ctx: ConversationContext = {
       workspaceId: ws,
@@ -286,13 +297,15 @@ export async function resolveAuthoritativeSession(
     }
     return { kind: 'created', context: ctx };
   } catch (err) {
-    if (isStale()) return { kind: 'error', message: 'Bootstrap superseded.' };
+    if (isStale()) return { kind: 'error', message: i18n.t('conversation.bootstrapSuperseded') };
     if (isDefinitePreEffectRejection(err)) {
       return { kind: 'error', message: rejectionMessage(err) };
     }
     return {
       kind: 'error',
-      message: `${err instanceof Error ? err.message : 'Conversation failed to start.'} Reload or retry once connectivity returns.`,
+      message: i18n.t('conversation.reloadRetry', {
+        message: err instanceof Error ? err.message : i18n.t('conversation.startFailed'),
+      }),
     };
   }
 }

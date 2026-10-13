@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProviderCard, type ProviderItem } from './provider-card';
 
 interface ProvidersListProps {
@@ -8,12 +8,17 @@ interface ProvidersListProps {
 }
 
 export function ProvidersList({ providers, connectedIds, onToggleConnect }: ProvidersListProps) {
+  const { t } = useTranslation();
   if (providers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-border-subtle bg-surface-subtle/30 py-10 text-center">
-        <p className="text-sm font-medium text-foreground">No providers configured</p>
+        <p className="text-sm font-medium text-foreground">
+          {t('settings.providers.emptyTitle', 'No providers configured')}
+        </p>
         <p className="text-xs text-foreground-secondary mt-1">
-          Switch to &ldquo;All providers&rdquo; to connect an AI provider.
+          {t('settings.providers.emptyHint', {
+            tab: t('settings.providers.allTab', 'All providers'),
+          })}
         </p>
       </div>
     );

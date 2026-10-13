@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/shared/i18n/format';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Folder01Icon, Shield01Icon, ChartHistogramIcon } from '@hugeicons/core-free-icons';
 
@@ -32,7 +33,7 @@ export function ComposeStatusStrip({
   return (
     <div
       role="region"
-      aria-label="Agent governance and budget status"
+      aria-label={t('compose.statusRegion', 'Agent governance and budget status')}
       className={`flex flex-wrap items-center justify-between gap-2 px-3 py-1 text-[11px] text-foreground-secondary ${className}`}
     >
       {/* Leading: Scope and Permission Chip */}
@@ -42,7 +43,7 @@ export function ComposeStatusStrip({
           title={
             scopeFolder === null
               ? t('compose.scopeUnknown', 'No project directory reported by the backend')
-              : `Active project directory: ${scopeFolder}`
+              : t('compose.scopeActive', { dir: `\u2066${scopeFolder}\u2069` })
           }
         >
           <HugeiconsIcon icon={Folder01Icon} className="size-3 text-foreground-muted" />
@@ -57,9 +58,9 @@ export function ComposeStatusStrip({
           }`}
           title={
             scopePolicy === 'standing-approval'
-              ? 'Agent may write files without per-action confirmation'
+              ? t('compose.policyStanding', 'Agent may write files without per-action confirmation')
               : scopePolicy === 'always-ask'
-                ? 'Agent prompts for approval before every write or command'
+                ? t('compose.policyAsk', 'Agent prompts for approval before every write or command')
                 : t('compose.policyUnknown', 'No approval policy reported by the backend')
           }
         >
@@ -81,7 +82,12 @@ export function ComposeStatusStrip({
           className="flex items-center gap-1.5"
           title={
             hasTokens
-              ? `Used ${usedTokens.toLocaleString()} of ${maxTokens.toLocaleString()} tokens (${tokenPercentage}%)`
+              ? t('compose.tokensUsed', {
+                  count: maxTokens,
+                  used: formatNumber(usedTokens),
+                  total: formatNumber(maxTokens),
+                  percent: tokenPercentage,
+                })
               : t('compose.tokensUnknown', 'No token usage reported by the backend')
           }
         >
@@ -114,11 +120,11 @@ export function ComposeStatusStrip({
           className="flex items-center gap-1 text-[10px] text-foreground-muted"
           title={
             hasSpend
-              ? `Current session cost: ${sessionSpend} of ${spendCap} cap`
+              ? t('compose.spendTitle', { spend: sessionSpend, cap: spendCap })
               : t('compose.budgetUnknown', 'No budget usage reported by the backend')
           }
         >
-          <span>Budget:</span>
+          <span>{t('compose.budgetLabel', 'Budget:')}</span>
           <span className="font-medium text-foreground">{sessionSpend ?? unknown}</span>
           <span>/</span>
           <span>{spendCap ?? unknown}</span>

@@ -48,7 +48,7 @@ export function ComposeActionBar({
   return (
     <div
       role="toolbar"
-      aria-label="Composer actions and controls"
+      aria-label={t('compose.actionsToolbar', 'Composer actions and controls')}
       className={`flex flex-wrap items-center justify-between gap-2 px-3 pb-2 pt-1 border-t border-border-subtle ${className}`}
     >
       {/* Leading controls: Attachment trigger + Mode Selector */}

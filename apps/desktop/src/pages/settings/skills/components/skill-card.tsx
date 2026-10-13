@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 
 export interface SkillItem {
@@ -17,6 +18,7 @@ interface SkillCardProps {
 }
 
 export function SkillCard({ skill, isActive, onToggle }: SkillCardProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface p-3 transition-colors hover:bg-surface-subtle/40">
       <div className="flex items-center gap-3 min-w-0">
@@ -28,7 +30,7 @@ export function SkillCard({ skill, isActive, onToggle }: SkillCardProps) {
             <span className="text-sm font-semibold text-foreground truncate">{skill.name}</span>
             {isActive && (
               <span className="rounded bg-success-surface px-1.5 py-0.5 text-2xs font-medium text-success-foreground">
-                Active
+                {t('settings.skills.badgeActive', 'Active')}
               </span>
             )}
             <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-2xs font-mono text-foreground-secondary uppercase">
@@ -46,7 +48,9 @@ export function SkillCard({ skill, isActive, onToggle }: SkillCardProps) {
         onClick={() => onToggle(skill.id)}
         className="ms-3 shrink-0"
       >
-        {isActive ? 'Active' : 'Enable'}
+        {isActive
+          ? t('settings.skills.activeButton', 'Active')
+          : t('settings.skills.enableButton', 'Enable')}
       </Button>
     </div>
   );

@@ -40,42 +40,51 @@ export function DataPage() {
       <section aria-labelledby="storage-details-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="storage-details-heading" className="text-sm font-semibold text-foreground">
-            Storage details
+            {t('settings.data.detailsTitle', 'Storage details')}
           </h3>
         </div>
         <div className="space-y-4">
           {/* Storage Directory */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Database location</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.storage.dbLocation', 'Database Location')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5 font-mono">
                 %LOCALAPPDATA%\Adham\data
               </div>
             </div>
             <span className="rounded bg-surface-muted px-2 py-1 text-xs text-foreground-muted font-medium">
-              Encrypted Local
+              {t('settings.data.encryptedBadge', 'Encrypted Local')}
             </span>
           </div>
 
           {/* Journal Mode */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">SQLite journal mode</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.storage.journalMode', 'Journal Mode')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Current transaction concurrency and recovery protocol
+                {t(
+                  'settings.data.journalHint',
+                  'Current transaction concurrency and recovery protocol',
+                )}
               </div>
             </div>
             <span className="rounded bg-success-surface px-2 py-0.5 text-xs text-success-foreground font-medium">
-              {status?.journalMode || 'WAL (Write-Ahead)'}
+              {status?.journalMode || t('settings.data.walFallback', 'WAL (Write-Ahead)')}
             </span>
           </div>
 
           {/* Schema Version */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Schema version</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.data.schemaLabel', 'Schema version')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Applied migration version of core database tables
+                {t('settings.data.schemaHint', 'Applied migration version of core database tables')}
               </div>
             </div>
             <span className="font-mono text-xs text-foreground">
@@ -86,16 +95,21 @@ export function DataPage() {
           {/* Auto-vacuum */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Automatic database vacuum</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.data.vacuumLabel', 'Automatic database vacuum')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Reclaim unused space when deleting old sessions or message cards
+                {t(
+                  'settings.data.vacuumHint',
+                  'Reclaim unused space when deleting old sessions or message cards',
+                )}
               </div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={autoVacuum}
-              aria-label="Automatic database vacuum"
+              aria-label={t('settings.data.vacuumLabel', 'Automatic database vacuum')}
               onClick={() => setAutoVacuum(!autoVacuum)}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 autoVacuum ? 'bg-action' : 'bg-surface-muted'
@@ -115,33 +129,45 @@ export function DataPage() {
       <section aria-labelledby="maintenance-heading" className="space-y-4">
         <div className="border-b border-border-subtle pb-2.5">
           <h3 id="maintenance-heading" className="text-sm font-semibold text-foreground">
-            Maintenance & recovery
+            {t('settings.data.maintenanceTitle', 'Maintenance & recovery')}
           </h3>
         </div>
         <div className="space-y-4">
           {/* Rebuild Projection */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Rebuild projections</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.storage.rebuildProjections', 'Rebuild Projections')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Reconstruct in-memory search and message indices from event logs
+                {t(
+                  'settings.data.rebuildHint',
+                  'Reconstruct in-memory search and message indices from event logs',
+                )}
               </div>
             </div>
             <Button size="sm" variant="secondary" onClick={handleRebuild} disabled={isRebuilding}>
-              {isRebuilding ? 'Rebuilding…' : 'Rebuild Index'}
+              {isRebuilding
+                ? t('settings.data.rebuilding', 'Rebuilding…')
+                : t('settings.data.rebuildIndex', 'Rebuild Index')}
             </Button>
           </div>
 
           {/* Purge Scratch */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Clear scratch cache</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.data.clearLabel', 'Clear scratch cache')}
+              </div>
               <div className="text-xs text-foreground-secondary mt-0.5">
-                Remove temporary test artifacts and subagent run logs
+                {t(
+                  'settings.data.clearHint',
+                  'Remove temporary test artifacts and subagent run logs',
+                )}
               </div>
             </div>
             <Button size="sm" variant="secondary">
-              Clear Cache
+              {t('settings.data.clearButton', 'Clear Cache')}
             </Button>
           </div>
         </div>

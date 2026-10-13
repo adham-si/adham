@@ -107,19 +107,19 @@ export function Panel({
   const defaultTabs: PanelTabItem[] = [
     {
       id: 'plan',
-      label: t('contextPanel.tabs.plan'),
+      label: t('contextPanel.tabs.plan', 'Plan'),
       icon: (
         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
       ),
     },
     {
       id: 'activity',
-      label: t('contextPanel.tabs.activity'),
+      label: t('contextPanel.tabs.activity', 'Activity'),
       icon: <path d="M13 10V3L4 14h7v7l9-11h-7z" />,
     },
     {
       id: 'graph',
-      label: t('contextPanel.tabs.graph'),
+      label: t('contextPanel.tabs.graph', 'Task graph'),
       icon: (
         <>
           <circle cx="6" cy="6" r="3" />
@@ -131,7 +131,7 @@ export function Panel({
     },
     {
       id: 'agents',
-      label: t('contextPanel.tabs.agents'),
+      label: t('contextPanel.tabs.agents', 'Agents'),
       icon: (
         <>
           <circle cx="9" cy="7" r="4" />
@@ -141,12 +141,12 @@ export function Panel({
     },
     {
       id: 'context',
-      label: t('contextPanel.tabs.context'),
+      label: t('contextPanel.tabs.context', 'Context'),
       icon: <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6" />,
     },
     {
       id: 'artifacts',
-      label: t('contextPanel.tabs.artifacts'),
+      label: t('contextPanel.tabs.artifacts', 'Artifacts'),
       icon: (
         <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
       ),
@@ -157,7 +157,7 @@ export function Panel({
 
   return (
     <aside
-      aria-label="Context Panel"
+      aria-label={t('contextPanel.regionLabel', 'Context Panel')}
       style={{
         width: `${currentWidth}px`,
         minWidth: `${minWidth}px`,
@@ -170,15 +170,15 @@ export function Panel({
       {/* Panel Header: 40px base height */}
       <div className="flex h-10 min-h-10 max-h-10 items-center justify-between border-b border-border-subtle px-3 py-1">
         <span className="truncate text-xs font-semibold text-foreground tracking-wide">
-          {title ?? t('contextPanel.title')}
+          {title ?? t('contextPanel.title', 'Inspector')}
         </span>
         <button
           type="button"
           onClick={handleClose}
-          aria-label={t('contextPanel.close')}
+          aria-label={t('contextPanel.close', 'Close panel')}
           className="flex min-h-control-sm w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
-          <AdhamIcon size="sm" label={t('contextPanel.close')}>
+          <AdhamIcon size="sm" label={t('contextPanel.close', 'Close panel')}>
             <path d="M18 6L6 18M6 6l12 12" />
           </AdhamIcon>
         </button>
@@ -217,24 +217,26 @@ export function Panel({
             {currentTab === 'plan' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Execution Plan
+                  {t('contextPanel.planHeading', 'Execution Plan')}
                 </h3>
                 <div className="space-y-2 rounded-md border border-border-subtle bg-surface-subtle p-3 text-xs">
                   <div className="flex items-center gap-2 text-foreground">
                     <span className="flex size-4 items-center justify-center rounded-full bg-success text-[10px] text-action-foreground">
                       ✓
                     </span>
-                    <span>Initialize project workspace</span>
+                    <span>{t('contextPanel.planInitialize', 'Initialize project workspace')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-foreground">
                     <span className="flex size-4 items-center justify-center rounded-full bg-action text-[10px] text-action-foreground">
                       •
                     </span>
-                    <span>Execute desktop shell integration</span>
+                    <span>
+                      {t('contextPanel.planExecute', 'Execute desktop shell integration')}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-foreground-muted">
                     <span className="size-4 rounded-full border border-border" />
-                    <span>Verify evidence and telemetry</span>
+                    <span>{t('contextPanel.planVerify', 'Verify evidence and telemetry')}</span>
                   </div>
                 </div>
               </div>
@@ -243,18 +245,24 @@ export function Panel({
             {currentTab === 'activity' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Recent Activity
+                  {t('contextPanel.activityHeading', 'Recent Activity')}
                 </h3>
                 <div className="space-y-2 text-xs text-foreground-secondary">
                   <div className="border-s border-action ps-3 py-1">
-                    <div className="font-medium text-foreground">Session created</div>
-                    <div className="text-[10px] text-foreground-muted">Now</div>
+                    <div className="font-medium text-foreground">
+                      {t('contextPanel.activitySessionCreated', 'Session created')}
+                    </div>
+                    <div className="text-[10px] text-foreground-muted">
+                      {t('contextPanel.activityNow', 'Now')}
+                    </div>
                   </div>
                   <div className="border-s border-border-subtle ps-3 py-1">
                     <div className="font-medium text-foreground">
-                      SQLite WAL checkpoint verified
+                      {t('contextPanel.activityCheckpoint', 'SQLite WAL checkpoint verified')}
                     </div>
-                    <div className="text-[10px] text-foreground-muted">1 min ago</div>
+                    <div className="text-[10px] text-foreground-muted">
+                      {t('contextPanel.activityMinuteAgo', '1 min ago')}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -263,10 +271,10 @@ export function Panel({
             {currentTab === 'graph' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Task Graph
+                  {t('contextPanel.graphHeading', 'Task Graph')}
                 </h3>
                 <div className="rounded border border-border-subtle bg-surface-subtle p-3 text-center text-xs text-foreground-secondary">
-                  Root [Task 1] → Isolated Subagent [Node A]
+                  {t('contextPanel.graphDemo', 'Root [Task 1] → Isolated Subagent [Node A]')}
                 </div>
               </div>
             )}
@@ -274,12 +282,14 @@ export function Panel({
             {currentTab === 'agents' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Active Agents
+                  {t('contextPanel.agentsHeading', 'Active Agents')}
                 </h3>
                 <div className="rounded-md border border-border-subtle bg-surface-subtle p-2 text-xs">
-                  <div className="font-semibold text-foreground">Orchestrator / Manager</div>
+                  <div className="font-semibold text-foreground">
+                    {t('contextPanel.agentsOrchestrator', 'Orchestrator / Manager')}
+                  </div>
                   <div className="text-[10px] text-running font-medium">
-                    Running • Local sandboxed
+                    {t('contextPanel.agentsRunning', 'Running • Local sandboxed')}
                   </div>
                 </div>
               </div>
@@ -288,10 +298,10 @@ export function Panel({
             {currentTab === 'context' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Context Sources
+                  {t('contextPanel.contextHeading', 'Context Sources')}
                 </h3>
                 <div className="rounded-md border border-border-subtle bg-surface-subtle p-2 text-xs text-foreground-secondary">
-                  Active workspace files: isolated boundary
+                  {t('contextPanel.contextActive', 'Active workspace files: isolated boundary')}
                 </div>
               </div>
             )}
@@ -299,10 +309,10 @@ export function Panel({
             {currentTab === 'artifacts' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Generated Artifacts
+                  {t('contextPanel.artifactsHeading', 'Generated Artifacts')}
                 </h3>
                 <div className="rounded-md border border-border-subtle bg-surface-subtle p-2 text-xs text-foreground-muted">
-                  No artifacts produced yet
+                  {t('contextPanel.artifactsEmpty', 'No artifacts produced yet')}
                 </div>
               </div>
             )}
@@ -314,7 +324,7 @@ export function Panel({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize panel"
+        aria-label={t('contextPanel.resizePanel', 'Resize panel')}
         onMouseDown={handleMouseDown}
         className="absolute top-0 bottom-0 start-0 w-1 cursor-col-resize transition-colors hover:bg-action"
       />

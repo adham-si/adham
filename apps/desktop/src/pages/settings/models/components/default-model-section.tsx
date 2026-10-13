@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import * as React from 'react';
 import type { ModelItem } from './model-card';
 
@@ -20,6 +21,7 @@ export function DefaultModelSection({
   onSelectFallback,
   onToggleLocalBoundary,
 }: DefaultModelSectionProps) {
+  const { t } = useTranslation();
   const defaultModel = models.find((m) => m.id === defaultModelId);
   const fallbackModel = models.find((m) => m.id === fallbackModelId);
 
@@ -27,9 +29,14 @@ export function DefaultModelSection({
     <div className="rounded-lg border border-border-subtle bg-surface p-4 space-y-4">
       <div className="flex items-center justify-between border-b border-border-subtle pb-3">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Workspace Defaults & Routing</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            {t('settings.models.defaultsTitle', 'Workspace Defaults & Routing')}
+          </h3>
           <p className="text-xs text-foreground-secondary mt-0.5">
-            Configure the default intelligence runtime and automatic recovery chain.
+            {t(
+              'settings.models.defaultsHint',
+              'Configure the default intelligence runtime and automatic recovery chain.',
+            )}
           </p>
         </div>
       </div>
@@ -38,7 +45,7 @@ export function DefaultModelSection({
         {/* Default Model Selector */}
         <div className="space-y-2">
           <label htmlFor="default-model-select" className="text-xs font-medium text-foreground">
-            Primary Default Model
+            {t('settings.models.primaryLabel', 'Primary Default Model')}
           </label>
           <div className="relative">
             <select
@@ -60,7 +67,10 @@ export function DefaultModelSection({
                 {defaultModel.icon}
               </div>
               <span className="truncate">
-                Dispatched by default for interactive agent workflows.
+                {t(
+                  'settings.models.primaryHint',
+                  'Dispatched by default for interactive agent workflows.',
+                )}
               </span>
             </div>
           )}
@@ -69,7 +79,7 @@ export function DefaultModelSection({
         {/* Fallback Model Selector */}
         <div className="space-y-2">
           <label htmlFor="fallback-model-select" className="text-xs font-medium text-foreground">
-            Automatic Fallback Model
+            {t('settings.models.fallbackModelLabel', 'Automatic Fallback Model')}
           </label>
           <div className="relative">
             <select
@@ -93,7 +103,10 @@ export function DefaultModelSection({
                 {fallbackModel.icon}
               </div>
               <span className="truncate">
-                Activates when primary reaches rate limits or has an outage.
+                {t(
+                  'settings.models.fallbackModelHint',
+                  'Activates when primary reaches rate limits or has an outage.',
+                )}
               </span>
             </div>
           )}
@@ -103,16 +116,21 @@ export function DefaultModelSection({
       {/* Local-first Boundary Toggle */}
       <div className="flex items-center justify-between pt-2 border-t border-border-subtle/50">
         <div className="space-y-0.5 max-w-[80%]">
-          <span className="text-xs font-medium text-foreground">Strict local privacy boundary</span>
+          <span className="text-xs font-medium text-foreground">
+            {t('settings.models.boundaryLabel', 'Strict local privacy boundary')}
+          </span>
           <p className="text-xs text-foreground-secondary">
-            Never silently fallback from local models to cloud providers without explicit
-            confirmation.
+            {t(
+              'settings.models.boundaryHint',
+              'Never silently fallback from local models to cloud providers without explicit confirmation.',
+            )}
           </p>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={strictLocalBoundary}
+          aria-label={t('settings.models.boundaryLabel', 'Strict local privacy boundary')}
           onClick={() => onToggleLocalBoundary(!strictLocalBoundary)}
           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-2 focus-visible:outline-focus ${
             strictLocalBoundary ? 'bg-brand' : 'bg-surface-muted'

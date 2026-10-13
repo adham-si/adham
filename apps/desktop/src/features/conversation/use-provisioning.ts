@@ -1,4 +1,5 @@
 import * as React from 'react';
+import i18n from '@/shared/i18n';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { ProjectSummary, WorkspaceSummary } from '@adham/contracts-generated';
 import {
@@ -59,10 +60,10 @@ export function useProvisioning({
     ): Promise<ProvisionOutcome> => {
       const trimmed = name.trim();
       if (!trimmed) {
-        return { ok: false, error: 'Name must not be empty.', uncertain: false };
+        return { ok: false, error: i18n.t('provision.emptyName'), uncertain: false };
       }
       if (workingRef.current) {
-        return { ok: false, error: 'Provisioning already in progress.', uncertain: false };
+        return { ok: false, error: i18n.t('provision.alreadyWorking'), uncertain: false };
       }
       workingRef.current = true;
       setWorking(true);
@@ -78,8 +79,7 @@ export function useProvisioning({
           frozen &&
           (frozen.name !== trimmed || frozen.workspaceId !== (boundWorkspaceId ?? undefined))
         ) {
-          const message =
-            'A previous provisioning attempt has an unknown status. Retry it before starting another.';
+          const message = i18n.t('provision.unknownStatusRetry');
           setError(message);
           return { ok: false, error: message, uncertain: true };
         }
@@ -89,7 +89,7 @@ export function useProvisioning({
           workspaceId: boundWorkspaceId ?? undefined,
         };
         if (!frozen && !writeIntent(intent)) {
-          const message = 'Provisioning identity could not be recorded. Nothing was sent.';
+          const message = i18n.t('provision.identityNotRecorded');
           setError(message);
           return { ok: false, error: message, uncertain: false };
         }
@@ -104,7 +104,7 @@ export function useProvisioning({
             ).workspaceId;
           } else {
             if (!boundWorkspaceId) {
-              const message = 'Create a workspace first.';
+              const message = i18n.t('provision.workspaceFirst');
               setError(message);
               return { ok: false, error: message, uncertain: false };
             }
@@ -128,8 +128,9 @@ export function useProvisioning({
             setError(message);
             return { ok: false, error: message, uncertain: false };
           }
-          const message = err instanceof Error ? err.message : 'Provisioning did not complete.';
-          setError(`${message} Retry with the same name before starting another.`);
+          const message =
+            err instanceof Error ? err.message : i18n.t('provision.incompleteDefault');
+          setError(i18n.t('provision.retrySameName', { message }));
           return { ok: false, error: message, uncertain: true };
         }
       } finally {

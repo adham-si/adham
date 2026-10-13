@@ -1,4 +1,5 @@
 import * as React from 'react';
+import i18n from '@/shared/i18n';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { SessionSummary as ContractSessionSummary } from '@adham/contracts-generated';
 import type { SessionSummary as SidebarSessionSummary } from '@/widgets/shell/primary-sidebar/primary-sidebar';
@@ -82,7 +83,7 @@ export function useProjectSessions({
       setSessions(mapped);
     } catch (err) {
       if (seq !== fetchSeqRef.current) return;
-      setError(err instanceof Error ? err.message : 'Failed to list sessions.');
+      setError(err instanceof Error ? err.message : i18n.t('conversation.listFailed'));
     } finally {
       if (seq === fetchSeqRef.current) {
         setLoading(false);
@@ -144,7 +145,7 @@ export function useProjectSessions({
       (unresolvedIntentRef.current.workspaceId !== workspaceId ||
         unresolvedIntentRef.current.projectId !== projectId)
     ) {
-      setError('A session creation for another scope is pending resolution.');
+      setError(i18n.t('conversation.creationPending'));
       return;
     }
 
@@ -210,7 +211,7 @@ export function useProjectSessions({
             ? err
             : err instanceof Error
               ? err.message
-              : 'Failed to create session.';
+              : i18n.t('conversation.createFailed');
         setError(msg);
       }
     } finally {

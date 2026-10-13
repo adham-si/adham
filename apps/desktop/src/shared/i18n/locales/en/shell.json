@@ -1,0 +1,92 @@
+{
+  "sidebar": {
+    "newTask": "New task",
+    "recentSessions": "Sessions",
+    "noSessions": "No sessions yet",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "regionLabel": "Primary Sidebar",
+    "resizeLabel": "Resize primary sidebar",
+    "defaultWorkspace": "Personal Workspace",
+    "defaultProject": "Default Project",
+    "sessionsTruncated": "Showing latest 100 sessions (truncated)"
+  },
+  "rail": {
+    "compose": "Compose",
+    "search": "Search",
+    "projects": "Projects",
+    "agents": "Agents",
+    "activity": "Activity",
+    "marketplace": "Marketplace",
+    "settings": "Settings",
+    "toggleSidebar": "Toggle sidebar",
+    "focusMode": "Focus mode",
+    "toggleTheme": "Switch theme",
+    "navRail": "Navigation Rail"
+  },
+  "titlebar": {
+    "appTitlebar": "Application Titlebar",
+    "hideNavRail": "Hide navigation rail",
+    "showNavRail": "Show navigation rail",
+    "windowActions": "Window and tab actions",
+    "actionsTitle": "Actions",
+    "windowActionsLabel": "Window Actions",
+    "openProject": "Open Project",
+    "reloadWindow": "Reload Window",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "closeWindow": "Close Window",
+    "close": "Close",
+    "hideSidebar": "Hide primary sidebar",
+    "showSidebar": "Show primary sidebar",
+    "hidePanel": "Hide panel",
+    "showPanel": "Show panel",
+    "hideSecondary": "Hide secondary sidebar",
+    "showSecondary": "Show secondary sidebar"
+  },
+  "contextPanel": {
+    "title": "Inspector",
+    "close": "Close panel",
+    "tabs": {
+      "plan": "Plan",
+      "activity": "Activity",
+      "graph": "Task graph",
+      "agents": "Agents",
+      "context": "Context",
+      "artifacts": "Artifacts"
+    },
+    "regionLabel": "Context Panel",
+    "resizePanel": "Resize panel",
+    "planHeading": "Execution Plan",
+    "planInitialize": "Initialize project workspace",
+    "planExecute": "Execute desktop shell integration",
+    "planVerify": "Verify evidence and telemetry",
+    "activityHeading": "Recent Activity",
+    "activitySessionCreated": "Session created",
+    "activityNow": "Now",
+    "activityCheckpoint": "SQLite WAL checkpoint verified",
+    "activityMinuteAgo": "1 min ago",
+    "graphHeading": "Task Graph",
+    "graphDemo": "Root [Task 1] → Isolated Subagent [Node A]",
+    "agentsHeading": "Active Agents",
+    "agentsOrchestrator": "Orchestrator / Manager",
+    "agentsRunning": "Running • Local sandboxed",
+    "contextHeading": "Context Sources",
+    "contextActive": "Active workspace files: isolated boundary",
+    "artifactsHeading": "Generated Artifacts",
+    "artifactsEmpty": "No artifacts produced yet"
+  },
+  "shell": {
+    "secondaryTitle": "Explorer",
+    "secondaryRegion": "Secondary Sidebar",
+    "secondaryClose": "Close secondary sidebar",
+    "secondaryResize": "Resize secondary sidebar",
+    "headerRegion": "Application Header"
+  },
+  "status": {
+    "ready": "Ready",
+    "loading": "Loading...",
+    "error": "An error occurred"
+  }
+}

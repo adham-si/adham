@@ -25,7 +25,10 @@ export function SkillsPage() {
     {
       id: 'refactor',
       name: 'Code Modernizer',
-      desc: 'Automate syntax upgrades, architectural refactoring, and code styling.',
+      desc: t(
+        'settings.skills.descRefactor',
+        'Automate syntax upgrades, architectural refactoring, and code styling.',
+      ),
       icon: <HugeiconsIcon icon={SourceCodeIcon} />,
       source: 'workspace',
       category: 'coding',
@@ -33,7 +36,10 @@ export function SkillsPage() {
     {
       id: 'test-gen',
       name: 'Test Generator',
-      desc: 'Generate Vitest unit and integration suites against component contracts.',
+      desc: t(
+        'settings.skills.descTestGen',
+        'Generate Vitest unit and integration suites against component contracts.',
+      ),
       icon: <HugeiconsIcon icon={FileCodeIcon} />,
       source: 'workspace',
       category: 'testing',
@@ -41,7 +47,10 @@ export function SkillsPage() {
     {
       id: 'research',
       name: 'Web Research',
-      desc: 'Browse verified documentation, developer guides, and upstream APIs.',
+      desc: t(
+        'settings.skills.descResearch',
+        'Browse verified documentation, developer guides, and upstream APIs.',
+      ),
       icon: <HugeiconsIcon icon={GlobalSearchIcon} />,
       source: 'global',
       category: 'research',
@@ -49,7 +58,10 @@ export function SkillsPage() {
     {
       id: 'sec-audit',
       name: 'Security Audit',
-      desc: 'Inspect dependencies, detect credential leaks, and enforce boundaries.',
+      desc: t(
+        'settings.skills.descSecAudit',
+        'Inspect dependencies, detect credential leaks, and enforce boundaries.',
+      ),
       icon: <HugeiconsIcon icon={ShieldIcon} />,
       source: 'global',
       category: 'security',
@@ -57,7 +69,10 @@ export function SkillsPage() {
     {
       id: 'db-expert',
       name: 'SQL Optimization',
-      desc: 'Analyze queries, optimize database indices, and validate schemas.',
+      desc: t(
+        'settings.skills.descDbExpert',
+        'Analyze queries, optimize database indices, and validate schemas.',
+      ),
       icon: <HugeiconsIcon icon={Database01Icon} />,
       source: 'builtin',
       category: 'data',
@@ -65,7 +80,10 @@ export function SkillsPage() {
     {
       id: 'skill-custom',
       name: 'Agent Customizer',
-      desc: 'Configure custom agent behaviors, workspace rules, and prompt personas.',
+      desc: t(
+        'settings.skills.descCustom',
+        'Configure custom agent behaviors, workspace rules, and prompt personas.',
+      ),
       icon: <HugeiconsIcon icon={AiDrawingIcon} />,
       source: 'workspace',
       category: 'agent',
@@ -73,7 +91,10 @@ export function SkillsPage() {
     {
       id: 'data-loss',
       name: 'Data Guard',
-      desc: 'Prevent accidental file deletions, broad drops, and unsafe shell operations.',
+      desc: t(
+        'settings.skills.descDataLoss',
+        'Prevent accidental file deletions, broad drops, and unsafe shell operations.',
+      ),
       icon: <HugeiconsIcon icon={ShieldIcon} />,
       source: 'global',
       category: 'safety',
@@ -81,7 +102,10 @@ export function SkillsPage() {
     {
       id: 'data-apps',
       name: 'App Builder',
-      desc: 'Scaffold interactive interfaces, dashboards, and UI prototypes.',
+      desc: t(
+        'settings.skills.descDataApps',
+        'Scaffold interactive interfaces, dashboards, and UI prototypes.',
+      ),
       icon: <HugeiconsIcon icon={ComputerIcon} />,
       source: 'builtin',
       category: 'frontend',
@@ -120,7 +144,10 @@ export function SkillsPage() {
           {t('settings.extensions.skills', { defaultValue: 'Agent Skills' })}
         </h2>
         <p className="text-xs text-foreground-secondary mt-1">
-          Manage specialized workflows, instructional playbooks, and task capabilities.
+          {t(
+            'settings.skills.desc',
+            'Manage specialized workflows, instructional playbooks, and task capabilities.',
+          )}
         </p>
       </div>
 
@@ -131,11 +158,11 @@ export function SkillsPage() {
       <section aria-labelledby="skills-heading" className="space-y-4">
         <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
           <h3 id="skills-heading" className="text-sm font-semibold text-foreground">
-            Installed Playbooks
+            {t('settings.skills.listTitle', 'Installed Playbooks')}
           </h3>
           <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
             <HugeiconsIcon icon={Add01Icon} />
-            <span>Add skill</span>
+            <span>{t('settings.skills.addSkill', 'Add skill')}</span>
           </Button>
         </div>
 
@@ -145,9 +172,10 @@ export function SkillsPage() {
 
       {/* Footer Notes */}
       <div className="pt-2 text-xs text-foreground-secondary">
-        Skills load automatically from <span className="font-mono">.agents/skills/</span> and global
-        settings.{' '}
-        <span className="text-action cursor-pointer hover:underline">Authoring guide →</span>
+        {t('settings.skills.footerLead', { workspacePath: '.agents/skills/' })}{' '}
+        <span className="text-action cursor-pointer hover:underline">
+          {t('settings.skills.footerLink', 'Authoring guide →')}
+        </span>
       </div>
     </div>
   );

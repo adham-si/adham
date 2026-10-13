@@ -1,0 +1,65 @@
+{
+  "gallery": {
+    "title": "Component Gallery",
+    "note": "Design-system quality surface. Renders every @adham/ui component across variants, sizes, and states.",
+    "buttons": {
+      "title": "Buttons",
+      "primary": "Primary",
+      "secondary": "Secondary",
+      "ghost": "Ghost",
+      "danger": "Danger",
+      "link": "Link",
+      "disabled": "Disabled",
+      "loading": "Loading...",
+      "fullWidth": "Full width"
+    },
+    "forms": {
+      "title": "Inputs & Textareas",
+      "label": "Your name",
+      "invalidLabel": "Email",
+      "error": "Enter a valid email address",
+      "placeholder": "Type something…",
+      "disabled": "Disabled",
+      "readOnly": "Read-only"
+    },
+    "navigation": {
+      "title": "Sidebar items",
+      "inbox": "Inbox",
+      "drafts": "Drafts",
+      "archive": "Archive",
+      "projects": "Projects"
+    },
+    "overlays": {
+      "title": "Menus & Dialogs",
+      "dialogOpen": "Open dialog",
+      "dialogTitle": "Delete project",
+      "dialogDesc": "This removes the project and its sessions. This action cannot be undone.",
+      "dialogConfirm": "Delete",
+      "dialogCancel": "Cancel",
+      "menuOpen": "Open menu",
+      "menuLabel": "Actions",
+      "file": "File",
+      "edit": "Edit",
+      "menuNew": "New",
+      "menuOpenFile": "Open…",
+      "menuSave": "Save",
+      "menuCut": "Cut",
+      "menuCopy": "Copy",
+      "menuPaste": "Paste",
+      "menuDisabled": "Paste as plain text"
+    },
+    "messages": {
+      "title": "Message cards",
+      "user": "Can you plan the release steps and show me a task graph?",
+      "assistant": "Yes — here is the plan. Four tasks, one reviewer, and a verification gate before merge.",
+      "system": "Verification passed: 15 files, 221 tests, no regressions.",
+      "selected": "Selected card",
+      "editable": "Editable card"
+    },
+    "icons": {
+      "title": "Icons",
+      "labelled": "Accessible icon",
+      "mirrored": "Mirrored (RTL)"
+    }
+  }
+}
