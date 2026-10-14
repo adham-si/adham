@@ -345,7 +345,10 @@ impl IsolatedSecretService {
             stdin.write_all(b"test\n").expect("write unlock password");
         }
         let status = child.wait().expect("wait on unlock daemon");
-        assert!(status.success(), "gnome-keyring-daemon --unlock must succeed");
+        assert!(
+            status.success(),
+            "gnome-keyring-daemon --unlock must succeed"
+        );
 
         let status2 = std::process::Command::new("gnome-keyring-daemon")
             .args(["--start", "--components=secrets"])
@@ -358,7 +361,10 @@ impl IsolatedSecretService {
             .stderr(std::process::Stdio::null())
             .status()
             .expect("gnome-keyring-daemon --start failed");
-        assert!(status2.success(), "gnome-keyring-daemon --start must succeed");
+        assert!(
+            status2.success(),
+            "gnome-keyring-daemon --start must succeed"
+        );
     }
 }
 
@@ -413,7 +419,11 @@ fn locked_collection_fails_closed_and_refuses_overwrite() {
                 let key = provider
                     .content_key()
                     .expect("read content key after unlock");
-                assert_eq!(fp(&key), expected_fp, "key must match original after unlock");
+                assert_eq!(
+                    fp(&key),
+                    expected_fp,
+                    "key must match original after unlock"
+                );
                 return;
             }
             "cleanup" => {
