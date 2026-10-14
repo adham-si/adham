@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useProvisioning } from './use-provisioning';
 import { readWorkspaceIntent } from './conversation-identity';
 import { ConversationPanel } from './conversation-panel';
+import i18n from '@/shared/i18n';
 
 beforeEach(() => {
   localStorage.clear();
@@ -289,6 +290,47 @@ describe('useProvisioning', () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.uncertain).toBe(false);
     expect(readWorkspaceIntent()).toBeNull();
+  });
+
+  it('sends the live locale and freezes it across an uncertain retry', async () => {
+    const backend = fakeProvisioning();
+    backend.createWorkspace.mockRejectedValueOnce(new Error('transport lost'));
+    const { result } = renderHook(() => useProvisioning({ backend }));
+    await i18n.changeLanguage('ar');
+    try {
+      let first!: { ok: boolean; uncertain?: boolean };
+      await act(async () => {
+        first = await result.current.createWorkspace('WS');
+      });
+      expect(first.ok).toBe(false);
+      expect(first.uncertain).toBe(true);
+      expect(backend.createWorkspace).toHaveBeenCalledWith(
+        { name: 'WS', kind: 'personal', preferredLanguage: 'ar' },
+        { requestId: expect.any(String) },
+      );
+      // The UI language changes while the outcome is unknown: the retry must
+      // replay the frozen payload, or the request fingerprint would conflict.
+      await i18n.changeLanguage('zh-CN');
+      backend.createWorkspace.mockResolvedValueOnce({
+        workspaceId: 'ws-1',
+        name: 'WS',
+        kind: 'personal',
+        preferredLanguage: 'ar',
+        createdAt: '2026-10-09T00:00:00Z',
+      });
+      await act(async () => {
+        await result.current.createWorkspace('WS');
+      });
+      expect(backend.createWorkspace).toHaveBeenLastCalledWith(
+        { name: 'WS', kind: 'personal', preferredLanguage: 'ar' },
+        { requestId: expect.any(String) },
+      );
+      const ids = requestIds(backend, 'createWorkspace');
+      expect(ids[0]).toBe(ids[1]);
+      expect(readWorkspaceIntent()).toBeNull();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
 

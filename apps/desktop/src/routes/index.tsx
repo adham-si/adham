@@ -1,71 +1,34 @@
 import * as React from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { Shell, Context, Titlebar, NavRail, Sidebar, Panel } from '@/widgets/shell';
-import { ConversationPanel } from '@/features/conversation/conversation-panel';
-import { useSelection } from '@/features/workspace-selection/use-selection';
-import { WorkspaceSelection } from '@/features/workspace-selection/workspace-selection';
+import { ConversationPanel, useProjectSessions } from '@/features/conversation';
 import {
+  useProvisionFlow,
+  WorkspaceSelection,
   ProvisionDialog,
-  type ProvisionDialogTarget,
-} from '@/features/workspace-selection/provision-dialog';
-import { announceScopeChanged } from '@/features/conversation/conversation-identity';
-import { useProjectSessions } from '@/features/conversation/use-project-sessions';
+} from '@/features/workspace-selection';
 import { SettingsPage } from '@/pages/settings';
 
 export const Route = createFileRoute('/')({
   component: IndexComponent,
 });
 
+/// Composition only: discovery/dialog orchestration lives in the
+/// workspace-selection feature, session history in conversation, and the
+/// first-run journey in onboarding. The route wires results into the shell.
 function IndexComponent() {
-  // Sidebar discovery owns its own read lifecycle; a confirmed selection
-  // announces scope-changed for the conversation surface to follow.
-  const sel = useSelection();
+  const {
+    sel,
+    provisionTarget,
+    openCreateWorkspace,
+    openCreateProject,
+    closeProvision,
+    handleProvisionSuccess,
+  } = useProvisionFlow();
+
   const handleSelectProject = React.useCallback(
     (workspaceId: string, projectId: string) => {
       void sel.select(workspaceId, projectId);
-    },
-    [sel],
-  );
-
-  const [provisionTarget, setProvisionTarget] = React.useState<ProvisionDialogTarget | null>(null);
-
-  const handleCreateWorkspace = React.useCallback(() => {
-    setProvisionTarget({ type: 'workspace' });
-  }, []);
-
-  const handleCreateProject = React.useCallback(
-    (workspaceId: string) => {
-      const ws = sel.workspaces.find((w) => w.workspaceId === workspaceId);
-      setProvisionTarget({
-        type: 'project',
-        workspaceId,
-        workspaceName: ws?.name ?? workspaceId,
-      });
-    },
-    [sel.workspaces],
-  );
-
-  const handleProvisionSuccess = React.useCallback(
-    (target: ProvisionDialogTarget, id: string, name?: string) => {
-      if (target.type === 'workspace') {
-        announceScopeChanged('workspace', 'created', {
-          workspaceId: id,
-          projectId: null,
-        });
-        void sel.refresh();
-        setProvisionTarget({
-          type: 'project',
-          workspaceId: id,
-          workspaceName: name || 'New Workspace',
-        });
-      } else {
-        announceScopeChanged('project', 'created', {
-          workspaceId: target.workspaceId,
-          projectId: id,
-        });
-        void sel.refresh();
-        setProvisionTarget(null);
-      }
     },
     [sel],
   );
@@ -99,8 +62,8 @@ function IndexComponent() {
       selectError={sel.error}
       onSelectProject={handleSelectProject}
       onRetryLists={() => void sel.refresh()}
-      onCreateWorkspace={handleCreateWorkspace}
-      onCreateProject={handleCreateProject}
+      onCreateWorkspace={openCreateWorkspace}
+      onCreateProject={openCreateProject}
     />
   );
   return (
@@ -129,7 +92,7 @@ function IndexComponent() {
           <ProvisionDialog
             open={provisionTarget !== null}
             target={provisionTarget}
-            onClose={() => setProvisionTarget(null)}
+            onClose={closeProvision}
             onSuccess={handleProvisionSuccess}
           />
         </>

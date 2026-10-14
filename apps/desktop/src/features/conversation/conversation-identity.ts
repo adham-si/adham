@@ -239,11 +239,14 @@ export function sameScope(a: ConversationScope, b: ConversationScope): boolean {
 
 /// Frozen provisioning intent: request identity + payload frozen BEFORE
 /// dispatch so an uncertain retry reuses both instead of forking a duplicate
-/// workspace or project. Mirrors the PendingSend discipline.
+/// workspace or project. Mirrors the PendingSend discipline. The workspace
+/// language rides along frozen: a retry after a language switch must replay
+/// the identical request fingerprint or the backend reports a conflict.
 export interface ProvisionIntent {
   requestId: string;
   name: string;
   workspaceId?: string | undefined;
+  preferredLanguage?: string | undefined;
 }
 
 function readProvisionIntent(key: string): ProvisionIntent | null {
@@ -256,6 +259,8 @@ function readProvisionIntent(key: string): ProvisionIntent | null {
         requestId: parsed.requestId,
         name: parsed.name,
         workspaceId: typeof parsed.workspaceId === 'string' ? parsed.workspaceId : undefined,
+        preferredLanguage:
+          typeof parsed.preferredLanguage === 'string' ? parsed.preferredLanguage : undefined,
       };
     }
     return null;

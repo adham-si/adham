@@ -6,7 +6,7 @@ import type { PendingOperationDto } from '@adham/contracts-generated';
 import type { ConversationBackend } from '../conversation-scope';
 import { usePendingRecovery } from './use-pending-recovery';
 import { ConversationPanel } from '../conversation-panel';
-import type { SelectionBackend } from '../../workspace-selection/use-selection';
+import type { SelectionBackend } from '../../workspace-selection';
 
 const crossOp: PendingOperationDto = {
   operationId: 'cross-op-1',

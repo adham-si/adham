@@ -1,5 +1,5 @@
 import * as React from 'react';
-import i18n from '@/shared/i18n';
+import i18n, { normalizeLanguage } from '@/shared/i18n';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { ProjectSummary, WorkspaceSummary } from '@adham/contracts-generated';
 import {
@@ -73,6 +73,9 @@ export function useProvisioning({
         const writeIntent = kind === 'workspace' ? writeWorkspaceIntent : writeProjectIntent;
         const clearIntent = kind === 'workspace' ? clearWorkspaceIntent : clearProjectIntent;
         const frozen = readIntent();
+        // Live locale on first dispatch; the frozen value on every retry so
+        // an uncertain request replays with an identical payload fingerprint.
+        const preferredLanguage = frozen?.preferredLanguage ?? normalizeLanguage(i18n.language);
         // A frozen intent for different input blocks: retrying under a new
         // name while the previous outcome is unknown would fork a duplicate.
         if (
@@ -87,6 +90,7 @@ export function useProvisioning({
           requestId: crypto.randomUUID(),
           name: trimmed,
           workspaceId: boundWorkspaceId ?? undefined,
+          preferredLanguage,
         };
         if (!frozen && !writeIntent(intent)) {
           const message = i18n.t('provision.identityNotRecorded');
@@ -98,7 +102,7 @@ export function useProvisioning({
           if (kind === 'workspace') {
             id = (
               await backend.createWorkspace(
-                { name: trimmed, kind: WORKSPACE_KIND, preferredLanguage: 'en' },
+                { name: trimmed, kind: WORKSPACE_KIND, preferredLanguage },
                 { requestId: intent.requestId },
               )
             ).workspaceId;

@@ -12,7 +12,7 @@ import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
 import { useConversation, type ConversationBackend } from './use-conversation';
 import { useProvisioning, type ProvisioningBackend } from './use-provisioning';
-import { useSelection, type SelectionBackend } from '../workspace-selection/use-selection';
+import { useSelection, type SelectionBackend } from '../workspace-selection';
 import { ConversationSetupSlot } from './conversation-setup-slot';
 import { announceScopeChanged, SCOPE_CHANGED_EVENT } from './conversation-identity';
 import { submissionNotice } from './submission-notice';

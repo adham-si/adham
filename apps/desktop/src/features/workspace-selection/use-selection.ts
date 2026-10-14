@@ -17,7 +17,7 @@ import {
   SCOPE_CHANGED_EVENT,
   writeSelectIntent,
   type ScopeChangedDetail,
-} from '../conversation/conversation-identity';
+} from '../conversation';
 
 /// Minimal backend surface for discovery + explicit selection.
 export interface SelectionBackend {

@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { PendingOperationDto } from '@adham/contracts-generated';
 import type { ConversationBackend } from '../conversation-scope';
 import { ConversationPanel } from '../conversation-panel';
-import type { SelectionBackend } from '../../workspace-selection/use-selection';
+import type { SelectionBackend } from '../../workspace-selection';
 
 const pendingOp: PendingOperationDto = {
   operationId: 'op-deferred-1',

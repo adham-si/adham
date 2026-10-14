@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { WorkspaceSelection } from '../workspace-selection/workspace-selection';
+import { WorkspaceSelection, type useSelection } from '../workspace-selection';
 import { ProvisioningForm } from './provisioning-form';
 import type { useProvisioning } from './use-provisioning';
-import type { useSelection } from '../workspace-selection/use-selection';
 
 export interface ConversationSetupSlotProps {
   status: 'needs-workspace' | 'needs-project' | 'bootstrapping';
