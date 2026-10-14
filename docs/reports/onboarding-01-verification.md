@@ -11,7 +11,8 @@ throughout; no user content, secrets, or raw app-data paths.
 - `9387911` / `22a5e28` — evidence reports + screenshots.
 - Reviewer round 2 — desktop side-rail layout, journey-header language selector, fail-closed storage readiness, architecture analysis.
 - Reviewer round 3 — `c892697` behavior-preserving dependency repair (provisioning leaf feature, ownership delimitation, shared helpers, barrel-workaround removal); follow-up evidence commit adds the readiness-recheck regression and the native compile/launch record below.
-- Reviewer round 4 — `e034e62` (this revision) — full-context two-column journey page: the route renders the journey inside the shell's `Context` card (app default layout) and the journey splits into a guide column (step rail + per-step showcase + decorative preview) and a form column; showcase copy added in all four locales; guide-column test added.
+- Reviewer round 4 — `e034e62` — full-context two-column journey page: the route renders the journey inside the shell's `Context` card (app default layout) and the journey splits into a guide column (step rail + per-step showcase + decorative preview) and a form column; showcase copy added in all four locales; guide-column test added.
+- Reviewer round 5 — `4382034` (this revision) — guide column upgraded to a vertical numbered progress stepper (circles + connecting lines) with animated per-step SVG showcase art; form block centered in its column with centered titles and start-aligned fields; project-step Back renders 50/50 beside the primary action; copy de-duplicated (form hint paragraphs removed, guide bodies reworded).
 
 ## Gate results (macOS arm64, this machine)
 
@@ -182,6 +183,31 @@ Implemented in `e034e62`:
 Model, copy of record, storage guards, and frozen-identity semantics are
 untouched; this is a presentation-layer revision.
 
+## Reviewer round 5 — stepper, SVG showcase, centered form (this revision)
+
+Native review of the round-4 layout produced four design corrections,
+implemented in `4382034` (presentation only; model and guards untouched):
+
+1. **Numbered progress stepper** — the text-pill rail is replaced by a
+   vertical stepper (`ui/guide-column.tsx`): a numbered circle per step
+   with connecting lines, filled up to the current step, current step
+   highlighted. Keeps the `Setup steps` list landmark, `aria-current="step"`,
+   and the per-step sr-only statuses; RTL mirrors via logical positioning.
+2. **Animated SVG showcase** — the skeleton-bar mock is replaced by pure
+   per-step SVG art (no text → no translation needed, `aria-hidden`):
+   an orbiting dot around the workspace card (16 s spin), a pulsing
+   isolation divider between the two project cards, and a pulsing halo
+   behind the ready checkmark. Built-in Tailwind animations only, all
+   disabled under `prefers-reduced-motion`.
+3. **Centered form column** — the form block now centers horizontally in
+   its column; step titles are centered while field labels, inputs, and
+   buttons stay start-aligned.
+4. **Button row + copy de-duplication** — project-step Back renders beside
+   the primary action in a 50/50 row (no more lone trailing button); the
+   form hint paragraphs (`workspaceHint`, `projectHint`) were removed and
+   the guide bodies reworded so "workspace" no longer repeats across the
+   two columns (the workspace screen went from seven mentions to four).
+
 
 Method: vite dev server (port 11111) driven by Playwright/Chromium with
 `window.__TAURI_INTERNALS__.invoke` shimmed to a synthetic canary backend
@@ -192,15 +218,15 @@ follows the amendment's textual spec. Captures in `docs/reports/evidence/`:
 | State | File | Result |
 |-------|------|--------|
 | Loading / checking | `onboarding-01-loading.png` | "Checking your setup…" inside the app Context card |
-| Workspace step (existing + create, full-context page) | `onboarding-01-workspace-step.png` | Two full columns: guide (rail + "One workspace for everything" showcase + preview) \| form; header language selector |
+| Workspace step (existing + create, full-context page) | `onboarding-01-workspace-step.png` | Numbered stepper (1 current) + orbit-animating SVG showcase \| centered form block: centered title, start-aligned fields; header language selector |
 | Focus / keyboard | `onboarding-01-focus-keyboard.png` | Tab reaches existing-workspace entry; Enter selects; Enter in name field submits |
-| Project step | `onboarding-01-project-step.png` | Guide showcase swaps to "Projects keep their own storage" (two-card isolation preview); target-workspace card, existing project list, create form |
-| Ready step | `onboarding-01-ready-step.png` | Guide showcase "You're set to start"; confirmed scope summary, "Open Adham" |
+| Project step | `onboarding-01-project-step.png` | Stepper advances (1 done, 2 current); pulsing isolation-divider SVG; Back \| Create project side-by-side 50/50 |
+| Ready step | `onboarding-01-ready-step.png` | Stepper at 3; pulsing check SVG; centered title, scope summary, "Open Adham" |
 | Error + retry | `onboarding-01-error-retry.png` | `role=alert` + Retry; retry recovers |
 | Storage degraded | `onboarding-01-storage-degraded.png` | Blocker message + Retry in the form column; guide column stays visible |
 | Storage unavailable (failed read) | `onboarding-01-storage-unavailable.png` | Unavailable blocker, no mutation controls; Retry recovers |
-| Arabic RTL | `onboarding-01-arabic-rtl.png` | Full RTL mirroring: guide column right, form left, Arabic showcase copy |
-| Narrow 700 px (columns stacked) | `onboarding-01-narrow-700px.png` | Columns stack (guide above form); no horizontal overflow |
+| Arabic RTL | `onboarding-01-arabic-rtl.png` | Full RTL mirroring: stepper + showcase right, form left, Arabic copy |
+| Narrow 700 px (columns stacked) | `onboarding-01-narrow-700px.png` | Columns stack (stepper + showcase above form); no horizontal overflow |
 
 Automated assertions in the same run: no create/select dispatch on mount;
 language switch to Arabic on the first screen dispatches nothing and survives
@@ -228,8 +254,8 @@ messages.
 | Language switch before creation dispatches the new locale | `OnboardingJourney` test |
 | Frozen request identity survives a language switch mid-uncertain-retry | `OnboardingJourney` test |
 | Retry → checking: all three mutation methods dispatch nothing while readiness re-read is pending (`blocker === null` ≠ safe to proceed); reopen only after explicit ready | `useOnboarding` regression test (round 3) |
-| Step rail marks and advances the current step | `OnboardingJourney` test |
-| Guide column (showcase copy, rail, form) renders together | `OnboardingJourney` test (round 4) |
+| Step stepper marks and advances the current step | `OnboardingJourney` test |
+| Guide column (showcase copy, stepper, form) renders together | `OnboardingJourney` test (round 4) |
 
 ## Real-backend native verification — macOS compile + launch attempted, PASSED
 
@@ -264,11 +290,13 @@ substitute for this.
 
 ## Copy and interaction review
 
-- Copy limited to the amendment plus the round-4 guide copy; new
-  `storageUnavailable` message added for the fail-closed blocker; all four
-  locales covered by the parity test. The six guide keys
-  (`guideWorkspace/guideProject/guideReady` title+body) are complementary
-  to the form copy, and the decorative preview carries no text at all.
+- Copy limited to the amendment plus the round-4 guide copy (reworded in
+  round 5 to remove the repeated "workspace" across columns); the round-5
+  pass also removed the form hint paragraphs (`workspaceHint`,
+  `projectHint`) from all locales, leaving the showcase as the single
+  explanatory text. New `storageUnavailable` message added for the
+  fail-closed blocker; all four locales covered by the parity test. The
+  SVG showcase art carries no text at all.
 - Optional settings stay outside onboarding: the only in-journey setting is
   the compact language selector (now in the journey header, per review);
   theme and everything else remain in Settings.
