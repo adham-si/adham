@@ -11,7 +11,7 @@ export function ReadyStep({ api }: { api: OnboardingJourneyApi }) {
   const { t } = useTranslation();
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
-      <h1 className="text-lg font-semibold text-foreground">
+      <h1 className="text-center text-lg font-semibold text-foreground">
         {t('onboarding.readyHeading', 'Your workspace is ready')}
       </h1>
 

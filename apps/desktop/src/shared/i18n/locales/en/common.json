@@ -38,10 +38,8 @@
   },
   "onboarding": {
     "workspaceHeading": "Set up your workspace",
-    "workspaceHint": "A workspace contains your projects and settings.",
     "existingWorkspaces": "Existing workspaces",
     "projectHeading": "Create your first project",
-    "projectHint": "Projects store their data in Adham's own storage inside this workspace.",
     "existingProjects": "Existing projects",
     "readyHeading": "Your workspace is ready",
     "openAdham": "Open Adham",
@@ -64,11 +62,11 @@
     "projectsFailed": "Projects could not be loaded.",
     "storageUnavailable": "Setup availability could not be confirmed. Retry until local storage is ready.",
     "guideWorkspaceTitle": "One workspace for everything",
-    "guideWorkspaceBody": "A workspace groups your projects and their settings. You can rename it or add more workspaces later.",
-    "guideProjectTitle": "Projects keep their own storage",
-    "guideProjectBody": "Each project stores its data in Adham's own storage, isolated from other projects. You can add more projects at any time.",
+    "guideWorkspaceBody": "Projects and settings live together here. Rename this one, or add more any time.",
+    "guideProjectTitle": "A home for each project",
+    "guideProjectBody": "Each one keeps its own storage, isolated from the rest.",
     "guideReadyTitle": "You're set to start",
-    "guideReadyBody": "Your workspace and first project are selected. Sessions start the first time you send a message."
+    "guideReadyBody": "Your workspace and first project are selected. Sessions start with your first message."
   },
   "newProject": "+ New Project",
   "newWorkspace": "+ New Workspace"

@@ -27,16 +27,10 @@ export function ProjectStep({ api }: { api: OnboardingJourneyApi }) {
 
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
-      <div>
+      <div className="text-center">
         <h1 className="text-lg font-semibold text-foreground">
           {t('onboarding.projectHeading', 'Create your first project')}
         </h1>
-        <p className="mt-1 text-sm text-foreground-secondary">
-          {t(
-            'onboarding.projectHint',
-            "Projects store their data in Adham's own storage inside this workspace.",
-          )}
-        </p>
       </div>
 
       {api.target && (
@@ -116,9 +110,14 @@ export function ProjectStep({ api }: { api: OnboardingJourneyApi }) {
             {localError}
           </p>
         )}
-        <Button type="submit" disabled={!name.trim() || api.working} loading={api.working}>
-          {t('provision.createProject', 'Create project')}
-        </Button>
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="secondary" onClick={api.back} disabled={api.working}>
+            {t('onboarding.back', 'Back')}
+          </Button>
+          <Button type="submit" disabled={!name.trim() || api.working} loading={api.working}>
+            {t('provision.createProject', 'Create project')}
+          </Button>
+        </div>
       </form>
 
       {api.selectedProjectId && (

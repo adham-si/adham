@@ -26,13 +26,10 @@ export function WorkspaceStep({ api }: { api: OnboardingJourneyApi }) {
 
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
-      <div>
+      <div className="text-center">
         <h1 className="text-lg font-semibold text-foreground">
           {t('onboarding.workspaceHeading', 'Set up your workspace')}
         </h1>
-        <p className="mt-1 text-sm text-foreground-secondary">
-          {t('onboarding.workspaceHint', 'A workspace contains your projects and settings.')}
-        </p>
       </div>
 
       {api.workspaces.length > 0 && (
