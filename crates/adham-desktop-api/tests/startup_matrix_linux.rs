@@ -270,13 +270,51 @@ impl IsolatedSecretService {
         let dbus_addr = dbus_addr.expect("parse DBUS_SESSION_BUS_ADDRESS");
         let dbus_pid = dbus_pid.expect("parse DBUS_SESSION_BUS_PID");
 
+        let ctrl_arg = format!("--control-directory={}", temp_dir.join("ctrl").display());
+        let mut child = std::process::Command::new("gnome-keyring-daemon")
+            .args([&ctrl_arg, "--unlock", "--components=secrets"])
+            .env("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)
+            .env("XDG_DATA_HOME", &temp_dir)
+            .env("XDG_DATA_DIRS", &temp_dir)
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("spawn gnome-keyring-daemon --unlock");
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            stdin.write_all(b"test\n").expect("write unlock password");
+        }
+        let status = child.wait().expect("wait on unlock daemon");
+        assert!(
+            status.success(),
+            "gnome-keyring-daemon --unlock must succeed"
+        );
+
+        let status2 = std::process::Command::new("gnome-keyring-daemon")
+            .args([&ctrl_arg, "--start", "--components=secrets"])
+            .env("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)
+            .env("XDG_DATA_HOME", &temp_dir)
+            .env("XDG_DATA_DIRS", &temp_dir)
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .expect("gnome-keyring-daemon --start failed");
+        assert!(
+            status2.success(),
+            "gnome-keyring-daemon --start must succeed"
+        );
+
         let this = Self {
             dbus_pid,
             dbus_addr,
             temp_dir,
         };
 
-        this.unlock();
         assert!(!this.is_locked(), "collection must be initially unlocked");
         this
     }
@@ -326,47 +364,24 @@ impl IsolatedSecretService {
     }
 
     fn unlock(&self) {
-        let ctrl_arg = format!(
-            "--control-directory={}",
-            self.temp_dir.join("ctrl").display()
-        );
-        let mut child = std::process::Command::new("gnome-keyring-daemon")
-            .args([&ctrl_arg, "--unlock", "--components=secrets"])
+        let out = std::process::Command::new("dbus-send")
+            .args([
+                "--session",
+                "--dest=org.freedesktop.secrets",
+                "--type=method_call",
+                "--print-reply",
+                "/org/freedesktop/secrets",
+                "org.freedesktop.Secret.Service.Unlock",
+                "array:objpath:/org/freedesktop/secrets/collection/login",
+            ])
             .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
             .env("XDG_DATA_HOME", &self.temp_dir)
             .env("XDG_DATA_DIRS", &self.temp_dir)
             .env_remove("DISPLAY")
             .env_remove("WAYLAND_DISPLAY")
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .expect("spawn gnome-keyring-daemon --unlock");
-        if let Some(mut stdin) = child.stdin.take() {
-            use std::io::Write;
-            stdin.write_all(b"test\n").expect("write unlock password");
-        }
-        let status = child.wait().expect("wait on unlock daemon");
-        assert!(
-            status.success(),
-            "gnome-keyring-daemon --unlock must succeed"
-        );
-
-        let status2 = std::process::Command::new("gnome-keyring-daemon")
-            .args([&ctrl_arg, "--start", "--components=secrets"])
-            .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
-            .env("XDG_DATA_HOME", &self.temp_dir)
-            .env("XDG_DATA_DIRS", &self.temp_dir)
-            .env_remove("DISPLAY")
-            .env_remove("WAYLAND_DISPLAY")
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .expect("gnome-keyring-daemon --start failed");
-        assert!(
-            status2.success(),
-            "gnome-keyring-daemon --start must succeed"
-        );
+            .output()
+            .expect("dbus-send Unlock execution failed");
+        assert!(out.status.success(), "dbus-send Unlock must succeed");
     }
 }
 
