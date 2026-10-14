@@ -266,7 +266,10 @@ jobs:
         run: xvfb-run -a cargo test -p adham-desktop-api --test p0_repair_regression --locked
 
       - name: Desktop build check
-        run: pnpm --filter @adham/desktop build
+        run: |
+          pnpm --filter @adham/desktop build
+          cargo build -p adham-desktop --locked
+
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked

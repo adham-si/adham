@@ -6,7 +6,7 @@ All data below is synthetic canary material — no user content, secrets, raw ho
 ## Revision & Worktree
 
 - Base: `origin/main` at `4547b74` (Merge PR #6).
-- Worktree: `.kilo/worktrees/linux-desktop-readiness` on branch `linux-desktop-readiness` (canonical checkout pristine).
+- Worktree: `.kilo/worktrees/linux-desktop-readiness` on branch `linux-desktop-readiness` at commit `6b9ede69d4c8ea65dac234b4af0d255ed1ddbb75` (canonical checkout pristine).
 - Declared target baseline: Ubuntu 24.04 LTS (Noble Numbat).
 - Actual local container architecture: `Ubuntu 24.04 aarch64` (tested via container runtime on Apple Silicon host).
 - Target CI runner architecture: `Ubuntu 24.04 x86_64` (executed via GitHub Actions `ubuntu-24.04`). Local testing was performed on `aarch64`; full `x86_64` parity is established through the new CI workflow.
@@ -36,20 +36,23 @@ All data below is synthetic canary material — no user content, secrets, raw ho
   - `$HOME/.local/share/adham` default fallback.
   - Fail-closed validation rejecting empty, relative, or missing roots before any directory creation.
 - `crates/adham-platform/tests/paths_resolve_tests.rs`: Tests covering XDG Base Directory resolution and default `$HOME/.local/share/adham` fallback.
-- `crates/adham-tools/src/sandbox/profile.rs`: Permits `RUSTUP_HOME` and `CARGO_HOME` in sanitized execution environments for toolchain execution.
-  * *Rationale & Security Impact*: When executing safe toolchain binaries (such as `cargo --version`), rustup binary shims locate installed toolchains via `RUSTUP_HOME` and `CARGO_HOME`. On non-standard or containerized installations where toolchains live outside `$HOME/.rustup` (e.g. `/usr/local/rustup`), stripping these causes rustup dispatch failure. These variables represent filesystem directory paths, not secrets or tokens. The sanitizer continues to strip all keys, secrets, tokens, passwords, auth credentials, and cloud provider variables. Permitting these directory paths preserves process sandbox security while enabling toolchain dispatch.
-- `crates/adham-event-log/tests/content_key_linux_store.rs`: 5 tests covering real Linux Secret Service lifecycle:
+- `crates/adham-tools/src/sandbox/profile.rs`: Pristine (matches `origin/main`). The global sandbox profile is intentionally not broadened. `CARGO_HOME` and `RUSTUP_HOME` remain excluded from the safe environment variable allowlist to prevent sandboxed processes from directing Cargo to host credentials or configuration. Toolchain dispatch in container/test environments is handled without compromising sandbox security.
+- `crates/adham-event-log/tests/content_key_linux_store.rs`: 7 tests covering real Linux Secret Service lifecycle:
   - `persistent_backend_is_available`
   - `initialize_creates_once_reads_stable_and_never_overwrites`
   - `missing_key_fails_closed_without_mint`
   - `corrupt_key_is_integrity_error_and_not_overwritten`
   - `seal_open_roundtrip_and_scope_binding`
-- `crates/adham-desktop-api/tests/startup_matrix_linux.rs`: 3 tests covering real Linux Secret Service startup matrix:
+  - `unavailable_secret_service_fails_closed` (isolated subprocess test proving fail-closed when Secret Service D-Bus is unreachable)
+  - `locked_collection_fails_closed_and_refuses_overwrite` (isolated D-Bus daemon and subprocess test proving fail-closed and refusal to overwrite when Secret Service collections are locked)
+- `crates/adham-desktop-api/tests/startup_matrix_linux.rs`: 5 tests covering real Linux Secret Service startup matrix:
   - `fresh_startup_initializes_key_and_reopen_is_stable`
   - `existing_installation_with_deleted_key_fails_closed`
   - `orphan_content_blocks_startup_regeneration`
-- `crates/adham-desktop-api/tests/linux_native_restart_proof.rs`: End-to-end native restart and disposable save/reopen proof.
-- `.github/workflows/ci.yml`: Additive `validate-linux` job on `ubuntu-24.04` running system dependency installation, lint, typecheck, tests under `dbus-run-session`, desktop build check, and dependency audits. Existing `validate` (Windows) and `validate-macos` (macOS) jobs unchanged.
+  - `unavailable_secret_service_fails_closed_and_preserves_identity` (isolated subprocess test proving fail-closed without replacing installation identity in SQLite)
+  - `locked_collection_fails_closed_and_preserves_identity` (isolated D-Bus daemon and subprocess test proving fail-closed without replacing installation identity in SQLite)
+- `crates/adham-desktop-api/tests/linux_native_reopen_proof.rs`: Native context/database reopen and disposable save/reopen proof (exercises pool drop, fresh context initialization, key fingerprint stability, and protected-content persistence across database reopen lifecycles).
+- `.github/workflows/ci.yml`: Additive `validate-linux` job on `ubuntu-24.04` running system dependency installation, lint, typecheck, tests under `dbus-run-session`, Desktop build check (`pnpm --filter @adham/desktop build` followed by `cargo build -p adham-desktop --locked` so native executable linking is an explicit gate), and dependency audits. Existing `validate` (Windows) and `validate-macos` (macOS) jobs unchanged.
 
 ## Linux Verification Results
 
@@ -61,26 +64,28 @@ All data below is synthetic canary material — no user content, secrets, raw ho
 | `pnpm lint` | 0 | Oxlint clean |
 | `pnpm typecheck` | 0 | TypeScript strict check clean |
 | `pnpm test` | 0 | 45 test files, 533 tests passed |
-| `pnpm --filter @adham/desktop build` | 0 | Vite + tsc bundle built in 1.41s |
+| `pnpm --filter @adham/desktop build` | 0 | Vite + tsc bundle built |
+| `cargo build -p adham-desktop --locked` | 0 | Native executable compiled and linked |
 | `cargo fmt --all -- --check` | 0 | Rust format clean |
 | `cargo check --workspace --all-targets --locked` | 0 | All crates compile cleanly on Linux |
 | `cargo clippy --workspace --all-targets --locked -- -D warnings` | 0 | Clippy clean |
 | `cargo xtask contracts` + `git diff --exit-code -- packages/contracts-generated` | 0 | Zero contracts drift |
 | `cargo test --workspace --locked` | 0 | All workspace tests pass |
 | `cargo test -p adham-desktop-api --test p0_repair_regression --locked` | 0 | 8 regression tests pass |
-| `cargo test -p adham-event-log --test content_key_linux_store` | 0 | 5 Secret Service lifecycle tests pass |
-| `cargo test -p adham-desktop-api --test startup_matrix_linux` | 0 | 3 startup matrix tests pass |
-| `cargo test -p adham-desktop-api --test linux_native_restart_proof` | 0 | E2E restart & save/reopen journey passes |
+| `cargo test -p adham-event-log --test content_key_linux_store` | 0 | 7 Secret Service lifecycle tests pass |
+| `cargo test -p adham-desktop-api --test startup_matrix_linux` | 0 | 5 startup matrix tests pass |
+| `cargo test -p adham-desktop-api --test linux_native_reopen_proof` | 0 | Context/database reopen & save/reopen journey passes |
 | `cargo deny check` | 0 | advisories ok, bans ok, licenses ok, sources ok |
 | `pnpm check:deny-exceptions` (+ `self-test`) | 0 | 22/22 exception self-test cases pass |
 
 ## Evidence Separation: Backend, Headless Shell, and Native GUI
 
-### Level 1: Backend Process-Reopen & Secret Service Journey
-* **Test:** [`linux_native_restart_proof.rs`](file:///Users/ilyassmotya/software/00.devlab/adham-desktop/.kilo/worktrees/linux-desktop-readiness/crates/adham-desktop-api/tests/linux_native_restart_proof.rs) (Exit code 0).
+### Level 1: Backend Context/Database Reopen & Secret Service Journey
+* **Test:** [`linux_native_reopen_proof.rs`](file:///Users/ilyassmotya/software/00.devlab/adham-desktop/.kilo/worktrees/linux-desktop-readiness/crates/adham-desktop-api/tests/linux_native_reopen_proof.rs) (Exit code 0).
 * **Proof:**
-  - Process 1 seeded synthetic workspace, project, session, and canary message encrypted under the Secret Service content key, writing to SQLite.
-  - Process 2 re-opened the database in a fresh process context, retrieved the key from Secret Service, confirmed exact Blake3 fingerprint match, and read back the decrypted canary message.
+  - Context 1 seeded synthetic workspace, project, session, and canary message encrypted under the Secret Service content key, writing to SQLite.
+  - Context 1 dropped. Context 2 re-opened the database in a fresh pool/context, retrieved the key from Secret Service, confirmed exact Blake3 fingerprint match, and read back the decrypted canary message.
+  - This verifies API context and database reopen lifecycles within a test process; it does not demonstrate distinct OS process lifetimes.
   - Credential deleted on exit; confirmed immediate fail-closed `NoEntry` error.
 
 ### Level 2: Headless Tauri Application Boot & Linking

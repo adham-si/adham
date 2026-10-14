@@ -1,8 +1,9 @@
-//! Real Linux Secret Service native restart and disposable save/reopen proof.
+//! Real Linux Secret Service native context/database reopen and disposable save/reopen proof.
 //!
-//! Exercises end-to-end native startup, persistent credential retrieval across
-//! distinct process lifetimes, and protected-content persistence using synthetic
-//! canary data. Cleans up synthetic credentials and files on completion.
+//! Exercises native startup, persistent credential retrieval across context/database
+//! reopen lifetimes within a test process, and protected-content persistence using synthetic
+//! canary data. Verifies API context and SQLite database reopen lifecycles, not distinct
+//! OS process lifetimes. Cleans up synthetic credentials and files on completion.
 
 #![cfg(target_os = "linux")]
 
@@ -28,7 +29,7 @@ fn delete_credential(account: &str) {
 }
 
 #[tokio::test]
-async fn test_native_linux_restart_and_save_reopen_journey() {
+async fn test_native_linux_context_reopen_and_save_journey() {
     let temp_dir = std::env::temp_dir().join(format!("adham_linux_proof_{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&temp_dir).expect("create temp dir");
     let home_str = temp_dir.to_str().unwrap().to_string();

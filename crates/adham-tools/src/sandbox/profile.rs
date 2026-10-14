@@ -63,7 +63,5 @@ fn is_safe_env_var(key: &str) -> bool {
             | "USERPROFILE"
             | "TERM"
             | "RUST_LOG"
-            | "RUSTUP_HOME"
-            | "CARGO_HOME"
     )
 }
