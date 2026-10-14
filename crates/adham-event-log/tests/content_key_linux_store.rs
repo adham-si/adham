@@ -39,14 +39,18 @@ fn scope() -> EventScope {
     }
 }
 
+static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn persistent_backend_is_available() {
+    let _guard = TEST_LOCK.lock().unwrap();
     OsKeyringProvider::ensure_persistent_backend()
         .expect("Linux Secret Service backend must be available");
 }
 
 #[test]
 fn initialize_creates_once_reads_stable_and_never_overwrites() {
+    let _guard = TEST_LOCK.lock().unwrap();
     let (provider, account) = provider_for("create-once");
     let key1 = provider.initialize_content_key().expect("first init");
 
@@ -72,6 +76,7 @@ fn initialize_creates_once_reads_stable_and_never_overwrites() {
 
 #[test]
 fn missing_key_fails_closed_without_mint() {
+    let _guard = TEST_LOCK.lock().unwrap();
     let (provider, account) = provider_for("no-mint");
     let err = match provider.content_key() {
         Ok(_) => panic!("must fail closed"),
@@ -98,6 +103,7 @@ fn missing_key_fails_closed_without_mint() {
 
 #[test]
 fn corrupt_key_is_integrity_error_and_not_overwritten() {
+    let _guard = TEST_LOCK.lock().unwrap();
     let (_provider, account) = provider_for("corrupt");
     let entry = keyring::Entry::new(SERVICE, &account).expect("entry");
     entry
@@ -131,6 +137,7 @@ fn corrupt_key_is_integrity_error_and_not_overwritten() {
 
 #[test]
 fn seal_open_roundtrip_and_scope_binding() {
+    let _guard = TEST_LOCK.lock().unwrap();
     let (provider, account) = provider_for("seal-open");
     provider.initialize_content_key().expect("init");
 
@@ -191,15 +198,15 @@ fn unavailable_secret_service_fails_closed() {
         return;
     }
 
+    let _guard = TEST_LOCK.lock().unwrap();
+
     let exe = std::env::current_exe().expect("current exe");
     let status = std::process::Command::new(exe)
         .arg("unavailable_secret_service_fails_closed")
         .arg("--exact")
         .env("TEST_UNAVAILABLE_SUBPROCESS", "1")
-        .env(
-            "DBUS_SESSION_BUS_ADDRESS",
-            "unix:path=/tmp/nonexistent-dbus-test.sock",
-        )
+        .env("DBUS_SESSION_BUS_ADDRESS", "disabled:")
+        .env_remove("DISPLAY")
         .status()
         .expect("run subprocess");
     assert!(
@@ -351,6 +358,8 @@ fn locked_collection_fails_closed_and_refuses_overwrite() {
         delete_credential(&account);
         return;
     }
+
+    let _guard = TEST_LOCK.lock().unwrap();
 
     let iso = match IsolatedSecretService::spawn() {
         Some(s) => s,

@@ -130,8 +130,6 @@ async fn orphan_content_blocks_startup_regeneration() {
 
 #[tokio::test]
 async fn unavailable_secret_service_fails_closed_and_preserves_identity() {
-    let _guard = TEST_LOCK.lock().await;
-
     if std::env::var("TEST_UNAVAIL_STARTUP_SUBPROCESS").is_ok() {
         let db = PathBuf::from(std::env::var("TEST_DB_PATH").expect("db path env"));
         let pool = create_sqlite_pool(&db).await.expect("pool");
@@ -156,6 +154,8 @@ async fn unavailable_secret_service_fails_closed_and_preserves_identity() {
         return;
     }
 
+    let _guard = TEST_LOCK.lock().await;
+
     let db = test_db_path();
     let pool = create_sqlite_pool(&db).await.expect("pool");
 
@@ -173,10 +173,8 @@ async fn unavailable_secret_service_fails_closed_and_preserves_identity() {
         .arg("--exact")
         .env("TEST_UNAVAIL_STARTUP_SUBPROCESS", "1")
         .env("TEST_DB_PATH", db.to_str().unwrap())
-        .env(
-            "DBUS_SESSION_BUS_ADDRESS",
-            "unix:path=/tmp/nonexistent-dbus-test.sock",
-        )
+        .env("DBUS_SESSION_BUS_ADDRESS", "disabled:")
+        .env_remove("DISPLAY")
         .status()
         .expect("run subprocess");
     assert!(
