@@ -11,14 +11,15 @@ throughout; no user content, secrets, or raw app-data paths.
 - `9387911` / `22a5e28` — evidence reports + screenshots.
 - Reviewer round 2 — desktop side-rail layout, journey-header language selector, fail-closed storage readiness, architecture analysis.
 - Reviewer round 3 — `c892697` behavior-preserving dependency repair (provisioning leaf feature, ownership delimitation, shared helpers, barrel-workaround removal); follow-up evidence commit adds the readiness-recheck regression and the native compile/launch record below.
+- Reviewer round 4 — `e034e62` (this revision) — full-context two-column journey page: the route renders the journey inside the shell's `Context` card (app default layout) and the journey splits into a guide column (step rail + per-step showcase + decorative preview) and a form column; showcase copy added in all four locales; guide-column test added.
 
 ## Gate results (macOS arm64, this machine)
 
 | Gate | Result |
 |------|--------|
 | `pnpm check` (format:check, lint, typecheck, test, magic-values ×2, deny-exceptions ×2) | Pass, exit 0 |
-| Full vitest suite | **46 test files / 552 tests passed** |
-| Focused: `features/onboarding/onboarding.test.tsx` | 18/18 passed (incl. round-3 regression) |
+| Full vitest suite | **46 test files / 553 tests passed** |
+| Focused: `features/onboarding/onboarding.test.tsx` | 19/19 passed (incl. round-3 regression, round-4 guide-column test) |
 | Focused: `features/provisioning/provisioning.test.tsx` (frozen-locale retry; moved, unchanged) | Passed |
 | `routes-migration.test.ts`, localization 4-locale coverage (`onboarding.storageUnavailable` in en/ar/ru/zh-CN) | Passed |
 | Native: `cargo build -p adham-desktop` | **Pass**, exit 0 (see Native verification) |
@@ -148,7 +149,39 @@ edges that remain are one-directional and do not create module cycles:
 `workspace-selection/selection-journey.test.tsx` render `ConversationPanel`
 as integration coverage (tests are never imported by runtime code).
 
-## Visual review — browser-shimmed captures (NOT native proof)
+## Reviewer round 4 — full-context page (this revision)
+
+The reviewer walked the journey natively (fresh setup → create workspace →
+create project → ready → Open Adham on macOS, all four steps captured in
+their own screenshots) and confirmed the business logic works. Layout
+feedback: the journey was a narrow centered island; it must be a
+**full-context page** inside the app's default layout, two full columns —
+one for the showcases/step guides, one for the input form.
+
+Implemented in `e034e62`:
+
+- **Shell integration** — `routes/index.tsx` now renders the journey inside
+  the shell's `Context` card, so onboarding occupies the app's content
+  region like any other page. This also removes the invalid nested `<main>`
+  landmark (the journey root is a `div`; the Shell keeps the `main`).
+- **Two full-width columns** — a guide column (vertical `StepRail` +
+  per-step `StepShowcase` copy + a static, non-textual `ShowcaseMock`
+  preview) beside the form column (the existing step forms, unchanged).
+  Below `md` the columns stack (guide first, form second) and the whole
+  page scrolls; at `md`+ each column scrolls internally. The divider is a
+  logical border, so RTL mirrors correctly.
+- **Guide copy** — six new keys (`guideWorkspace/guideProject/guideReady`,
+  title + body) in all four locales, complementary to (not duplicating)
+  the form copy. The decorative preview is pure geometry with no text, so
+  it needs no translation and cannot be mistaken for data.
+- **Header** — the journey header row keeps the compact language selector,
+  top-right, available before anything is created.
+- New journey test `renders the guide column beside the form column`
+  asserts showcase copy, step rail, and form field coexist.
+
+Model, copy of record, storage guards, and frozen-identity semantics are
+untouched; this is a presentation-layer revision.
+
 
 Method: vite dev server (port 11111) driven by Playwright/Chromium with
 `window.__TAURI_INTERNALS__.invoke` shimmed to a synthetic canary backend
@@ -158,16 +191,16 @@ follows the amendment's textual spec. Captures in `docs/reports/evidence/`:
 
 | State | File | Result |
 |-------|------|--------|
-| Loading / checking | `onboarding-01-loading.png` | "Checking your setup…" with step rail |
-| Workspace step (existing + create, desktop side rail) | `onboarding-01-workspace-step.png` | Two-column: vertical rail + content; header language selector |
+| Loading / checking | `onboarding-01-loading.png` | "Checking your setup…" inside the app Context card |
+| Workspace step (existing + create, full-context page) | `onboarding-01-workspace-step.png` | Two full columns: guide (rail + "One workspace for everything" showcase + preview) \| form; header language selector |
 | Focus / keyboard | `onboarding-01-focus-keyboard.png` | Tab reaches existing-workspace entry; Enter selects; Enter in name field submits |
-| Project step | `onboarding-01-project-step.png` | Target-workspace card, existing project list, create form |
-| Ready step | `onboarding-01-ready-step.png` | Confirmed scope summary, "Open Adham" |
+| Project step | `onboarding-01-project-step.png` | Guide showcase swaps to "Projects keep their own storage" (two-card isolation preview); target-workspace card, existing project list, create form |
+| Ready step | `onboarding-01-ready-step.png` | Guide showcase "You're set to start"; confirmed scope summary, "Open Adham" |
 | Error + retry | `onboarding-01-error-retry.png` | `role=alert` + Retry; retry recovers |
-| Storage degraded | `onboarding-01-storage-degraded.png` | Blocker message + Retry |
+| Storage degraded | `onboarding-01-storage-degraded.png` | Blocker message + Retry in the form column; guide column stays visible |
 | Storage unavailable (failed read) | `onboarding-01-storage-unavailable.png` | Unavailable blocker, no mutation controls; Retry recovers |
-| Arabic RTL | `onboarding-01-arabic-rtl.png` | Full RTL mirroring incl. side rail, Arabic copy |
-| Narrow 700 px (rail collapsed) | `onboarding-01-narrow-700px.png` | Rail collapses above content; no horizontal overflow |
+| Arabic RTL | `onboarding-01-arabic-rtl.png` | Full RTL mirroring: guide column right, form left, Arabic showcase copy |
+| Narrow 700 px (columns stacked) | `onboarding-01-narrow-700px.png` | Columns stack (guide above form); no horizontal overflow |
 
 Automated assertions in the same run: no create/select dispatch on mount;
 language switch to Arabic on the first screen dispatches nothing and survives
@@ -196,10 +229,12 @@ messages.
 | Frozen request identity survives a language switch mid-uncertain-retry | `OnboardingJourney` test |
 | Retry → checking: all three mutation methods dispatch nothing while readiness re-read is pending (`blocker === null` ≠ safe to proceed); reopen only after explicit ready | `useOnboarding` regression test (round 3) |
 | Step rail marks and advances the current step | `OnboardingJourney` test |
+| Guide column (showcase copy, rail, form) renders together | `OnboardingJourney` test (round 4) |
 
 ## Real-backend native verification — macOS compile + launch attempted, PASSED
 
-Attempted on the available Mac at the round-3 head (this revision):
+Attempted on the available Mac at the round-3 head; the round-4 revision
+(`e034e62`) changed frontend files only, so this record carries over:
 
 | Check | Command | Result |
 |-------|---------|--------|
@@ -214,13 +249,14 @@ Per-platform status after this attempt:
 
 | Platform | Compile + launch | 7-scenario native walk | Next action for the walk |
 |----------|------------------|------------------------|--------------------------|
-| macOS (arm64) | **Verified this revision** (above) | Not tested | Run `pnpm tauri dev` on this Mac and walk: fresh setup, relaunch (resume), kill mid-create + relaunch (frozen-identity replay), degraded/unavailable storage blockers, restart persistence, duplicate-creation check |
+| macOS (arm64) | **Verified this revision** (above) | **Partially tested** — the reviewer walked fresh setup natively (fresh DB → create workspace → create project → ready → Open Adham; four native screenshots + confirmation that workspace/project exist with no session) | Walk the remaining scenarios natively: relaunch mid-setup (resume), kill mid-create + relaunch (frozen-identity replay), degraded/unavailable storage blockers, restart persistence, duplicate-creation check |
 | Windows (x64) | Not tested | Not tested | Same walk on a Windows host with MSVC toolchain via `pnpm tauri dev` |
 | Linux (declared target) | Not tested | Not tested | Same walk on a Linux host with webkit2gtk via `pnpm tauri dev` |
 
-What the native walk must still show: fresh setup, existing setup,
-interruption/relaunch, failed-read recovery, restart persistence, no
-duplicate workspace/project/session creation, no stale-scope sending. The
+What the native walk must still show: fresh setup (**done by the reviewer
+natively**, human observation at the round-3 head; screenshots held by the
+reviewer), relaunch/interruption, failed-read recovery, restart persistence,
+no duplicate workspace/project/session creation, no stale-scope sending. The
 first five have automated analogues (jsdom, injected backends);
 duplicate-creation and stale-scope protection are covered by frozen-identity
 unit tests but **not** by a native end-to-end run. Browser mocks do not
@@ -228,22 +264,27 @@ substitute for this.
 
 ## Copy and interaction review
 
-- Copy limited to the amendment; new `storageUnavailable` message added for
-  the fail-closed blocker; all four locales covered by the parity test.
+- Copy limited to the amendment plus the round-4 guide copy; new
+  `storageUnavailable` message added for the fail-closed blocker; all four
+  locales covered by the parity test. The six guide keys
+  (`guideWorkspace/guideProject/guideReady` title+body) are complementary
+  to the form copy, and the decorative preview carries no text at all.
 - Optional settings stay outside onboarding: the only in-journey setting is
   the compact language selector (now in the journey header, per review);
   theme and everything else remain in Settings.
 - Focus/keyboard: Tab reaches journey controls, Enter selects and submits;
   `aria-current="step"`, `aria-pressed`, `role="alert"`, `aria-busy` in place.
-- Scrolling/resize: rail collapses below `md`; 700×760 has no horizontal
-  overflow; step content `max-w-md`, journey region scrolls internally.
+- Scrolling/resize: columns stack below `md` (guide above form) and the
+  page scrolls; at `md`+ each column scrolls internally; 700×760 has no
+  horizontal overflow; form content `max-w-md`.
 - Language persistence: header switch sets `document lang/dir` (RTL for
   Arabic) and survives reload — verified in the shimmed run.
 
 ## Remaining not tested
 
-- Native 7-scenario onboarding walk on any OS (macOS compile + launch now
-  verified; see matrix above).
+- Native 7-scenario onboarding walk: only the fresh-setup scenario has been
+  walked natively (by the reviewer); the rest of the matrix above still
+  applies.
 - Windows/Linux compile and launch.
 - Screen-reader session (NVDA/VoiceOver) — semantics asserted in DOM only.
 - Touch-only input paths.
