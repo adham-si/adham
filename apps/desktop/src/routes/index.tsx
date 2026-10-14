@@ -20,13 +20,16 @@ export const Route = createFileRoute('/')({
 function IndexComponent() {
   const onboarding = useOnboarding();
 
-  // Incomplete first-run setup keeps the window chrome but hides the app
-  // regions; the journey derives its phase from backend-confirmed state, so
-  // a returning install goes straight to the full shell below.
+  // Incomplete first-run setup keeps the window chrome and renders the
+  // journey inside the app's default Context card as a full-context page;
+  // the journey derives its phase from backend-confirmed state, so a
+  // returning install goes straight to the full shell below.
   if (onboarding.phase !== 'complete') {
     return (
       <Shell titlebar={<Titlebar />}>
-        <OnboardingJourney api={onboarding} />
+        <Context>
+          <OnboardingJourney api={onboarding} />
+        </Context>
       </Shell>
     );
   }

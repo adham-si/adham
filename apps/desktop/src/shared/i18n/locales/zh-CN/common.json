@@ -62,7 +62,13 @@
     "readyProjectLabel": "项目",
     "truncated": "列表有限，部分内容已隐藏。",
     "projectsFailed": "无法加载项目。",
-    "storageUnavailable": "无法确认设置可用性。请重试直到本地存储就绪。"
+    "storageUnavailable": "无法确认设置可用性。请重试直到本地存储就绪。",
+    "guideWorkspaceTitle": "一个工作区承载一切",
+    "guideWorkspaceBody": "工作区统一管理你的项目和设置。你可以随时重命名或稍后添加更多工作区。",
+    "guideProjectTitle": "项目各自独立存储",
+    "guideProjectBody": "每个项目的数据存储在 Adham 自己的存储中，与其他项目隔离。你可以随时添加更多项目。",
+    "guideReadyTitle": "一切就绪",
+    "guideReadyBody": "已选定你的工作区和第一个项目。首次发送消息时会自动创建会话。"
   },
   "newProject": "+ 新建项目",
   "newWorkspace": "+ 新建工作区"

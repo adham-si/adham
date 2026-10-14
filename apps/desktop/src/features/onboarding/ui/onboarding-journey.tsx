@@ -9,7 +9,7 @@ import { LanguageSelect } from './language-select';
 
 const STEP_ORDER: OnboardingStep[] = ['workspace', 'project', 'ready'];
 
-/// Compact progress rail: vertical beside the content on desktop widths,
+/// Compact progress rail: vertical in the guide column on desktop widths,
 /// collapsed to a horizontal row above it in narrow windows.
 function StepRail({ current }: { current: OnboardingStep }) {
   const { t } = useTranslation();
@@ -27,7 +27,7 @@ function StepRail({ current }: { current: OnboardingStep }) {
   return (
     <ol
       aria-label={t('onboarding.stepsLabel', 'Setup steps')}
-      className="flex flex-row gap-1.5 md:w-40 md:shrink-0 md:flex-col md:items-start md:gap-2"
+      className="flex flex-row gap-1.5 md:flex-col md:items-start md:gap-2"
     >
       {STEP_ORDER.map((step, index) => {
         const status =
@@ -50,6 +50,95 @@ function StepRail({ current }: { current: OnboardingStep }) {
         );
       })}
     </ol>
+  );
+}
+
+/// Static, decorative preview of the current step's concept. Deliberately
+/// non-textual so it needs no translation and cannot be mistaken for data.
+function ShowcaseMock({ step }: { step: OnboardingStep }) {
+  const card = 'rounded-md border border-border-subtle bg-surface';
+  const bar = 'h-2 rounded bg-border-subtle';
+  return (
+    <div
+      aria-hidden="true"
+      className={`flex flex-col gap-3 p-4 opacity-70 ${'rounded-lg border border-border-subtle bg-surface-subtle'}`}
+    >
+      {step === 'workspace' && (
+        <>
+          <div className={`px-3 py-2 ${card}`}>
+            <div className={`mb-2 w-1/3 ${bar}`} />
+            <div className="flex flex-col gap-1.5">
+              <div className={`w-2/3 ${bar}`} />
+              <div className={`w-1/2 ${bar}`} />
+            </div>
+          </div>
+          <div className={`px-3 py-2 ${card}`}>
+            <div className={`mb-2 w-1/4 ${bar}`} />
+            <div className={`w-2/3 ${bar}`} />
+          </div>
+        </>
+      )}
+      {step === 'project' && (
+        <div className="flex gap-3">
+          <div className={`flex-1 px-3 py-2 ${card}`}>
+            <div className={`mb-2 w-1/2 ${bar}`} />
+            <div className={`w-2/3 ${bar}`} />
+          </div>
+          <div className={`flex-1 px-3 py-2 ${card}`}>
+            <div className={`mb-2 w-1/2 ${bar}`} />
+            <div className={`w-2/3 ${bar}`} />
+          </div>
+        </div>
+      )}
+      {step === 'ready' && (
+        <div className={`px-3 py-2 ${card}`}>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="inline-block size-2 rounded-full bg-selection" />
+            <div className={`w-1/3 ${bar}`} />
+          </div>
+          <div className={`mb-1.5 w-2/3 ${bar}`} />
+          <div className={`w-1/2 ${bar}`} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/// Guide-column showcase: short complementary copy for the current step
+/// plus a decorative preview. The form column keeps the actionable copy.
+function StepShowcase({ step }: { step: OnboardingStep }) {
+  const { t } = useTranslation();
+  const copy = {
+    workspace: {
+      title: t('onboarding.guideWorkspaceTitle', 'One workspace for everything'),
+      body: t(
+        'onboarding.guideWorkspaceBody',
+        'A workspace groups your projects and their settings. You can rename it or add more workspaces later.',
+      ),
+    },
+    project: {
+      title: t('onboarding.guideProjectTitle', 'Projects keep their own storage'),
+      body: t(
+        'onboarding.guideProjectBody',
+        "Each project stores its data in Adham's own storage, isolated from other projects. You can add more projects at any time.",
+      ),
+    },
+    ready: {
+      title: t('onboarding.guideReadyTitle', "You're set to start"),
+      body: t(
+        'onboarding.guideReadyBody',
+        'Your workspace and first project are selected. Sessions start the first time you send a message.',
+      ),
+    },
+  }[step];
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <p className="text-base font-semibold text-foreground">{copy.title}</p>
+        <p className="text-sm leading-relaxed text-foreground-secondary">{copy.body}</p>
+      </div>
+      <ShowcaseMock step={step} />
+    </div>
   );
 }
 
@@ -80,20 +169,23 @@ function StorageBlocker({ api }: { api: OnboardingJourneyApi }) {
 }
 
 /**
- * First-run journey surface. Composition only: the phase/step model lives in
- * the model hook, each step is its own component, and a storage blocker or
- * load failure replaces the step content until an explicit retry succeeds.
- * The compact language selector sits in the header so the journey can be
- * read in the user's language before anything is created.
+ * First-run journey surface, rendered inside the app's default Context
+ * card as a full-context page: a guide column (step rail + per-step
+ * showcase) beside a form column with the inputs. Composition only — the
+ * phase/step model lives in the model hook, each step is its own
+ * component, and a storage blocker or load failure replaces the form
+ * content until an explicit retry succeeds. The language selector sits in
+ * the page header, available before anything is created. Narrow windows
+ * stack the columns; the guide column keeps the rail above the form.
  */
 export function OnboardingJourney({ api }: { api: OnboardingJourneyApi }) {
   const { t } = useTranslation();
 
   if (api.phase === 'checking') {
     return (
-      <main className="flex flex-1 items-center justify-center text-sm text-foreground-secondary">
+      <div className="flex flex-1 items-center justify-center text-sm text-foreground-secondary">
         <p aria-busy="true">{t('onboarding.checking', 'Checking your setup…')}</p>
-      </main>
+      </div>
     );
   }
 
@@ -101,27 +193,32 @@ export function OnboardingJourney({ api }: { api: OnboardingJourneyApi }) {
     const message =
       api.error ?? api.listError ?? t('onboarding.loadFailed', 'Setup state could not be loaded.');
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-3">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3">
         <p role="alert" className="text-sm text-danger-foreground">
           {message}
         </p>
         <Button type="button" variant="secondary" onClick={api.retry}>
           {t('common.retry', 'Retry')}
         </Button>
-      </main>
+      </div>
     );
   }
 
   if (api.phase === 'complete') return null;
 
   return (
-    <main className="flex flex-1 flex-col items-center overflow-y-auto p-6">
-      <div className="flex w-full max-w-xl flex-col gap-8">
-        <div className="flex justify-end">
-          <LanguageSelect />
-        </div>
-        <div className="flex flex-col gap-8 md:flex-row md:items-start md:gap-10">
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center justify-end border-b border-border-subtle px-6 py-3">
+        <LanguageSelect />
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+        {/* Guide column: progress rail + showcase for the current step. */}
+        <section className="flex flex-col gap-8 border-b border-border-subtle p-8 md:w-1/2 md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-e">
           <StepRail current={api.step} />
+          <StepShowcase step={api.step} />
+        </section>
+        {/* Form column: the inputs and actions for the current step. */}
+        <section className="flex flex-1 flex-col justify-center p-8 md:overflow-y-auto">
           <div className="flex w-full max-w-md flex-col gap-8">
             {api.blocker ? (
               <StorageBlocker api={api} />
@@ -150,8 +247,8 @@ export function OnboardingJourney({ api }: { api: OnboardingJourneyApi }) {
               </>
             )}
           </div>
-        </div>
+        </section>
       </div>
-    </main>
+    </div>
   );
 }

@@ -478,4 +478,19 @@ describe('OnboardingJourney', () => {
     expect(secondPayload).toEqual(firstPayload);
     expect(secondPayload.preferredLanguage).toBe('en');
   });
+
+  it('renders the guide column beside the form column', async () => {
+    render(
+      <JourneyHarness
+        selection={fakeSelection()}
+        provisioning={fakeProvisioning()}
+        platform={fakePlatform()}
+      />,
+    );
+    await screen.findByRole('heading', { name: 'Set up your workspace' });
+    // Guide showcase and step rail coexist with the actionable form.
+    expect(screen.getByText('One workspace for everything')).toBeTruthy();
+    expect(screen.getByRole('list', { name: 'Setup steps' })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Workspace name' })).toBeTruthy();
+  });
 });

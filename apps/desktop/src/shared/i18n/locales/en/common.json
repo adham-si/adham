@@ -62,7 +62,13 @@
     "readyProjectLabel": "Project",
     "truncated": "Some entries are hidden because the list is limited.",
     "projectsFailed": "Projects could not be loaded.",
-    "storageUnavailable": "Setup availability could not be confirmed. Retry until local storage is ready."
+    "storageUnavailable": "Setup availability could not be confirmed. Retry until local storage is ready.",
+    "guideWorkspaceTitle": "One workspace for everything",
+    "guideWorkspaceBody": "A workspace groups your projects and their settings. You can rename it or add more workspaces later.",
+    "guideProjectTitle": "Projects keep their own storage",
+    "guideProjectBody": "Each project stores its data in Adham's own storage, isolated from other projects. You can add more projects at any time.",
+    "guideReadyTitle": "You're set to start",
+    "guideReadyBody": "Your workspace and first project are selected. Sessions start the first time you send a message."
   },
   "newProject": "+ New Project",
   "newWorkspace": "+ New Workspace"
