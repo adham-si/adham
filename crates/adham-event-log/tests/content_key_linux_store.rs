@@ -245,6 +245,25 @@ impl IsolatedSecretService {
         let temp_dir = std::env::temp_dir().join(format!("adham_iso_ss_{}", uuid::Uuid::now_v7()));
         std::fs::create_dir_all(&temp_dir).expect("create isolated secret service temp dir");
 
+        let ctrl_dir = temp_dir.join("ctrl");
+        std::fs::create_dir_all(&ctrl_dir).expect("create isolated ctrl dir");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&ctrl_dir, std::fs::Permissions::from_mode(0o700));
+        }
+
+        let keyring_dir = temp_dir.join("keyrings");
+        std::fs::create_dir_all(&keyring_dir).expect("create keyring dir");
+        let login_path = keyring_dir.join("login.keyring");
+        if !login_path.exists() {
+            std::fs::write(
+                &login_path,
+                "[keyring]\ndisplay-name=login\nctime=0\nmtime=0\nlock-on-idle=false\nlock-after=false\n",
+            )
+            .expect("create dummy login keyring");
+        }
+
         let output = std::process::Command::new("dbus-launch")
             .arg("--sh-syntax")
             .env_remove("DISPLAY")
@@ -328,8 +347,12 @@ impl IsolatedSecretService {
     }
 
     fn unlock(&self) {
+        let ctrl_arg = format!(
+            "--control-directory={}",
+            self.temp_dir.join("ctrl").display()
+        );
         let mut child = std::process::Command::new("gnome-keyring-daemon")
-            .args(["--replace", "--unlock"])
+            .args([&ctrl_arg, "--unlock", "--components=secrets"])
             .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
             .env("XDG_DATA_HOME", &self.temp_dir)
             .env("XDG_DATA_DIRS", &self.temp_dir)
@@ -339,7 +362,7 @@ impl IsolatedSecretService {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn()
-            .expect("spawn gnome-keyring-daemon --replace --unlock");
+            .expect("spawn gnome-keyring-daemon --unlock");
         if let Some(mut stdin) = child.stdin.take() {
             use std::io::Write;
             stdin.write_all(b"test\n").expect("write unlock password");
@@ -351,7 +374,7 @@ impl IsolatedSecretService {
         );
 
         let status2 = std::process::Command::new("gnome-keyring-daemon")
-            .args(["--start", "--components=secrets"])
+            .args([&ctrl_arg, "--start", "--components=secrets"])
             .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
             .env("XDG_DATA_HOME", &self.temp_dir)
             .env("XDG_DATA_DIRS", &self.temp_dir)
