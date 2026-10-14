@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { announceScopeChanged } from '../conversation';
+import { announceScopeChanged } from '../provisioning';
 import { useSelection, type SelectionBackend } from './use-selection';
 import type { ProvisionDialogTarget } from './provision-dialog';
 

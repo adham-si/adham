@@ -1,19 +1,9 @@
-/// Public API of the conversation feature. Cross-feature consumers (workspace
-/// selection, onboarding, the root route) import from here — never from module
-/// internals. Protocol and provisioning leaves are re-exported first so any
-/// barrel-level import cycle resolves with these bindings already initialized.
-export {
-  announceScopeChanged,
-  clearSelectIntent,
-  isDefinitePreEffectRejection,
-  readSelectIntent,
-  rejectionMessage,
-  SCOPE_CHANGED_EVENT,
-  writeSelectIntent,
-} from './conversation-identity';
-export type { ScopeChangedDetail } from './conversation-identity';
-export { useProvisioning } from './use-provisioning';
-export type { ProvisioningBackend, ProvisionOutcome } from './use-provisioning';
+/// Public API of the conversation feature. The root route imports from here
+/// — never from module internals. Workspace/project provisioning, the scope
+/// event, and the selection identity live in the provisioning feature (a
+/// leaf module this feature depends on); generic storage and error-envelope
+/// helpers live in shared infrastructure. No re-exports of other domains:
+/// consumers import them from their owner.
 export { useProjectSessions } from './use-project-sessions';
 export { ConversationPanel } from './conversation-panel';
 export type { ConversationPanelProps } from './conversation-panel';

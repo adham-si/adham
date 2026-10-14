@@ -1,7 +1,8 @@
 import * as React from 'react';
 import type { PendingOperationDto } from '@adham/contracts-generated';
 import type { ConversationBackend } from '../conversation-scope';
-import { isDefinitePreEffectRejection, SCOPE_CHANGED_EVENT } from '../conversation-identity';
+import { isDefinitePreEffectRejection } from '@/shared/api/error-envelope';
+import { SCOPE_CHANGED_EVENT } from '../../provisioning';
 import { isSessionMissingOrMismatched } from '../conversation-scope';
 import {
   clearDurablePendingOperation,

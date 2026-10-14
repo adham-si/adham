@@ -3,7 +3,8 @@ import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { SessionSummary as ContractSessionSummary } from '@adham/contracts-generated';
 import type { SessionSummary as SidebarSessionSummary } from '@/widgets/shell/primary-sidebar/primary-sidebar';
-import { SCOPE_CHANGED_EVENT, readPendingSend } from './conversation-identity';
+import { SCOPE_CHANGED_EVENT } from '../provisioning';
+import { readPendingSend } from './conversation-identity';
 import { readPendingFirstSend } from './lazy-session-creation';
 
 export interface UseProjectSessionsOptions {

@@ -4,7 +4,7 @@ import {
   announceScopeChanged,
   useProvisioning,
   type ProvisioningBackend,
-} from '../../conversation';
+} from '../../provisioning';
 import { useSelection, type SelectionBackend } from '../../workspace-selection';
 
 export type OnboardingStep = 'workspace' | 'project' | 'ready';
@@ -34,6 +34,8 @@ export interface OnboardingJourneyApi {
   step: OnboardingStep;
   /// Backend-confirmed storage blocker for setup. Fail-closed: any state
   /// other than an explicit "ready" blocks while setup is incomplete.
+  /// blocker === null never means "safe to proceed" — during the transient
+  /// checking phase it is null while the model guards still block mutations.
   blocker: OnboardingBlocker | null;
   /// Localized provisioning/selection error for the active step, if any.
   error: string | null;

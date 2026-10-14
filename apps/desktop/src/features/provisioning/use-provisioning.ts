@@ -2,16 +2,15 @@ import * as React from 'react';
 import i18n, { normalizeLanguage } from '@/shared/i18n';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { ProjectSummary, WorkspaceSummary } from '@adham/contracts-generated';
+import { isDefinitePreEffectRejection, rejectionMessage } from '@/shared/api/error-envelope';
 import {
   clearProjectIntent,
   clearWorkspaceIntent,
-  isDefinitePreEffectRejection,
   readProjectIntent,
   readWorkspaceIntent,
-  rejectionMessage,
   writeProjectIntent,
   writeWorkspaceIntent,
-} from './conversation-identity';
+} from './provision-intent';
 
 /// Minimal backend surface for deliberate provisioning. Mirrors the optional
 /// stable-request-ID support of the session/message commands.

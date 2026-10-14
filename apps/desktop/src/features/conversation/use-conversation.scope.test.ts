@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';
 import { fakeBackend } from './conversation-test-utils';
-import { clearSelectIntent, writeSelectIntent } from './conversation-identity';
+import { clearSelectIntent, writeSelectIntent } from '../provisioning';
 
 beforeEach(() => {
   sessionStorage.clear();

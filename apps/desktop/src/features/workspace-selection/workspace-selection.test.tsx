@@ -3,7 +3,7 @@ import { act, render, renderHook, screen, waitFor } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { useSelection } from './use-selection';
 import { WorkspaceSelection } from './workspace-selection';
-import { SCOPE_CHANGED_EVENT, readSelectIntent } from '../conversation';
+import { SCOPE_CHANGED_EVENT, readSelectIntent } from '../provisioning';
 
 beforeEach(() => {
   localStorage.clear();

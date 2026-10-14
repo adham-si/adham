@@ -1,12 +1,8 @@
 import i18n from '@/shared/i18n';
 import type { ConversationMessageDto } from '@/shared/api/adham-client';
-import {
-  SESSION_CACHE_KEY,
-  isDefinitePreEffectRejection,
-  readSessionCache,
-  rejectionMessage,
-  removeStorage,
-} from './conversation-identity';
+import { isDefinitePreEffectRejection, rejectionMessage } from '@/shared/api/error-envelope';
+import { removeStorage } from '@/shared/lib/session-storage';
+import { SESSION_CACHE_KEY, readSessionCache } from './conversation-identity';
 
 import {
   clearDurableSessionPreference,

@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useProvisioning } from './use-provisioning';
-import { readWorkspaceIntent } from './conversation-identity';
-import { ConversationPanel } from './conversation-panel';
+import { readWorkspaceIntent } from './provision-intent';
+import { ConversationPanel } from '../conversation';
 import i18n from '@/shared/i18n';
 
 beforeEach(() => {

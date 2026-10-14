@@ -5,7 +5,7 @@ import {
   writeDurableSessionPreference,
   readDurableSessionPreference,
 } from './durable-session-storage';
-import { announceScopeChanged } from './conversation-identity';
+import { announceScopeChanged } from '../provisioning';
 import { useProjectSessions } from './use-project-sessions';
 
 describe('APP-WIRING-03/04: Session restoration and recovery', () => {
