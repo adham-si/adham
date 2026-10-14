@@ -181,6 +181,66 @@ describe('useOnboarding', () => {
     expect(result.current.blocker).toBe('storage-unavailable');
   });
 
+  it('dispatches nothing from any mutation while a readiness re-read is pending, even with blocker null', async () => {
+    let release!: (value: { status: string }) => void;
+    const platform = {
+      getStorageStatus: vi
+        .fn()
+        .mockResolvedValueOnce({ status: 'ready' })
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              release = resolve;
+            }),
+        ),
+    };
+    const selection = fakeSelection({
+      getBootstrapState: vi.fn().mockResolvedValue({
+        isInitialized: true,
+        activeWorkspaceId: 'ws-1',
+        activeProjectId: null,
+      }),
+      listWorkspaces: vi.fn().mockResolvedValue({
+        workspaces: [{ workspaceId: 'ws-1', name: 'Resume WS' }],
+        truncated: false,
+      }),
+      listProjects: vi.fn().mockResolvedValue({
+        projects: [{ projectId: 'proj-1', name: 'Resume Proj' }],
+        truncated: false,
+      }),
+    });
+    const provisioning = fakeProvisioning();
+    const { result } = await renderReadyHook({ selection, provisioning, platform });
+    expect(result.current.step).toBe('project');
+    await waitFor(() => expect(result.current.projects).not.toBeNull());
+    act(() => result.current.chooseProject('proj-1'));
+    expect(result.current.selectedProjectId).toBe('proj-1');
+
+    // Retry re-enters the transient checking state. blocker === null there,
+    // and blocker === null must never mean "safe to proceed".
+    act(() => result.current.retry());
+    await waitFor(() => expect(platform.getStorageStatus).toHaveBeenCalledTimes(2));
+    expect(result.current.phase).toBe('checking');
+    expect(result.current.blocker).toBeNull();
+
+    await act(async () => {
+      await result.current.createWorkspace('Blocked WS');
+      await result.current.createProject('Blocked Proj');
+      await result.current.confirmProject();
+    });
+    expect(provisioning.createWorkspace).not.toHaveBeenCalled();
+    expect(provisioning.createProject).not.toHaveBeenCalled();
+    expect(selection.selectProject).not.toHaveBeenCalled();
+
+    // Only an explicit ready reopens the mutations.
+    await act(async () => {
+      release({ status: 'ready' });
+    });
+    await waitFor(() => expect(result.current.phase).toBe('setup'));
+    await act(async () => result.current.confirmProject());
+    expect(selection.selectProject).toHaveBeenCalledTimes(1);
+  });
+
   it('reports a failed project list as failure, never as empty', async () => {
     const selection = fakeSelection({
       getBootstrapState: vi.fn().mockResolvedValue({

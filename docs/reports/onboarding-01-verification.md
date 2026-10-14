@@ -9,18 +9,20 @@ throughout; no user content, secrets, or raw app-data paths.
 - `015b102` — behavior-preserving boundary repair (feature public-API barrels; extracted `use-provision-flow`; frozen `preferredLanguage` in provisioning intent).
 - `27197a2` — onboarding UX (`features/onboarding`; route gating).
 - `9387911` / `22a5e28` — evidence reports + screenshots.
-- Reviewer round 2 (this update) — desktop side-rail layout, journey-header
-  language selector, fail-closed storage readiness, architecture analysis.
+- Reviewer round 2 — desktop side-rail layout, journey-header language selector, fail-closed storage readiness, architecture analysis.
+- Reviewer round 3 — `c892697` behavior-preserving dependency repair (provisioning leaf feature, ownership delimitation, shared helpers, barrel-workaround removal); follow-up evidence commit adds the readiness-recheck regression and the native compile/launch record below.
 
-## Gate results (macOS 15 arm64, this machine)
+## Gate results (macOS arm64, this machine)
 
 | Gate | Result |
 |------|--------|
 | `pnpm check` (format:check, lint, typecheck, test, magic-values ×2, deny-exceptions ×2) | Pass, exit 0 |
-| Full vitest suite | Passed (see per-file counts below) |
-| Focused: `features/onboarding/onboarding.test.tsx` | 17/17 passed |
-| Focused: `features/conversation/provisioning.test.tsx` (frozen-locale retry) | Passed |
-| `routes-migration.test.ts`, localization 4-locale coverage (`onboarding.storageUnavailable` added in en/ar/ru/zh-CN) | Passed |
+| Full vitest suite | **46 test files / 552 tests passed** |
+| Focused: `features/onboarding/onboarding.test.tsx` | 18/18 passed (incl. round-3 regression) |
+| Focused: `features/provisioning/provisioning.test.tsx` (frozen-locale retry; moved, unchanged) | Passed |
+| `routes-migration.test.ts`, localization 4-locale coverage (`onboarding.storageUnavailable` in en/ar/ru/zh-CN) | Passed |
+| Native: `cargo build -p adham-desktop` | **Pass**, exit 0 (see Native verification) |
+| Native: launch of `target/debug/adham-desktop` | **Pass**, alive 8 s, backend booted (see Native verification) |
 
 ## Reviewer round 2 — implemented changes
 
@@ -72,7 +74,7 @@ that backend protection was bypassed.
 
 ### 4. Architecture check — honest state and smallest correction
 
-#### Remaining dependency graph (module-level, features only)
+#### Dependency graph before the repair (module-level, features only)
 
 ```
 conversation ──(conversation-panel, conversation-setup-slot)──▶ workspace-selection
@@ -82,32 +84,69 @@ onboarding ──▶ workspace-selection (useSelection)
 routes ──▶ all three features (barrels only)
 ```
 
-There is a real **module-level cycle** between `conversation` and
+There was a real **module-level cycle** between `conversation` and
 `workspace-selection` (panel/slot ⇄ use-selection/provision-dialog/provision-flow).
-The conversation barrel's export-ordering comment exists precisely to let
-barrel-level cycles resolve — i.e. the public API improves the interface but
-does **not** establish domain ownership. `use-provisioning.ts` (workspace and
-project creation) living under `conversation` is the concrete ownership gap:
+The conversation barrel's export-ordering comment existed precisely to let
+barrel-level cycles resolve — i.e. the public API improved the interface but
+did **not** establish domain ownership. `use-provisioning.ts` (workspace and
+project creation) living under `conversation` was the concrete ownership gap:
 it is consumed by workspace-selection and onboarding, and its only intra-feature
-dependency is `conversation-identity.ts`.
+dependency was `conversation-identity.ts`.
 
-#### Smallest correction (proposed, not implemented)
+#### Smallest correction — revised and implemented (`c892697`)
 
-Extract one leaf feature, `features/provisioning/`, containing exactly two
-moved files — `use-provisioning.ts` and `conversation-identity.ts` (identity ←
-provisioning is the only internal edge) — with its own explicit barrel.
-Resulting graph becomes a DAG:
+The original proposal moved `conversation-identity.ts` wholesale; the
+reviewer correctly rejected that, since the file also owns session caching,
+pending sends, session-creation intents, and send-blocking rules. The
+revised, responsibility-based split:
+
+| Responsibility | Before | After |
+|----------------|--------|-------|
+| `useProvisioning` hook + `ProvisioningBackend`/`ProvisionOutcome` | `conversation/use-provisioning.ts` | `features/provisioning/use-provisioning.ts` |
+| Frozen workspace/project provisioning intents (`PROVISION_WS_KEY`, `PROVISION_PROJ_KEY`, `read/write/clearWorkspaceIntent`, `read/write/clearProjectIntent`, `ProvisionIntent`) | `conversation/conversation-identity.ts` | `features/provisioning/provision-intent.ts` |
+| Shared scope event (`SCOPE_CHANGED_EVENT`, `announceScopeChanged`, `ScopeChangedDetail`) | `conversation/conversation-identity.ts` | `features/provisioning/scope-event.ts` |
+| Frozen selection identity (`adham:select:intent`, `read/write/clearSelectIntent`, `SelectIntent`) | `conversation/conversation-identity.ts` | `features/provisioning/select-intent.ts` |
+| Session cache, pending send, session-creation intent, `sameScope`, send-blocking rules (`unresolvedSelectionMessage`, `sendBlockedReason`) | `conversation/conversation-identity.ts` | **stays** in `conversation/conversation-identity.ts` (owner unchanged) |
+| Generic sessionStorage wrappers (`readStorage`, `writeStorage`, `removeStorage`) | `conversation/conversation-identity.ts` | `shared/lib/session-storage.ts` (no domain rules) |
+| Error-envelope classification (`isDefinitePreEffectRejection`, `rejectionMessage`, code/messageKey whitelists) | `conversation/conversation-identity.ts` | `shared/api/error-envelope.ts` (envelope shape only; policy stays with callers) |
+
+Public API map after the repair:
+
+- `features/provisioning/index.ts` — `useProvisioning`, `ProvisioningBackend`,
+  `ProvisionOutcome`, `announceScopeChanged`, `SCOPE_CHANGED_EVENT`,
+  `ScopeChangedDetail`, `read/write/clearSelectIntent`, `SelectIntent`,
+  `read/write/clearWorkspaceIntent`, `read/write/clearProjectIntent`,
+  `ProvisionIntent`.
+- `features/conversation/index.ts` — **only** `ConversationPanel`,
+  `ConversationPanelProps`, `useProjectSessions`. The export-ordering
+  comment that anticipated barrel-level cycles is **deleted**; no domain is
+  re-exported through it.
+- `shared/lib/session-storage.ts`, `shared/api/error-envelope.ts` — imported
+  directly by path (no shared barrel exists in this codebase).
+
+Invariant preservation (code motion only): storage key strings
+(`adham:provision:*`, `adham:select:intent`, `adham:compose:*`), JSON
+payload shapes, `crypto.randomUUID()` request IDs, frozen-retry semantics,
+and the event name `adham:scope-changed` are byte-identical to before.
+
+#### Import graph verification (acyclic)
+
+Runtime cross-feature edges resolved from source after the repair:
 
 ```
-provisioning (leaf) ◀── workspace-selection ◀── conversation
-provisioning ◀── onboarding, routes
+conversation     -> [provisioning, workspace-selection]
+onboarding       -> [provisioning, workspace-selection]
+workspace-selection -> [provisioning]
+provisioning     -> []            (leaf: shared infrastructure only)
 ```
 
-Blast radius: ~16 files, mechanical import-line updates only (12 conversation
-internals that consume identity/provisioning, 3 workspace-selection modules,
-1 onboarding model); no logic changes; the barrel cycle-ordering comment is
-deleted. Deliberately NOT implemented in this PR — flagged for reviewer
-approval before a follow-up commit, per "avoid a broad restructure".
+DFS over this graph reports **no cycle**. Notably, the former
+`workspace-selection -> conversation` runtime edge is gone: selection
+modules now import provisioning and shared helpers directly. Test-harness
+edges that remain are one-directional and do not create module cycles:
+`provisioning/provisioning.test.tsx` and
+`workspace-selection/selection-journey.test.tsx` render `ConversationPanel`
+as integration coverage (tests are never imported by runtime code).
 
 ## Visual review — browser-shimmed captures (NOT native proof)
 
@@ -155,19 +194,31 @@ messages.
 | Existing workspace → confirm existing project (no creation calls) | `OnboardingJourney` test |
 | Language switch before creation dispatches the new locale | `OnboardingJourney` test |
 | Frozen request identity survives a language switch mid-uncertain-retry | `OnboardingJourney` test |
+| Retry → checking: all three mutation methods dispatch nothing while readiness re-read is pending (`blocker === null` ≠ safe to proceed); reopen only after explicit ready | `useOnboarding` regression test (round 3) |
 | Step rail marks and advances the current step | `OnboardingJourney` test |
 
-## Real-backend native verification — BLOCKED on all platforms
+## Real-backend native verification — macOS compile + launch attempted, PASSED
 
-No native run was executed. Named next action per platform (exact commands):
+Attempted on the available Mac at the round-3 head (this revision):
 
-| Platform | Status | Next action |
-|----------|--------|-------------|
-| macOS (arm64) | Not tested natively | On a Mac: `pnpm install && pnpm tauri dev`, then walk: fresh setup, relaunch (resume), kill mid-create + relaunch (frozen-identity replay), lock/corrupt storage (degraded + unavailable blockers), restart persistence, duplicate-creation check |
-| Windows (x64) | Not tested | Same flow on a Windows host with MSVC toolchain via `pnpm tauri dev` |
-| Linux (declared target) | Not tested | Same flow on a Linux host with webkit2gtk via `pnpm tauri dev` |
+| Check | Command | Result |
+|-------|---------|--------|
+| Compile | `cargo build -p adham-desktop` (after touching `apps/desktop/src-tauri/src/{lib,main}.rs` to force a fresh compile of the app crate) | **Pass**, exit 0 — `Compiling adham-desktop v0.1.0` → `Finished dev profile [unoptimized + debuginfo] in 3.29s`; binary `target/debug/adham-desktop` (46.5 MB) |
+| Launch | vite dev on `:11111` (`pnpm --filter @adham/desktop dev`) + run `target/debug/adham-desktop` for 8 s | **Pass** — process alive after 8 s, no panic; real backend booted: embedded SQLite schema initialization logged (`adham_event_log::sqlite`, "Database schema initialized successfully"); terminated by SIGTERM only |
 
-What native proof must still show: fresh setup, existing setup,
+Environment: macOS 27.0.1, arm64 (`uname -m` → `arm64`), rustc/cargo 1.99.0
+(2026-08-27/2026-09-28), Node via pnpm 10.33.2. No build or launch failure
+occurred on this platform, so none is recorded.
+
+Per-platform status after this attempt:
+
+| Platform | Compile + launch | 7-scenario native walk | Next action for the walk |
+|----------|------------------|------------------------|--------------------------|
+| macOS (arm64) | **Verified this revision** (above) | Not tested | Run `pnpm tauri dev` on this Mac and walk: fresh setup, relaunch (resume), kill mid-create + relaunch (frozen-identity replay), degraded/unavailable storage blockers, restart persistence, duplicate-creation check |
+| Windows (x64) | Not tested | Not tested | Same walk on a Windows host with MSVC toolchain via `pnpm tauri dev` |
+| Linux (declared target) | Not tested | Not tested | Same walk on a Linux host with webkit2gtk via `pnpm tauri dev` |
+
+What the native walk must still show: fresh setup, existing setup,
 interruption/relaunch, failed-read recovery, restart persistence, no
 duplicate workspace/project/session creation, no stale-scope sending. The
 first five have automated analogues (jsdom, injected backends);
@@ -191,6 +242,8 @@ substitute for this.
 
 ## Remaining not tested
 
-- Native end-to-end on any OS (see matrix above).
+- Native 7-scenario onboarding walk on any OS (macOS compile + launch now
+  verified; see matrix above).
+- Windows/Linux compile and launch.
 - Screen-reader session (NVDA/VoiceOver) — semantics asserted in DOM only.
 - Touch-only input paths.
