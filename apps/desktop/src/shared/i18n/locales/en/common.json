@@ -36,6 +36,33 @@
     "requestIdConflict": "Conflicting request. Try again.",
     "notSaved": "Message was not saved."
   },
+  "onboarding": {
+    "workspaceHeading": "Set up your workspace",
+    "workspaceHint": "A workspace contains your projects and settings.",
+    "existingWorkspaces": "Existing workspaces",
+    "projectHeading": "Create your first project",
+    "projectHint": "Projects store their data in Adham's own storage inside this workspace.",
+    "existingProjects": "Existing projects",
+    "readyHeading": "Your workspace is ready",
+    "openAdham": "Open Adham",
+    "continue": "Continue",
+    "back": "Back",
+    "stepReady": "Ready",
+    "stepsLabel": "Setup steps",
+    "stepCurrent": "Current step",
+    "stepCompleted": "Completed",
+    "stepUpcoming": "Upcoming",
+    "loadFailed": "Setup state could not be loaded.",
+    "storageDegraded": "Local storage is unavailable. Setup cannot continue until it recovers.",
+    "languageLabel": "Language",
+    "checking": "Checking your setup…",
+    "stepWorkspace": "Workspace",
+    "stepProject": "Project",
+    "readyWorkspaceLabel": "Workspace",
+    "readyProjectLabel": "Project",
+    "truncated": "Some entries are hidden because the list is limited.",
+    "projectsFailed": "Projects could not be loaded."
+  },
   "newProject": "+ New Project",
   "newWorkspace": "+ New Workspace"
 }

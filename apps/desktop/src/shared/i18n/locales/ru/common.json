@@ -36,6 +36,33 @@
     "requestIdConflict": "Конфликтующий запрос. Попробуйте снова.",
     "notSaved": "Сообщение не сохранено."
   },
+  "onboarding": {
+    "workspaceHeading": "Настройте рабочее пространство",
+    "workspaceHint": "Рабочее пространство содержит ваши проекты и настройки.",
+    "existingWorkspaces": "Существующие пространства",
+    "projectHeading": "Создайте первый проект",
+    "projectHint": "Данные проектов хранятся в собственном хранилище Adham внутри пространства.",
+    "existingProjects": "Существующие проекты",
+    "readyHeading": "Рабочее пространство готово",
+    "openAdham": "Открыть Adham",
+    "continue": "Продолжить",
+    "back": "Назад",
+    "stepReady": "Готово",
+    "stepsLabel": "Шаги настройки",
+    "stepCurrent": "Текущий шаг",
+    "stepCompleted": "Завершено",
+    "stepUpcoming": "Далее",
+    "loadFailed": "Не удалось загрузить состояние настройки.",
+    "storageDegraded": "Локальное хранилище недоступно. Настройка не продолжится, пока оно не восстановится.",
+    "languageLabel": "Язык",
+    "checking": "Проверка настройки…",
+    "stepWorkspace": "Пространство",
+    "stepProject": "Проект",
+    "readyWorkspaceLabel": "Пространство",
+    "readyProjectLabel": "Проект",
+    "truncated": "Некоторые элементы скрыты: список ограничен.",
+    "projectsFailed": "Не удалось загрузить проекты."
+  },
   "newProject": "+ Новый проект",
   "newWorkspace": "+ Новое рабочее пространство"
 }

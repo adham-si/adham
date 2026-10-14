@@ -7,6 +7,7 @@ import {
   WorkspaceSelection,
   ProvisionDialog,
 } from '@/features/workspace-selection';
+import { useOnboarding, OnboardingJourney } from '@/features/onboarding';
 import { SettingsPage } from '@/pages/settings';
 
 export const Route = createFileRoute('/')({
@@ -17,6 +18,23 @@ export const Route = createFileRoute('/')({
 /// workspace-selection feature, session history in conversation, and the
 /// first-run journey in onboarding. The route wires results into the shell.
 function IndexComponent() {
+  const onboarding = useOnboarding();
+
+  // Incomplete first-run setup keeps the window chrome but hides the app
+  // regions; the journey derives its phase from backend-confirmed state, so
+  // a returning install goes straight to the full shell below.
+  if (onboarding.phase !== 'complete') {
+    return (
+      <Shell titlebar={<Titlebar />}>
+        <OnboardingJourney api={onboarding} />
+      </Shell>
+    );
+  }
+
+  return <AppBody />;
+}
+
+function AppBody() {
   const {
     sel,
     provisionTarget,

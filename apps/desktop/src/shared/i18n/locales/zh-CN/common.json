@@ -36,6 +36,33 @@
     "requestIdConflict": "请求冲突，请重试。",
     "notSaved": "消息未保存。"
   },
+  "onboarding": {
+    "workspaceHeading": "设置你的工作区",
+    "workspaceHint": "工作区包含你的项目和设置。",
+    "existingWorkspaces": "现有工作区",
+    "projectHeading": "创建你的第一个项目",
+    "projectHint": "项目数据存储在工作区内 Adham 自有的存储中。",
+    "existingProjects": "现有项目",
+    "readyHeading": "你的工作区已就绪",
+    "openAdham": "打开 Adham",
+    "continue": "继续",
+    "back": "返回",
+    "stepReady": "就绪",
+    "stepsLabel": "设置步骤",
+    "stepCurrent": "当前步骤",
+    "stepCompleted": "已完成",
+    "stepUpcoming": "后续步骤",
+    "loadFailed": "无法加载设置状态。",
+    "storageDegraded": "本地存储不可用。存储恢复前无法继续设置。",
+    "languageLabel": "语言",
+    "checking": "正在检查设置…",
+    "stepWorkspace": "工作区",
+    "stepProject": "项目",
+    "readyWorkspaceLabel": "工作区",
+    "readyProjectLabel": "项目",
+    "truncated": "列表有限，部分内容已隐藏。",
+    "projectsFailed": "无法加载项目。"
+  },
   "newProject": "+ 新建项目",
   "newWorkspace": "+ 新建工作区"
 }

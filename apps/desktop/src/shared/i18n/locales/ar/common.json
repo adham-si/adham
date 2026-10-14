@@ -36,6 +36,33 @@
     "requestIdConflict": "طلب متعارض. حاول مجددًا.",
     "notSaved": "لم تُحفَظ الرسالة."
   },
+  "onboarding": {
+    "workspaceHeading": "إعداد مساحة العمل",
+    "workspaceHint": "تحتوي مساحة عملك على مشاريعك وإعداداتك.",
+    "existingWorkspaces": "مساحات العمل الموجودة",
+    "projectHeading": "أنشئ مشروعك الأول",
+    "projectHint": "تُخزَّن بيانات المشاريع في تخزين يخص Adham داخل مساحة العمل.",
+    "existingProjects": "المشاريع الموجودة",
+    "readyHeading": "مساحة عملك جاهزة",
+    "openAdham": "افتح Adham",
+    "continue": "متابعة",
+    "back": "رجوع",
+    "stepReady": "جاهز",
+    "stepsLabel": "خطوات الإعداد",
+    "stepCurrent": "الخطوة الحالية",
+    "stepCompleted": "مكتملة",
+    "stepUpcoming": "قادمة",
+    "loadFailed": "تعذّر تحميل حالة الإعداد.",
+    "storageDegraded": "التخزين المحلي غير متاح. لا يمكن متابعة الإعداد حتى يتعافى.",
+    "languageLabel": "اللغة",
+    "checking": "جارٍ التحقق من الإعداد…",
+    "stepWorkspace": "مساحة العمل",
+    "stepProject": "المشروع",
+    "readyWorkspaceLabel": "مساحة العمل",
+    "readyProjectLabel": "المشروع",
+    "truncated": "بعض العناصر مخفية لأن القائمة محدودة.",
+    "projectsFailed": "تعذّر تحميل المشاريع."
+  },
   "newProject": "+ مشروع جديد",
   "newWorkspace": "+ مساحة عمل جديدة"
 }
