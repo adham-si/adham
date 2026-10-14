@@ -201,18 +201,37 @@ fn unavailable_secret_service_fails_closed() {
     let _guard = TEST_LOCK.lock().unwrap();
 
     let exe = std::env::current_exe().expect("current exe");
-    let status = std::process::Command::new(exe)
-        .arg("unavailable_secret_service_fails_closed")
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("unavailable_secret_service_fails_closed")
         .arg("--exact")
         .env("TEST_UNAVAILABLE_SUBPROCESS", "1")
         .env("DBUS_SESSION_BUS_ADDRESS", "disabled:")
         .env_remove("DISPLAY")
-        .status()
-        .expect("run subprocess");
+        .env_remove("WAYLAND_DISPLAY");
+    let status = run_subprocess(cmd);
     assert!(
         status.success(),
         "unavailable secret service subprocess test must pass"
     );
+}
+
+fn run_subprocess(mut cmd: std::process::Command) -> std::process::ExitStatus {
+    let mut child = cmd.spawn().expect("spawn subprocess");
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(10);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return status,
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    panic!("subprocess timed out after 10s");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(e) => panic!("try_wait failed: {e}"),
+        }
+    }
 }
 
 struct IsolatedSecretService {
@@ -230,6 +249,9 @@ impl IsolatedSecretService {
 
         let output = std::process::Command::new("dbus-launch")
             .arg("--sh-syntax")
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .env("XDG_DATA_DIRS", &temp_dir)
             .output()
             .ok()?;
         if !output.status.success() {
@@ -260,27 +282,13 @@ impl IsolatedSecretService {
             }
         };
 
-        let mut child = std::process::Command::new("gnome-keyring-daemon")
-            .args(["--replace", "--unlock"])
-            .env("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)
-            .env("XDG_DATA_HOME", &temp_dir)
-            .env_remove("DISPLAY")
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .ok()?;
-        if let Some(mut stdin) = child.stdin.take() {
-            use std::io::Write;
-            let _ = stdin.write_all(b"test\n");
-        }
-        let _ = child.wait();
-
         let _ = std::process::Command::new("gnome-keyring-daemon")
             .args(["--start", "--components=secrets"])
             .env("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)
             .env("XDG_DATA_HOME", &temp_dir)
+            .env("XDG_DATA_DIRS", &temp_dir)
             .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status();
@@ -305,35 +313,7 @@ impl Drop for IsolatedSecretService {
 #[test]
 fn locked_collection_fails_closed_and_refuses_overwrite() {
     if std::env::var("TEST_LOCKED_SUBPROCESS").is_ok() {
-        let (provider, account) = provider_for("locked-sub");
-        let key1 = provider
-            .initialize_content_key()
-            .expect("initialize key before lock");
-        let _key1_fp = fp(&key1);
-
-        // Lock both default and login collections in this isolated Secret Service
-        let _ = std::process::Command::new("dbus-send")
-            .args([
-                "--session",
-                "--dest=org.freedesktop.secrets",
-                "--type=method_call",
-                "--print-reply",
-                "/org/freedesktop/secrets",
-                "org.freedesktop.Secret.Service.Lock",
-                "array:objpath:/org/freedesktop/secrets/aliases/default",
-            ])
-            .output();
-        let _ = std::process::Command::new("dbus-send")
-            .args([
-                "--session",
-                "--dest=org.freedesktop.secrets",
-                "--type=method_call",
-                "--print-reply",
-                "/org/freedesktop/secrets",
-                "org.freedesktop.Secret.Service.Lock",
-                "array:objpath:/org/freedesktop/secrets/collection/login",
-            ])
-            .output();
+        let (provider, _account) = provider_for("locked-sub");
 
         // Reading from locked collection must fail closed
         let read_err = match provider.content_key() {
@@ -355,7 +335,6 @@ fn locked_collection_fails_closed_and_refuses_overwrite() {
             "expected Storage error on init against locked collection, got {init_err:?}"
         );
 
-        delete_credential(&account);
         return;
     }
 
@@ -370,15 +349,16 @@ fn locked_collection_fails_closed_and_refuses_overwrite() {
     };
 
     let exe = std::env::current_exe().expect("current exe");
-    let status = std::process::Command::new(exe)
-        .arg("locked_collection_fails_closed_and_refuses_overwrite")
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("locked_collection_fails_closed_and_refuses_overwrite")
         .arg("--exact")
         .env("TEST_LOCKED_SUBPROCESS", "1")
         .env("DBUS_SESSION_BUS_ADDRESS", &iso.dbus_addr)
         .env("XDG_DATA_HOME", &iso.temp_dir)
+        .env("XDG_DATA_DIRS", &iso.temp_dir)
         .env_remove("DISPLAY")
-        .status()
-        .expect("run subprocess");
+        .env_remove("WAYLAND_DISPLAY");
+    let status = run_subprocess(cmd);
     assert!(
         status.success(),
         "locked collection subprocess test must pass"
