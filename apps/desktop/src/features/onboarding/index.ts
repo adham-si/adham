@@ -1,5 +1,6 @@
 export { useOnboarding } from './model/use-onboarding';
 export type {
+  OnboardingBlocker,
   OnboardingJourneyApi,
   OnboardingPhase,
   OnboardingPlatformBackend,

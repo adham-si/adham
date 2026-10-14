@@ -4,10 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { useOnboarding, type UseOnboardingOptions } from './model/use-onboarding';
 import { OnboardingJourney } from './ui/onboarding-journey';
 import type { SelectionBackend } from '../workspace-selection';
+import i18n from '@/shared/i18n';
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear();
   sessionStorage.clear();
+  // Language tests switch the shared i18n singleton; reset for isolation.
+  await i18n.changeLanguage('en');
 });
 
 function fakeSelection(overrides: Partial<SelectionBackend> = {}) {
@@ -139,10 +142,43 @@ describe('useOnboarding', () => {
       provisioning: fakeProvisioning(),
       platform,
     });
-    expect(result.current.blocker).toBe('storage');
+    expect(result.current.blocker).toBe('storage-degraded');
     platform.getStorageStatus.mockResolvedValue({ status: 'ready' });
     act(() => result.current.retry());
     await waitFor(() => expect(result.current.blocker).toBeNull());
+  });
+
+  it('blocks setup with an unavailable state when the readiness read fails', async () => {
+    const platform = { getStorageStatus: vi.fn().mockRejectedValue(new Error('status lost')) };
+    const provisioning = fakeProvisioning();
+    const { result } = await renderReadyHook({
+      selection: fakeSelection(),
+      provisioning,
+      platform,
+    });
+    expect(result.current.blocker).toBe('storage-unavailable');
+    // Fail-closed at the model, not just the UI: no mutation dispatches.
+    await act(async () => result.current.createWorkspace('Blocked WS'));
+    expect(provisioning.createWorkspace).not.toHaveBeenCalled();
+    // Recovery: an explicit ready reopens setup. (blocker is also null while
+    // the re-read is in flight, so require the setup phase as well.)
+    platform.getStorageStatus.mockResolvedValue({ status: 'ready' });
+    act(() => result.current.retry());
+    await waitFor(() => {
+      expect(result.current.phase).toBe('setup');
+      expect(result.current.blocker).toBeNull();
+    });
+    await act(async () => result.current.createWorkspace('Allowed WS'));
+    expect(provisioning.createWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an unrecognized readiness status as unavailable, never as ready', async () => {
+    const { result } = await renderReadyHook({
+      selection: fakeSelection(),
+      provisioning: fakeProvisioning(),
+      platform: fakePlatform('something-new'),
+    });
+    expect(result.current.blocker).toBe('storage-unavailable');
   });
 
   it('reports a failed project list as failure, never as empty', async () => {
@@ -301,5 +337,85 @@ describe('OnboardingJourney', () => {
     platform.getStorageStatus.mockResolvedValue({ status: 'ready' });
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     await screen.findByRole('heading', { name: 'Set up your workspace' });
+  });
+
+  it('blocks setup mutations while readiness is unconfirmed and recovers', async () => {
+    const user = userEvent.setup();
+    const platform = { getStorageStatus: vi.fn().mockRejectedValue(new Error('status lost')) };
+    render(
+      <JourneyHarness
+        selection={fakeSelection()}
+        provisioning={fakeProvisioning()}
+        platform={platform}
+      />,
+    );
+    await screen.findByRole('alert');
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Setup availability could not be confirmed',
+    );
+    // Step content (and therefore every mutation control) is replaced.
+    expect(screen.queryByRole('textbox', { name: 'Workspace name' })).toBeNull();
+    platform.getStorageStatus.mockResolvedValue({ status: 'ready' });
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await screen.findByRole('heading', { name: 'Set up your workspace' });
+  });
+
+  it('switches language from the first screen and dispatches the new locale', async () => {
+    const user = userEvent.setup();
+    const provisioning = fakeProvisioning();
+    render(
+      <JourneyHarness
+        selection={fakeSelection()}
+        provisioning={provisioning}
+        platform={fakePlatform()}
+      />,
+    );
+    await screen.findByRole('heading', { name: 'Set up your workspace' });
+    await user.selectOptions(screen.getByRole('combobox'), 'ar');
+    await screen.findByRole('heading', { name: 'إعداد مساحة العمل' });
+    await user.type(screen.getByRole('textbox', { name: 'اسم مساحة العمل' }), 'My WS');
+    await user.click(screen.getByRole('button', { name: 'إنشاء مساحة عمل' }));
+    await screen.findByRole('heading', { name: 'أنشئ مشروعك الأول' });
+    const payload = provisioning.createWorkspace.mock.calls[0]?.[0];
+    expect(payload).toBeDefined();
+    expect(payload.preferredLanguage).toBe('ar');
+  });
+
+  it('keeps the frozen request identity across an uncertain retry under a language switch', async () => {
+    const user = userEvent.setup();
+    const provisioning = fakeProvisioning();
+    provisioning.createWorkspace
+      .mockRejectedValueOnce(new Error('transport lost'))
+      .mockResolvedValueOnce({
+        workspaceId: 'ws-1',
+        name: 'My WS',
+        kind: 'personal',
+        preferredLanguage: 'en',
+        createdAt: '2026-10-14T00:00:00Z',
+      });
+    render(
+      <JourneyHarness
+        selection={fakeSelection()}
+        provisioning={provisioning}
+        platform={fakePlatform()}
+      />,
+    );
+    await screen.findByRole('heading', { name: 'Set up your workspace' });
+    await user.type(screen.getByRole('textbox', { name: 'Workspace name' }), 'My WS');
+    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await screen.findByRole('alert'); // uncertain outcome surfaced, not swallowed
+
+    await user.selectOptions(screen.getByRole('combobox'), 'ar');
+    await user.click(screen.getByRole('button', { name: 'إنشاء مساحة عمل' }));
+    await screen.findByRole('heading', { name: 'أنشئ مشروعك الأول' });
+
+    expect(provisioning.createWorkspace).toHaveBeenCalledTimes(2);
+    const [firstPayload, firstOptions] = provisioning.createWorkspace.mock.calls[0] ?? [];
+    const [secondPayload, secondOptions] = provisioning.createWorkspace.mock.calls[1] ?? [];
+    // The replay reuses the frozen identity and payload fingerprint,
+    // including the original locale, despite the live language switch.
+    expect(secondOptions.requestId).toBe(firstOptions.requestId);
+    expect(secondPayload).toEqual(firstPayload);
+    expect(secondPayload.preferredLanguage).toBe('en');
   });
 });

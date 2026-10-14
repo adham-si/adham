@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
 import type { OnboardingJourneyApi } from '../model/use-onboarding';
-import { LanguageSelect } from './language-select';
 
 /**
- * Ready step: confirms the backend-confirmed scope, offers the compact
- * language selector, and acknowledges entry into the app for this session.
+ * Ready step: confirms the backend-confirmed scope and acknowledges entry
+ * into the app for this session. Language selection lives in the journey
+ * header, available from the first screen.
  */
 export function ReadyStep({ api }: { api: OnboardingJourneyApi }) {
   const { t } = useTranslation();
@@ -29,8 +29,6 @@ export function ReadyStep({ api }: { api: OnboardingJourneyApi }) {
           <dd className="font-medium text-foreground">{api.readyProject}</dd>
         </div>
       </dl>
-
-      <LanguageSelect />
 
       <Button type="button" onClick={api.enter}>
         {t('onboarding.openAdham', 'Open Adham')}

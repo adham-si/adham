@@ -10,11 +10,16 @@ import { useSelection, type SelectionBackend } from '../../workspace-selection';
 export type OnboardingStep = 'workspace' | 'project' | 'ready';
 export type OnboardingPhase = 'checking' | 'error' | 'setup' | 'ready' | 'complete';
 
-/// Minimal platform surface: the one genuine blocker read. Unknown statuses
-/// never block — the backend still fail-closes on its own.
+/// Minimal platform surface: the one genuine blocker read. A failed or
+/// unrecognized readiness read never permits setup — only an explicit
+/// backend "ready" does.
 export interface OnboardingPlatformBackend {
   getStorageStatus(): Promise<{ status: string }>;
 }
+
+/// Storage readiness blocker. Degraded is a confirmed backend failure;
+/// unavailable covers rejected reads and unrecognized statuses.
+export type OnboardingBlocker = 'storage-degraded' | 'storage-unavailable';
 
 export interface OnboardingTarget {
   workspaceId: string;
@@ -27,8 +32,9 @@ export interface OnboardingTarget {
 export interface OnboardingJourneyApi {
   phase: OnboardingPhase;
   step: OnboardingStep;
-  /// Backend-confirmed storage failure blocking setup. Not a checklist.
-  blocker: 'storage' | null;
+  /// Backend-confirmed storage blocker for setup. Fail-closed: any state
+  /// other than an explicit "ready" blocks while setup is incomplete.
+  blocker: OnboardingBlocker | null;
   /// Localized provisioning/selection error for the active step, if any.
   error: string | null;
   /// Localized list-read error, when discovery failed or is only partial.
@@ -145,6 +151,8 @@ export function useOnboarding({
 
   const createWorkspace = React.useCallback(
     async (name: string) => {
+      // Fail-closed: no setup mutation until readiness is confirmed.
+      if (storage !== 'ready') return;
       const outcome = await prov.createWorkspace(name);
       if (!outcome.ok) return;
       setTarget({ workspaceId: outcome.id, workspaceName: name.trim(), fresh: true });
@@ -155,11 +163,12 @@ export function useOnboarding({
       });
       setStep('project');
     },
-    [prov],
+    [prov, storage],
   );
 
   const createProject = React.useCallback(
     async (name: string) => {
+      if (storage !== 'ready') return;
       const workspaceId = target?.workspaceId ?? sel.activeWorkspaceId;
       if (!workspaceId) return;
       const outcome = await prov.createProject(name, workspaceId);
@@ -170,7 +179,7 @@ export function useOnboarding({
       setAwaitingReady(true);
       setStep('ready');
     },
-    [prov, sel.activeWorkspaceId, target],
+    [prov, sel.activeWorkspaceId, storage, target],
   );
 
   const chooseWorkspace = React.useCallback(
@@ -193,13 +202,14 @@ export function useOnboarding({
   );
 
   const confirmProject = React.useCallback(async () => {
+    if (storage !== 'ready') return;
     if (!target || !projectChoice) return;
     const outcome = await sel.select(target.workspaceId, projectChoice.projectId);
     if (!outcome.ok) return;
     setReadyNames({ workspace: target.workspaceName, project: projectChoice.name });
     setAwaitingReady(true);
     setStep('ready');
-  }, [projectChoice, sel, target]);
+  }, [projectChoice, sel, storage, target]);
 
   const back = React.useCallback(() => {
     setStep((current) => (current === 'ready' ? 'project' : 'workspace'));
@@ -226,7 +236,13 @@ export function useOnboarding({
   return {
     phase,
     step,
-    blocker: blocking && storage === 'degraded' ? 'storage' : null,
+    blocker: blocking
+      ? storage === 'degraded'
+        ? 'storage-degraded'
+        : storage === 'ready'
+          ? null
+          : 'storage-unavailable'
+      : null,
     error: prov.error ?? sel.error,
     listError: sel.listError,
     working: prov.working || sel.working,

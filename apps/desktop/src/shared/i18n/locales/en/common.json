@@ -61,7 +61,8 @@
     "readyWorkspaceLabel": "Workspace",
     "readyProjectLabel": "Project",
     "truncated": "Some entries are hidden because the list is limited.",
-    "projectsFailed": "Projects could not be loaded."
+    "projectsFailed": "Projects could not be loaded.",
+    "storageUnavailable": "Setup availability could not be confirmed. Retry until local storage is ready."
   },
   "newProject": "+ New Project",
   "newWorkspace": "+ New Workspace"

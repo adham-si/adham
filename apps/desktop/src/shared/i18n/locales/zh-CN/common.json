@@ -61,7 +61,8 @@
     "readyWorkspaceLabel": "工作区",
     "readyProjectLabel": "项目",
     "truncated": "列表有限，部分内容已隐藏。",
-    "projectsFailed": "无法加载项目。"
+    "projectsFailed": "无法加载项目。",
+    "storageUnavailable": "无法确认设置可用性。请重试直到本地存储就绪。"
   },
   "newProject": "+ 新建项目",
   "newWorkspace": "+ 新建工作区"

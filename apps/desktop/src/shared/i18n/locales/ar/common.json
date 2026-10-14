@@ -61,7 +61,8 @@
     "readyWorkspaceLabel": "مساحة العمل",
     "readyProjectLabel": "المشروع",
     "truncated": "بعض العناصر مخفية لأن القائمة محدودة.",
-    "projectsFailed": "تعذّر تحميل المشاريع."
+    "projectsFailed": "تعذّر تحميل المشاريع.",
+    "storageUnavailable": "تعذّر تأكيد جاهزية الإعداد. أعد المحاولة حتى يصبح التخزين المحلي جاهزًا."
   },
   "newProject": "+ مشروع جديد",
   "newWorkspace": "+ مساحة عمل جديدة"

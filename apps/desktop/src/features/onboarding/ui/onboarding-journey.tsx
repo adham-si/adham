@@ -5,9 +5,12 @@ import type { OnboardingJourneyApi, OnboardingStep } from '../model/use-onboardi
 import { WorkspaceStep } from './workspace-step';
 import { ProjectStep } from './project-step';
 import { ReadyStep } from './ready-step';
+import { LanguageSelect } from './language-select';
 
 const STEP_ORDER: OnboardingStep[] = ['workspace', 'project', 'ready'];
 
+/// Compact progress rail: vertical beside the content on desktop widths,
+/// collapsed to a horizontal row above it in narrow windows.
 function StepRail({ current }: { current: OnboardingStep }) {
   const { t } = useTranslation();
   const currentIndex = STEP_ORDER.indexOf(current);
@@ -22,7 +25,10 @@ function StepRail({ current }: { current: OnboardingStep }) {
     t('onboarding.stepUpcoming', 'Upcoming'),
   ];
   return (
-    <ol aria-label={t('onboarding.stepsLabel', 'Setup steps')} className="flex gap-1.5">
+    <ol
+      aria-label={t('onboarding.stepsLabel', 'Setup steps')}
+      className="flex flex-row gap-1.5 md:w-40 md:shrink-0 md:flex-col md:items-start md:gap-2"
+    >
       {STEP_ORDER.map((step, index) => {
         const status =
           index === currentIndex ? statuses[0] : index < currentIndex ? statuses[1] : statuses[2];
@@ -47,10 +53,38 @@ function StepRail({ current }: { current: OnboardingStep }) {
   );
 }
 
+function StorageBlocker({ api }: { api: OnboardingJourneyApi }) {
+  const { t } = useTranslation();
+  const message =
+    api.blocker === 'storage-degraded'
+      ? t(
+          'onboarding.storageDegraded',
+          'Local storage is unavailable. Setup cannot continue until it recovers.',
+        )
+      : t(
+          'onboarding.storageUnavailable',
+          'Setup availability could not be confirmed. Retry until local storage is ready.',
+        );
+  return (
+    <div className="flex flex-col gap-3">
+      <p role="alert" className="text-sm text-danger-foreground">
+        {message}
+      </p>
+      <div>
+        <Button type="button" variant="secondary" onClick={api.retry}>
+          {t('common.retry', 'Retry')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * First-run journey surface. Composition only: the phase/step model lives in
- * the model hook, each step is its own component, and the storage blocker or
+ * the model hook, each step is its own component, and a storage blocker or
  * load failure replaces the step content until an explicit retry succeeds.
+ * The compact language selector sits in the header so the journey can be
+ * read in the user's language before anything is created.
  */
 export function OnboardingJourney({ api }: { api: OnboardingJourneyApi }) {
   const { t } = useTranslation();
@@ -80,43 +114,43 @@ export function OnboardingJourney({ api }: { api: OnboardingJourneyApi }) {
 
   if (api.phase === 'complete') return null;
 
-  const showBack = api.step !== 'workspace';
-
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto p-6">
-      <div className="flex w-full max-w-md flex-col items-stretch gap-8">
-        <StepRail current={api.step} />
-        {api.blocker === 'storage' ? (
-          <div className="flex flex-col gap-3">
-            <p role="alert" className="text-sm text-danger-foreground">
-              {t(
-                'onboarding.storageDegraded',
-                'Local storage is unavailable. Setup cannot continue until it recovers.',
-              )}
-            </p>
-            <Button type="button" variant="secondary" onClick={api.retry}>
-              {t('common.retry', 'Retry')}
-            </Button>
+    <main className="flex flex-1 flex-col items-center overflow-y-auto p-6">
+      <div className="flex w-full max-w-xl flex-col gap-8">
+        <div className="flex justify-end">
+          <LanguageSelect />
+        </div>
+        <div className="flex flex-col gap-8 md:flex-row md:items-start md:gap-10">
+          <StepRail current={api.step} />
+          <div className="flex w-full max-w-md flex-col gap-8">
+            {api.blocker ? (
+              <StorageBlocker api={api} />
+            ) : (
+              <>
+                {api.step === 'workspace' && <WorkspaceStep api={api} />}
+                {api.step === 'project' && <ProjectStep api={api} />}
+                {api.step === 'ready' && <ReadyStep api={api} />}
+                {api.error && (
+                  <p role="alert" className="text-xs text-danger-foreground">
+                    {api.error}
+                  </p>
+                )}
+                {api.step !== 'workspace' && api.step !== 'ready' && (
+                  <div className="flex">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={api.back}
+                      disabled={api.working}
+                    >
+                      {t('onboarding.back', 'Back')}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        ) : (
-          <>
-            {api.step === 'workspace' && <WorkspaceStep api={api} />}
-            {api.step === 'project' && <ProjectStep api={api} />}
-            {api.step === 'ready' && <ReadyStep api={api} />}
-            {api.step !== 'workspace' && api.error && (
-              <p role="alert" className="text-xs text-danger-foreground">
-                {api.error}
-              </p>
-            )}
-            {showBack && api.step !== 'ready' && (
-              <div className="flex">
-                <Button type="button" variant="secondary" onClick={api.back} disabled={api.working}>
-                  {t('onboarding.back', 'Back')}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
+        </div>
       </div>
     </main>
   );
