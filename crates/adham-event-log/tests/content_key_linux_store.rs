@@ -218,20 +218,14 @@ fn unavailable_secret_service_fails_closed() {
 fn run_subprocess(mut cmd: std::process::Command) -> std::process::ExitStatus {
     let mut child = cmd.spawn().expect("spawn subprocess");
     let start = std::time::Instant::now();
-    let timeout = std::time::Duration::from_secs(10);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return status,
-            Ok(None) => {
-                if start.elapsed() > timeout {
-                    let _ = child.kill();
-                    panic!("subprocess timed out after 10s");
-                }
-                std::thread::sleep(std::time::Duration::from_millis(50));
-            }
-            Err(e) => panic!("try_wait failed: {e}"),
+    while start.elapsed() < std::time::Duration::from_secs(10) {
+        if let Some(status) = child.try_wait().expect("try_wait") {
+            return status;
         }
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
+    let _ = child.kill();
+    panic!("subprocess timed out after 10s");
 }
 
 struct IsolatedSecretService {
@@ -278,25 +272,35 @@ impl IsolatedSecretService {
         let mut dbus_pid = None;
         for line in s.lines() {
             if let Some(rest) = line.strip_prefix("DBUS_SESSION_BUS_ADDRESS=") {
-                let addr = rest.trim_end_matches(';').trim_matches('\'').to_string();
-                dbus_addr = Some(addr);
+                dbus_addr = Some(rest.trim_end_matches(';').trim_matches('\'').to_string());
             } else if let Some(rest) = line.strip_prefix("DBUS_SESSION_BUS_PID=") {
-                let pid_str = rest.trim_end_matches(';').trim_matches('\'');
-                if let Ok(p) = pid_str.parse::<u32>() {
-                    dbus_pid = Some(p);
-                }
+                dbus_pid = rest.trim_end_matches(';').trim_matches('\'').parse().ok();
             }
         }
 
         let dbus_addr = dbus_addr.expect("parse DBUS_SESSION_BUS_ADDRESS");
         let dbus_pid = dbus_pid.expect("parse DBUS_SESSION_BUS_PID");
 
-        let ctrl_arg = format!("--control-directory={}", temp_dir.join("ctrl").display());
+        let this = Self {
+            dbus_pid,
+            dbus_addr,
+            temp_dir,
+        };
+        this.start_daemon();
+        assert!(!this.is_locked(), "collection must be initially unlocked");
+        this
+    }
+
+    fn start_daemon(&self) {
+        let ctrl_arg = format!(
+            "--control-directory={}",
+            self.temp_dir.join("ctrl").display()
+        );
         let mut child = std::process::Command::new("gnome-keyring-daemon")
             .args([&ctrl_arg, "--unlock", "--components=secrets"])
-            .env("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)
-            .env("XDG_DATA_HOME", &temp_dir)
-            .env("XDG_DATA_DIRS", &temp_dir)
+            .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
+            .env("XDG_DATA_HOME", &self.temp_dir)
+            .env("XDG_DATA_DIRS", &self.temp_dir)
             .env_remove("DISPLAY")
             .env_remove("WAYLAND_DISPLAY")
             .stdin(std::process::Stdio::piped())
@@ -316,9 +320,9 @@ impl IsolatedSecretService {
 
         let status2 = std::process::Command::new("gnome-keyring-daemon")
             .args([&ctrl_arg, "--start", "--components=secrets"])
-            .env("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)
-            .env("XDG_DATA_HOME", &temp_dir)
-            .env("XDG_DATA_DIRS", &temp_dir)
+            .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
+            .env("XDG_DATA_HOME", &self.temp_dir)
+            .env("XDG_DATA_DIRS", &self.temp_dir)
             .env_remove("DISPLAY")
             .env_remove("WAYLAND_DISPLAY")
             .stdout(std::process::Stdio::null())
@@ -329,22 +333,44 @@ impl IsolatedSecretService {
             status2.success(),
             "gnome-keyring-daemon --start must succeed"
         );
+    }
 
-        let this = Self {
-            dbus_pid,
-            dbus_addr,
-            temp_dir,
-        };
-
-        assert!(!this.is_locked(), "collection must be initially unlocked");
-        this
+    fn kill_daemon(&self) {
+        let out = self.dbus_call_dest(
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus.GetConnectionUnixProcessID",
+            &["string:org.freedesktop.secrets"],
+        );
+        let s = String::from_utf8_lossy(&out.stdout);
+        for line in s.lines() {
+            if let Some(rest) = line.trim().strip_prefix("uint32 ") {
+                if let Ok(pid) = rest.parse::<u32>() {
+                    let _ = std::process::Command::new("kill")
+                        .arg(pid.to_string())
+                        .status();
+                    std::thread::sleep(std::time::Duration::from_millis(150));
+                    break;
+                }
+            }
+        }
     }
 
     fn dbus_call(&self, obj: &str, method: &str, args: &[&str]) -> std::process::Output {
+        self.dbus_call_dest("org.freedesktop.secrets", obj, method, args)
+    }
+
+    fn dbus_call_dest(
+        &self,
+        dest: &str,
+        obj: &str,
+        method: &str,
+        args: &[&str],
+    ) -> std::process::Output {
         let mut cmd = std::process::Command::new("dbus-send");
         cmd.args([
             "--session",
-            "--dest=org.freedesktop.secrets",
+            &format!("--dest={dest}"),
             "--type=method_call",
             "--print-reply",
         ])
@@ -378,12 +404,8 @@ impl IsolatedSecretService {
     }
 
     fn unlock(&self) {
-        let out = self.dbus_call(
-            "/org/freedesktop/secrets",
-            "org.freedesktop.Secret.Service.Unlock",
-            &["array:objpath:/org/freedesktop/secrets/collection/login"],
-        );
-        assert!(out.status.success(), "dbus-send Unlock must succeed");
+        self.kill_daemon();
+        self.start_daemon();
     }
 
     fn subprocess(
@@ -408,6 +430,7 @@ impl IsolatedSecretService {
 
 impl Drop for IsolatedSecretService {
     fn drop(&mut self) {
+        self.kill_daemon();
         let _ = std::process::Command::new("kill")
             .arg(self.dbus_pid.to_string())
             .status();
