@@ -101,7 +101,31 @@ fn windows_base_preserves_localappdata_location() {
     remove_dir(&base);
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+#[test]
+fn linux_base_follows_xdg_specification() {
+    let home = temp_root("home");
+    let home_str = home.to_str().unwrap().to_string();
+
+    let base = PlatformStoragePolicy::resolve_base(None, Some(&home_str)).expect("base default");
+    assert_eq!(base, home.join(".local").join("share").join("adham"));
+
+    let xdg = temp_root("xdg");
+    let xdg_str = xdg.to_str().unwrap().to_string();
+    let base_xdg =
+        PlatformStoragePolicy::resolve_base_with_xdg(None, Some(&home_str), Some(&xdg_str))
+            .expect("base xdg");
+    assert_eq!(base_xdg, xdg.join("adham"));
+
+    let policy = PlatformStoragePolicy::new(&base_xdg).expect("policy");
+    assert_eq!(policy.database_path().file_name().unwrap(), "adham.db");
+    assert!(policy.data_dir().is_dir());
+
+    remove_dir(&home);
+    remove_dir(&xdg);
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 #[test]
 fn unsupported_platform_errors() {
     let err = PlatformStoragePolicy::resolve_base(Some("/tmp/x"), Some("/tmp/x")).unwrap_err();
@@ -112,17 +136,17 @@ fn unsupported_platform_errors() {
 fn absolute_temp_root_creates_data_dir() {
     let root = temp_root("ok");
     let home_str = root.to_str().unwrap().to_string();
-    // On macOS the first arg is ignored; on Windows the second is ignored.
+    // On macOS and Linux the first arg is ignored; on Windows the second is ignored.
     // Either way this exercises the absolute-path happy path with a temp root.
     let base = PlatformStoragePolicy::resolve_base(Some(&home_str), Some(&home_str));
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     {
         let base = base.expect("absolute temp root must resolve");
         let policy = PlatformStoragePolicy::new(&base).expect("policy");
         assert!(policy.data_dir().is_dir());
         remove_dir(&base);
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
         assert!(base.is_err());
     }
