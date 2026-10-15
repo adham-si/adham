@@ -340,69 +340,69 @@ impl IsolatedSecretService {
         this
     }
 
+    fn dbus_call(&self, obj: &str, method: &str, args: &[&str]) -> std::process::Output {
+        let mut cmd = std::process::Command::new("dbus-send");
+        cmd.args([
+            "--session",
+            "--dest=org.freedesktop.secrets",
+            "--type=method_call",
+            "--print-reply",
+        ])
+        .arg(obj)
+        .arg(method)
+        .args(args)
+        .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
+        .env("XDG_DATA_HOME", &self.temp_dir)
+        .env("XDG_DATA_DIRS", &self.temp_dir)
+        .env_remove("DISPLAY")
+        .env_remove("WAYLAND_DISPLAY");
+        cmd.output().expect("dbus call failed")
+    }
+
     fn lock(&self) {
-        let out = std::process::Command::new("dbus-send")
-            .args([
-                "--session",
-                "--dest=org.freedesktop.secrets",
-                "--type=method_call",
-                "--print-reply",
-                "/org/freedesktop/secrets",
-                "org.freedesktop.Secret.Service.Lock",
-                "array:objpath:/org/freedesktop/secrets/collection/login",
-            ])
-            .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
-            .env("XDG_DATA_HOME", &self.temp_dir)
-            .env("XDG_DATA_DIRS", &self.temp_dir)
-            .env_remove("DISPLAY")
-            .env_remove("WAYLAND_DISPLAY")
-            .output()
-            .expect("dbus-send Lock execution failed");
+        let out = self.dbus_call(
+            "/org/freedesktop/secrets",
+            "org.freedesktop.Secret.Service.Lock",
+            &["array:objpath:/org/freedesktop/secrets/collection/login"],
+        );
         assert!(out.status.success(), "dbus-send Lock must succeed");
     }
 
     fn is_locked(&self) -> bool {
-        let out = std::process::Command::new("dbus-send")
-            .args([
-                "--session",
-                "--dest=org.freedesktop.secrets",
-                "--type=method_call",
-                "--print-reply",
-                "/org/freedesktop/secrets/collection/login",
-                "org.freedesktop.DBus.Properties.Get",
-                "string:org.freedesktop.Secret.Collection",
-                "string:Locked",
-            ])
-            .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
-            .env("XDG_DATA_HOME", &self.temp_dir)
-            .env("XDG_DATA_DIRS", &self.temp_dir)
-            .env_remove("DISPLAY")
-            .env_remove("WAYLAND_DISPLAY")
-            .output()
-            .expect("dbus-send Get Locked execution failed");
-        let s = String::from_utf8_lossy(&out.stdout);
-        s.contains("boolean true")
+        let out = self.dbus_call(
+            "/org/freedesktop/secrets/collection/login",
+            "org.freedesktop.DBus.Properties.Get",
+            &["string:org.freedesktop.Secret.Collection", "string:Locked"],
+        );
+        String::from_utf8_lossy(&out.stdout).contains("boolean true")
     }
 
     fn unlock(&self) {
-        let out = std::process::Command::new("dbus-send")
-            .args([
-                "--session",
-                "--dest=org.freedesktop.secrets",
-                "--type=method_call",
-                "--print-reply",
-                "/org/freedesktop/secrets",
-                "org.freedesktop.Secret.Service.Unlock",
-                "array:objpath:/org/freedesktop/secrets/collection/login",
-            ])
+        let out = self.dbus_call(
+            "/org/freedesktop/secrets",
+            "org.freedesktop.Secret.Service.Unlock",
+            &["array:objpath:/org/freedesktop/secrets/collection/login"],
+        );
+        assert!(out.status.success(), "dbus-send Unlock must succeed");
+    }
+
+    fn subprocess(
+        &self,
+        exe: &std::path::Path,
+        action: &str,
+        account: &str,
+    ) -> std::process::Command {
+        let mut cmd = std::process::Command::new(exe);
+        cmd.arg("locked_collection_fails_closed_and_refuses_overwrite")
+            .arg("--exact")
+            .env("TEST_LOCKED_ACTION", action)
+            .env("TEST_ACCOUNT", account)
             .env("DBUS_SESSION_BUS_ADDRESS", &self.dbus_addr)
             .env("XDG_DATA_HOME", &self.temp_dir)
             .env("XDG_DATA_DIRS", &self.temp_dir)
             .env_remove("DISPLAY")
-            .env_remove("WAYLAND_DISPLAY")
-            .output()
-            .expect("dbus-send Unlock execution failed");
-        assert!(out.status.success(), "dbus-send Unlock must succeed");
+            .env_remove("WAYLAND_DISPLAY");
+        cmd
     }
 }
 
@@ -478,52 +478,29 @@ fn locked_collection_fails_closed_and_refuses_overwrite() {
     assert!(!iso.is_locked(), "collection must be initially unlocked");
 
     let account = format!("locked-sub-{}", uuid::Uuid::now_v7());
+    let exe = std::env::current_exe().expect("current exe");
 
-    struct CleanupGuard<'a> {
-        account: &'a str,
-        iso: &'a IsolatedSecretService,
-    }
+    struct CleanupGuard<'a>(&'a str, &'a IsolatedSecretService);
     impl<'a> Drop for CleanupGuard<'a> {
         fn drop(&mut self) {
             let exe = std::env::current_exe().expect("current exe");
-            let mut cmd = std::process::Command::new(exe);
-            cmd.arg("locked_collection_fails_closed_and_refuses_overwrite")
-                .arg("--exact")
-                .env("TEST_LOCKED_ACTION", "cleanup")
-                .env("TEST_ACCOUNT", self.account)
-                .env("DBUS_SESSION_BUS_ADDRESS", &self.iso.dbus_addr)
-                .env("XDG_DATA_HOME", &self.iso.temp_dir)
-                .env("XDG_DATA_DIRS", &self.iso.temp_dir)
-                .env_remove("DISPLAY")
-                .env_remove("WAYLAND_DISPLAY");
+            let cmd = self.1.subprocess(&exe, "cleanup", self.0);
             let _ = run_subprocess(cmd);
         }
     }
-    let _cleanup = CleanupGuard {
-        account: &account,
-        iso: &iso,
-    };
-
-    let exe = std::env::current_exe().expect("current exe");
+    let _cleanup = CleanupGuard(&account, &iso);
 
     // 1. Seed credential while unlocked
-    let mut seed_cmd = std::process::Command::new(&exe);
+    let mut seed_cmd = iso.subprocess(&exe, "seed", &account);
     seed_cmd
-        .arg("locked_collection_fails_closed_and_refuses_overwrite")
-        .arg("--exact")
         .arg("--nocapture")
-        .env("TEST_LOCKED_ACTION", "seed")
-        .env("TEST_ACCOUNT", &account)
-        .env("DBUS_SESSION_BUS_ADDRESS", &iso.dbus_addr)
-        .env("XDG_DATA_HOME", &iso.temp_dir)
-        .env("XDG_DATA_DIRS", &iso.temp_dir)
-        .env_remove("DISPLAY")
-        .env_remove("WAYLAND_DISPLAY")
         .stdout(std::process::Stdio::piped());
     let mut child = seed_cmd.spawn().expect("spawn seed");
     let stdout = child.stdout.take().expect("stdout");
-    let status = child.wait().expect("wait seed");
-    assert!(status.success(), "seeding credential must succeed");
+    assert!(
+        child.wait().expect("wait seed").success(),
+        "seeding credential must succeed"
+    );
     use std::io::Read;
     let mut out_str = String::new();
     let mut reader = std::io::BufReader::new(stdout);
@@ -531,7 +508,7 @@ fn locked_collection_fails_closed_and_refuses_overwrite() {
     let key_fp = out_str
         .lines()
         .find_map(|l| l.strip_prefix("KEY_FP:"))
-        .expect("must output KEY_FP")
+        .expect("key fp")
         .trim()
         .to_string();
 
@@ -540,37 +517,21 @@ fn locked_collection_fails_closed_and_refuses_overwrite() {
     assert!(iso.is_locked(), "collection must be explicitly locked");
 
     // 3. Exercise provider failure while locked
-    let mut lock_cmd = std::process::Command::new(&exe);
-    lock_cmd
-        .arg("locked_collection_fails_closed_and_refuses_overwrite")
-        .arg("--exact")
-        .env("TEST_LOCKED_ACTION", "verify_locked_failure")
-        .env("TEST_ACCOUNT", &account)
-        .env("DBUS_SESSION_BUS_ADDRESS", &iso.dbus_addr)
-        .env("XDG_DATA_HOME", &iso.temp_dir)
-        .env("XDG_DATA_DIRS", &iso.temp_dir)
-        .env_remove("DISPLAY")
-        .env_remove("WAYLAND_DISPLAY");
-    let status = run_subprocess(lock_cmd);
-    assert!(status.success(), "locked failure verification must pass");
+    let lock_cmd = iso.subprocess(&exe, "verify_locked_failure", &account);
+    assert!(
+        run_subprocess(lock_cmd).success(),
+        "locked failure verification must pass"
+    );
 
     // 4. Unlock collection and assert unlocked state
     iso.unlock();
     assert!(!iso.is_locked(), "collection must be unlocked");
 
     // 5. Verify original key remains unchanged after unlock
-    let mut unlock_cmd = std::process::Command::new(&exe);
-    unlock_cmd
-        .arg("locked_collection_fails_closed_and_refuses_overwrite")
-        .arg("--exact")
-        .env("TEST_LOCKED_ACTION", "verify_unlocked_read")
-        .env("TEST_ACCOUNT", &account)
-        .env("TEST_EXPECTED_FP", &key_fp)
-        .env("DBUS_SESSION_BUS_ADDRESS", &iso.dbus_addr)
-        .env("XDG_DATA_HOME", &iso.temp_dir)
-        .env("XDG_DATA_DIRS", &iso.temp_dir)
-        .env_remove("DISPLAY")
-        .env_remove("WAYLAND_DISPLAY");
-    let status = run_subprocess(unlock_cmd);
-    assert!(status.success(), "unlocked read verification must pass");
+    let mut unlock_cmd = iso.subprocess(&exe, "verify_unlocked_read", &account);
+    unlock_cmd.env("TEST_EXPECTED_FP", &key_fp);
+    assert!(
+        run_subprocess(unlock_cmd).success(),
+        "unlocked read verification must pass"
+    );
 }
