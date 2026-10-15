@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -32,12 +33,29 @@ impl PlatformStoragePolicy {
     }
 
     pub fn resolve() -> Result<Self, PlatformError> {
-        let base = Self::resolve_base_with_xdg(
+        let base = Self::resolve_base_with_override(
+            std::env::var_os("ADHAM_DATA_ROOT").as_deref(),
             std::env::var("LOCALAPPDATA").ok().as_deref(),
             std::env::var("HOME").ok().as_deref(),
             std::env::var("XDG_DATA_HOME").ok().as_deref(),
         )?;
         Self::new(base)
+    }
+
+    /// Pure, testable base-directory selection with the dev/test-only
+    /// `ADHAM_DATA_ROOT` override: honored only in debug-assertions builds
+    /// (absolute, non-empty and UTF-8 required — invalid values fail closed),
+    /// ignored entirely by release builds. No env access, no I/O.
+    pub fn resolve_base_with_override(
+        data_root: Option<&OsStr>,
+        local_app_data: Option<&str>,
+        home: Option<&str>,
+        xdg_data_home: Option<&str>,
+    ) -> Result<PathBuf, PlatformError> {
+        match debug_data_root(data_root)? {
+            Some(path) => Ok(path),
+            None => Self::resolve_base_with_xdg(local_app_data, home, xdg_data_home),
+        }
     }
 
     /// Pure, testable base-directory selection. No env access, no I/O.
@@ -143,4 +161,26 @@ fn validate_root_var(name: &str, value: Option<&str>) -> Result<PathBuf, Platfor
         )));
     }
     Ok(path)
+}
+
+/// Debug-assertions builds honor `ADHAM_DATA_ROOT`; release builds ignore it
+/// regardless of value (this stub never validates, so a stray or malformed
+/// variable cannot affect release startup).
+#[cfg(debug_assertions)]
+fn debug_data_root(data_root: Option<&OsStr>) -> Result<Option<PathBuf>, PlatformError> {
+    let Some(value) = data_root else {
+        return Ok(None);
+    };
+    let Some(raw) = value.to_str() else {
+        return Err(PlatformError::InvalidPath(
+            "ADHAM_DATA_ROOT is not valid UTF-8; refusing to fall back to the default data root"
+                .to_string(),
+        ));
+    };
+    validate_root_var("ADHAM_DATA_ROOT", Some(raw)).map(Some)
+}
+
+#[cfg(not(debug_assertions))]
+fn debug_data_root(_data_root: Option<&OsStr>) -> Result<Option<PathBuf>, PlatformError> {
+    Ok(None)
 }
