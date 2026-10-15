@@ -173,3 +173,116 @@ jobs:
 
       - name: Dependency audit (pnpm)
         run: pnpm audit --audit-level=high
+
+  # Additive Linux coverage. The `validate` and `validate-macos` jobs above
+  # keep their ids, names, and runners so existing required checks are
+  # unchanged. Require this job too once it is green.
+  validate-linux:
+    name: Validation and Quality Checks (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            curl \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libwebkit2gtk-4.1-dev \
+            gnome-keyring \
+            dbus-x11 \
+            xvfb
+
+      - name: Setup Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version-file: '.node-version'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          run_install: false
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check file sizes
+        run: node scripts/check-file-size.mjs
+
+      - name: Biome formatting check
+        run: pnpm format:check
+
+      - name: Oxlint linting check
+        run: pnpm lint
+
+      - name: TypeScript typecheck
+        run: pnpm typecheck
+
+      - name: Frontend unit & component tests
+        run: pnpm test
+
+      - name: Rust formatting check
+        run: cargo fmt --all -- --check
+
+      - name: Rust typecheck
+        run: cargo check --workspace --all-targets --locked
+
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Contracts drift check
+        run: cargo xtask contracts
+
+      - name: Contracts no-diff
+        run: git diff --exit-code -- packages/contracts-generated
+
+      - name: Start Secret Service daemon
+        run: |
+          eval $(dbus-launch --sh-syntax)
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $GITHUB_ENV
+          eval $(echo -n "test" | gnome-keyring-daemon --replace --unlock 2>/dev/null || true)
+          eval $(gnome-keyring-daemon --start --components=secrets 2>/dev/null || true)
+
+      - name: Rust tests
+        run: xvfb-run -a cargo test --workspace --locked
+
+      - name: P0 repair regression suite
+        run: xvfb-run -a cargo test -p adham-desktop-api --test p0_repair_regression --locked
+
+      - name: Desktop build check
+        run: |
+          pnpm --filter @adham/desktop build
+          cargo build -p adham-desktop --locked
+
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Dependency audit (cargo-deny)
+        run: cargo deny check
+
+      - name: Deny exception record check
+        run: pnpm check:deny-exceptions
+
+      - name: Deny exception record self-test
+        run: pnpm check:deny-exceptions:self-test
+
+      - name: Dependency audit (pnpm)
+        run: pnpm audit --audit-level=high
