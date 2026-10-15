@@ -30,6 +30,12 @@ export function WorkspaceStep({ api }: { api: OnboardingJourneyApi }) {
         <h1 className="text-lg font-semibold text-foreground">
           {t('onboarding.workspaceHeading', 'Set up your workspace')}
         </h1>
+        <p className="mt-2 text-sm text-foreground-secondary">
+          {t(
+            'onboarding.workspaceDescription',
+            'Your projects and settings live here. You can rename it or add more later.',
+          )}
+        </p>
       </div>
 
       {api.workspaces.length > 0 && (

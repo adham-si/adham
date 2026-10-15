@@ -488,9 +488,16 @@ describe('OnboardingJourney', () => {
       />,
     );
     await screen.findByRole('heading', { name: 'Set up your workspace' });
-    // Guide showcase and step rail coexist with the actionable form.
-    expect(screen.getByText('One workspace for everything')).toBeTruthy();
+    // Full-width step rail, mascot stage, and the step description under the
+    // form heading coexist with the actionable form; the old showcase copy
+    // stays removed.
     expect(screen.getByRole('list', { name: 'Setup steps' })).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Your projects and settings live here. You can rename it or add more later.',
+      ),
+    ).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Workspace name' })).toBeTruthy();
+    expect(screen.queryByText('One workspace for everything')).toBeNull();
   });
 });

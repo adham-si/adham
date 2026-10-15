@@ -66,7 +66,10 @@
     "guideProjectTitle": "每个项目各得其所",
     "guideProjectBody": "每个项目的数据彼此独立存放。",
     "guideReadyTitle": "一切就绪",
-    "guideReadyBody": "已选定你的工作区和第一个项目。首次发送消息时即开始会话。"
+    "guideReadyBody": "已选定你的工作区和第一个项目。首次发送消息时即开始会话。",
+    "workspaceDescription": "项目与设置都保存在这里。之后可以重命名或继续添加。",
+    "projectDescription": "每个项目都有自己的存储空间，与其他项目相互独立。",
+    "readyDescription": "一切就绪。打开 Adham 即可开始使用。"
   },
   "newProject": "+ 新建项目",
   "newWorkspace": "+ 新建工作区"

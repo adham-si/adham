@@ -11,9 +11,14 @@ export function ReadyStep({ api }: { api: OnboardingJourneyApi }) {
   const { t } = useTranslation();
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
-      <h1 className="text-center text-lg font-semibold text-foreground">
-        {t('onboarding.readyHeading', 'Your workspace is ready')}
-      </h1>
+      <div className="text-center">
+        <h1 className="text-lg font-semibold text-foreground">
+          {t('onboarding.readyHeading', 'Your workspace is ready')}
+        </h1>
+        <p className="mt-2 text-sm text-foreground-secondary">
+          {t('onboarding.readyDescription', 'Everything is set. Open Adham to start working.')}
+        </p>
+      </div>
 
       <dl className="flex flex-col gap-1.5 rounded-md border border-border-subtle bg-surface-subtle p-2.5 text-xs">
         <div className="flex items-center justify-between gap-2">

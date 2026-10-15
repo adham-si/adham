@@ -35,15 +35,15 @@ function StorageBlocker({ api }: { api: OnboardingJourneyApi }) {
 
 /**
  * First-run journey surface, rendered inside the app's default Context
- * card as a full-context page: a guide column (numbered step stepper +
- * per-step showcase) beside a form column whose block is centered in the
- * column — titles centered, fields and buttons aligned to the start.
- * Composition only — the phase/step model lives in the model hook, each
- * step is its own component, and a storage blocker or load failure
- * replaces the form content until an explicit retry succeeds. The
- * language selector sits in the page header, available before anything is
- * created. Narrow windows stack the columns; the guide column keeps the
- * stepper above the form.
+ * card as a full-context page: a guide column (full-width numbered step
+ * rail + mascot stage) beside a form column — the display-language
+ * selector pins to the form column's top-end corner, and the step block
+ * centers below it, titles centered with fields and buttons aligned to
+ * the start. Composition only — the phase/step model lives in the model
+ * hook, each step is its own component, and a storage blocker or load
+ * failure replaces the form content until an explicit retry succeeds.
+ * Narrow windows stack the columns; the guide column keeps the rail
+ * above the mascot.
  */
 export function OnboardingJourney({ api }: { api: OnboardingJourneyApi }) {
   const { t } = useTranslation();
@@ -75,29 +75,32 @@ export function OnboardingJourney({ api }: { api: OnboardingJourneyApi }) {
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-end border-b border-border-subtle px-6 py-3">
-        <LanguageSelect />
-      </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
         <GuideColumn step={api.step} />
-        {/* Form column: the block centers in the column; the step owns its
-            own heading, fields, and actions (incl. the Back row). */}
-        <section className="flex flex-1 flex-col items-center justify-center p-8 md:overflow-y-auto">
-          <div className="flex w-full max-w-md flex-col gap-8">
-            {api.blocker ? (
-              <StorageBlocker api={api} />
-            ) : (
-              <>
-                {api.step === 'workspace' && <WorkspaceStep api={api} />}
-                {api.step === 'project' && <ProjectStep api={api} />}
-                {api.step === 'ready' && <ReadyStep api={api} />}
-                {api.error && (
-                  <p role="alert" className="text-xs text-danger-foreground">
-                    {api.error}
-                  </p>
-                )}
-              </>
-            )}
+        {/* Form column: the language selector pins to the top-end corner;
+            the step block centers in the remaining space and owns its own
+            heading, fields, and actions (incl. the Back row). */}
+        <section className="flex flex-1 flex-col gap-6 p-8 md:overflow-y-auto">
+          <div className="flex shrink-0 justify-end">
+            <LanguageSelect />
+          </div>
+          <div className="flex flex-1 flex-col items-center justify-center">
+            <div className="flex w-full max-w-md flex-col gap-8">
+              {api.blocker ? (
+                <StorageBlocker api={api} />
+              ) : (
+                <>
+                  {api.step === 'workspace' && <WorkspaceStep api={api} />}
+                  {api.step === 'project' && <ProjectStep api={api} />}
+                  {api.step === 'ready' && <ReadyStep api={api} />}
+                  {api.error && (
+                    <p role="alert" className="text-xs text-danger-foreground">
+                      {api.error}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </section>
       </div>

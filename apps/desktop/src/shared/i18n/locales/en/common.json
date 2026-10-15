@@ -66,7 +66,10 @@
     "guideProjectTitle": "A home for each project",
     "guideProjectBody": "Each one keeps its own storage, isolated from the rest.",
     "guideReadyTitle": "You're set to start",
-    "guideReadyBody": "Your workspace and first project are selected. Sessions start with your first message."
+    "guideReadyBody": "Your workspace and first project are selected. Sessions start with your first message.",
+    "workspaceDescription": "Your projects and settings live here. You can rename it or add more later.",
+    "projectDescription": "Each project keeps its own storage, separate from the rest.",
+    "readyDescription": "Everything is set. Open Adham to start working."
   },
   "newProject": "+ New Project",
   "newWorkspace": "+ New Workspace"

@@ -31,6 +31,12 @@ export function ProjectStep({ api }: { api: OnboardingJourneyApi }) {
         <h1 className="text-lg font-semibold text-foreground">
           {t('onboarding.projectHeading', 'Create your first project')}
         </h1>
+        <p className="mt-2 text-sm text-foreground-secondary">
+          {t(
+            'onboarding.projectDescription',
+            'Each project keeps its own storage, separate from the rest.',
+          )}
+        </p>
       </div>
 
       {api.target && (
