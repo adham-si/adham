@@ -225,6 +225,7 @@ fn run_subprocess(mut cmd: std::process::Command) -> std::process::ExitStatus {
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
     let _ = child.kill();
+    let _ = child.wait();
     panic!("subprocess timed out after 10s");
 }
 
