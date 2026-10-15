@@ -9,6 +9,15 @@ use adham_desktop_api::{
 #[cfg(target_os = "macos")]
 use tauri::Manager;
 
+#[cfg(test)]
+mod ipc_contract_tests;
+
+/// Single `generate_context!` expansion shared by `run()` and the IPC contract
+/// tests: the macro embeds one set of static symbols per binary.
+fn app_context<R: tauri::Runtime>() -> tauri::Context<R> {
+    tauri::generate_context!()
+}
+
 #[tauri::command]
 fn get_platform_info() -> PlatformInfo {
     adham_desktop_api::handle_get_platform_info()
@@ -238,7 +247,7 @@ pub fn run() {
         ]);
 
     let app = builder
-        .build(tauri::generate_context!())
+        .build(app_context())
         .expect("error while building tauri application");
 
     app.run(|_app_handle, _event| {
