@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import { normalizeLanguage } from '@/shared/i18n';
 import { ThemeProvider } from '@/theme/theme-provider';
+import { resetDetectionPersistForTests } from './use-app-preferences';
 import { useAppPreferences } from './use-app-preferences';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
@@ -50,6 +51,7 @@ beforeEach(async () => {
   vi.mocked(invoke).mockReset();
   window.localStorage.clear();
   document.documentElement.classList.remove('dark');
+  resetDetectionPersistForTests();
   const { default: i18n } = await import('@/shared/i18n');
   await i18n.changeLanguage('en');
 });
@@ -195,5 +197,58 @@ describe('useAppPreferences', () => {
     );
     // Detection stands: the UI was never forced back to English.
     expect(normalizeLanguage(i18n.language)).toBe('ar');
+  });
+
+  it('persists first-launch detection once across mounted instances', async () => {
+    const { default: i18n } = await import('@/shared/i18n');
+    await i18n.changeLanguage('ar');
+    window.localStorage.removeItem('adham.language');
+    vi.mocked(invoke).mockImplementation(async (cmd, args) => {
+      if (cmd === 'get_app_preferences') {
+        return {
+          preferences: {
+            appearance: 'system',
+            language: 'en',
+            fontFamily: 'default',
+            fontSize: 'md',
+            highContrast: 'system',
+            reducedMotion: 'system',
+            enterToSend: true,
+          },
+          revision: 0,
+        };
+      }
+      if (cmd === 'update_app_preferences') {
+        const payload = (
+          args as { payload: { preferences: Record<string, unknown>; baseRevision: number } }
+        ).payload;
+        return { preferences: payload.preferences, revision: 1 };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    // Two live instances (PreferencesHost + route): only one may persist.
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <ThemeProvider>
+          <Harness onReady={() => {}} />
+          <Harness onReady={() => {}} />
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(invoke)
+          .mock.calls.filter(
+            ([cmd, args]) =>
+              cmd === 'update_app_preferences' &&
+              (args as { payload: { preferences: { language: string } } }).payload.preferences
+                .language === 'ar',
+          ),
+      ).toHaveLength(1),
+    );
   });
 });

@@ -21,7 +21,9 @@ export function ModelsPage() {
   // to be active. The catalog below stays as product direction.
   const [defaultModelId, setDefaultModelId] = React.useState('');
   const [fallbackModelId, setFallbackModelId] = React.useState('');
-  const [strictLocalBoundary, setStrictLocalBoundary] = React.useState(true);
+  // Neutral default: no boundary is enforced in this build, so the switch
+  // must not render ON as if a local-only boundary were active.
+  const [strictLocalBoundary, setStrictLocalBoundary] = React.useState(false);
 
   const models: ModelItem[] = [
     {

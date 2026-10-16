@@ -207,10 +207,10 @@ export async function migrateLegacy(
   const legacy = readLegacyPreferences();
   if (!legacy) return snapshot;
   if (!snapshot.backendAvailable || snapshot.revision > 0) {
-    // Backend unreachable (caller retries later) or already authoritative:
-    // stale legacy keys must not compete — drop them only when the backend
-    // is the authority.
-    if (snapshot.backendAvailable) clearLegacyPreferences();
+    // Plain load, not a migration: the keys already mirror confirmed backend
+    // values (every confirmed write re-mirrors all of them), so they stay as
+    // the first-paint and offline cache. Only a successful migration write
+    // below clears them.
     return snapshot;
   }
   const merged: ValidatedAppPreferences = AppPreferencesSchema.parse({
@@ -274,6 +274,9 @@ export async function savePatch(
             'conflict',
             'Settings changed elsewhere. Reloaded the latest values.',
           );
+        }
+        if (envelopeCode(retryError) === null) {
+          throw new SavePreferencesError('offline', 'Settings storage is unreachable.');
         }
         throw new SavePreferencesError('unknown', 'Could not save settings.');
       }

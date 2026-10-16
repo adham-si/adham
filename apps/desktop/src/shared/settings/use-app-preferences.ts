@@ -33,6 +33,17 @@ function cacheSnapshot(): PreferenceSnapshot {
   return { preferences: readPresentationCache(), revision: 0, backendAvailable: false };
 }
 
+// Process-wide first-launch detection guard: several hook instances can be
+// mounted at once (PreferencesHost + route), and each would otherwise persist
+// the detected language against base revision 0. The first instance wins;
+// the rest observe the updated snapshot.
+let detectionPersisted = false;
+
+/** Test-only reset for the detection guard (module state outlives a test file). */
+export function resetDetectionPersistForTests(): void {
+  detectionPersisted = false;
+}
+
 /**
  * Backend-authoritative application preferences.
  *
@@ -110,7 +121,6 @@ export function useAppPreferences(): AppPreferencesApi {
   // First-launch exception: a pristine backend (revision 0) carries no user
   // choice, so it must not override OS language detection (P0 1.6). Instead
   // the detected language is persisted once, making detection durable.
-  const persistedDetectionRef = React.useRef(false);
   React.useEffect(() => {
     if (!query.data) return;
     applyPresentation(query.data.preferences);
@@ -118,12 +128,8 @@ export function useAppPreferences(): AppPreferencesApi {
     const snapshotLang = query.data.preferences.language;
     const currentLang = normalizeLanguage(i18n.language);
     if (currentLang === snapshotLang) return;
-    if (
-      query.data.backendAvailable &&
-      query.data.revision === 0 &&
-      !persistedDetectionRef.current
-    ) {
-      persistedDetectionRef.current = true;
+    if (query.data.backendAvailable && query.data.revision === 0 && !detectionPersisted) {
+      detectionPersisted = true;
       void update({ language: currentLang });
       return;
     }

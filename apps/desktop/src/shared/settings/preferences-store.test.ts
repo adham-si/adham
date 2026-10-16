@@ -148,8 +148,12 @@ describe('legacy migration', () => {
     expect(window.localStorage.getItem('adham.appearance')).toBe('dark');
   });
 
-  it('backend values win over stale legacy keys', async () => {
-    window.localStorage.setItem('adham.appearance', 'light');
+  it('plain loads preserve the presentation cache for offline startup', async () => {
+    // The cache mirrors confirmed backend values; a plain load must not wipe
+    // it, or the next offline startup would fall back to defaults instead of
+    // the last-confirmed values.
+    window.localStorage.setItem('adham.appearance', 'dark');
+    window.localStorage.setItem('adham.language', 'ar');
     const client = fakeClient({
       stored: { preferences: { ...DARK_AR }, revision: 2, backendAvailable: true },
     });
@@ -157,7 +161,8 @@ describe('legacy migration', () => {
     const migrated = await migrateLegacy(client, snapshot);
     expect(client.updates).toHaveLength(0);
     expect(migrated.preferences.appearance).toBe('dark');
-    expect(window.localStorage.getItem('adham.appearance')).toBeNull();
+    expect(window.localStorage.getItem('adham.appearance')).toBe('dark');
+    expect(window.localStorage.getItem('adham.language')).toBe('ar');
   });
 });
 
@@ -233,6 +238,31 @@ describe('savePatch', () => {
     await expect(savePatch(client, current, { appearance: 'dark' })).rejects.toMatchObject({
       kind: 'offline',
     });
+  });
+
+  it('reports a retry that fails offline as offline, not unknown', async () => {
+    let calls = 0;
+    const client = fakeClient({
+      stored: {
+        preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
+        revision: 5,
+        backendAvailable: true,
+      },
+      onUpdate: () => {
+        calls += 1;
+        if (calls === 1) throw envelope('ConcurrencyConflict');
+        throw new Error('transport down');
+      },
+    });
+    const current: PreferenceSnapshot = {
+      preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
+      revision: 4,
+      backendAvailable: true,
+    };
+    await expect(savePatch(client, current, { appearance: 'dark' })).rejects.toMatchObject({
+      kind: 'offline',
+    });
+    expect(client.updates.map((u) => u.base)).toEqual([4, 5]);
   });
 });
 
