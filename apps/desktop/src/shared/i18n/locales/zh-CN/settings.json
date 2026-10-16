@@ -51,11 +51,15 @@
       "editorTitle": "编辑器与输入",
       "enterToSendLabel": "按 Enter 发送消息",
       "enterToSendHint": "按 Enter 立即提交消息。按 Shift + Enter 换行。",
-      "hardwareAccelLabel": "硬件加速",
-      "hardwareAccelHint": "使用 GPU 渲染以优化界面流畅度、过渡效果和滚动。",
-      "desktopTitle": "桌面集成",
-      "handleLinksLabel": "处理工作区链接",
-      "handleLinksHint": "直接在应用窗口中打开受支持的工作区和项目链接。"
+      "reducedMotionLabel": "减少动态效果",
+      "reducedMotionHint": "尽量减少界面动画，或遵循操作系统设置。",
+      "motionReduce": "减少",
+      "motionNoPreference": "无偏好",
+      "syncSaving": "正在保存…",
+      "syncUnsynced": "无法访问设置存储——更改仅适用于当前会话。",
+      "syncInvalid": "不支持该值——未保存任何内容。",
+      "syncConflict": "设置已在别处更改——已重新加载最新值。",
+      "syncNotSaved": "无法保存设置。请重试。"
     },
     "models": {
       "title": "模型与服务商",

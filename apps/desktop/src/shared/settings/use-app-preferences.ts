@@ -63,18 +63,6 @@ export function useAppPreferences(): AppPreferencesApi {
 
   const snapshot: PreferenceSnapshot = query.data ?? cacheSnapshot();
 
-  // Authority application: backend snapshot drives the document, the theme
-  // context and the i18n language. Idempotent — re-running with the same
-  // snapshot is a no-op (same-value sets, guarded language switch).
-  React.useEffect(() => {
-    if (!query.data) return;
-    applyPresentation(query.data.preferences);
-    setAppearance(query.data.preferences.appearance);
-    if (normalizeLanguage(i18n.language) !== query.data.preferences.language) {
-      void i18n.changeLanguage(query.data.preferences.language);
-    }
-  }, [query.data, setAppearance, i18n]);
-
   const update = React.useCallback(
     (patch: Partial<AppPreferences>): Promise<void> => {
       setSaveError(null);
@@ -115,6 +103,34 @@ export function useAppPreferences(): AppPreferencesApi {
     },
     [queryClient],
   );
+
+  // Authority application: backend snapshot drives the document, the theme
+  // context and the i18n language. Idempotent — re-running with the same
+  // snapshot is a no-op (same-value sets, guarded language switch).
+  // First-launch exception: a pristine backend (revision 0) carries no user
+  // choice, so it must not override OS language detection (P0 1.6). Instead
+  // the detected language is persisted once, making detection durable.
+  const persistedDetectionRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!query.data) return;
+    applyPresentation(query.data.preferences);
+    setAppearance(query.data.preferences.appearance);
+    const snapshotLang = query.data.preferences.language;
+    const currentLang = normalizeLanguage(i18n.language);
+    if (currentLang === snapshotLang) return;
+    if (
+      query.data.backendAvailable &&
+      query.data.revision === 0 &&
+      !persistedDetectionRef.current
+    ) {
+      persistedDetectionRef.current = true;
+      void update({ language: currentLang });
+      return;
+    }
+    if (query.data.revision > 0) {
+      void i18n.changeLanguage(snapshotLang);
+    }
+  }, [query.data, setAppearance, i18n, update]);
 
   const syncState: PreferencesSyncState = isSaving
     ? 'saving'

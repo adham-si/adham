@@ -1,19 +1,30 @@
 import * as React from 'react';
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/theme/theme-provider';
 import '@/shared/i18n';
 import { ShellLayoutProvider, useShellLayout } from '@/widgets/shell';
 import { SettingsPage } from './settings-page';
 
 function TestSettingsWrapper({ children }: { children: React.ReactNode }) {
+  // Mirrors the production tree (QueryProvider → ThemeProvider): preference
+  // controls read the backend-authoritative snapshot through react-query.
+  const [client] = React.useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+      }),
+  );
   return (
-    <ThemeProvider>
-      <ShellLayoutProvider>
-        {children}
-        <SettingsPage />
-      </ShellLayoutProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={client}>
+      <ThemeProvider>
+        <ShellLayoutProvider>
+          {children}
+          <SettingsPage />
+        </ShellLayoutProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

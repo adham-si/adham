@@ -51,11 +51,15 @@
       "editorTitle": "المحرر والإدخال",
       "enterToSendLabel": "إرسال الرسالة بزر Enter",
       "enterToSendHint": "اضغط Enter لإرسال الرسائل فورًا. اضغط Shift + Enter لإضافة سطر جديد.",
-      "hardwareAccelLabel": "تسريع الأجهزة",
-      "hardwareAccelHint": "استخدم عرض GPU لتحسين سلاسة الواجهة والانتقالات والتمرير.",
-      "desktopTitle": "تكامل سطح المكتب",
-      "handleLinksLabel": "معالجة روابط مساحة العمل",
-      "handleLinksHint": "افتح روابط مساحة العمل والمشاريع المدعومة داخل نافذة التطبيق مباشرة."
+      "reducedMotionLabel": "تقليل الحركة",
+      "reducedMotionHint": "قلّل حركات الواجهة، أو اتبع إعداد نظام التشغيل.",
+      "motionReduce": "تقليل",
+      "motionNoPreference": "لا تفضيل",
+      "syncSaving": "جارٍ الحفظ…",
+      "syncUnsynced": "تعذّر الوصول إلى مخزن الإعدادات — تُطبَّق التغييرات على هذه الجلسة فقط.",
+      "syncInvalid": "هذه القيمة غير مدعومة — لم يُحفظ شيء.",
+      "syncConflict": "تغيّرت الإعدادات في مكان آخر — أُعيد تحميل أحدث القيم.",
+      "syncNotSaved": "تعذّر حفظ الإعدادات. حاول مجددًا."
     },
     "models": {
       "title": "النماذج ومزودو الخدمة",

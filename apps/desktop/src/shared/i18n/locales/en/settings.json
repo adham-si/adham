@@ -51,11 +51,15 @@
       "editorTitle": "Editor & input",
       "enterToSendLabel": "Send message on Enter",
       "enterToSendHint": "Press Enter to submit messages immediately. Press Shift + Enter to add a new line.",
-      "hardwareAccelLabel": "Hardware acceleration",
-      "hardwareAccelHint": "Use GPU rendering to optimize interface smoothness, transitions, and scrolling.",
-      "desktopTitle": "Desktop integration",
-      "handleLinksLabel": "Handle workspace links",
-      "handleLinksHint": "Open supported workspace and project links directly inside the application window."
+      "reducedMotionLabel": "Reduced motion",
+      "reducedMotionHint": "Minimize interface animations, or follow your operating system setting.",
+      "motionReduce": "Reduce",
+      "motionNoPreference": "No preference",
+      "syncSaving": "Saving…",
+      "syncUnsynced": "Settings storage is unreachable — changes apply to this session only.",
+      "syncInvalid": "That value is not supported — nothing was saved.",
+      "syncConflict": "Settings changed elsewhere — reloaded the latest values.",
+      "syncNotSaved": "Could not save settings. Try again."
     },
     "models": {
       "title": "Models & Providers",

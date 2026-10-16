@@ -34,6 +34,7 @@
     "sessionNotFound": "Session was not found.",
     "contextMismatch": "Selection changed. Reload and try again.",
     "requestIdConflict": "Conflicting request. Try again.",
+    "preferencesConflict": "Settings changed elsewhere. Reloaded the latest values.",
     "notSaved": "Message was not saved."
   },
   "onboarding": {

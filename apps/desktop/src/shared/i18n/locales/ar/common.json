@@ -34,6 +34,7 @@
     "sessionNotFound": "لم يتم العثور على الجلسة.",
     "contextMismatch": "تغيّر الاختيار. أعد التحميل وحاول مجددًا.",
     "requestIdConflict": "طلب متعارض. حاول مجددًا.",
+    "preferencesConflict": "تغيّرت الإعدادات في مكان آخر — أُعيد تحميل أحدث القيم.",
     "notSaved": "لم تُحفَظ الرسالة."
   },
   "onboarding": {
