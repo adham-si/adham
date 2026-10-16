@@ -8,7 +8,7 @@ import {
   DialogTitle,
   Input,
 } from '@adham/ui';
-import { useProvisioning, type ProvisioningBackend } from '../conversation/use-provisioning';
+import { useProvisioning, type ProvisioningBackend } from '../provisioning';
 
 export type ProvisionDialogTarget =
   | { type: 'workspace' }

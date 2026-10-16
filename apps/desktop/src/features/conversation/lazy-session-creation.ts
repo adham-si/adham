@@ -1,12 +1,7 @@
 import i18n from '@/shared/i18n';
 import type { ConversationBackend, ConversationContext } from './conversation-scope';
-import {
-  isDefinitePreEffectRejection,
-  readStorage,
-  rejectionMessage,
-  removeStorage,
-  writeStorage,
-} from './conversation-identity';
+import { isDefinitePreEffectRejection, rejectionMessage } from '@/shared/api/error-envelope';
+import { readStorage, removeStorage, writeStorage } from '@/shared/lib/session-storage';
 import {
   clearDurablePendingOperation,
   recordDurablePendingOperation,

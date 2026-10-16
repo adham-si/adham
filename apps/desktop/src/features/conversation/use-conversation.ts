@@ -1,12 +1,12 @@
 import * as React from 'react';
 import i18n from '@/shared/i18n';
+import { removeStorage } from '@/shared/lib/session-storage';
 import {
   SESSION_CACHE_KEY,
   readPendingSend,
   sameScope,
   sendBlockedReason,
   type PendingSend,
-  removeStorage,
 } from './conversation-identity';
 import {
   performLazyFirstSend,

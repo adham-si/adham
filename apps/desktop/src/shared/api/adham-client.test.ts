@@ -8,6 +8,7 @@ import {
 import { queryKeys } from './query-keys';
 import { invoke } from '@tauri-apps/api/core';
 import { AdhamApiClient } from './adham-client';
+import ipcBasicSendFixture from '../../../fixtures/ipc-basic-send.json';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
@@ -174,5 +175,96 @@ describe('AdhamApiClient request identity', () => {
     expect(info.arch).toBe('aarch64');
     expect(info.hasNativeTitlebarControls).toBe(true);
     expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_platform_info');
+  });
+});
+
+describe('IPC contract fixture (cross-language)', () => {
+  it('serializes the provisioning → session → send → read-back chain exactly like the Rust replay fixture', async () => {
+    // The Rust side (apps/desktop/src-tauri/src/ipc_contract_tests.rs) replays
+    // this same fixture through the real `tauri::generate_handler!` dispatch.
+    // This test pins the request side: commands, argument keys, envelope
+    // casing, and payload field names must match byte-for-byte.
+    const calls = ipcBasicSendFixture.calls;
+
+    const workspace = {
+      workspaceId: '01925b68-3000-7000-8000-000000000001',
+      name: 'Canary Workspace',
+      kind: 'personal',
+      preferredLanguage: 'en',
+      createdAt: '2026-10-15T00:00:00Z',
+    };
+    const project = {
+      projectId: '01925b68-3000-7000-8000-000000000002',
+      workspaceId: workspace.workspaceId,
+      name: 'Canary Project',
+      storageKind: 'isolated',
+      createdAt: '2026-10-15T00:00:01Z',
+    };
+    const session = {
+      sessionId: '01925b68-3000-7000-8000-000000000003',
+      projectId: project.projectId,
+      title: null,
+      createdAt: '2026-10-15T00:00:02Z',
+    };
+    const submitted = {
+      messageId: '01925b68-4000-7000-8000-000000000001',
+      sessionId: session.sessionId,
+      text: 'Canary first message',
+      createdAt: '2026-10-15T00:00:03Z',
+      streamSequence: '1',
+      projectionPosition: '1',
+    };
+    const page = {
+      items: [
+        {
+          messageId: submitted.messageId,
+          role: 'user',
+          text: submitted.text,
+          createdAt: submitted.createdAt,
+          sourceEventId: '01925b68-4000-7000-8000-000000000002',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    };
+
+    vi.mocked(invoke).mockClear();
+    vi.mocked(invoke)
+      .mockResolvedValueOnce({ data: workspace })
+      .mockResolvedValueOnce({ data: project })
+      .mockResolvedValueOnce({ data: session })
+      .mockResolvedValueOnce({ data: submitted })
+      .mockResolvedValueOnce(page);
+
+    const client = new AdhamApiClient();
+    const ws = await client.createWorkspace(
+      {
+        name: workspace.name,
+        kind: workspace.kind,
+        preferredLanguage: workspace.preferredLanguage,
+      },
+      { requestId: '01925b68-2000-7000-8000-000000000001' },
+    );
+    const proj = await client.createProject(
+      ws.workspaceId,
+      { name: project.name, storageKind: project.storageKind },
+      { requestId: '01925b68-2000-7000-8000-000000000002' },
+    );
+    const sess = await client.createSession(
+      ws.workspaceId,
+      proj.projectId,
+      { title: null },
+      { requestId: '01925b68-2000-7000-8000-000000000003' },
+    );
+    await client.submitMessage(
+      ws.workspaceId,
+      proj.projectId,
+      sess.sessionId,
+      { text: submitted.text },
+      { requestId: '01925b68-2000-7000-8000-000000000004' },
+    );
+    await client.getConversation(ws.workspaceId, proj.projectId, sess.sessionId);
+
+    expect(vi.mocked(invoke).mock.calls).toEqual(calls.map((call) => [call.cmd, call.args]));
   });
 });

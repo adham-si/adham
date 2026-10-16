@@ -1,0 +1,85 @@
+{
+  "calls": [
+    {
+      "cmd": "create_workspace",
+      "args": {
+        "request": {
+          "protocolVersion": 1,
+          "requestId": "01925b68-2000-7000-8000-000000000001",
+          "context": {
+            "workspaceId": null,
+            "projectId": null,
+            "sessionId": null
+          },
+          "payload": {
+            "name": "Canary Workspace",
+            "kind": "personal",
+            "preferredLanguage": "en"
+          }
+        }
+      }
+    },
+    {
+      "cmd": "create_project",
+      "args": {
+        "request": {
+          "protocolVersion": 1,
+          "requestId": "01925b68-2000-7000-8000-000000000002",
+          "context": {
+            "workspaceId": "01925b68-3000-7000-8000-000000000001",
+            "projectId": null,
+            "sessionId": null
+          },
+          "payload": {
+            "name": "Canary Project",
+            "storageKind": "isolated"
+          }
+        }
+      }
+    },
+    {
+      "cmd": "create_session",
+      "args": {
+        "request": {
+          "protocolVersion": 1,
+          "requestId": "01925b68-2000-7000-8000-000000000003",
+          "context": {
+            "workspaceId": "01925b68-3000-7000-8000-000000000001",
+            "projectId": "01925b68-3000-7000-8000-000000000002",
+            "sessionId": null
+          },
+          "payload": {
+            "title": null
+          }
+        }
+      }
+    },
+    {
+      "cmd": "submit_message",
+      "args": {
+        "request": {
+          "protocolVersion": 1,
+          "requestId": "01925b68-2000-7000-8000-000000000004",
+          "context": {
+            "workspaceId": "01925b68-3000-7000-8000-000000000001",
+            "projectId": "01925b68-3000-7000-8000-000000000002",
+            "sessionId": "01925b68-3000-7000-8000-000000000003"
+          },
+          "payload": {
+            "text": "Canary first message"
+          }
+        }
+      }
+    },
+    {
+      "cmd": "get_conversation",
+      "args": {
+        "context": {
+          "workspaceId": "01925b68-3000-7000-8000-000000000001",
+          "projectId": "01925b68-3000-7000-8000-000000000002",
+          "sessionId": "01925b68-3000-7000-8000-000000000003"
+        }
+      }
+    }
+  ]
+}

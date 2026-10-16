@@ -83,3 +83,29 @@ body {
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--border);
 }
+
+/* Onboarding mascot idle motion (used by ui/horse-mascot). */
+@theme {
+  --animate-mascot-float: mascot-float 7s ease-in-out infinite;
+  --animate-mascot-sway: mascot-sway 7s ease-in-out infinite;
+}
+
+@keyframes mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes mascot-sway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}

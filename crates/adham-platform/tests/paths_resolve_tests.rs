@@ -4,6 +4,7 @@
 //! process environment and creates real directories).
 
 use adham_platform::{PlatformError, PlatformStoragePolicy};
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
 fn temp_root(name: &str) -> PathBuf {
@@ -150,5 +151,138 @@ fn absolute_temp_root_creates_data_dir() {
     {
         assert!(base.is_err());
     }
+    remove_dir(&root);
+}
+
+#[test]
+fn absent_data_root_override_keeps_default_resolution() {
+    let root = temp_root("override_absent");
+    let root_str = root.to_str().unwrap().to_string();
+    let base = PlatformStoragePolicy::resolve_base_with_override(
+        None,
+        Some(&root_str),
+        Some(&root_str),
+        None,
+    );
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    {
+        let base = base.expect("default resolution must succeed");
+        let plain = PlatformStoragePolicy::resolve_base(Some(&root_str), Some(&root_str))
+            .expect("plain base");
+        assert_eq!(base, plain, "absent override must change nothing");
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+    assert!(base.is_err());
+    remove_dir(&root);
+}
+
+#[cfg(all(
+    debug_assertions,
+    any(windows, target_os = "macos", target_os = "linux")
+))]
+#[test]
+fn data_root_override_honored_in_debug_builds() {
+    let probe = temp_root("override_probe");
+    let probe_str = probe.to_str().unwrap();
+    let base = PlatformStoragePolicy::resolve_base_with_override(
+        Some(OsStr::new(probe_str)),
+        None,
+        Some("/nonexistent-home"),
+        None,
+    )
+    .expect("override must resolve");
+    assert_eq!(base, probe);
+
+    let policy = PlatformStoragePolicy::new(&base).expect("policy");
+    assert_eq!(policy.database_path().file_name().unwrap(), "adham.db");
+    assert!(policy.data_dir().is_dir());
+    remove_dir(&base);
+}
+
+#[cfg(all(
+    debug_assertions,
+    any(windows, target_os = "macos", target_os = "linux")
+))]
+#[test]
+fn invalid_data_root_override_fails_closed() {
+    for raw in ["", "   ", "\t ", "relative/root", ".", "Adham"] {
+        let err = PlatformStoragePolicy::resolve_base_with_override(
+            Some(OsStr::new(raw)),
+            None,
+            Some("/nonexistent-home"),
+            None,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, PlatformError::InvalidPath(_)),
+            "override {raw:?} must error, got {err:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let err = PlatformStoragePolicy::resolve_base_with_override(
+            Some(OsStr::from_bytes(b"non\xffutf8")),
+            None,
+            Some("/nonexistent-home"),
+            None,
+        )
+        .unwrap_err();
+        match err {
+            PlatformError::InvalidPath(msg) => assert!(msg.contains("UTF-8"), "{msg}"),
+            other => panic!("expected InvalidPath, got {other:?}"),
+        }
+    }
+}
+
+#[cfg(all(
+    not(debug_assertions),
+    any(windows, target_os = "macos", target_os = "linux")
+))]
+#[test]
+fn data_root_override_ignored_in_release_builds() {
+    // Direct release-mode check: the same inputs that redirect a debug build
+    // must resolve to the platform default here, and invalid values must not
+    // fail startup in release either.
+    let root = temp_root("override_release");
+    let root_str = root.to_str().unwrap().to_string();
+    let probe = temp_root("override_release_probe");
+    let plain =
+        PlatformStoragePolicy::resolve_base(Some(&root_str), Some(&root_str)).expect("plain base");
+
+    let base = PlatformStoragePolicy::resolve_base_with_override(
+        Some(OsStr::new(probe.to_str().unwrap())),
+        Some(&root_str),
+        Some(&root_str),
+        None,
+    )
+    .expect("release base");
+    assert_eq!(base, plain, "override must be ignored in release builds");
+
+    for raw in ["", "   ", "relative/root"] {
+        let base = PlatformStoragePolicy::resolve_base_with_override(
+            Some(OsStr::new(raw)),
+            Some(&root_str),
+            Some(&root_str),
+            None,
+        )
+        .expect("release ignores invalid values");
+        assert_eq!(base, plain);
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let base = PlatformStoragePolicy::resolve_base_with_override(
+            Some(OsStr::from_bytes(b"non\xffutf8")),
+            Some(&root_str),
+            Some(&root_str),
+            None,
+        )
+        .expect("release ignores non-UTF-8 values");
+        assert_eq!(base, plain);
+    }
+
     remove_dir(&root);
 }

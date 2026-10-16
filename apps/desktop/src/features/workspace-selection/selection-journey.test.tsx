@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ConversationPanel } from '../conversation/conversation-panel';
+import { ConversationPanel } from '../conversation';
 
 beforeEach(() => {
   localStorage.clear();

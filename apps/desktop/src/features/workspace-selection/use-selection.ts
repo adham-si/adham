@@ -8,16 +8,15 @@ import type {
   WorkspaceList,
   WorkspaceSummary,
 } from '@adham/contracts-generated';
+import { isDefinitePreEffectRejection, rejectionMessage } from '@/shared/api/error-envelope';
 import {
   announceScopeChanged,
   clearSelectIntent,
-  isDefinitePreEffectRejection,
   readSelectIntent,
-  rejectionMessage,
   SCOPE_CHANGED_EVENT,
   writeSelectIntent,
   type ScopeChangedDetail,
-} from '../conversation/conversation-identity';
+} from '../provisioning';
 
 /// Minimal backend surface for discovery + explicit selection.
 export interface SelectionBackend {

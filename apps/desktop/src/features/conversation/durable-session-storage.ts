@@ -9,7 +9,8 @@
  * falling back to ephemeral sessionStorage.
  */
 
-import { SESSION_CACHE_KEY, writeStorage } from './conversation-identity';
+import { writeStorage } from '@/shared/lib/session-storage';
+import { SESSION_CACHE_KEY } from './conversation-identity';
 
 export interface DurableSessionPreference {
   installationId: string;

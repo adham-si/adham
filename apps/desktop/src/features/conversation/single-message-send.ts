@@ -1,9 +1,8 @@
 import i18n from '@/shared/i18n';
 import type { ConversationBackend } from './conversation-scope';
+import { isDefinitePreEffectRejection, rejectionMessage } from '@/shared/api/error-envelope';
 import {
-  isDefinitePreEffectRejection,
   readPendingSend,
-  rejectionMessage,
   removePendingSend,
   sameScope,
   type PendingSend,

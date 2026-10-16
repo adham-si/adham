@@ -7,6 +7,12 @@ license.workspace = true
 [build-dependencies]
 tauri-build = { version = "2.0.0", features = [] }
 
+# `test` enables `tauri::test` (mock runtime + get_ipc_response) for the
+# real-IPC contract tests. Off Windows only: test binaries linking the mock
+# runtime fail to load on Windows (tauri-apps/tauri#11028, #13419).
+[target.'cfg(not(windows))'.dev-dependencies]
+tauri = { version = "2.0.0", features = ["test"] }
+
 [dependencies]
 adham-core-types = { path = "../../../crates/adham-core-types" }
 adham-desktop-api = { path = "../../../crates/adham-desktop-api" }
