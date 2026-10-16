@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import { normalizeLanguage } from '@/shared/i18n';
 import { ThemeProvider } from '@/theme/theme-provider';
-import { resetDetectionPersistForTests } from './use-app-preferences';
+import { resetPreferencesSyncForTests } from './use-app-preferences';
 import { useAppPreferences } from './use-app-preferences';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
@@ -51,7 +51,7 @@ beforeEach(async () => {
   vi.mocked(invoke).mockReset();
   window.localStorage.clear();
   document.documentElement.classList.remove('dark');
-  resetDetectionPersistForTests();
+  resetPreferencesSyncForTests();
   const { default: i18n } = await import('@/shared/i18n');
   await i18n.changeLanguage('en');
 });
@@ -75,6 +75,22 @@ describe('useAppPreferences', () => {
     expect(document.documentElement.dataset.reducedMotion).toBe('reduce');
     expect(window.localStorage.getItem('adham.appearance')).toBe('dark');
     expect(seen.api?.syncState).toBe('synced');
+  });
+
+  it('refreshes the full presentation cache from the authoritative load', async () => {
+    // Cache starts empty (e.g. cleared site data): every mirrored key must
+    // come back from the backend snapshot, or the next offline startup falls
+    // back to defaults for the keys no other writer touches.
+    vi.mocked(invoke).mockImplementation(async (cmd) => {
+      if (cmd === 'get_app_preferences') {
+        return { preferences: BACKEND_PREFS, revision: 2 };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    renderHarness(() => {});
+    await waitFor(() => expect(window.localStorage.getItem('adham.font-size')).toBe('lg'));
+    expect(window.localStorage.getItem('adham.high-contrast')).toBe('enabled');
+    expect(window.localStorage.getItem('adham.reduced-motion')).toBe('reduce');
   });
 
   it('writes through the backend and mirrors the cache on success', async () => {
@@ -250,5 +266,80 @@ describe('useAppPreferences', () => {
           ),
       ).toHaveLength(1),
     );
+  });
+
+  it('serializes concurrent updates from all mounted instances through one queue', async () => {
+    let stored = {
+      preferences: {
+        appearance: 'system',
+        language: 'en',
+        fontFamily: 'default',
+        fontSize: 'md',
+        highContrast: 'system',
+        reducedMotion: 'system',
+        enterToSend: true,
+      },
+      revision: 1,
+    };
+    vi.mocked(invoke).mockImplementation(async (cmd, args) => {
+      if (cmd === 'get_app_preferences') {
+        return { preferences: { ...stored.preferences }, revision: stored.revision };
+      }
+      if (cmd === 'update_app_preferences') {
+        const payload = (
+          args as { payload: { preferences: typeof stored.preferences; baseRevision: number } }
+        ).payload;
+        // Backend revision guard: stale bases conflict instead of overwriting.
+        if (payload.baseRevision !== stored.revision) {
+          throw {
+            protocolVersion: 1,
+            code: 'ConcurrencyConflict',
+            messageKey: 'error.preferencesConflict',
+            retryable: true,
+            correlationId: 'c',
+            fieldErrors: [],
+          };
+        }
+        stored = { preferences: { ...payload.preferences }, revision: stored.revision + 1 };
+        return { preferences: { ...stored.preferences }, revision: stored.revision };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    const seenA: { api?: ReturnType<typeof useAppPreferences> } = {};
+    const seenB: { api?: ReturnType<typeof useAppPreferences> } = {};
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <ThemeProvider>
+          <Harness
+            onReady={(api) => {
+              seenA.api = api;
+            }}
+          />
+          <Harness
+            onReady={(api) => {
+              seenB.api = api;
+            }}
+          />
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(seenA.api?.syncState).toBe('synced'));
+    await act(async () => {
+      await Promise.all([
+        seenA.api?.update({ appearance: 'dark' }),
+        seenB.api?.update({ language: 'ar' }),
+      ]);
+    });
+    const bases = vi
+      .mocked(invoke)
+      .mock.calls.filter(([cmd]) => cmd === 'update_app_preferences')
+      .map(([, args]) => (args as { payload: { baseRevision: number } }).payload.baseRevision);
+    // Ordered, no conflict retry: second update observed the first.
+    expect(bases).toEqual([1, 2]);
+    expect(stored.revision).toBe(3);
+    expect(stored.preferences).toMatchObject({ appearance: 'dark', language: 'ar' });
   });
 });

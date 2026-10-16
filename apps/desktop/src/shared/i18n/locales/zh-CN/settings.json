@@ -60,6 +60,7 @@
       "motionReduce": "减少",
       "motionNoPreference": "无偏好",
       "syncSaving": "正在保存…",
+      "syncRetry": "重试",
       "syncUnsynced": "无法访问设置存储——更改仅适用于当前会话。",
       "syncInvalid": "不支持该值——未保存任何内容。",
       "syncConflict": "设置已在别处更改——已重新加载最新值。",

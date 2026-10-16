@@ -60,6 +60,7 @@
       "motionReduce": "Reduce",
       "motionNoPreference": "No preference",
       "syncSaving": "Saving…",
+      "syncRetry": "Retry",
       "syncUnsynced": "Settings storage is unreachable — changes apply to this session only.",
       "syncInvalid": "That value is not supported — nothing was saved.",
       "syncConflict": "Settings changed elsewhere — reloaded the latest values.",

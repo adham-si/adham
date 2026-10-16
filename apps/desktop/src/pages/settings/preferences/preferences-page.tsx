@@ -4,7 +4,7 @@ import { useAppPreferences } from '@/shared/settings/use-app-preferences';
 
 export function PreferencesPage() {
   const { t } = useTranslation();
-  const { syncState, saveError } = useAppPreferences();
+  const { syncState, saveError, retrySync } = useAppPreferences();
 
   return (
     <div className="space-y-6">
@@ -20,34 +20,45 @@ export function PreferencesPage() {
           )}
         </p>
         {syncState !== 'synced' && (
-          <p
-            role={syncState === 'error' ? 'alert' : 'status'}
-            className="text-xs text-foreground-secondary mt-1"
-          >
-            {syncState === 'saving' && t('settings.preferences.syncSaving', 'Saving…')}
-            {syncState === 'unsynced' &&
-              t(
-                'settings.preferences.syncUnsynced',
-                'Settings storage is unreachable — changes apply to this session only.',
-              )}
-            {syncState === 'error' &&
-              saveError?.kind === 'validation' &&
-              t(
-                'settings.preferences.syncInvalid',
-                'That value is not supported — nothing was saved.',
-              )}
-            {syncState === 'error' &&
-              saveError?.kind === 'conflict' &&
-              t(
-                'settings.preferences.syncConflict',
-                'Settings changed elsewhere — reloaded the latest values.',
-              )}
-            {syncState === 'error' &&
-              saveError &&
-              saveError.kind !== 'validation' &&
-              saveError.kind !== 'conflict' &&
-              t('settings.preferences.syncNotSaved', 'Could not save settings. Try again.')}
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <p
+              role={syncState === 'error' ? 'alert' : 'status'}
+              className="text-xs text-foreground-secondary"
+            >
+              {syncState === 'saving' && t('settings.preferences.syncSaving', 'Saving…')}
+              {syncState === 'unsynced' &&
+                t(
+                  'settings.preferences.syncUnsynced',
+                  'Settings storage is unreachable — changes apply to this session only.',
+                )}
+              {syncState === 'error' &&
+                saveError?.kind === 'validation' &&
+                t(
+                  'settings.preferences.syncInvalid',
+                  'That value is not supported — nothing was saved.',
+                )}
+              {syncState === 'error' &&
+                saveError?.kind === 'conflict' &&
+                t(
+                  'settings.preferences.syncConflict',
+                  'Settings changed elsewhere — reloaded the latest values.',
+                )}
+              {syncState === 'error' &&
+                saveError &&
+                saveError.kind !== 'validation' &&
+                saveError.kind !== 'conflict' &&
+                t('settings.preferences.syncNotSaved', 'Could not save settings. Try again.')}
+            </p>
+            {(syncState === 'error' || syncState === 'unsynced') && (
+              <button
+                type="button"
+                onClick={() => void retrySync()}
+                className="shrink-0 rounded-md border border-border-subtle bg-surface px-2 py-0.5 text-xs text-foreground hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
+              >
+                {t('settings.preferences.syncRetry', 'Retry')}
+              </button>
+            )}
+          </div>
         )}
       </div>
 

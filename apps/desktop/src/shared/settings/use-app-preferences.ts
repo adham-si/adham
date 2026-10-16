@@ -27,6 +27,8 @@ export interface AppPreferencesApi {
   saveError: SavePreferencesError | null;
   isSaving: boolean;
   update: (patch: Partial<ValidatedAppPreferences>) => Promise<void>;
+  /** Clears the error state and re-reads the backend snapshot. */
+  retrySync: () => Promise<void>;
 }
 
 function cacheSnapshot(): PreferenceSnapshot {
@@ -39,9 +41,50 @@ function cacheSnapshot(): PreferenceSnapshot {
 // the rest observe the updated snapshot.
 let detectionPersisted = false;
 
-/** Test-only reset for the detection guard (module state outlives a test file). */
-export function resetDetectionPersistForTests(): void {
+// Shared process-wide save FIFO (see update below).
+let saveTail: Promise<void> = Promise.resolve();
+
+// Shared save/error state across mounted instances.
+//
+// Controls (AppearanceSection, …) and the page note (PreferencesPage) each
+// mount their own useAppPreferences. Ordering flows through the module FIFO
+// above; error and in-flight state must be shared too, or a failed save from
+// a control would never reach the page note. Plain module cell with a
+// listener set (read via useSyncExternalStore) keeps every instance in
+// agreement without a provider.
+interface SaveSyncSnapshot {
+  saveError: SavePreferencesError | null;
+  isSaving: boolean;
+  localOnly: boolean;
+}
+
+let saveSyncSnapshot: SaveSyncSnapshot = { saveError: null, isSaving: false, localOnly: false };
+const saveSyncListeners = new Set<() => void>();
+
+function setSaveSyncSnapshot(next: SaveSyncSnapshot): void {
+  saveSyncSnapshot = next;
+  for (const listener of saveSyncListeners) listener();
+}
+
+function subscribeSaveSync(listener: () => void): () => void {
+  saveSyncListeners.add(listener);
+  return () => {
+    saveSyncListeners.delete(listener);
+  };
+}
+
+function getSaveSyncSnapshot(): SaveSyncSnapshot {
+  return saveSyncSnapshot;
+}
+
+export function useSharedSaveState(): SaveSyncSnapshot {
+  return React.useSyncExternalStore(subscribeSaveSync, getSaveSyncSnapshot);
+}
+
+/** Test-only reset for module sync state (outlives a test file). */
+export function resetPreferencesSyncForTests(): void {
   detectionPersisted = false;
+  setSaveSyncSnapshot({ saveError: null, isSaving: false, localOnly: false });
 }
 
 /**
@@ -58,10 +101,7 @@ export function useAppPreferences(): AppPreferencesApi {
   const queryClient = useQueryClient();
   const { setAppearance } = useTheme();
   const { i18n } = useTranslation();
-  const [saveError, setSaveError] = React.useState<SavePreferencesError | null>(null);
-  const [localOnly, setLocalOnly] = React.useState(false);
-  const [isSaving, setIsSaving] = React.useState(false);
-  const tailRef = React.useRef(Promise.resolve());
+  const { saveError, isSaving, localOnly } = useSharedSaveState();
 
   const query = useQuery({
     queryKey: queryKeys.preferences,
@@ -76,8 +116,12 @@ export function useAppPreferences(): AppPreferencesApi {
 
   const update = React.useCallback(
     (patch: Partial<ValidatedAppPreferences>): Promise<void> => {
-      setSaveError(null);
-      const run = tailRef.current.then(async () => {
+      setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), saveError: null });
+      // Shared process-wide FIFO: every mounted instance serializes through
+      // one tail, so concurrent updates observe each other's revisions
+      // instead of racing on the same base. The tail can never poison: the
+      // work catches everything, and waiters attach on both outcomes.
+      const work = async (): Promise<void> => {
         const current =
           queryClient.getQueryData<PreferenceSnapshot>(queryKeys.preferences) ?? cacheSnapshot();
         if (!current.backendAvailable) {
@@ -89,27 +133,29 @@ export function useAppPreferences(): AppPreferencesApi {
             revision: 0,
             backendAvailable: false,
           });
-          setLocalOnly(true);
+          setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), localOnly: true });
           return;
         }
-        setIsSaving(true);
+        setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), isSaving: true });
         try {
           const next = await savePatch(adhamClient, current, patch);
           applyPresentation(next.preferences);
           mirrorPresentationCache(next.preferences);
           queryClient.setQueryData<PreferenceSnapshot>(queryKeys.preferences, next);
-          setLocalOnly(false);
+          setSaveSyncSnapshot({ saveError: null, isSaving: false, localOnly: false });
         } catch (error) {
-          if (error instanceof SavePreferencesError) {
-            setSaveError(error);
-          } else {
-            setSaveError(new SavePreferencesError('unknown', 'Could not save settings.'));
-          }
-        } finally {
-          setIsSaving(false);
+          setSaveSyncSnapshot({
+            saveError:
+              error instanceof SavePreferencesError
+                ? error
+                : new SavePreferencesError('unknown', 'Could not save settings.'),
+            isSaving: false,
+            localOnly: getSaveSyncSnapshot().localOnly,
+          });
         }
-      });
-      tailRef.current = run;
+      };
+      const run = saveTail.then(work, work);
+      saveTail = run;
       return run;
     },
     [queryClient],
@@ -124,6 +170,11 @@ export function useAppPreferences(): AppPreferencesApi {
   React.useEffect(() => {
     if (!query.data) return;
     applyPresentation(query.data.preferences);
+    // Authoritative-load cache refresh: re-mirror confirmed values so a
+    // cleared cache recovers and the next offline startup reads the last
+    // backend state instead of defaults. Write-through only — the cache
+    // never flows back into the backend except via migration/update.
+    if (query.data.backendAvailable) mirrorPresentationCache(query.data.preferences);
     setAppearance(query.data.preferences.appearance);
     const snapshotLang = query.data.preferences.language;
     const currentLang = normalizeLanguage(i18n.language);
@@ -146,6 +197,19 @@ export function useAppPreferences(): AppPreferencesApi {
         ? 'unsynced'
         : 'synced';
 
+  const retrySync = React.useCallback(async (): Promise<void> => {
+    setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), saveError: null });
+    // Explicit refetch bypasses the infinite staleTime: this is the user's
+    // deliberate retry, not a background refresh.
+    await queryClient.refetchQueries({ queryKey: queryKeys.preferences });
+    const fresh = queryClient.getQueryData<PreferenceSnapshot>(queryKeys.preferences);
+    // A recovered backend reasserts authority; a still-dead one keeps the
+    // local-only flag so values stay honestly labeled.
+    if (fresh?.backendAvailable) {
+      setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), localOnly: false });
+    }
+  }, [queryClient]);
+
   return {
     preferences: snapshot.preferences,
     revision: snapshot.revision,
@@ -154,6 +218,7 @@ export function useAppPreferences(): AppPreferencesApi {
     saveError,
     isSaving,
     update,
+    retrySync,
   };
 }
 
