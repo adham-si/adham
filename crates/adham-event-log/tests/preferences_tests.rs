@@ -6,7 +6,7 @@
 //! changes last-writer-wins ordering without silent overwrites.
 
 use adham_event_log::{
-    PREFERENCES_SCHEMA_VERSION, PreferenceWriteError, StoredPreferences, create_sqlite_pool,
+    create_sqlite_pool, PreferenceWriteError, StoredPreferences, PREFERENCES_SCHEMA_VERSION,
 };
 use std::path::PathBuf;
 

@@ -13,14 +13,14 @@ pub use content_key::{
     ContentKeyProvider, InMemoryProvider, OsKeyringProvider, UnavailableKeyProvider,
 };
 pub use fingerprint::{request_fingerprint, scope_fingerprint};
-pub use health::{StorageHealthReport, verify_storage_health};
+pub use health::{verify_storage_health, StorageHealthReport};
 pub use identity::{
-    InstallationInit, InstallationRecord, load_or_create_installation, set_active_scope,
-    set_active_scope_tx,
+    load_or_create_installation, set_active_scope, set_active_scope_tx, InstallationInit,
+    InstallationRecord,
 };
 pub use preferences::{
-    PREFERENCES_SCHEMA_VERSION, PreferenceWriteError, StoredPreferences, read_preferences,
-    reset_preferences, write_preferences,
+    read_preferences, reset_preferences, write_preferences, PreferenceWriteError,
+    StoredPreferences, PREFERENCES_SCHEMA_VERSION,
 };
 pub use store::{
     AppendEventRequest, AppendEventResult, CommandReceiptRecord, HydratedPendingOperation,
