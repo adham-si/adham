@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@adham/ui';
+import { PreviewNote } from '../preview-note';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Add01Icon,
   PuzzleIcon,
   GitBranchIcon,
   SourceCodeIcon,
@@ -18,9 +17,9 @@ import { PluginFilterTabs, type PluginFilterTab, PluginsList, type PluginItem } 
 export function PluginsPage() {
   const { t } = useTranslation();
   const [tab, setTab] = React.useState<PluginFilterTab>('all');
-  const [installedIds, setInstalledIds] = React.useState<Set<string>>(
-    () => new Set(['core-tools', 'linter-sync', 'security-guard']),
-  );
+  // No plugin is installed in this build: signing and trust checks (P0-14)
+  // do not exist yet, so nothing may claim to be installed.
+  const [installedIds, setInstalledIds] = React.useState<Set<string>>(() => new Set());
 
   const plugins: PluginItem[] = [
     {
@@ -144,6 +143,8 @@ export function PluginsPage() {
         </p>
       </div>
 
+      <PreviewNote />
+
       {/* Branded Filter Tabs */}
       <PluginFilterTabs activeTab={tab} onTabChange={setTab} counts={counts} />
 
@@ -153,18 +154,16 @@ export function PluginsPage() {
           <h3 id="plugins-heading" className="text-sm font-semibold text-foreground">
             {t('settings.plugins.listTitle', 'Verified Extensions')}
           </h3>
-          <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
-            <HugeiconsIcon icon={Add01Icon} />
-            <span>{t('settings.plugins.addPlugin', 'Install plugin')}</span>
-          </Button>
         </div>
 
-        {/* Dynamic Plugins List Grid */}
-        <PluginsList
-          plugins={filteredPlugins}
-          installedIds={installedIds}
-          onToggle={handleToggle}
-        />
+        {/* Dynamic Plugins List Grid (not connected: disabled preview) */}
+        <fieldset disabled className="min-w-0 border-0 p-0 m-0">
+          <PluginsList
+            plugins={filteredPlugins}
+            installedIds={installedIds}
+            onToggle={handleToggle}
+          />
+        </fieldset>
       </section>
 
       {/* Footer Security Note */}

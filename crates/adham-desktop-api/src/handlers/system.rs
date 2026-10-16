@@ -53,9 +53,9 @@ pub async fn handle_admin_rebuild_projections(
     let replayed = ConversationProjection::rebuild(&ctx.pool)
         .await
         .map_err(|e| e.to_string())?;
-    Ok(RebuildProjectionsResponse {
-        replayed_count: replayed,
-    })
+    let replayed_count =
+        u32::try_from(replayed).map_err(|_| "REBUILD_COUNT_OVERFLOW:replayed count exceeds u32")?;
+    Ok(RebuildProjectionsResponse { replayed_count })
 }
 
 fn stored_to_preferences(

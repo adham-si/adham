@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@adham/ui';
+import { PreviewNote } from '../preview-note';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Add01Icon,
   AiDrawingIcon,
   SourceCodeIcon,
   ShieldIcon,
@@ -17,9 +16,9 @@ import { SkillFilterTabs, type SkillFilterTab, SkillsList, type SkillItem } from
 export function SkillsPage() {
   const { t } = useTranslation();
   const [tab, setTab] = React.useState<SkillFilterTab>('all');
-  const [activeIds, setActiveIds] = React.useState<Set<string>>(
-    () => new Set(['refactor', 'test-gen', 'research', 'sec-audit', 'skill-custom']),
-  );
+  // No skill is active in this build: lazy skill discovery (P0-13) does not
+  // exist yet, so nothing may claim to be active.
+  const [activeIds, setActiveIds] = React.useState<Set<string>>(() => new Set());
 
   const skills: SkillItem[] = [
     {
@@ -151,6 +150,8 @@ export function SkillsPage() {
         </p>
       </div>
 
+      <PreviewNote />
+
       {/* Branded Filter Tabs */}
       <SkillFilterTabs activeTab={tab} onTabChange={setTab} counts={counts} />
 
@@ -160,14 +161,12 @@ export function SkillsPage() {
           <h3 id="skills-heading" className="text-sm font-semibold text-foreground">
             {t('settings.skills.listTitle', 'Installed Playbooks')}
           </h3>
-          <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
-            <HugeiconsIcon icon={Add01Icon} />
-            <span>{t('settings.skills.addSkill', 'Add skill')}</span>
-          </Button>
         </div>
 
-        {/* Dynamic Skills List Grid */}
-        <SkillsList skills={filteredSkills} activeIds={activeIds} onToggle={handleToggle} />
+        {/* Dynamic Skills List Grid (not connected: disabled preview) */}
+        <fieldset disabled className="min-w-0 border-0 p-0 m-0">
+          <SkillsList skills={filteredSkills} activeIds={activeIds} onToggle={handleToggle} />
+        </fieldset>
       </section>
 
       {/* Footer Notes */}

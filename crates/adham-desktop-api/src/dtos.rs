@@ -205,7 +205,7 @@ pub struct StorageStatus {
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct RebuildProjectionsResponse {
-    pub replayed_count: u64,
+    pub replayed_count: u32,
 }
 
 /// Installation-scoped presentation preferences (SETTINGS-01 Pillar 1).

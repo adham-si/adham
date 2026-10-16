@@ -1,5 +1,9 @@
 {
   "settings": {
+    "preview": {
+      "title": "预览",
+      "note": "这些控件尚未连接。此处的任何操作都不会改变应用。"
+    },
     "title": "系统设置",
     "search": "搜索设置",
     "close": "关闭设置",
@@ -252,6 +256,8 @@
       "trackLocalLabel": "跟踪本地模型令牌",
       "trackLocalHint": "记录设备端 Ollama 实例生成的执行令牌计数",
       "utilizationTitle": "模型利用率",
+      "emptyTitle": "暂无用量数据",
+      "emptyHint": "此版本不收集用量统计。",
       "metricTotalLabel": "总调用次数",
       "metricTotalDetail": "本地智能体循环",
       "metricPromptLabel": "提示令牌",

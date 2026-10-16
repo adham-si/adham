@@ -80,7 +80,7 @@ export type StorageStatus = { status: string, journalMode: string, schemaVersion
  */
 dataDir: string, };
 
-export type RebuildProjectionsResponse = { replayedCount: bigint, };
+export type RebuildProjectionsResponse = { replayedCount: number, };
 
 export type AppPreferences = { 
 /**

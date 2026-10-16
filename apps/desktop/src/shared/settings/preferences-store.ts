@@ -3,7 +3,7 @@ import {
   type AppPreferences,
   type GetPreferencesResponse,
 } from '@/shared/api/adham-client';
-import { AppPreferencesSchema } from '@/shared/api/schemas';
+import { AppPreferencesSchema, type ValidatedAppPreferences } from '@/shared/api/schemas';
 
 /** Minimal client surface the store needs (the real `adhamClient` satisfies it). */
 export interface PreferenceClient {
@@ -15,7 +15,7 @@ export interface PreferenceClient {
 }
 
 export interface PreferenceSnapshot {
-  preferences: AppPreferences;
+  preferences: ValidatedAppPreferences;
   revision: number;
   backendAvailable: boolean;
 }
@@ -64,14 +64,14 @@ function removeKey(key: string): void {
 }
 
 /** Valid legacy presentation values. Anything else stays untouched by migration. */
-export function readLegacyPreferences(): Partial<AppPreferences> | null {
+export function readLegacyPreferences(): Partial<ValidatedAppPreferences> | null {
   const appearance = readKey('adham.appearance');
   const language = readKey('adham.language');
   const fontFamily = readKey('adham.font-family');
   const fontSize = readKey('adham.font-size');
   const highContrast = readKey('adham.high-contrast');
   const reducedMotion = readKey('adham.reduced-motion');
-  const partial: Partial<AppPreferences> = {};
+  const partial: Partial<ValidatedAppPreferences> = {};
   if (appearance === 'light' || appearance === 'dark' || appearance === 'system') {
     partial.appearance = appearance;
   }
@@ -130,7 +130,7 @@ function systemPreferences(): SystemPreferences {
  * explicit offline fallback where the caller marks values unsynced.
  */
 export function applyPresentation(
-  prefs: AppPreferences,
+  prefs: ValidatedAppPreferences,
   system: SystemPreferences = systemPreferences(),
 ): void {
   const dark = prefs.appearance === 'system' ? system.dark : prefs.appearance === 'dark';
@@ -156,7 +156,7 @@ export function applyPresentation(
  * script + pre-backend startup read). Written only after the backend
  * confirms; the cache never overwrites the backend.
  */
-export function mirrorPresentationCache(prefs: AppPreferences): void {
+export function mirrorPresentationCache(prefs: ValidatedAppPreferences): void {
   writeKey('adham.appearance', prefs.appearance);
   writeKey('adham.language', prefs.language);
   writeKey('adham.font-family', prefs.fontFamily);
@@ -166,11 +166,11 @@ export function mirrorPresentationCache(prefs: AppPreferences): void {
 }
 
 /** Synchronous presentation-cache read for startup application (pre-backend). */
-export function readPresentationCache(): AppPreferences {
-  return { ...DEFAULT_PREFERENCES, ...readLegacyPreferences() };
+export function readPresentationCache(): ValidatedAppPreferences {
+  return AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES, ...readLegacyPreferences() });
 }
 
-function snapshotFromCache(): AppPreferences {
+function snapshotFromCache(): ValidatedAppPreferences {
   return readPresentationCache();
 }
 
@@ -213,7 +213,7 @@ export async function migrateLegacy(
     if (snapshot.backendAvailable) clearLegacyPreferences();
     return snapshot;
   }
-  const merged: AppPreferences = AppPreferencesSchema.parse({
+  const merged: ValidatedAppPreferences = AppPreferencesSchema.parse({
     ...DEFAULT_PREFERENCES,
     ...legacy,
   });
@@ -237,9 +237,9 @@ export async function migrateLegacy(
 export async function savePatch(
   client: PreferenceClient,
   current: PreferenceSnapshot,
-  patch: Partial<AppPreferences>,
+  patch: Partial<ValidatedAppPreferences>,
 ): Promise<PreferenceSnapshot> {
-  const merged: AppPreferences = AppPreferencesSchema.parse({
+  const merged: ValidatedAppPreferences = AppPreferencesSchema.parse({
     ...current.preferences,
     ...patch,
   });
@@ -257,7 +257,7 @@ export async function savePatch(
     }
     if (code === 'ConcurrencyConflict') {
       const fresh = await client.getAppPreferences();
-      const rebased: AppPreferences = AppPreferencesSchema.parse({
+      const rebased: ValidatedAppPreferences = AppPreferencesSchema.parse({
         ...AppPreferencesSchema.parse(fresh.preferences),
         ...patch,
       });

@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { adhamClient, type AppPreferences } from '@/shared/api/adham-client';
+import { adhamClient } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
-import { AppPreferencesSchema } from '@/shared/api/schemas';
+import { AppPreferencesSchema, type ValidatedAppPreferences } from '@/shared/api/schemas';
 import { normalizeLanguage } from '@/shared/i18n';
 import { useTheme } from '@/theme/use-theme';
 import {
@@ -20,13 +20,13 @@ import {
 export type PreferencesSyncState = 'synced' | 'saving' | 'unsynced' | 'error';
 
 export interface AppPreferencesApi {
-  preferences: AppPreferences;
+  preferences: ValidatedAppPreferences;
   revision: number;
   backendAvailable: boolean;
   syncState: PreferencesSyncState;
   saveError: SavePreferencesError | null;
   isSaving: boolean;
-  update: (patch: Partial<AppPreferences>) => Promise<void>;
+  update: (patch: Partial<ValidatedAppPreferences>) => Promise<void>;
 }
 
 function cacheSnapshot(): PreferenceSnapshot {
@@ -64,7 +64,7 @@ export function useAppPreferences(): AppPreferencesApi {
   const snapshot: PreferenceSnapshot = query.data ?? cacheSnapshot();
 
   const update = React.useCallback(
-    (patch: Partial<AppPreferences>): Promise<void> => {
+    (patch: Partial<ValidatedAppPreferences>): Promise<void> => {
       setSaveError(null);
       const run = tailRef.current.then(async () => {
         const current =

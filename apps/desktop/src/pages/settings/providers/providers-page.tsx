@@ -1,15 +1,13 @@
 import * as React from 'react';
-import { Button } from '@adham/ui';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Add01Icon } from '@hugeicons/core-free-icons';
-import { useTheme } from '@/theme/use-theme';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '@/theme/use-theme';
 import {
   ProviderFilterTabs,
   type ProviderFilterTab,
   ProvidersList,
   type ProviderItem,
 } from './components';
+import { PreviewNote } from '../preview-note';
 
 export function ProvidersPage() {
   const { t } = useTranslation();
@@ -17,7 +15,10 @@ export function ProvidersPage() {
   const isDark = resolvedAppearance === 'dark';
 
   const [tab, setTab] = React.useState<ProviderFilterTab>('all');
-  const [connectedIds, setConnectedIds] = React.useState<Set<string>>(() => new Set(['ollama']));
+  // No provider is connected in this build: the credential vault and
+  // provider gateway (P0-08) do not exist yet, so nothing may claim a
+  // connection. The catalog below stays as product direction.
+  const [connectedIds, setConnectedIds] = React.useState<Set<string>>(() => new Set());
 
   // Provider company entities using provider logos from public/media/provider/
   const providers: ProviderItem[] = [
@@ -311,24 +312,24 @@ export function ProvidersPage() {
         totalCount={providers.length}
       />
 
+      <PreviewNote />
+
       {/* Section Header with Action and Notion-style separator line */}
       <section aria-labelledby="providers-section-heading" className="space-y-4">
         <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
           <h3 id="providers-section-heading" className="text-sm font-semibold text-foreground">
             {t('settings.providers.listTitle', 'Providers')}
           </h3>
-          <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
-            <HugeiconsIcon icon={Add01Icon} />
-            <span>{t('settings.providers.addProvider', 'Add provider')}</span>
-          </Button>
         </div>
 
-        {/* Dynamic Provider Cards List */}
-        <ProvidersList
-          providers={filteredProviders}
-          connectedIds={connectedIds}
-          onToggleConnect={handleToggleConnect}
-        />
+        {/* Dynamic Provider Cards List (not connected: disabled preview) */}
+        <fieldset disabled className="min-w-0 border-0 p-0 m-0">
+          <ProvidersList
+            providers={filteredProviders}
+            connectedIds={connectedIds}
+            onToggleConnect={handleToggleConnect}
+          />
+        </fieldset>
       </section>
     </div>
   );

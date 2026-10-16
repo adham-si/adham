@@ -120,6 +120,8 @@ export const UpdatePreferencesResponseSchema = GetPreferencesResponseSchema;
 
 export const ResetPreferencesResponseSchema = GetPreferencesResponseSchema;
 
+export type ValidatedAppPreferences = z.infer<typeof AppPreferencesSchema>;
+
 export const RebuildProjectionsResponseSchema = z.object({
   replayedCount: z.number().int(),
 });
