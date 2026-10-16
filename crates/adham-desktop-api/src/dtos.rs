@@ -49,6 +49,10 @@ pub struct PlatformInfo {
     pub os: String,
     pub arch: String,
     pub has_native_titlebar_controls: bool,
+    /// Workspace `version`: the shipped application version.
+    pub app_version: String,
+    /// `debug` or `release`: which pipeline produced this binary.
+    pub build_profile: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -192,6 +196,9 @@ pub struct StorageStatus {
     pub status: String,
     pub journal_mode: String,
     pub schema_version: u32,
+    /// Resolved installation data directory (platform policy). Resolution
+    /// failure is an error, never a guessed path.
+    pub data_dir: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

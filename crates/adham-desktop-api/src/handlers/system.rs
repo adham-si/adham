@@ -30,10 +30,20 @@ pub async fn handle_get_storage_status(ctx: &super::ApiContext) -> Result<Storag
         "degraded".to_string()
     };
 
+    // Authoritative location from the platform policy (the same resolution
+    // the startup path uses). Unresolvable roots fail the call so the UI
+    // shows unavailable instead of a fabricated path.
+    let data_dir = adham_platform::PlatformStoragePolicy::resolve()
+        .map_err(|e| e.to_string())?
+        .data_dir
+        .to_string_lossy()
+        .into_owned();
+
     Ok(StorageStatus {
         status,
         journal_mode: health.journal_mode,
         schema_version: 1,
+        data_dir,
     })
 }
 
@@ -141,5 +151,11 @@ pub fn handle_get_platform_info() -> PlatformInfo {
         },
         arch: std::env::consts::ARCH.to_string(),
         has_native_titlebar_controls: cfg!(target_os = "macos"),
+        app_version: env!("CARGO_PKG_VERSION").to_string(),
+        build_profile: if cfg!(debug_assertions) {
+            "debug".to_string()
+        } else {
+            "release".to_string()
+        },
     }
 }

@@ -35,7 +35,15 @@ export type CommandContext = { workspaceId: string | null, projectId: string | n
 
 export type BootstrapState = { isInitialized: boolean, activeWorkspaceId: string | null, activeProjectId: string | null, installationId?: string | null, };
 
-export type PlatformInfo = { os: string, arch: string, hasNativeTitlebarControls: boolean, };
+export type PlatformInfo = { os: string, arch: string, hasNativeTitlebarControls: boolean, 
+/**
+ * Workspace `version`: the shipped application version.
+ */
+appVersion: string, 
+/**
+ * `debug` or `release`: which pipeline produced this binary.
+ */
+buildProfile: string, };
 
 export type CreateWorkspacePayload = { name: string, kind: string, preferredLanguage: string, };
 
@@ -65,7 +73,12 @@ export type ConversationMessageDto = { messageId: string, role: string, text: st
 
 export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, };
 
-export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, };
+export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, 
+/**
+ * Resolved installation data directory (platform policy). Resolution
+ * failure is an error, never a guessed path.
+ */
+dataDir: string, };
 
 export type RebuildProjectionsResponse = { replayedCount: bigint, };
 
