@@ -50,7 +50,7 @@ pub async fn handle_admin_rebuild_projections(
 
 fn stored_to_preferences(
     stored: Option<adham_event_log::StoredPreferences>,
-) -> Result<(AppPreferences, i64), String> {
+) -> Result<(AppPreferences, u32), String> {
     match stored {
         None => Ok((AppPreferences::defaults(), 0)),
         Some(row) => {
@@ -68,7 +68,9 @@ fn stored_to_preferences(
             prefs
                 .validate()
                 .map_err(|e| format!("PREFERENCES_CORRUPT:{e}"))?;
-            Ok((prefs, row.revision))
+            let revision = u32::try_from(row.revision)
+                .map_err(|_| "PREFERENCES_CORRUPT:revision out of range".to_string())?;
+            Ok((prefs, revision))
         }
     }
 }
@@ -95,7 +97,7 @@ pub async fn handle_update_app_preferences(
         &ctx.pool,
         adham_event_log::PREFERENCES_SCHEMA_VERSION,
         &serde_json::to_string(&payload.preferences).map_err(|e| e.to_string())?,
-        payload.base_revision,
+        i64::from(payload.base_revision),
     )
     .await
     .map_err(|e| match e {

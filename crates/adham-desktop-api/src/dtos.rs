@@ -273,7 +273,7 @@ impl AppPreferences {
 #[ts(export)]
 pub struct GetPreferencesResponse {
     pub preferences: AppPreferences,
-    pub revision: i64,
+    pub revision: u32,
 }
 
 /// Plain payload (no idempotency envelope): the revision guard in
@@ -284,7 +284,7 @@ pub struct GetPreferencesResponse {
 #[ts(export)]
 pub struct UpdatePreferencesPayload {
     pub preferences: AppPreferences,
-    pub base_revision: i64,
+    pub base_revision: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -292,7 +292,7 @@ pub struct UpdatePreferencesPayload {
 #[ts(export)]
 pub struct UpdatePreferencesResponse {
     pub preferences: AppPreferences,
-    pub revision: i64,
+    pub revision: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -300,7 +300,7 @@ pub struct UpdatePreferencesResponse {
 #[ts(export)]
 pub struct ResetPreferencesResponse {
     pub preferences: AppPreferences,
-    pub revision: i64,
+    pub revision: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

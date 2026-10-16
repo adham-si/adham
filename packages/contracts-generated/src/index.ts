@@ -95,13 +95,13 @@ highContrast: string,
  */
 reducedMotion: string, enterToSend: boolean, };
 
-export type GetPreferencesResponse = { preferences: AppPreferences, revision: bigint, };
+export type GetPreferencesResponse = { preferences: AppPreferences, revision: number, };
 
-export type UpdatePreferencesPayload = { preferences: AppPreferences, baseRevision: bigint, };
+export type UpdatePreferencesPayload = { preferences: AppPreferences, baseRevision: number, };
 
-export type UpdatePreferencesResponse = { preferences: AppPreferences, revision: bigint, };
+export type UpdatePreferencesResponse = { preferences: AppPreferences, revision: number, };
 
-export type ResetPreferencesResponse = { preferences: AppPreferences, revision: bigint, };
+export type ResetPreferencesResponse = { preferences: AppPreferences, revision: number, };
 
 export type RecordPendingOperationPayload = { operationId: string, kind: string, messageRequestId: string, createRequestId: string | null, text: string, title: string | null, };
 
