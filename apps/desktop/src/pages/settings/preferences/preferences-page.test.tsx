@@ -132,4 +132,79 @@ describe('PreferencesPage with a real backend', () => {
     });
     await waitFor(() => expect(screen.queryByRole('button', { name: /retry/i })).toBeNull());
   });
+
+  it('cancels reset without dispatching anything', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd) => {
+      if (cmd === 'get_app_preferences') {
+        return { preferences: { ...BACKEND_PREFS }, revision: 2 };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    renderPage();
+    await waitFor(() =>
+      expect((screen.getByLabelText('Theme') as HTMLSelectElement).value).toBe('dark'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(
+      vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === 'reset_app_preferences'),
+    ).toHaveLength(0);
+    expect((screen.getByLabelText('Theme') as HTMLSelectElement).value).toBe('dark');
+  });
+
+  it('resets through the contract and applies the confirmed defaults', async () => {
+    const DEFAULTS = {
+      appearance: 'system',
+      language: 'en',
+      fontFamily: 'default',
+      fontSize: 'md',
+      highContrast: 'system',
+      reducedMotion: 'system',
+      enterToSend: true,
+    };
+    vi.mocked(invoke).mockImplementation(async (cmd) => {
+      if (cmd === 'get_app_preferences') {
+        return { preferences: { ...BACKEND_PREFS }, revision: 2 };
+      }
+      if (cmd === 'reset_app_preferences') {
+        return { preferences: DEFAULTS, revision: 3 };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    renderPage();
+    await waitFor(() =>
+      expect((screen.getByLabelText('Theme') as HTMLSelectElement).value).toBe('dark'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm reset/i }));
+    // Confirming unmounts immediately; the shared FIFO serializes any repeat.
+    await waitFor(() => expect(screen.getByText(/defaults restored/i)).not.toBeNull());
+    expect(
+      vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === 'reset_app_preferences'),
+    ).toHaveLength(1);
+    expect((screen.getByLabelText('Theme') as HTMLSelectElement).value).toBe('system');
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(window.localStorage.getItem('adham.appearance')).toBe('system');
+  });
+
+  it('reports a failed reset without changing anything', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd) => {
+      if (cmd === 'get_app_preferences') {
+        return { preferences: { ...BACKEND_PREFS }, revision: 2 };
+      }
+      if (cmd === 'reset_app_preferences') {
+        throw new Error('transport down');
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    renderPage();
+    await waitFor(() =>
+      expect((screen.getByLabelText('Theme') as HTMLSelectElement).value).toBe('dark'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm reset/i }));
+    await waitFor(() => expect(screen.getByRole('alert')).not.toBeNull());
+    expect((screen.getByLabelText('Theme') as HTMLSelectElement).value).toBe('dark');
+    expect(window.localStorage.getItem('adham.appearance')).toBe('dark');
+  });
 });

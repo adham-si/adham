@@ -1,13 +1,14 @@
 import * as React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { adhamClient } from '@/shared/api/adham-client';
+import { adhamClient, DEFAULT_PREFERENCES } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
 import { AppPreferencesSchema, type ValidatedAppPreferences } from '@/shared/api/schemas';
 import { normalizeLanguage } from '@/shared/i18n';
 import { useTheme } from '@/theme/use-theme';
 import {
   applyPresentation,
+  envelopeCode,
   loadSnapshot,
   migrateLegacy,
   mirrorPresentationCache,
@@ -29,6 +30,13 @@ export interface AppPreferencesApi {
   update: (patch: Partial<ValidatedAppPreferences>) => Promise<void>;
   /** Clears the error state and re-reads the backend snapshot. */
   retrySync: () => Promise<void>;
+  /**
+   * Restores installation defaults through the reset contract. Applies the
+   * confirmed defaults immediately; touches only presentation preferences —
+   * never workspaces, conversations, credentials or app data. Resolves true
+   * when the defaults were confirmed, false when nothing was applied.
+   */
+  resetToDefaults: () => Promise<boolean>;
 }
 
 function cacheSnapshot(): PreferenceSnapshot {
@@ -197,6 +205,57 @@ export function useAppPreferences(): AppPreferencesApi {
         ? 'unsynced'
         : 'synced';
 
+  const resetToDefaults = React.useCallback(async (): Promise<boolean> => {
+    setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), saveError: null });
+    const work = async (): Promise<boolean> => {
+      const current =
+        queryClient.getQueryData<PreferenceSnapshot>(queryKeys.preferences) ?? cacheSnapshot();
+      if (!current.backendAvailable) {
+        const prefs = AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES });
+        applyPresentation(prefs);
+        mirrorPresentationCache(prefs);
+        queryClient.setQueryData<PreferenceSnapshot>(queryKeys.preferences, {
+          preferences: prefs,
+          revision: 0,
+          backendAvailable: false,
+        });
+        setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), localOnly: true });
+        return true;
+      }
+      setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), isSaving: true });
+      try {
+        const res = await adhamClient.resetAppPreferences();
+        const prefs = AppPreferencesSchema.parse(res.preferences);
+        applyPresentation(prefs);
+        mirrorPresentationCache(prefs);
+        queryClient.setQueryData<PreferenceSnapshot>(queryKeys.preferences, {
+          preferences: prefs,
+          revision: res.revision,
+          backendAvailable: true,
+        });
+        setSaveSyncSnapshot({ saveError: null, isSaving: false, localOnly: false });
+        return true;
+      } catch (error) {
+        // Transport failure is honest offline; a backend rejection surfaces
+        // generically — either way nothing is applied and the old values stay.
+        const kind = envelopeCode(error) === null ? 'offline' : 'unknown';
+        setSaveSyncSnapshot({
+          saveError: new SavePreferencesError(kind, 'Could not reset settings.'),
+          isSaving: false,
+          localOnly: getSaveSyncSnapshot().localOnly,
+        });
+        return false;
+      }
+    };
+    const run = saveTail.then(work, work);
+    // The shared tail stays void-typed; only this call observes the outcome.
+    saveTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }, [queryClient]);
+
   const retrySync = React.useCallback(async (): Promise<void> => {
     setSaveSyncSnapshot({ ...getSaveSyncSnapshot(), saveError: null });
     // Explicit refetch bypasses the infinite staleTime: this is the user's
@@ -219,6 +278,7 @@ export function useAppPreferences(): AppPreferencesApi {
     isSaving,
     update,
     retrySync,
+    resetToDefaults,
   };
 }
 

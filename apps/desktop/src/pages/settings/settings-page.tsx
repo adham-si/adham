@@ -32,6 +32,18 @@ import { UsagePage } from './usage';
 import { DataPage } from './data';
 import { InfoPage } from './info';
 
+/**
+ * Visible settings surface: only capabilities with a real backend appear in
+ * navigation, search and rendering. Hidden page implementations stay in the
+ * tree for future capability work (P0-07/08/09/13/14) but can never render
+ * through this shell — see `visiblePage` below.
+ */
+export const VISIBLE_SETTINGS_PAGES: ReadonlySet<SettingsPageId> = new Set([
+  'preferences',
+  'data',
+  'info',
+]);
+
 export function SettingsPage() {
   const { t } = useTranslation();
   const { settingsOpen, closeSettings, activeSettingsPage, setActiveSettingsPage } =
@@ -51,6 +63,16 @@ export function SettingsPage() {
   }, [settingsOpen, closeSettings]);
 
   if (!settingsOpen) return null;
+
+  // Visible settings surface (settings completion): Preferences, Data and
+  // About. Capability pages (models, providers, routing, extensions,
+  // governance, budget, usage) keep their implementation for future backend
+  // work but stay out of navigation, search and rendering until their
+  // capabilities exist — a hidden id always falls back to Preferences so no
+  // usable-looking control can leak through.
+  const visiblePage: SettingsPageId = VISIBLE_SETTINGS_PAGES.has(activeSettingsPage)
+    ? activeSettingsPage
+    : 'preferences';
 
   const categories: Array<{
     name: string;
@@ -146,8 +168,12 @@ export function SettingsPage() {
   const filteredCategories = categories
     .map((cat) => ({
       ...cat,
-      pages: cat.pages.filter((page) =>
-        page.label.toLowerCase().includes(searchQuery.toLowerCase()),
+      // Visibility first (hidden pages leave navigation), then the text
+      // search over what remains — hidden pages never match search either.
+      pages: cat.pages.filter(
+        (page) =>
+          VISIBLE_SETTINGS_PAGES.has(page.id) &&
+          page.label.toLowerCase().includes(searchQuery.toLowerCase()),
       ),
     }))
     .filter((cat) => cat.pages.length > 0);
@@ -210,22 +236,20 @@ export function SettingsPage() {
 
         {/* Right Settings Page Content Pane */}
         <main className="relative flex-1 flex flex-col min-w-0 bg-surface overflow-hidden">
-          {/* Active Settings Page View */}
+          {/* Active Settings Page View (visibility-gated: hidden ids fall back) */}
           <div className="flex-1 overflow-y-auto p-6 sm:p-8 pe-12">
-            {activeSettingsPage === 'preferences' && <PreferencesPage />}
-            {activeSettingsPage === 'models' && <ModelsPage />}
-            {activeSettingsPage === 'providers' && <ProvidersPage />}
-            {activeSettingsPage === 'routing' && <RoutingPage />}
-            {activeSettingsPage === 'mcp' && <McpPage />}
-            {activeSettingsPage === 'skills' && <SkillsPage />}
-            {activeSettingsPage === 'plugins' && <PluginsPage />}
-            {(activeSettingsPage === 'security' || activeSettingsPage === 'governance') && (
-              <GovernancePage />
-            )}
-            {activeSettingsPage === 'budget' && <BudgetPage />}
-            {activeSettingsPage === 'usage' && <UsagePage />}
-            {activeSettingsPage === 'data' && <DataPage />}
-            {activeSettingsPage === 'info' && <InfoPage />}
+            {visiblePage === 'preferences' && <PreferencesPage />}
+            {visiblePage === 'models' && <ModelsPage />}
+            {visiblePage === 'providers' && <ProvidersPage />}
+            {visiblePage === 'routing' && <RoutingPage />}
+            {visiblePage === 'mcp' && <McpPage />}
+            {visiblePage === 'skills' && <SkillsPage />}
+            {visiblePage === 'plugins' && <PluginsPage />}
+            {(visiblePage === 'security' || visiblePage === 'governance') && <GovernancePage />}
+            {visiblePage === 'budget' && <BudgetPage />}
+            {visiblePage === 'usage' && <UsagePage />}
+            {visiblePage === 'data' && <DataPage />}
+            {visiblePage === 'info' && <InfoPage />}
           </div>
 
           {/* Top Close Button (floated at top-end, no separator bar, natural DOM stacking) */}

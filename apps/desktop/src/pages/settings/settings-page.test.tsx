@@ -66,11 +66,11 @@ describe('SettingsPage Component', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('switches settings pages and displays page content', () => {
+  it('shows only supported pages and falls back for hidden ids', () => {
     function Trigger() {
       const { openSettings } = useShellLayout();
       return (
-        <button type="button" onClick={() => openSettings('preferences')}>
+        <button type="button" onClick={() => openSettings('models')}>
           Open
         </button>
       );
@@ -84,45 +84,28 @@ describe('SettingsPage Component', () => {
 
     fireEvent.click(screen.getByText('Open'));
 
-    // Switch to AI Models page
-    const modelsPageBtn = screen.getByRole('button', { name: /^AI Models/i });
-    fireEvent.click(modelsPageBtn);
-    expect(screen.getByText('Available Models')).not.toBeNull();
+    // Visible surface: Preferences, Data, About only.
+    const categoriesAside = screen.getByLabelText('Settings Categories');
+    expect(within(categoriesAside).getByText('Preferences')).not.toBeNull();
+    expect(within(categoriesAside).getByText('Data')).not.toBeNull();
+    expect(within(categoriesAside).getByText('About')).not.toBeNull();
+    for (const hidden of [
+      'AI Models',
+      'AI Providers',
+      'Routing',
+      'MCP',
+      'Skills',
+      'Plugins',
+      'Security',
+      'Budget',
+      'Usage',
+    ]) {
+      expect(within(categoriesAside).queryByText(hidden)).toBeNull();
+    }
 
-    // Switch to AI Providers page
-    const providersPageBtn = screen.getByRole('button', { name: /^AI Providers/i });
-    fireEvent.click(providersPageBtn);
-    expect(screen.getByText('Anthropic')).not.toBeNull();
-
-    // Switch to Security page
-    const secPageBtn = screen.getByRole('button', { name: /^Security/i });
-    fireEvent.click(secPageBtn);
-    expect(screen.getByText('Security & Governance')).not.toBeNull();
-
-    // Switch to MCP page
-    const mcpPageBtn = screen.getByRole('button', { name: /^MCP/i });
-    fireEvent.click(mcpPageBtn);
-    expect(screen.getByText('Servers to use with Adham')).not.toBeNull();
-
-    // Switch to Routing page
-    const routingPageBtn = screen.getByRole('button', { name: /^Routing/i });
-    fireEvent.click(routingPageBtn);
-    expect(screen.getByText('Dispatch policy')).not.toBeNull();
-
-    // Switch to Budget page
-    const budgetPageBtn = screen.getByRole('button', { name: /^Budget/i });
-    fireEvent.click(budgetPageBtn);
-    expect(screen.getByText('Spend guardrails')).not.toBeNull();
-
-    // Switch to Usage page
-    const usagePageBtn = screen.getByRole('button', { name: /^Usage/i });
-    fireEvent.click(usagePageBtn);
-    expect(screen.getByText('Model utilization')).not.toBeNull();
-
-    // Switch to About page
-    const aboutPageBtn = screen.getByRole('button', { name: /^About/i });
-    fireEvent.click(aboutPageBtn);
-    expect(screen.getByText('Application details')).not.toBeNull();
+    // A hidden id never exposes its controls: falls back to Preferences.
+    expect(screen.getByText('Appearance')).not.toBeNull();
+    expect(screen.queryByText('Available Models')).toBeNull();
   });
 
   it('filters settings pages list based on search input', () => {
@@ -146,8 +129,12 @@ describe('SettingsPage Component', () => {
     const searchInput = screen.getByPlaceholderText('Search settings');
     fireEvent.change(searchInput, { target: { value: 'Budget' } });
 
+    // Hidden pages are excluded from search: nothing usable-looking remains.
     const categoriesAside = screen.getByLabelText('Settings Categories');
-    expect(within(categoriesAside).getByText('Budget')).not.toBeNull();
+    expect(within(categoriesAside).queryByText('Budget')).toBeNull();
     expect(within(categoriesAside).queryByText('Preferences')).toBeNull();
+
+    fireEvent.change(searchInput, { target: { value: 'Data' } });
+    expect(within(categoriesAside).getByText('Data')).not.toBeNull();
   });
 });

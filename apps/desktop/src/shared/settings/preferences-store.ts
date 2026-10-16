@@ -174,7 +174,8 @@ function snapshotFromCache(): ValidatedAppPreferences {
   return readPresentationCache();
 }
 
-function envelopeCode(error: unknown): string | null {
+/** Backend error-code classifier: envelope codes vs transport failure (null). */
+export function envelopeCode(error: unknown): string | null {
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const code = (error as { code: unknown }).code;
     return typeof code === 'string' ? code : null;

@@ -95,7 +95,11 @@ export function DataPage() {
                 </div>
               </div>
               <span className="rounded bg-surface-muted px-2 py-1 text-xs text-foreground-muted font-medium shrink-0">
-                {storageQuery.data.status}
+                {storageQuery.data.status === 'ready'
+                  ? t('settings.data.statusReady', 'Ready')
+                  : storageQuery.data.status === 'degraded'
+                    ? t('settings.data.statusDegraded', 'Degraded')
+                    : storageQuery.data.status}
               </span>
             </div>
 

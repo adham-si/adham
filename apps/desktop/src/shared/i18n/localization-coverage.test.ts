@@ -135,7 +135,6 @@ describe('desktop localization coverage (all selectable languages)', () => {
       'compose.tokensUsed',
       'compose.pastedChars',
       'settings.budget.tokensAllowed',
-      'settings.usage.calls',
       'settings.routing.fallbackModels',
       'settings.routing.seconds',
       'compose.withheldAttachments',

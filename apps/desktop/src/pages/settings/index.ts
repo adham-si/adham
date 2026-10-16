@@ -7,7 +7,6 @@ export * from './mcp';
 export * from './skills';
 export * from './plugins';
 export * from './data';
-export * from './privacy';
 export * from './budget';
 export * from './usage';
 export * from './governance';

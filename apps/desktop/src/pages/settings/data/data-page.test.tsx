@@ -26,9 +26,12 @@ function renderPage() {
   );
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(invoke).mockReset();
   window.localStorage.clear();
+  // Test files share the i18n singleton: never inherit another file's locale.
+  const { default: i18n } = await import('@/shared/i18n');
+  await i18n.changeLanguage('en');
 });
 
 describe('DataPage (authoritative storage)', () => {
@@ -43,6 +46,9 @@ describe('DataPage (authoritative storage)', () => {
     expect(screen.queryByText('%LOCALAPPDATA%\\Adham\\data')).toBeNull();
     expect(screen.queryByText(/vacuum/i)).toBeNull();
     expect(screen.queryByText(/clear cache/i)).toBeNull();
+    // Status badge is localized, never the raw backend string.
+    expect(screen.getByText('Ready')).not.toBeNull();
+    expect(screen.queryByText('ready', { exact: true })).toBeNull();
   });
 
   it('shows an unavailable state with retry instead of fallback facts', async () => {

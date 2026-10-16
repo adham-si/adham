@@ -329,8 +329,10 @@ export function ModelsPage() {
 
       {/* Local-first Policy Note */}
       <div className="pt-2 text-xs text-foreground-secondary">
-        Local-first guarantee: When strict local boundary is enabled, requests with local models
-        never cross to cloud providers without approval.
+        {t(
+          'settings.models.localFirstNote',
+          'Local-first guarantee: When strict local boundary is enabled, requests with local models never cross to cloud providers without approval.',
+        )}
       </div>
     </div>
   );
