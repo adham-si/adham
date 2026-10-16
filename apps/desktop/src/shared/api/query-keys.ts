@@ -1,6 +1,7 @@
 export const queryKeys = {
   bootstrap: ['bootstrap'] as const,
   storageStatus: ['storage-status'] as const,
+  platformInfo: ['platform-info'] as const,
   preferences: ['app-preferences'] as const,
   workspace: (workspaceId: string) => ['workspace', workspaceId] as const,
   projects: (workspaceId: string) => ['projects', workspaceId] as const,

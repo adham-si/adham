@@ -27,6 +27,8 @@ export const PlatformInfoSchema = z.object({
   os: z.string(),
   arch: z.string(),
   hasNativeTitlebarControls: z.boolean(),
+  appVersion: z.string(),
+  buildProfile: z.string(),
 });
 
 export const WorkspaceSummarySchema = z.object({
@@ -96,6 +98,7 @@ export const StorageStatusSchema = z.object({
   status: z.string(),
   journalMode: z.string(),
   schemaVersion: z.number().int(),
+  dataDir: z.string(),
 });
 
 export const AppPreferencesSchema = z.object({

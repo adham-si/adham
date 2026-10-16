@@ -168,12 +168,15 @@ describe('AdhamApiClient request identity', () => {
       os: 'macos',
       arch: 'aarch64',
       hasNativeTitlebarControls: true,
+      appVersion: '0.1.0',
+      buildProfile: 'debug',
     });
     const client = new AdhamApiClient();
     const info = await client.getPlatformInfo();
     expect(info.os).toBe('macos');
     expect(info.arch).toBe('aarch64');
     expect(info.hasNativeTitlebarControls).toBe(true);
+    expect(info.appVersion).toBe('0.1.0');
     expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_platform_info');
   });
 });
