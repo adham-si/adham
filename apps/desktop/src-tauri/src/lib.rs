@@ -1,10 +1,11 @@
 use adham_desktop_api::{
     ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
     CommandResult, ConversationPage, CreateProjectPayload, CreateSessionPayload,
-    CreateWorkspacePayload, ErrorEnvelope, PendingOperationDto, PendingOperationList, PlatformInfo,
-    ProjectList, ProjectSummary, RebuildProjectionsResponse, RecordPendingOperationPayload,
-    SelectProjectPayload, SessionList, SessionSummary, StorageStatus, SubmitMessagePayload,
-    SubmittedMessage, WorkspaceList, WorkspaceSummary,
+    CreateWorkspacePayload, ErrorEnvelope, GetPreferencesResponse, PendingOperationDto,
+    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, RebuildProjectionsResponse,
+    RecordPendingOperationPayload, ResetPreferencesResponse, SelectProjectPayload, SessionList,
+    SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage,
+    UpdatePreferencesPayload, UpdatePreferencesResponse, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -140,6 +141,34 @@ async fn admin_rebuild_projections(
 }
 
 #[tauri::command]
+async fn get_app_preferences(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<GetPreferencesResponse, ErrorEnvelope> {
+    adham_desktop_api::handle_get_app_preferences(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn update_app_preferences(
+    state: tauri::State<'_, ApiContext>,
+    payload: UpdatePreferencesPayload,
+) -> Result<UpdatePreferencesResponse, ErrorEnvelope> {
+    adham_desktop_api::handle_update_app_preferences(&state, payload)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn reset_app_preferences(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<ResetPreferencesResponse, ErrorEnvelope> {
+    adham_desktop_api::handle_reset_app_preferences(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn record_pending_operation(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<RecordPendingOperationPayload>,
@@ -231,6 +260,9 @@ pub fn run() {
             get_bootstrap_state,
             get_storage_status,
             get_platform_info,
+            get_app_preferences,
+            update_app_preferences,
+            reset_app_preferences,
             create_workspace,
             create_project,
             list_workspaces,

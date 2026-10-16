@@ -69,6 +69,40 @@ export type StorageStatus = { status: string, journalMode: string, schemaVersion
 
 export type RebuildProjectionsResponse = { replayedCount: bigint, };
 
+export type AppPreferences = { 
+/**
+ * `system` | `light` | `dark`
+ */
+appearance: string, 
+/**
+ * `en` | `ar` | `zh-CN` | `ru`
+ */
+language: string, 
+/**
+ * `default` | `system` | `serif` | `mono`
+ */
+fontFamily: string, 
+/**
+ * `sm` | `md` | `lg`
+ */
+fontSize: string, 
+/**
+ * `system` | `enabled` | `disabled`
+ */
+highContrast: string, 
+/**
+ * `system` | `reduce` | `no-preference`
+ */
+reducedMotion: string, enterToSend: boolean, };
+
+export type GetPreferencesResponse = { preferences: AppPreferences, revision: bigint, };
+
+export type UpdatePreferencesPayload = { preferences: AppPreferences, baseRevision: bigint, };
+
+export type UpdatePreferencesResponse = { preferences: AppPreferences, revision: bigint, };
+
+export type ResetPreferencesResponse = { preferences: AppPreferences, revision: bigint, };
+
 export type RecordPendingOperationPayload = { operationId: string, kind: string, messageRequestId: string, createRequestId: string | null, text: string, title: string | null, };
 
 export type PendingOperationDto = { operationId: string, kind: string, workspaceId: string, projectId: string, sessionId: string | null, createRequestId: string | null, messageRequestId: string, text: string, title: string | null, status: string, createdAt: string, };

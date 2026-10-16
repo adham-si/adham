@@ -48,6 +48,84 @@ pub async fn handle_admin_rebuild_projections(
     })
 }
 
+fn stored_to_preferences(
+    stored: Option<adham_event_log::StoredPreferences>,
+) -> Result<(AppPreferences, i64), String> {
+    match stored {
+        None => Ok((AppPreferences::defaults(), 0)),
+        Some(row) => {
+            if row.schema_version != adham_event_log::PREFERENCES_SCHEMA_VERSION {
+                return Err(format!(
+                    "PREFERENCES_SCHEMA_MISMATCH:stored={} supported={}",
+                    row.schema_version,
+                    adham_event_log::PREFERENCES_SCHEMA_VERSION
+                ));
+            }
+            let prefs: AppPreferences = serde_json::from_str(&row.prefs_json)
+                .map_err(|e| format!("PREFERENCES_CORRUPT:invalid stored document: {e}"))?;
+            // Stored rows were validated on write; re-validate so a corrupt
+            // row can never surface as live configuration.
+            prefs
+                .validate()
+                .map_err(|e| format!("PREFERENCES_CORRUPT:{e}"))?;
+            Ok((prefs, row.revision))
+        }
+    }
+}
+
+pub async fn handle_get_app_preferences(
+    ctx: &super::ApiContext,
+) -> Result<GetPreferencesResponse, String> {
+    let stored = adham_event_log::read_preferences(&ctx.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    let (preferences, revision) = stored_to_preferences(stored)?;
+    Ok(GetPreferencesResponse {
+        preferences,
+        revision,
+    })
+}
+
+pub async fn handle_update_app_preferences(
+    ctx: &super::ApiContext,
+    payload: UpdatePreferencesPayload,
+) -> Result<UpdatePreferencesResponse, String> {
+    payload.preferences.validate()?;
+    let stored = adham_event_log::write_preferences(
+        &ctx.pool,
+        adham_event_log::PREFERENCES_SCHEMA_VERSION,
+        &serde_json::to_string(&payload.preferences).map_err(|e| e.to_string())?,
+        payload.base_revision,
+    )
+    .await
+    .map_err(|e| match e {
+        adham_event_log::PreferenceWriteError::Conflict(current) => {
+            format!(
+                "PREFERENCE_REVISION_CONFLICT:current_revision={}",
+                current.revision
+            )
+        }
+        adham_event_log::PreferenceWriteError::Storage(inner) => inner.to_string(),
+    })?;
+    let (preferences, revision) = stored_to_preferences(Some(stored))?;
+    Ok(UpdatePreferencesResponse {
+        preferences,
+        revision,
+    })
+}
+
+pub async fn handle_reset_app_preferences(
+    ctx: &super::ApiContext,
+) -> Result<ResetPreferencesResponse, String> {
+    adham_event_log::reset_preferences(&ctx.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(ResetPreferencesResponse {
+        preferences: AppPreferences::defaults(),
+        revision: 0,
+    })
+}
+
 pub fn handle_get_platform_info() -> PlatformInfo {
     PlatformInfo {
         os: if cfg!(target_os = "macos") {
