@@ -117,7 +117,7 @@ async fn update_with_stale_base_conflicts_and_keeps_current() {
 }
 
 #[tokio::test]
-async fn reset_returns_installation_to_defaults() {
+async fn reset_returns_installation_to_defaults_at_next_revision() {
     let ctx = common::setup_ctx(&common::test_db_path()).await;
     adham_desktop_api::handle_update_app_preferences(
         &ctx,
@@ -131,6 +131,12 @@ async fn reset_returns_installation_to_defaults() {
     let res = adham_desktop_api::handle_reset_app_preferences(&ctx)
         .await
         .expect("reset");
-    assert_eq!(res.revision, 0);
+    // Monotonic: revision moves forward to 2 with the defaults document.
+    assert_eq!(res.revision, 2);
     assert_eq!(res.preferences, AppPreferences::defaults());
+    let reread = adham_desktop_api::handle_get_app_preferences(&ctx)
+        .await
+        .expect("get prefs");
+    assert_eq!(reread.revision, 2);
+    assert_eq!(reread.preferences, AppPreferences::defaults());
 }

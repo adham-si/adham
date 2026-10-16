@@ -129,12 +129,21 @@ pub async fn handle_update_app_preferences(
 pub async fn handle_reset_app_preferences(
     ctx: &super::ApiContext,
 ) -> Result<ResetPreferencesResponse, String> {
-    adham_event_log::reset_preferences(&ctx.pool)
-        .await
-        .map_err(|e| e.to_string())?;
+    // Guarded by construction: only the validated compiled defaults are
+    // ever written by a reset, and the revision always moves forward.
+    let defaults = AppPreferences::defaults();
+    defaults.validate()?;
+    let stored = adham_event_log::reset_preferences(
+        &ctx.pool,
+        adham_event_log::PREFERENCES_SCHEMA_VERSION,
+        &serde_json::to_string(&defaults).map_err(|e| e.to_string())?,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let (preferences, revision) = stored_to_preferences(Some(stored))?;
     Ok(ResetPreferencesResponse {
-        preferences: AppPreferences::defaults(),
-        revision: 0,
+        preferences,
+        revision,
     })
 }
 

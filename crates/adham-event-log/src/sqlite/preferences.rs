@@ -139,11 +139,32 @@ pub async fn write_preferences(
     }
 }
 
-/// Delete the preference row: the installation returns to compiled defaults.
-pub async fn reset_preferences(pool: &Pool<Sqlite>) -> Result<(), DomainError> {
-    sqlx::query("DELETE FROM installation_preferences WHERE id = 1")
-        .execute(pool)
-        .await
-        .map_err(|e| DomainError::Storage(e.to_string()))?;
-    Ok(())
+/// Reset to a defaults document, bumping the revision.
+/// Unlike delete-then-recreate, revisions stay strictly monotonic across
+/// resets: a stale base from before the reset can never match a recycled
+/// revision number. The row always exists afterwards.
+pub async fn reset_preferences(
+    pool: &Pool<Sqlite>,
+    schema_version: u32,
+    prefs_json: &str,
+) -> Result<StoredPreferences, DomainError> {
+    sqlx::query(
+        "INSERT INTO installation_preferences
+         (id, schema_version, prefs_json, revision, updated_at_us)
+         VALUES (1, ?, ?, 1, ?)
+         ON CONFLICT(id) DO UPDATE SET
+             schema_version = excluded.schema_version,
+             prefs_json = excluded.prefs_json,
+             revision = revision + 1,
+             updated_at_us = excluded.updated_at_us",
+    )
+    .bind(schema_version as i64)
+    .bind(prefs_json)
+    .bind(now_us())
+    .execute(pool)
+    .await
+    .map_err(|e| DomainError::Storage(e.to_string()))?;
+    read_preferences(pool)
+        .await?
+        .ok_or_else(|| DomainError::Storage("preference row missing after reset".into()))
 }

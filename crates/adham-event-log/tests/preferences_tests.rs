@@ -97,22 +97,44 @@ async fn sequential_writes_increment_revision() {
 }
 
 #[tokio::test]
-async fn reset_returns_to_defaults() {
+async fn reset_bumps_revision_with_defaults() {
     let pool = create_sqlite_pool(&test_db_path())
         .await
         .expect("create pool");
     adham_event_log::write_preferences(&pool, PREFERENCES_SCHEMA_VERSION, PREFS_A, 0)
         .await
         .expect("first write");
-    adham_event_log::reset_preferences(&pool)
+    let reset = adham_event_log::reset_preferences(&pool, PREFERENCES_SCHEMA_VERSION, PREFS_B)
         .await
         .expect("reset");
-    let stored = adham_event_log::read_preferences(&pool)
+    // Monotonic: the reset is revision 2, not a recycled 0/1.
+    assert_eq!(reset.revision, 2);
+    assert_eq!(reset.prefs_json, PREFS_B);
+    let reread = adham_event_log::read_preferences(&pool)
         .await
-        .expect("read prefs");
+        .expect("read prefs")
+        .expect("row present after reset");
+    assert_eq!(reread.revision, 2);
+}
+
+#[tokio::test]
+async fn stale_base_from_before_reset_conflicts() {
+    let pool = create_sqlite_pool(&test_db_path())
+        .await
+        .expect("create pool");
+    adham_event_log::write_preferences(&pool, PREFERENCES_SCHEMA_VERSION, PREFS_A, 0)
+        .await
+        .expect("first write");
+    adham_event_log::reset_preferences(&pool, PREFERENCES_SCHEMA_VERSION, PREFS_B)
+        .await
+        .expect("reset");
+    // Base 1 predates the reset; recycled revision numbers would match it.
+    let err = adham_event_log::write_preferences(&pool, PREFERENCES_SCHEMA_VERSION, PREFS_A, 1)
+        .await
+        .expect_err("pre-reset base must conflict");
     assert!(
-        stored.is_none(),
-        "reset removes the row; callers fall back to defaults"
+        matches!(err, PreferenceWriteError::Conflict(_)),
+        "expected conflict, got {err}"
     );
 }
 
