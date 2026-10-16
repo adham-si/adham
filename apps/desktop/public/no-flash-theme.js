@@ -71,4 +71,47 @@
 
   root.setAttribute('lang', language);
   root.setAttribute('dir', language === 'ar' ? 'rtl' : 'ltr');
+
+  // Presentation datasets for first paint. Values mirror the validated
+  // allowlists in preferences-store.ts (kept inline: this classic script
+  // cannot import modules). Unknown values fall through to the stylesheet
+  // defaults; React re-applies authoritative backend values after mount.
+  function cached(key, allowed, fallback) {
+    var value = null;
+    try {
+      value = window.localStorage.getItem(key);
+    } catch {
+      // Same fallback as above.
+    }
+    return allowed.indexOf(value) !== -1 ? value : fallback;
+  }
+
+  root.dataset.fontFamily = cached(
+    'adham.font-family',
+    ['default', 'system', 'serif', 'mono'],
+    'default',
+  );
+  root.dataset.fontSize = cached('adham.font-size', ['sm', 'md', 'lg'], 'md');
+
+  // "system" resolves against the OS here so first paint already honors it;
+  // React re-resolves from the authoritative snapshot after mount.
+  function systemFlag(query) {
+    return typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+  }
+
+  var contrast = cached('adham.high-contrast', ['system', 'enabled', 'disabled'], 'system');
+  root.dataset.highContrast =
+    contrast === 'system'
+      ? systemFlag('(prefers-contrast: more)')
+        ? 'enabled'
+        : 'disabled'
+      : contrast;
+
+  var motion = cached('adham.reduced-motion', ['system', 'reduce', 'no-preference'], 'system');
+  root.dataset.reducedMotion =
+    motion === 'system'
+      ? systemFlag('(prefers-reduced-motion: reduce)')
+        ? 'reduce'
+        : 'no-preference'
+      : motion;
 })();

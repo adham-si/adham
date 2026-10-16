@@ -2,6 +2,7 @@ import * as React from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
 import { ThemeProvider } from '@/theme/theme-provider';
 import { PlatformProvider } from '@/shared/platform';
+import { PreferencesHost } from '@/shared/settings/use-app-preferences';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -10,6 +11,7 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <ThemeProvider>
+      <PreferencesHost />
       <PlatformProvider>
         <Outlet />
       </PlatformProvider>

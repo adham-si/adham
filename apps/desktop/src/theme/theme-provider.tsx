@@ -6,6 +6,7 @@ import {
   type Palette,
   type ThemeContextValue,
 } from './theme-context';
+import { applyPresentation, readPresentationCache } from '@/shared/settings/preferences-store';
 
 function readStorage(key: string): string | null {
   try {
@@ -63,6 +64,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', resolvedAppearance === 'dark');
   }, [resolvedAppearance]);
+
+  // Startup application for fonts, contrast and motion: the no-flash script
+  // covers the theme class and language direction; everything else applies
+  // here at root mount — not when Settings is first opened. The backend
+  // snapshot re-applies authoritative values when it arrives.
+  React.useEffect(() => {
+    applyPresentation(readPresentationCache());
+  }, []);
 
   const setAppearance = React.useCallback((next: Appearance) => {
     setAppearanceState(next);
