@@ -13,6 +13,11 @@
 //! it does NOT cover the durable pending-send recovery chain
 //! (`record_pending_operation` → `clear_pending_operation`), which has its
 //! own backend coverage in `crates/adham-desktop-api/tests`.
+//!
+//! Platform: non-Windows only. Enabling tauri's `test` feature on Windows
+//! makes the lib test binary fail at load (STATUS_ENTRYPOINT_NOT_FOUND,
+//! tauri-apps/tauri#11028); the TS-side fixture assertions still run on
+//! every platform.
 
 use super::*;
 use serde_json::{json, Value};

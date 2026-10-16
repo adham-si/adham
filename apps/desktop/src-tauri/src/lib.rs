@@ -9,7 +9,7 @@ use adham_desktop_api::{
 #[cfg(target_os = "macos")]
 use tauri::Manager;
 
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod ipc_contract_tests;
 
 /// Single `generate_context!` expansion shared by `run()` and the IPC contract
