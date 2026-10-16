@@ -9,6 +9,7 @@ import {
 } from '@/features/workspace-selection';
 import { useOnboarding, OnboardingJourney } from '@/features/onboarding';
 import { SettingsPage } from '@/pages/settings';
+import { useAppPreferences } from '@/shared/settings/use-app-preferences';
 
 export const Route = createFileRoute('/')({
   component: IndexComponent,
@@ -38,6 +39,8 @@ function IndexComponent() {
 }
 
 function AppBody() {
+  // Real composer input behavior (Settings → Send message on Enter).
+  const { preferences } = useAppPreferences();
   const {
     sel,
     provisionTarget,
@@ -120,7 +123,7 @@ function AppBody() {
       }
     >
       <Context>
-        <ConversationPanel />
+        <ConversationPanel enterToSend={preferences.enterToSend} />
       </Context>
     </Shell>
   );
