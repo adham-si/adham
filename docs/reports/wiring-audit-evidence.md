@@ -64,7 +64,10 @@ across sessions fails authentication.
 
 `cargo test --workspace` → **248 passed, 0 failed** at the candidate revision
 (243 at the original audit, +3 `data_root_override_*` debug-profile tests,
-+2 `ipc_contract_tests`). `cargo fmt --all --check`, `cargo check --workspace
++2 `ipc_contract_tests`). The `ipc_contract_tests` run on Linux/macOS only
+(Windows test binaries skip the tauri-mock module — suspected, unconfirmed
+upstream cause: tauri-apps/tauri#11028; the TS fixture assertions run on
+every platform). `cargo fmt --all --check`, `cargo check --workspace
 --all-targets --locked`, `cargo clippy --workspace --all-targets --locked
 -- -D warnings`, `cargo xtask contracts` (no generated diff) and the desktop
 production build (`tsc --noEmit && vite build`) also pass at the candidate.
@@ -164,13 +167,15 @@ revision are §3 (`pnpm` 46 files / 554 tests; cargo 248 passed).
 
 Item 15 (frontend against real backend) is now covered by the committed
 cross-language contract tests (`9e13fd9`): the TS client's exact invoke
-payloads are pinned in a fixture and replayed through the real Rust dispatch.
+payloads are pinned in a fixture and replayed through the real Rust dispatch
+(Rust leg: Linux/macOS; the TS fixture assertions run on every platform).
 Item 16 (switch/restart under real webview storage) is only partly exercised
 (session renders after send) and remains deferred with S3 corroboration / S4.
 
-Item-14 walk isolation (see §8): **PASS** — dedicated fake `HOME`, a dedicated
-OS-credential-store item for the walk's fresh installation, and a tagged
-binary copy with its own WebKit container. The pre-existing production
+Item-14 walk isolation (see §8): **PASS** — real `HOME` throughout, with app
+data isolated via the debug-only `ADHAM_DATA_ROOT` override (a disposable run
+directory), a dedicated OS-credential-store item for the walk's fresh
+installation, and a tagged binary copy with its own WebKit container. The pre-existing production
 keychain item's attributes were byte-identical at S1 against the pre-walk
 baseline. Walk resources (processes, credential item, WebKit container) are
 preserved; no cleanup has been performed.
@@ -184,8 +189,11 @@ results are not established and must be run on those platforms.
 
 Facts constraining a real launch:
 
-1. **App data**: macOS storage root derives from `$HOME`, so a disposable
-   `HOME` redirects SQLite (`<fake-home>/Library/Application Support/Adham/data/adham.db`).
+1. **App data**: the default macOS storage root derives from `$HOME`, but
+   debug-assertions builds honor the `ADHAM_DATA_ROOT` override
+   (`crates/adham-platform/src/paths.rs`; release builds ignore it). Walk W1
+   therefore ran with the **real `HOME`** and redirected SQLite to a
+   disposable run directory (`<run-dir>/appdata/data/adham.db`, DB-verified).
 2. **Credential store**: the content key lives in the OS credential store
    (service `adham-content-key`, account = installation id). A fresh database
    creates a fresh installation id, and first initialization writes **one new
