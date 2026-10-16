@@ -4,6 +4,7 @@ pub mod content_key;
 pub mod fingerprint;
 pub mod health;
 pub mod identity;
+pub mod preferences;
 pub mod store;
 
 pub use connection::create_sqlite_pool;
@@ -12,10 +13,14 @@ pub use content_key::{
     ContentKeyProvider, InMemoryProvider, OsKeyringProvider, UnavailableKeyProvider,
 };
 pub use fingerprint::{request_fingerprint, scope_fingerprint};
-pub use health::{verify_storage_health, StorageHealthReport};
+pub use health::{StorageHealthReport, verify_storage_health};
 pub use identity::{
-    load_or_create_installation, set_active_scope, set_active_scope_tx, InstallationInit,
-    InstallationRecord,
+    InstallationInit, InstallationRecord, load_or_create_installation, set_active_scope,
+    set_active_scope_tx,
+};
+pub use preferences::{
+    PREFERENCES_SCHEMA_VERSION, PreferenceWriteError, StoredPreferences, read_preferences,
+    reset_preferences, write_preferences,
 };
 pub use store::{
     AppendEventRequest, AppendEventResult, CommandReceiptRecord, HydratedPendingOperation,
