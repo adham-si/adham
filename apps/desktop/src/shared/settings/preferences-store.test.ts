@@ -10,6 +10,7 @@ import {
   type PreferenceSnapshot,
 } from './preferences-store';
 import { DEFAULT_PREFERENCES } from '@/shared/api/adham-client';
+import { AppPreferencesSchema, type ValidatedAppPreferences } from '@/shared/api/schemas';
 
 function envelope(code: string) {
   return {
@@ -30,8 +31,9 @@ function fakeClient(opts: {
 }): PreferenceClient & { updates: Array<{ prefs: unknown; base: number }> } {
   const updates: Array<{ prefs: unknown; base: number }> = [];
   let stored: PreferenceSnapshot = opts.stored ?? {
-    preferences: { ...DEFAULT_PREFERENCES },
+    preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
     revision: 0,
+    backendAvailable: true,
   };
   return {
     updates,
@@ -46,17 +48,18 @@ function fakeClient(opts: {
       stored = {
         preferences: { ...(prefs as PreferenceSnapshot['preferences']) },
         revision: stored.revision + 1,
+        backendAvailable: true,
       };
       return { preferences: { ...stored.preferences }, revision: stored.revision };
     },
   };
 }
 
-const DARK_AR = {
+const DARK_AR: ValidatedAppPreferences = AppPreferencesSchema.parse({
   ...DEFAULT_PREFERENCES,
   appearance: 'dark',
   language: 'ar',
-} as const;
+});
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -70,7 +73,12 @@ beforeEach(() => {
 describe('applyPresentation', () => {
   it('applies explicit values onto the document', () => {
     applyPresentation(
-      { ...DARK_AR, fontSize: 'lg', highContrast: 'enabled', reducedMotion: 'reduce' } as never,
+      AppPreferencesSchema.parse({
+        ...DARK_AR,
+        fontSize: 'lg',
+        highContrast: 'enabled',
+        reducedMotion: 'reduce',
+      }),
       {
         dark: false,
         reduceMotion: false,
@@ -84,7 +92,7 @@ describe('applyPresentation', () => {
   });
 
   it('resolves system values from the OS preference', () => {
-    applyPresentation({ ...DEFAULT_PREFERENCES } as never, {
+    applyPresentation(AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }), {
       dark: true,
       reduceMotion: true,
       highContrast: true,
@@ -143,7 +151,7 @@ describe('legacy migration', () => {
   it('backend values win over stale legacy keys', async () => {
     window.localStorage.setItem('adham.appearance', 'light');
     const client = fakeClient({
-      stored: { preferences: { ...DARK_AR } as never, revision: 2 },
+      stored: { preferences: { ...DARK_AR }, revision: 2, backendAvailable: true },
     });
     const snapshot = await loadSnapshot(client);
     const migrated = await migrateLegacy(client, snapshot);
@@ -167,14 +175,18 @@ describe('savePatch', () => {
   it('rebases and retries once after a revision conflict, preserving the latest value', async () => {
     let calls = 0;
     const client = fakeClient({
-      stored: { preferences: { ...DEFAULT_PREFERENCES } as never, revision: 5 },
+      stored: {
+        preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
+        revision: 5,
+        backendAvailable: true,
+      },
       onUpdate: () => {
         calls += 1;
         if (calls === 1) throw envelope('ConcurrencyConflict');
       },
     });
     const current: PreferenceSnapshot = {
-      preferences: { ...DEFAULT_PREFERENCES },
+      preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
       revision: 4,
       backendAvailable: true,
     };
@@ -188,7 +200,7 @@ describe('savePatch', () => {
   it('surfaces validation failures without writing or retrying', async () => {
     const client = fakeClient({ failUpdate: envelope('InvalidRequest') });
     const current: PreferenceSnapshot = {
-      preferences: { ...DEFAULT_PREFERENCES },
+      preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
       revision: 0,
       backendAvailable: true,
     };
@@ -201,7 +213,7 @@ describe('savePatch', () => {
   it('gives up after a second conflict instead of looping', async () => {
     const client = fakeClient({ failUpdate: envelope('ConcurrencyConflict') });
     const current: PreferenceSnapshot = {
-      preferences: { ...DEFAULT_PREFERENCES },
+      preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
       revision: 0,
       backendAvailable: true,
     };
@@ -214,7 +226,7 @@ describe('savePatch', () => {
   it('reports transport failure so the caller can mark values unsynced, not saved', async () => {
     const client = fakeClient({ failUpdate: new Error('transport down') });
     const current: PreferenceSnapshot = {
-      preferences: { ...DEFAULT_PREFERENCES },
+      preferences: AppPreferencesSchema.parse({ ...DEFAULT_PREFERENCES }),
       revision: 0,
       backendAvailable: true,
     };

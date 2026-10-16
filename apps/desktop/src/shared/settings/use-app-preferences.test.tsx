@@ -62,9 +62,9 @@ describe('useAppPreferences', () => {
       }
       throw new Error(`unexpected command ${cmd}`);
     });
-    let latest: ReturnType<typeof useAppPreferences> | null = null;
+    const seen: { api?: ReturnType<typeof useAppPreferences> } = {};
     renderHarness((api) => {
-      latest = api;
+      seen.api = api;
     });
     await waitFor(() => expect(screen.getByTestId('appearance').textContent).toBe('dark'));
     expect(document.documentElement.classList.contains('dark')).toBe(true);
@@ -72,7 +72,7 @@ describe('useAppPreferences', () => {
     expect(document.documentElement.dataset.highContrast).toBe('enabled');
     expect(document.documentElement.dataset.reducedMotion).toBe('reduce');
     expect(window.localStorage.getItem('adham.appearance')).toBe('dark');
-    expect(latest?.syncState).toBe('synced');
+    expect(seen.api?.syncState).toBe('synced');
   });
 
   it('writes through the backend and mirrors the cache on success', async () => {
@@ -98,13 +98,13 @@ describe('useAppPreferences', () => {
       }
       throw new Error(`unexpected command ${cmd}`);
     });
-    let latest: ReturnType<typeof useAppPreferences> | null = null;
+    const seen: { api?: ReturnType<typeof useAppPreferences> } = {};
     renderHarness((api) => {
-      latest = api;
+      seen.api = api;
     });
     await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('synced'));
     await act(async () => {
-      await latest?.update({ appearance: 'light' });
+      await seen.api?.update({ appearance: 'light' });
     });
     expect(vi.mocked(invoke)).toHaveBeenCalledWith('update_app_preferences', {
       payload: expect.objectContaining({ baseRevision: 1 }),
@@ -141,13 +141,13 @@ describe('useAppPreferences', () => {
       }
       throw new Error(`unexpected command ${cmd}`);
     });
-    let latest: ReturnType<typeof useAppPreferences> | null = null;
+    const seen: { api?: ReturnType<typeof useAppPreferences> } = {};
     renderHarness((api) => {
-      latest = api;
+      seen.api = api;
     });
     await waitFor(() => expect(screen.getByTestId('appearance').textContent).toBe('dark'));
     await act(async () => {
-      await latest?.update({ appearance: 'light' });
+      await seen.api?.update({ appearance: 'light' });
     });
     await waitFor(() => expect(screen.getByTestId('error').textContent).toBe('validation'));
     // Rejected write changes nothing observable.
