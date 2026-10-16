@@ -34,6 +34,7 @@
     "sessionNotFound": "未找到会话。",
     "contextMismatch": "选择已更改，请重新加载后重试。",
     "requestIdConflict": "请求冲突，请重试。",
+    "preferencesConflict": "设置已在别处更改——已重新加载最新值。",
     "notSaved": "消息未保存。"
   },
   "onboarding": {

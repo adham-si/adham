@@ -27,6 +27,8 @@ export const PlatformInfoSchema = z.object({
   os: z.string(),
   arch: z.string(),
   hasNativeTitlebarControls: z.boolean(),
+  appVersion: z.string(),
+  buildProfile: z.string(),
 });
 
 export const WorkspaceSummarySchema = z.object({
@@ -96,6 +98,32 @@ export const StorageStatusSchema = z.object({
   status: z.string(),
   journalMode: z.string(),
   schemaVersion: z.number().int(),
+  dataDir: z.string(),
+});
+
+export const AppPreferencesSchema = z.object({
+  appearance: z.enum(['system', 'light', 'dark']),
+  language: z.enum(['en', 'ar', 'zh-CN', 'ru']),
+  fontFamily: z.enum(['default', 'system', 'serif', 'mono']),
+  fontSize: z.enum(['sm', 'md', 'lg']),
+  highContrast: z.enum(['system', 'enabled', 'disabled']),
+  reducedMotion: z.enum(['system', 'reduce', 'no-preference']),
+  enterToSend: z.boolean(),
+});
+
+export const GetPreferencesResponseSchema = z.object({
+  preferences: AppPreferencesSchema,
+  revision: z.number().int(),
+});
+
+export const UpdatePreferencesResponseSchema = GetPreferencesResponseSchema;
+
+export const ResetPreferencesResponseSchema = GetPreferencesResponseSchema;
+
+export type ValidatedAppPreferences = z.infer<typeof AppPreferencesSchema>;
+
+export const RebuildProjectionsResponseSchema = z.object({
+  replayedCount: z.number().int(),
 });
 
 export const PendingOperationDtoSchema = z.object({

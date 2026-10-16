@@ -134,13 +134,13 @@ describe('ThemeProvider', () => {
   });
 
   it('tracks a live OS change while on system', () => {
-    let listener: ((event: MediaQueryListEvent) => void) | null = null;
+    const listeners = new Map<string, (event: MediaQueryListEvent) => void>();
     window.matchMedia = ((query: string) => ({
       matches: false,
       media: query,
       onchange: null,
       addEventListener: (_: string, handler: (event: MediaQueryListEvent) => void) => {
-        listener = handler;
+        listeners.set(query, handler);
       },
       removeEventListener: () => {},
       addListener: () => {},
@@ -155,9 +155,65 @@ describe('ThemeProvider', () => {
     );
     expect(screen.getByTestId('state').textContent).toBe('system/light/neutral');
     act(() => {
-      listener?.({ matches: true } as MediaQueryListEvent);
+      listeners.get('(prefers-color-scheme: dark)')?.({ matches: true } as MediaQueryListEvent);
     });
     expect(screen.getByTestId('state').textContent).toBe('system/dark/neutral');
+  });
+
+  it('follows live OS reduced-motion changes while set to system', () => {
+    const listeners = new Map<string, (event: MediaQueryListEvent) => void>();
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: (_: string, handler: (event: MediaQueryListEvent) => void) => {
+        listeners.set(query, handler);
+      },
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    window.localStorage.setItem('adham.reduced-motion', 'system');
+
+    render(
+      <ThemeProvider>
+        <AppearanceControl />
+      </ThemeProvider>,
+    );
+    expect(document.documentElement.dataset.reducedMotion).toBe('no-preference');
+    act(() => {
+      listeners.get('(prefers-reduced-motion: reduce)')?.({ matches: true } as MediaQueryListEvent);
+    });
+    expect(document.documentElement.dataset.reducedMotion).toBe('reduce');
+  });
+
+  it('follows live OS contrast changes while set to system', () => {
+    const listeners = new Map<string, (event: MediaQueryListEvent) => void>();
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: (_: string, handler: (event: MediaQueryListEvent) => void) => {
+        listeners.set(query, handler);
+      },
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    window.localStorage.setItem('adham.high-contrast', 'system');
+
+    render(
+      <ThemeProvider>
+        <AppearanceControl />
+      </ThemeProvider>,
+    );
+    expect(document.documentElement.dataset.highContrast).toBe('disabled');
+    act(() => {
+      listeners.get('(prefers-contrast: more)')?.({ matches: true } as MediaQueryListEvent);
+    });
+    expect(document.documentElement.dataset.highContrast).toBe('enabled');
   });
 
   it('accepts only the neutral palette in v1', () => {

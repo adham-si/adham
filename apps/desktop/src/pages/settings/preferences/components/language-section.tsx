@@ -1,8 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, normalizeLanguage } from '@/shared/i18n';
+import { useAppPreferences } from '@/shared/settings/use-app-preferences';
 
 export function LanguageSection() {
-  const { t, i18n } = useTranslation();
+  // Language application (including RTL) is owned by the preferences sync:
+  // the control only records the choice; the backend confirms it first.
+  const { t } = useTranslation();
+  const { preferences, isSaving, update } = useAppPreferences();
 
   return (
     <section aria-labelledby="language-section-heading" className="space-y-4">
@@ -32,8 +36,9 @@ export function LanguageSection() {
           </div>
           <select
             id="display-language-select"
-            value={normalizeLanguage(i18n.language)}
-            onChange={(e) => void i18n.changeLanguage(e.target.value)}
+            value={normalizeLanguage(preferences.language)}
+            disabled={isSaving}
+            onChange={(e) => void update({ language: normalizeLanguage(e.target.value) })}
             className="min-h-control-sm rounded-md border border-border-subtle bg-surface px-3 py-1 text-xs text-foreground cursor-pointer hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
           >
             {Object.values(SUPPORTED_LANGUAGES).map((language) => (

@@ -41,6 +41,8 @@ export interface ConversationPanelProps {
   provisioning?: ProvisioningBackend;
   /** Injectable selection backend for tests; defaults to the real client. */
   selection?: SelectionBackend;
+  /** Backend preference (Settings → Send message on Enter). Defaults to true. */
+  enterToSend?: boolean | undefined;
 }
 
 /**
@@ -53,6 +55,7 @@ export function ConversationPanel({
   backend = adhamClient,
   provisioning,
   selection,
+  enterToSend = true,
 }: ConversationPanelProps) {
   const { t } = useTranslation();
   const conv = useConversation({ backend });
@@ -359,6 +362,7 @@ export function ConversationPanel({
           onSubmit={() => void handleSubmit()}
           onStop={handleStop}
           status="idle"
+          enterToSend={enterToSend}
           mode={mode}
           onChangeMode={setMode}
           selectedModelId={selectedModelId}

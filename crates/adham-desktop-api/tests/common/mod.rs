@@ -31,6 +31,7 @@ pub async fn setup_ctx_with_key(
         .expect("load identity")
 }
 
+#[allow(dead_code)]
 pub async fn create_test_workspace(ctx: &ApiContext, name: &str) -> String {
     let res = handle_create_workspace(
         ctx,
@@ -50,6 +51,7 @@ pub async fn create_test_workspace(ctx: &ApiContext, name: &str) -> String {
     res.data.workspace_id
 }
 
+#[allow(dead_code)]
 pub async fn create_test_project(ctx: &ApiContext, ws_id: &str, name: &str) -> String {
     let res = handle_create_project(
         ctx,

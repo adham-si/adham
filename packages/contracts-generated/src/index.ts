@@ -35,7 +35,15 @@ export type CommandContext = { workspaceId: string | null, projectId: string | n
 
 export type BootstrapState = { isInitialized: boolean, activeWorkspaceId: string | null, activeProjectId: string | null, installationId?: string | null, };
 
-export type PlatformInfo = { os: string, arch: string, hasNativeTitlebarControls: boolean, };
+export type PlatformInfo = { os: string, arch: string, hasNativeTitlebarControls: boolean, 
+/**
+ * Workspace `version`: the shipped application version.
+ */
+appVersion: string, 
+/**
+ * `debug` or `release`: which pipeline produced this binary.
+ */
+buildProfile: string, };
 
 export type CreateWorkspacePayload = { name: string, kind: string, preferredLanguage: string, };
 
@@ -65,9 +73,48 @@ export type ConversationMessageDto = { messageId: string, role: string, text: st
 
 export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, };
 
-export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, };
+export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, 
+/**
+ * Resolved installation data directory (platform policy). Resolution
+ * failure is an error, never a guessed path.
+ */
+dataDir: string, };
 
-export type RebuildProjectionsResponse = { replayedCount: bigint, };
+export type RebuildProjectionsResponse = { replayedCount: number, };
+
+export type AppPreferences = { 
+/**
+ * `system` | `light` | `dark`
+ */
+appearance: string, 
+/**
+ * `en` | `ar` | `zh-CN` | `ru`
+ */
+language: string, 
+/**
+ * `default` | `system` | `serif` | `mono`
+ */
+fontFamily: string, 
+/**
+ * `sm` | `md` | `lg`
+ */
+fontSize: string, 
+/**
+ * `system` | `enabled` | `disabled`
+ */
+highContrast: string, 
+/**
+ * `system` | `reduce` | `no-preference`
+ */
+reducedMotion: string, enterToSend: boolean, };
+
+export type GetPreferencesResponse = { preferences: AppPreferences, revision: number, };
+
+export type UpdatePreferencesPayload = { preferences: AppPreferences, baseRevision: number, };
+
+export type UpdatePreferencesResponse = { preferences: AppPreferences, revision: number, };
+
+export type ResetPreferencesResponse = { preferences: AppPreferences, revision: number, };
 
 export type RecordPendingOperationPayload = { operationId: string, kind: string, messageRequestId: string, createRequestId: string | null, text: string, title: string | null, };
 

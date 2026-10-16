@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@adham/ui';
+import { PreviewNote } from '../preview-note';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Add01Icon,
   McpServerIcon,
   GlobalSearchIcon,
   Folder01Icon,
@@ -22,9 +21,9 @@ import {
 export function McpPage() {
   const { t } = useTranslation();
   const [tab, setTab] = React.useState<McpFilterTab>('all');
-  const [configuredIds, setConfiguredIds] = React.useState<Set<string>>(
-    () => new Set(['playwright', 'filesystem']),
-  );
+  // No MCP server is configured in this build: per-tool grants (spec §10)
+  // do not exist yet, so nothing may claim to be configured.
+  const [configuredIds, setConfiguredIds] = React.useState<Set<string>>(() => new Set());
 
   const mcpServers: McpServerItem[] = [
     {
@@ -150,6 +149,8 @@ export function McpPage() {
         </p>
       </div>
 
+      <PreviewNote />
+
       {/* Sandbox & Isolation Note */}
       <McpSandboxSection />
 
@@ -162,18 +163,16 @@ export function McpPage() {
           <h3 id="mcp-servers-heading" className="text-sm font-semibold text-foreground">
             {t('settings.mcp.listTitle', 'Servers to use with Adham')}
           </h3>
-          <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
-            <HugeiconsIcon icon={Add01Icon} />
-            <span>{t('settings.mcp.addServer', 'Add server')}</span>
-          </Button>
         </div>
 
-        {/* Dynamic MCP Servers List */}
-        <McpServersList
-          servers={filteredServers}
-          configuredIds={configuredIds}
-          onToggle={handleToggle}
-        />
+        {/* Dynamic MCP Servers List (not connected: disabled preview) */}
+        <fieldset disabled className="min-w-0 border-0 p-0 m-0">
+          <McpServersList
+            servers={filteredServers}
+            configuredIds={configuredIds}
+            onToggle={handleToggle}
+          />
+        </fieldset>
       </section>
 
       {/* Footer Documentation Link */}

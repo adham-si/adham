@@ -53,6 +53,7 @@ const DYNAMIC_KEYS = [
   'error.sessionNotFound',
   'error.contextMismatch',
   'error.requestIdConflict',
+  'error.preferencesConflict',
   'error.notSaved',
 ];
 

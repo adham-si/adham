@@ -4,6 +4,7 @@ pub mod content_key;
 pub mod fingerprint;
 pub mod health;
 pub mod identity;
+pub mod preferences;
 pub mod store;
 
 pub use connection::create_sqlite_pool;
@@ -16,6 +17,10 @@ pub use health::{verify_storage_health, StorageHealthReport};
 pub use identity::{
     load_or_create_installation, set_active_scope, set_active_scope_tx, InstallationInit,
     InstallationRecord,
+};
+pub use preferences::{
+    read_preferences, reset_preferences, write_preferences, PreferenceWriteError,
+    StoredPreferences, PREFERENCES_SCHEMA_VERSION,
 };
 pub use store::{
     AppendEventRequest, AppendEventResult, CommandReceiptRecord, HydratedPendingOperation,

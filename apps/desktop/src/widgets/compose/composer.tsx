@@ -40,6 +40,8 @@ export interface ComposerProps {
   placeholder?: string | undefined;
   isCentered?: boolean | undefined;
   className?: string | undefined;
+  /** Backend preference (Settings → Send message on Enter). Defaults to true. */
+  enterToSend?: boolean | undefined;
 }
 
 export function Composer({
@@ -70,6 +72,7 @@ export function Composer({
   placeholder,
   isCentered = false,
   className = '',
+  enterToSend = true,
 }: ComposerProps) {
   const { t } = useTranslation();
   const [isDragOver, setIsDragOver] = React.useState(false);
@@ -172,6 +175,7 @@ export function Composer({
           onAttachPastedBlob={handleAttachPastedBlob}
           placeholder={placeholder}
           disabled={status === 'sending' || status === 'streaming'}
+          enterToSend={enterToSend}
         />
 
         {/* Bottom Control Bar: Attachments, Modes, Model & Privacy, Send/Stop */}

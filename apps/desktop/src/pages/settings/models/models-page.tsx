@@ -1,8 +1,5 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@adham/ui';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Add01Icon } from '@hugeicons/core-free-icons';
 import { useTheme } from '@/theme/use-theme';
 import {
   DefaultModelSection,
@@ -11,6 +8,7 @@ import {
   ModelsList,
   type ModelItem,
 } from './components';
+import { PreviewNote } from '../preview-note';
 
 export function ModelsPage() {
   const { t } = useTranslation();
@@ -18,9 +16,14 @@ export function ModelsPage() {
   const isDark = resolvedAppearance === 'dark';
 
   const [tab, setTab] = React.useState<ModelFilterTab>('all');
-  const [defaultModelId, setDefaultModelId] = React.useState('claude-3-7-sonnet');
-  const [fallbackModelId, setFallbackModelId] = React.useState('qwen2-5-coder-7b-local');
-  const [strictLocalBoundary, setStrictLocalBoundary] = React.useState(true);
+  // No model is selected in this build: routing and the provider gateway
+  // (P0-08) do not exist yet, so no default, fallback or boundary may claim
+  // to be active. The catalog below stays as product direction.
+  const [defaultModelId, setDefaultModelId] = React.useState('');
+  const [fallbackModelId, setFallbackModelId] = React.useState('');
+  // Neutral default: no boundary is enforced in this build, so the switch
+  // must not render ON as if a local-only boundary were active.
+  const [strictLocalBoundary, setStrictLocalBoundary] = React.useState(false);
 
   const models: ModelItem[] = [
     {
@@ -286,16 +289,20 @@ export function ModelsPage() {
         </p>
       </div>
 
-      {/* Workspace Defaults & Recovery Chain Section */}
-      <DefaultModelSection
-        models={models}
-        defaultModelId={defaultModelId}
-        fallbackModelId={fallbackModelId}
-        strictLocalBoundary={strictLocalBoundary}
-        onSelectDefault={setDefaultModelId}
-        onSelectFallback={setFallbackModelId}
-        onToggleLocalBoundary={setStrictLocalBoundary}
-      />
+      <PreviewNote />
+
+      {/* Workspace Defaults & Recovery Chain Section (not connected: disabled preview) */}
+      <fieldset disabled className="min-w-0 border-0 p-0 m-0 space-y-4">
+        <DefaultModelSection
+          models={models}
+          defaultModelId={defaultModelId}
+          fallbackModelId={fallbackModelId}
+          strictLocalBoundary={strictLocalBoundary}
+          onSelectDefault={setDefaultModelId}
+          onSelectFallback={setFallbackModelId}
+          onToggleLocalBoundary={setStrictLocalBoundary}
+        />
+      </fieldset>
 
       {/* Filter Tabs */}
       <ModelFilterTabs activeTab={tab} onTabChange={setTab} counts={counts} />
@@ -306,20 +313,18 @@ export function ModelsPage() {
           <h3 id="models-section-heading" className="text-sm font-semibold text-foreground">
             {t('settings.models.listTitle', 'Available Models')}
           </h3>
-          <Button size="sm" variant="primary" className="[&_svg]:size-icon-sm">
-            <HugeiconsIcon icon={Add01Icon} />
-            <span>{t('settings.models.addModel', 'Add custom model')}</span>
-          </Button>
         </div>
 
-        {/* Dynamic Model Cards List */}
-        <ModelsList
-          models={filteredModels}
-          defaultModelId={defaultModelId}
-          fallbackModelId={fallbackModelId}
-          onSetDefault={setDefaultModelId}
-          onSetFallback={setFallbackModelId}
-        />
+        {/* Dynamic Model Cards List (not connected: disabled preview) */}
+        <fieldset disabled className="min-w-0 border-0 p-0 m-0">
+          <ModelsList
+            models={filteredModels}
+            defaultModelId={defaultModelId}
+            fallbackModelId={fallbackModelId}
+            onSetDefault={setDefaultModelId}
+            onSetFallback={setFallbackModelId}
+          />
+        </fieldset>
       </section>
 
       {/* Local-first Policy Note */}

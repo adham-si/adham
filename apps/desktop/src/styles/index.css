@@ -45,6 +45,33 @@ html[data-font-family="mono"] {
 }
 
 /*
+  High contrast (settings: appearance → high contrast). Collapses muted text
+  and subtle borders onto their strongest tokens so secondary content stays
+  legible. Applies in both schemes; `enabled` is always a resolved value
+  (the "system" choice resolves via prefers-contrast before first paint).
+*/
+html[data-high-contrast="enabled"] {
+  --foreground-secondary: var(--foreground);
+  --foreground-muted: var(--foreground);
+  --border-subtle: var(--border-strong);
+  --border: var(--border-strong);
+}
+
+/*
+  Reduced motion (settings: appearance → reduced motion). Forces animations
+  and transitions to complete near-instantly and disables smooth scrolling.
+  Covers Tailwind animate-* utilities, which respond to the media query only.
+*/
+html[data-reduced-motion="reduce"] *,
+html[data-reduced-motion="reduce"] *::before,
+html[data-reduced-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/*
   The scheme declaration lives in tokens.css, where the light and dark blocks
   each set their own. Setting one here would override the theme, leaving native
   scrollbars, form controls and the caret on the wrong scheme.

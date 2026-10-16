@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
+  AppPreferences,
   BootstrapState,
   CommandContext,
   ClearPendingOperationPayload,
@@ -7,45 +8,57 @@ import type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  GetPreferencesResponse,
   PendingOperationDto,
   PendingOperationList,
   ProjectList,
   PlatformInfo,
   ProjectSummary,
+  RebuildProjectionsResponse,
   RecordPendingOperationPayload,
+  ResetPreferencesResponse,
   SelectProjectPayload,
   SessionList,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
+  UpdatePreferencesResponse,
   WorkspaceList,
   WorkspaceSummary,
 } from '@adham/contracts-generated';
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
+  GetPreferencesResponseSchema,
   PendingOperationDtoSchema,
   PendingOperationListSchema,
   ProjectListSchema,
   PlatformInfoSchema,
   ProjectSummarySchema,
+  RebuildProjectionsResponseSchema,
+  ResetPreferencesResponseSchema,
   SessionListSchema,
   SessionSummarySchema,
   StorageStatusSchema,
   SubmittedMessageSchema,
+  UpdatePreferencesResponseSchema,
   WorkspaceListSchema,
   WorkspaceSummarySchema,
 } from './schemas';
 
 export type {
+  AppPreferences,
   BootstrapState,
   CommandContext,
   CommandEnvelope,
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  GetPreferencesResponse,
   PlatformInfo,
   ProjectSummary,
+  RebuildProjectionsResponse,
+  ResetPreferencesResponse,
   SessionList,
   ClearPendingOperationPayload,
   PendingOperationDto,
@@ -54,6 +67,7 @@ export type {
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
+  UpdatePreferencesResponse,
   WorkspaceSummary,
 };
 
@@ -116,6 +130,13 @@ export interface AdhamClient {
   ): Promise<ConversationPage>;
   getStorageStatus(): Promise<StorageStatus>;
   getPlatformInfo(): Promise<PlatformInfo>;
+  getAppPreferences(): Promise<GetPreferencesResponse>;
+  updateAppPreferences(
+    preferences: AppPreferences,
+    baseRevision: number,
+  ): Promise<UpdatePreferencesResponse>;
+  resetAppPreferences(): Promise<ResetPreferencesResponse>;
+  adminRebuildProjections(): Promise<RebuildProjectionsResponse>;
   recordPendingOperation(
     workspaceId: string,
     projectId: string,
@@ -306,6 +327,31 @@ export class AdhamApiClient implements AdhamClient {
     return PlatformInfoSchema.parse(raw);
   }
 
+  async getAppPreferences(): Promise<GetPreferencesResponse> {
+    const raw = await invoke('get_app_preferences');
+    return GetPreferencesResponseSchema.parse(raw);
+  }
+
+  async updateAppPreferences(
+    preferences: AppPreferences,
+    baseRevision: number,
+  ): Promise<UpdatePreferencesResponse> {
+    const raw = await invoke('update_app_preferences', {
+      payload: { preferences, baseRevision },
+    });
+    return UpdatePreferencesResponseSchema.parse(raw);
+  }
+
+  async resetAppPreferences(): Promise<ResetPreferencesResponse> {
+    const raw = await invoke('reset_app_preferences');
+    return ResetPreferencesResponseSchema.parse(raw);
+  }
+
+  async adminRebuildProjections(): Promise<RebuildProjectionsResponse> {
+    const raw = await invoke('admin_rebuild_projections');
+    return RebuildProjectionsResponseSchema.parse(raw);
+  }
+
   async recordPendingOperation(
     workspaceId: string,
     projectId: string,
@@ -342,3 +388,16 @@ export class AdhamApiClient implements AdhamClient {
 }
 
 export const adhamClient = new AdhamApiClient();
+
+/// Compiled installation defaults. Mirror of the backend
+/// `AppPreferences::defaults`; used before the first backend read resolves
+/// and as the fallback when the backend is unreachable.
+export const DEFAULT_PREFERENCES: AppPreferences = {
+  appearance: 'system',
+  language: 'en',
+  fontFamily: 'default',
+  fontSize: 'md',
+  highContrast: 'system',
+  reducedMotion: 'system',
+  enterToSend: true,
+};

@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { DispatchStrategySection, FallbackCascadesSection, TaskRoutingSection } from './components';
+import { PreviewNote } from '../preview-note';
 
 export function RoutingPage() {
   const { t } = useTranslation();
 
-  // Dispatch policy state
+  // Dispatch policy state (preview only: no routing runtime reads these —
+  // dispatch lives behind P0-07/P0-08, so the sections below are disabled).
   const [strategy, setStrategy] = React.useState('local-only');
   const [timeout, setTimeout] = React.useState('30s');
   const [autoRetry, setAutoRetry] = React.useState(true);
@@ -36,37 +38,45 @@ export function RoutingPage() {
         </p>
       </div>
 
-      {/* Dispatch Policy Section */}
-      <DispatchStrategySection
-        strategy={strategy}
-        timeout={timeout}
-        autoRetry={autoRetry}
-        streaming={streaming}
-        onStrategyChange={setStrategy}
-        onTimeoutChange={setTimeout}
-        onAutoRetryChange={setAutoRetry}
-        onStreamingChange={setStreaming}
-      />
+      <PreviewNote />
 
-      {/* Fallback Cascades Section */}
-      <FallbackCascadesSection
-        promptCloud={promptCloud}
-        maxCascades={maxCascades}
-        onPromptCloudChange={setPromptCloud}
-        onMaxCascadesChange={setMaxCascades}
-      />
+      {/* Dispatch Policy Section (not connected: disabled preview) */}
+      <fieldset disabled className="min-w-0 border-0 p-0 m-0 space-y-4">
+        <DispatchStrategySection
+          strategy={strategy}
+          timeout={timeout}
+          autoRetry={autoRetry}
+          streaming={streaming}
+          onStrategyChange={setStrategy}
+          onTimeoutChange={setTimeout}
+          onAutoRetryChange={setAutoRetry}
+          onStreamingChange={setStreaming}
+        />
+      </fieldset>
 
-      {/* Task-Specific Routing Section */}
-      <TaskRoutingSection
-        codingModel={codingModel}
-        reasoningModel={reasoningModel}
-        visionModel={visionModel}
-        summarizationModel={summarizationModel}
-        onCodingModelChange={setCodingModel}
-        onReasoningModelChange={setReasoningModel}
-        onVisionModelChange={setVisionModel}
-        onSummarizationModelChange={setSummarizationModel}
-      />
+      {/* Fallback Cascades Section (not connected: disabled preview) */}
+      <fieldset disabled className="min-w-0 border-0 p-0 m-0 space-y-4">
+        <FallbackCascadesSection
+          promptCloud={promptCloud}
+          maxCascades={maxCascades}
+          onPromptCloudChange={setPromptCloud}
+          onMaxCascadesChange={setMaxCascades}
+        />
+      </fieldset>
+
+      {/* Task-Specific Routing Section (not connected: disabled preview) */}
+      <fieldset disabled className="min-w-0 border-0 p-0 m-0 space-y-4">
+        <TaskRoutingSection
+          codingModel={codingModel}
+          reasoningModel={reasoningModel}
+          visionModel={visionModel}
+          summarizationModel={summarizationModel}
+          onCodingModelChange={setCodingModel}
+          onReasoningModelChange={setReasoningModel}
+          onVisionModelChange={setVisionModel}
+          onSummarizationModelChange={setSummarizationModel}
+        />
+      </fieldset>
 
       {/* Footer Note */}
       <div className="pt-2 text-xs text-foreground-secondary">

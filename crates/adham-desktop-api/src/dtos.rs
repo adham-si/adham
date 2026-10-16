@@ -49,6 +49,10 @@ pub struct PlatformInfo {
     pub os: String,
     pub arch: String,
     pub has_native_titlebar_controls: bool,
+    /// Workspace `version`: the shipped application version.
+    pub app_version: String,
+    /// `debug` or `release`: which pipeline produced this binary.
+    pub build_profile: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -192,13 +196,118 @@ pub struct StorageStatus {
     pub status: String,
     pub journal_mode: String,
     pub schema_version: u32,
+    /// Resolved installation data directory (platform policy). Resolution
+    /// failure is an error, never a guessed path.
+    pub data_dir: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct RebuildProjectionsResponse {
-    pub replayed_count: u64,
+    pub replayed_count: u32,
+}
+
+/// Installation-scoped presentation preferences (SETTINGS-01 Pillar 1).
+/// Presentation only: no secrets, no operational/security policy.
+/// Every string field is a closed allowlist validated by
+/// `AppPreferences::validate`; unknown values are rejected, never stored.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AppPreferences {
+    /// `system` | `light` | `dark`
+    pub appearance: String,
+    /// `en` | `ar` | `zh-CN` | `ru`
+    pub language: String,
+    /// `default` | `system` | `serif` | `mono`
+    pub font_family: String,
+    /// `sm` | `md` | `lg`
+    pub font_size: String,
+    /// `system` | `enabled` | `disabled`
+    pub high_contrast: String,
+    /// `system` | `reduce` | `no-preference`
+    pub reduced_motion: String,
+    pub enter_to_send: bool,
+}
+
+impl AppPreferences {
+    pub fn defaults() -> Self {
+        Self {
+            appearance: "system".to_string(),
+            language: "en".to_string(),
+            font_family: "default".to_string(),
+            font_size: "md".to_string(),
+            high_contrast: "system".to_string(),
+            reduced_motion: "system".to_string(),
+            enter_to_send: true,
+        }
+    }
+
+    fn check_one(field: &str, value: &str, allowed: &[&str]) -> Result<(), String> {
+        if allowed.contains(&value) {
+            Ok(())
+        } else {
+            Err(format!("VALIDATION_FAILED:{field}={value}"))
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        Self::check_one("appearance", &self.appearance, &["system", "light", "dark"])?;
+        Self::check_one("language", &self.language, &["en", "ar", "zh-CN", "ru"])?;
+        Self::check_one(
+            "fontFamily",
+            &self.font_family,
+            &["default", "system", "serif", "mono"],
+        )?;
+        Self::check_one("fontSize", &self.font_size, &["sm", "md", "lg"])?;
+        Self::check_one(
+            "highContrast",
+            &self.high_contrast,
+            &["system", "enabled", "disabled"],
+        )?;
+        Self::check_one(
+            "reducedMotion",
+            &self.reduced_motion,
+            &["system", "reduce", "no-preference"],
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GetPreferencesResponse {
+    pub preferences: AppPreferences,
+    pub revision: u32,
+}
+
+/// Plain payload (no idempotency envelope): the revision guard in
+/// `base_revision` is the ordering mechanism. A stale base conflicts
+/// instead of overwriting.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UpdatePreferencesPayload {
+    pub preferences: AppPreferences,
+    pub base_revision: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UpdatePreferencesResponse {
+    pub preferences: AppPreferences,
+    pub revision: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ResetPreferencesResponse {
+    pub preferences: AppPreferences,
+    pub revision: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -267,6 +376,12 @@ impl ErrorEnvelope {
                 PublicErrorCode::RequestIdConflict,
                 "error.requestIdConflict",
                 false,
+            )
+        } else if err.starts_with("PREFERENCE_REVISION_CONFLICT") {
+            (
+                PublicErrorCode::ConcurrencyConflict,
+                "error.preferencesConflict",
+                true,
             )
         } else {
             (PublicErrorCode::InternalError, "error.internalError", true)

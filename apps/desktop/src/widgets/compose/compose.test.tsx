@@ -220,6 +220,34 @@ describe('RTL and ComposeInput', () => {
     expect(handleSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it('inserts a newline instead of submitting when enter-to-send is off', () => {
+    const handleSubmit = vi.fn();
+    render(
+      <ComposeInput
+        value="Build this component"
+        onChange={vi.fn()}
+        onSubmit={handleSubmit}
+        enterToSend={false}
+      />,
+    );
+    const textarea = screen.getByRole('textbox', { name: /composer input/i });
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    fireEvent(textarea, event);
+    expect(handleSubmit).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('ignores Enter while an IME composition is in progress', () => {
+    const handleSubmit = vi.fn();
+    render(<ComposeInput value="nihongo" onChange={vi.fn()} onSubmit={handleSubmit} />);
+    const textarea = screen.getByRole('textbox', { name: /composer input/i });
+
+    // IME confirmations surface as keyCode 229; they must never submit.
+    fireEvent.keyDown(textarea, { key: 'Enter', keyCode: 229 });
+    expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
   it('intercepts pastes exceeding 2000 characters and turns them into a context chip', () => {
     const handleAttachBlob = vi.fn();
     render(
@@ -387,5 +415,24 @@ describe('Unified Composer Component', () => {
 
     fireEvent.click(stopButton);
     expect(handleStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes enter-to-send through to the composer input', () => {
+    const handleSubmit = vi.fn();
+
+    render(
+      <Composer
+        inputText="Write tests"
+        onChangeInput={vi.fn()}
+        onSubmit={handleSubmit}
+        status="idle"
+        enterToSend={false}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole('textbox', { name: /composer input/i }), {
+      key: 'Enter',
+      shiftKey: false,
+    });
+    expect(handleSubmit).not.toHaveBeenCalled();
   });
 });

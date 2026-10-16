@@ -15,6 +15,9 @@ export interface ComposeInputProps {
   minRows?: number | undefined;
   maxRows?: number | undefined;
   className?: string | undefined;
+  /** Backend preference (Settings → Send message on Enter). Off means Enter
+   * inserts a newline like Shift+Enter. Defaults to true. */
+  enterToSend?: boolean | undefined;
 }
 
 // Arabic / RTL character range detector
@@ -39,6 +42,7 @@ export function ComposeInput({
   minRows = 2,
   maxRows = 10,
   className = '',
+  enterToSend = true,
 }: ComposeInputProps) {
   const { t } = useTranslation();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -79,9 +83,19 @@ export function ComposeInput({
     }
   };
 
-  // Keyboard navigation: Enter sends, Shift+Enter newlines, Up/Down recalls history when cursor at start/empty
+  // Keyboard navigation: Enter sends (when enter-to-send is on),
+  // Shift+Enter always newlines, Up/Down recalls history when cursor at start/empty
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // IME confirmations surface as keyCode 229: never submit mid-composition.
+    const composing =
+      e.keyCode === 229 ||
+      (typeof e.nativeEvent === 'object' &&
+        e.nativeEvent !== null &&
+        'isComposing' in e.nativeEvent &&
+        (e.nativeEvent as { isComposing?: unknown }).isComposing === true);
+    if (composing) return;
+
+    if (e.key === 'Enter' && !e.shiftKey && enterToSend) {
       e.preventDefault();
       if (value.trim() && !disabled) {
         onSubmit();

@@ -6,6 +6,7 @@ import {
   type Palette,
   type ThemeContextValue,
 } from './theme-context';
+import { applyPresentation, readPresentationCache } from '@/shared/settings/preferences-store';
 
 function readStorage(key: string): string | null {
   try {
@@ -23,12 +24,13 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
-function systemPrefersDark(): boolean {
-  return (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
+function mediaMatches(query: string): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
 }
+
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+const REDUCE_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+const MORE_CONTRAST_QUERY = '(prefers-contrast: more)';
 
 function readAppearance(): Appearance {
   const stored = readStorage(APPEARANCE_STORAGE_KEY);
@@ -44,17 +46,33 @@ function readAppearance(): Appearance {
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [appearance, setAppearanceState] = React.useState<Appearance>(readAppearance);
-  const [systemDark, setSystemDark] = React.useState(systemPrefersDark);
+  const [systemDark, setSystemDark] = React.useState(() => mediaMatches(DARK_QUERY));
+  const [systemReduceMotion, setSystemReduceMotion] = React.useState(() =>
+    mediaMatches(REDUCE_MOTION_QUERY),
+  );
+  const [systemHighContrast, setSystemHighContrast] = React.useState(() =>
+    mediaMatches(MORE_CONTRAST_QUERY),
+  );
   const [palette] = React.useState<Palette>('neutral');
 
-  // Track the OS preference live, so `system` follows the machine changing at
-  // runtime rather than only at load.
+  // Track OS preferences live, so `system` choices follow the machine
+  // changing at runtime rather than only at load.
   React.useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
-    const query = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = (event: MediaQueryListEvent) => setSystemDark(event.matches);
-    query.addEventListener('change', onChange);
-    return () => query.removeEventListener('change', onChange);
+    const watches: Array<[query: string, set: (matches: boolean) => void]> = [
+      [DARK_QUERY, setSystemDark],
+      [REDUCE_MOTION_QUERY, setSystemReduceMotion],
+      [MORE_CONTRAST_QUERY, setSystemHighContrast],
+    ];
+    const cleanups = watches.map(([query, set]) => {
+      const list = window.matchMedia(query);
+      const onChange = (event: MediaQueryListEvent) => set(event.matches);
+      list.addEventListener('change', onChange);
+      return () => list.removeEventListener('change', onChange);
+    });
+    return () => {
+      for (const cleanup of cleanups) cleanup();
+    };
   }, []);
 
   const resolvedAppearance: 'light' | 'dark' =
@@ -63,6 +81,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', resolvedAppearance === 'dark');
   }, [resolvedAppearance]);
+
+  // Startup application for fonts, contrast and motion: the no-flash script
+  // covers the theme class and language direction; everything else applies
+  // here at root mount — not when Settings is first opened. The backend
+  // snapshot re-applies authoritative values when it arrives. Re-runs on OS
+  // changes so `system` contrast/motion choices stay live; the cache always
+  // mirrors the last-confirmed backend values, so re-applying it cannot
+  // clobber anything newer.
+  React.useEffect(() => {
+    applyPresentation(readPresentationCache(), {
+      dark: systemDark,
+      reduceMotion: systemReduceMotion,
+      highContrast: systemHighContrast,
+    });
+  }, [systemDark, systemReduceMotion, systemHighContrast]);
 
   const setAppearance = React.useCallback((next: Appearance) => {
     setAppearanceState(next);
