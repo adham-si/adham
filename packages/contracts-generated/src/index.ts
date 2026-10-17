@@ -152,6 +152,10 @@ export type CompletionStartDto = { opId: string, messageId: string, };
 
 export type ListProviderAccountsResponse = { accounts: Array<ProviderAccountDto>, };
 
+export type ListProviderModelsPayload = { accountId: string, };
+
+export type ListProviderModelsResponse = { models: Array<ProviderModelDto>, };
+
 export type StopCompletionPayload = { opId: string, };
 
 export type StopCompletionResponse = { opId: string, status: string, };

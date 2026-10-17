@@ -458,6 +458,7 @@ fn provider_mock_app(ctx: ApiContext) -> tauri::App<MockRuntime> {
             get_conversation,
             list_provider_accounts,
             test_provider_connection,
+            list_provider_models,
             discover_ollama_models,
             update_provider_account,
             complete_once_streaming,
@@ -1570,4 +1571,46 @@ fn provider_accounts_are_listable_and_unsaved_probe_persists_nothing() {
     let response = invoke(&webview, "list_provider_accounts", json!({})).expect("list again");
     let accounts = response["data"]["accounts"].as_array().expect("accounts");
     assert_eq!(accounts.len(), 1, "probes never persisted an account row");
+}
+
+/// A6 support: persisted registry models are listing-reachable without any
+/// network round-trip.
+#[test]
+fn provider_models_are_listable_from_the_pinned_registry() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let base_url = spawn_stub_ollama(&runtime, None, captures.clone(), ChatProgram::once(vec![]));
+    let account_id = seed_local_account_with_model(&runtime, &ctx, &base_url);
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+
+    let response = invoke(
+        &webview,
+        "list_provider_models",
+        args_for(json!({}), json!({"accountId": account_id})),
+    )
+    .expect("list models");
+    let models = response["data"]["models"].as_array().expect("models");
+    assert_eq!(models.len(), 1, "seeded m:latest via pinned registry");
+    assert_eq!(models[0]["modelId"], json!("m:latest"));
+    assert_eq!(
+        models[0]["digest"],
+        json!("sha256:seeded"),
+        "digest pin kept"
+    );
+    assert_eq!(
+        captures.accepts(),
+        0,
+        "registry read never touches the wire"
+    );
+
+    // unknown account blocked without a network round-trip
+    let text = resp_text(invoke(
+        &webview,
+        "list_provider_models",
+        args_for(json!({}), json!({"accountId": "ghost"})),
+    ));
+    assert!(text.contains("InvalidRequest"), "{text}");
+    assert_eq!(captures.accepts(), 0);
 }

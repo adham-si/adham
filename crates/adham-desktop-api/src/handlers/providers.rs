@@ -1054,3 +1054,25 @@ pub async fn transient_probe(
         }),
     }
 }
+
+/// Persisted digest-pinned models for one account (registry read — no
+/// network), used by the Models page and composer picker on reload.
+pub async fn handle_list_provider_models(
+    ctx: &ApiContext,
+    env: CommandEnvelope<ListProviderModelsPayload>,
+) -> Result<CommandResult<ListProviderModelsResponse>, String> {
+    let account = local_account(ctx, env.payload.account_id.trim()).await?;
+    let pinned = ctx
+        .registry
+        .list_models(&account.account_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let models = pinned
+        .iter()
+        .map(|m| provider_model_dto(&m.descriptor, &m.digest))
+        .collect();
+    Ok(ok_result(
+        env.request_id,
+        ListProviderModelsResponse { models },
+    ))
+}

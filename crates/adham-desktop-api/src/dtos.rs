@@ -506,6 +506,20 @@ pub struct StopCompletionPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
+pub struct ListProviderModelsPayload {
+    pub account_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct ListProviderModelsResponse {
+    pub models: Vec<ProviderModelDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
 pub struct ListProviderAccountsResponse {
     pub accounts: Vec<ProviderAccountDto>,
 }

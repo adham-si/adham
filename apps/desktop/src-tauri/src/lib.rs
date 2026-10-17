@@ -2,14 +2,14 @@ use adham_desktop_api::{
     ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
     CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
     CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
-    GetPreferencesResponse, ListProviderAccountsResponse, PendingOperationDto,
-    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
-    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
-    RecordPendingOperationPayload, ResetPreferencesResponse, SelectProjectPayload, SessionList,
-    SessionSummary, StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
-    SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
-    WorkspaceList, WorkspaceSummary,
+    GetPreferencesResponse, ListProviderAccountsResponse, ListProviderModelsPayload,
+    ListProviderModelsResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
+    ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
+    RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
+    SelectProjectPayload, SessionList, SessionSummary, StopCompletionPayload,
+    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
+    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
+    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -162,6 +162,16 @@ async fn test_provider_connection(
     request: CommandEnvelope<TestProviderConnectionPayload>,
 ) -> Result<CommandResult<ProviderHealthResponse>, ErrorEnvelope> {
     adham_desktop_api::handle_test_provider_connection(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn list_provider_models(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<ListProviderModelsPayload>,
+) -> Result<CommandResult<ListProviderModelsResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_list_provider_models(&state, request)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -356,6 +366,7 @@ pub fn run() {
             list_provider_accounts,
             test_provider_connection,
             discover_ollama_models,
+            list_provider_models,
             update_provider_account,
             complete_once_streaming,
             stop_completion,
