@@ -130,6 +130,15 @@ export type PendingOperationList = { operations: Array<PendingOperationDto>, tru
 
 export type ClearPendingOperationPayload = { operationId: string, expectedMessageRequestId: string, reason: string, };
 
+export type MarkCompletionInterruptedPayload = { operationId: string, expectedMessageRequestId: string, };
+
+export type MarkCompletionInterruptedResponse = { 
+/**
+ * `interrupted` when this call closed the op, `already-resolved` when a
+ * previous call (or the live run) had already recorded a terminal.
+ */
+status: string, };
+
 export type TestProviderConnectionPayload = { accountId: string, 
 /**
  * When set (with an empty `accountId`), probe this URL without saving

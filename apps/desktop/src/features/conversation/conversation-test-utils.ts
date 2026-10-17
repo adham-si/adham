@@ -5,6 +5,9 @@ import type { ConversationBackend } from './use-conversation';
 // test double assignments typecheck exactly like production wiring.
 export type CompletionStreamFn = NonNullable<ConversationBackend['completeOnceStreaming']>;
 export type StopCompletionFn = NonNullable<ConversationBackend['stopCompletion']>;
+export type MarkCompletionInterruptedFn = NonNullable<
+  ConversationBackend['markCompletionInterrupted']
+>;
 /** The stream-event callback parameter of the completion dispatch. */
 export type StreamEventParam = Parameters<CompletionStreamFn>[4];
 // Explicit, publicly-nameable mock signatures: bare vi.fn() infers vitest's
@@ -43,6 +46,7 @@ export interface ConversationFakeBackend {
   // contract represented by `ConversationBackend` itself.
   completeOnceStreaming?: Mock<CompletionStreamFn>;
   stopCompletion?: Mock<StopCompletionFn>;
+  markCompletionInterrupted?: Mock<MarkCompletionInterruptedFn>;
 }
 
 export function fakeBackend(): ConversationFakeBackend {

@@ -152,6 +152,10 @@ export const PendingOperationListSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const MarkCompletionInterruptedResponseSchema = z.object({
+  status: z.string(),
+});
+
 // ===== Delivery A: provider commands + streaming completions =====
 
 export const MessageUsageV1Schema = z.object({

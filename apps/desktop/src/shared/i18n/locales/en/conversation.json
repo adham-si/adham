@@ -67,6 +67,21 @@
       "checkingTarget": "Checking target availability…",
       "resendFailed": "Resend failed.",
       "dismissFailed": "Dismissal failed."
+    },
+    "providerRecovery": {
+      "title": "Unfinished generation",
+      "description": "A generation from a previous run never produced a final result.",
+      "reviewAction": "Review",
+      "morePending": "Other unfinished operations will remain after this one.",
+      "dialogTitle": "Mark this generation interrupted?",
+      "dialogDescription": "The operation will be closed and the conversation will show a cancelled answer. The original prompt and operation record are kept.",
+      "targetLabel": "Conversation",
+      "startedLabel": "Started",
+      "confirmAction": "Mark interrupted",
+      "cancelAction": "Cancel",
+      "failed": "Could not mark the operation interrupted.",
+      "listFailed": "Failed to check for unfinished generations.",
+      "retryAction": "Retry"
     }
   },
   "provision": {

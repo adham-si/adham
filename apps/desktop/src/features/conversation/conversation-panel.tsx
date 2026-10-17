@@ -29,6 +29,7 @@ import {
   PendingRecoveryReviewDialog,
   usePendingRecovery,
 } from './pending-recovery';
+import { ProviderRecoveryBanner, useProviderRecovery } from './provider-recovery';
 
 const PENDING_DRAFT_BUCKET = 'pending';
 
@@ -110,6 +111,7 @@ export function ConversationPanel({
       void handleSessionOpened(workspaceId, projectId, sessionId);
     },
   });
+  const providerRecovery = useProviderRecovery({ backend });
   /// Committed creation or selection awaiting authoritative bootstrap.
   /// Holds the confirmed step disabled so a second action cannot fork a
   /// duplicate while the read is in flight. Cleared only when bootstrap
@@ -324,13 +326,21 @@ export function ConversationPanel({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent">
-      {/* Pending recovery banner (unresolved message recovery) */}
-      <div className="px-4 pt-2">
+      {/* Pending recovery banners: unsent messages and unfinished provider
+          operations have separate lifecycles and separate actions. */}
+      <div className="space-y-2 px-4 pt-2">
         <PendingRecoveryBanner
           operations={recovery.operations}
           truncated={recovery.truncated}
           onReview={recovery.openReview}
           onDismiss={(op) => recovery.openDismiss(op)}
+        />
+        <ProviderRecoveryBanner
+          operations={providerRecovery.operations}
+          error={providerRecovery.error}
+          busyOperationId={providerRecovery.busyOperationId}
+          onRetry={() => void providerRecovery.refresh()}
+          onMarkInterrupted={providerRecovery.markInterrupted}
         />
       </div>
 

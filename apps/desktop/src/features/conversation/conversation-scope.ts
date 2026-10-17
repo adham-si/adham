@@ -73,6 +73,13 @@ export interface ConversationBackend {
     opId: string,
     options?: { requestId?: string },
   ): Promise<import('@adham/contracts-generated').StopCompletionResponse>;
+  markCompletionInterrupted?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: import('@adham/contracts-generated').MarkCompletionInterruptedPayload,
+    options?: { requestId?: string },
+  ): Promise<import('@adham/contracts-generated').MarkCompletionInterruptedResponse>;
 }
 
 export type ConversationContext = {

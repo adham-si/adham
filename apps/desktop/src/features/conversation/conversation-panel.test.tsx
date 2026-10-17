@@ -77,6 +77,7 @@ function fakeBackend(): ConversationFakeBackend {
       truncated: false,
     }),
     clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+    markCompletionInterrupted: vi.fn().mockResolvedValue({ status: 'interrupted' }),
   };
 }
 
@@ -935,5 +936,45 @@ describe('ConversationPanel', () => {
     expect(emptySuccess.getByRole('button', { name: /create project/i })).toBeDefined();
     expect(emptySuccess.getByText(/first project in chosen ws/i)).toBeDefined();
     emptySuccess.unmount();
+  });
+
+  it('closes a crash-left provider operation through the dedicated recovery command, never a message resend', async () => {
+    const backend = fakeBackend();
+    const staleOp = {
+      operationId: '01a14a4e-912d-728d-9a5b-235e6098ccb0',
+      kind: 'provider-completion',
+      workspaceId: 'ws-1',
+      projectId: 'proj-1',
+      sessionId: 'sess-1',
+      createRequestId: null,
+      messageRequestId: '01a14a4e-9400-728d-9a5b-235e6098ccb1',
+      text: '',
+      title: null,
+      status: 'pending',
+      createdAt: '2026-10-17T10:00:00Z',
+    };
+    backend.listPendingOperations
+      .mockResolvedValueOnce({ operations: [staleOp], truncated: false })
+      .mockResolvedValueOnce({ operations: [staleOp], truncated: false })
+      .mockResolvedValue({ operations: [], truncated: false });
+
+    render(<ConversationPanel backend={backend} />);
+
+    // The message-recovery surface ignores provider handles; the dedicated
+    // banner surfaces the stale operation instead.
+    expect(await screen.findByText(/Unfinished generation/i)).toBeDefined();
+    expect(screen.queryByText(/Review & Resend/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Review/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Mark interrupted/i }));
+
+    await waitFor(() => expect(backend.markCompletionInterrupted).toHaveBeenCalledTimes(1));
+    expect(backend.markCompletionInterrupted).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1', {
+      operationId: staleOp.operationId,
+      expectedMessageRequestId: staleOp.messageRequestId,
+    });
+    // Recovery never re-submits the prompt.
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByText(/Unfinished generation/i)).toBeNull());
   });
 });

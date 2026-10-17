@@ -12,6 +12,8 @@ import type {
   ListProviderModelsResponse,
   ConversationPage,
   GetPreferencesResponse,
+  MarkCompletionInterruptedPayload,
+  MarkCompletionInterruptedResponse,
   PendingOperationDto,
   PendingOperationList,
   ProjectList,
@@ -56,6 +58,7 @@ import {
   CompletionStartDtoSchema,
   ListProviderAccountsResponseSchema,
   ListProviderModelsResponseSchema,
+  MarkCompletionInterruptedResponseSchema,
   ProviderAccountDtoSchema,
   ProviderHealthResponseSchema,
   ProviderModelsListSchema,
@@ -526,6 +529,25 @@ export class AdhamApiClient implements AdhamClient {
       request: envelope,
     });
     return StopCompletionResponseSchema.parse(result.data);
+  }
+
+  async markCompletionInterrupted(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: MarkCompletionInterruptedPayload,
+    options?: { requestId?: string },
+  ): Promise<MarkCompletionInterruptedResponse> {
+    const envelope = this.wrapCommand(
+      payload,
+      this.sessionContext(workspaceId, projectId, sessionId),
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<MarkCompletionInterruptedResponse>>(
+      'mark_completion_interrupted',
+      { request: envelope },
+    );
+    return MarkCompletionInterruptedResponseSchema.parse(result.data);
   }
 }
 

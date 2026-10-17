@@ -211,6 +211,11 @@ pub async fn list_pending_operations(ctx: &ApiContext) -> Result<PendingOperatio
 
     let operations = hydrated
         .into_iter()
+        // A live provider op is running, not awaiting recovery: exclude it so
+        // the recovery surface can never offer to close a healthy generation.
+        .filter(|op| {
+            op.kind != "provider-completion" || !ctx.completion_runs.is_live(&op.operation_id)
+        })
         .map(|op| PendingOperationDto {
             operation_id: op.operation_id,
             kind: op.kind,

@@ -10,6 +10,7 @@
 
 use super::ApiContext;
 use crate::dtos::*;
+use crate::pending_dtos::{MarkCompletionInterruptedPayload, MarkCompletionInterruptedResponse};
 use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::adapters::ollama_http::OllamaHttpAdapter;
@@ -67,6 +68,12 @@ impl CompletionRuns {
             }
             None => false,
         }
+    }
+
+    /// Liveness check without cancelling: recovery must never treat a running
+    /// op as a crashed one.
+    pub fn is_live(&self, op: &str) -> bool {
+        self.runs.lock().expect("runs mutex").contains_key(op)
     }
 
     pub fn remove(&self, op: &str) {
@@ -384,6 +391,91 @@ pub async fn handle_stop_completion(
         env.request_id,
         StopCompletionResponse {
             op_id: op_str,
+            status: status.to_string(),
+        },
+    ))
+}
+
+/// Close a stale provider op left pending by a crash or a failed terminal
+/// commit. Explicit, one-shot authority from the recovery surface: the op is
+/// claimed inside the same tx that writes the canonical `interrupted`
+/// terminal, so history gains a labelled cancelled turn instead of staying
+/// silently unanswered. The pending row itself is never deleted.
+pub async fn handle_mark_completion_interrupted(
+    ctx: &ApiContext,
+    env: CommandEnvelope<MarkCompletionInterruptedPayload>,
+) -> Result<CommandResult<MarkCompletionInterruptedResponse>, String> {
+    let ids = expect_full_scope(&env.context)?;
+    validate_session_scope(ctx, &ids).await?;
+
+    let op_id = OperationId::from_string(&env.payload.operation_id).map_err(|_| {
+        format!(
+            "VALIDATION_FAILED: unknown completion operation '{}'",
+            env.payload.operation_id
+        )
+    })?;
+    let op_str = op_id.to_string();
+
+    let row: Option<sqlx::sqlite::SqliteRow> = sqlx::query(
+        "SELECT workspace_id, project_id, session_id, message_request_id, status \
+         FROM pending_operations WHERE operation_id = ? AND kind = 'provider-completion'",
+    )
+    .bind(&op_str)
+    .fetch_optional(&ctx.pool)
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    let row =
+        row.ok_or_else(|| format!("CONTEXT_MISMATCH: unknown completion operation '{op_str}'"))?;
+
+    let matches = row.get::<String, _>("workspace_id") == ids.ws_id.to_string()
+        && row.get::<String, _>("project_id") == ids.proj_id.to_string()
+        && row.get::<Option<String>, _>("session_id").as_deref() == Some(&ids.sess_id.to_string());
+    if !matches {
+        return Err(format!(
+            "CONTEXT_MISMATCH: completion operation '{op_str}' does not belong to this session"
+        ));
+    }
+    if row.get::<String, _>("message_request_id") != env.payload.expected_message_request_id {
+        return Err(
+            "REQUEST_ID_CONFLICT: expected_message_request_id does not match the operation"
+                .to_string(),
+        );
+    }
+    if ctx.completion_runs.is_live(&op_str) {
+        // A healthy run owns its own terminal (Stop or completion).
+        return Err(format!(
+            "CONFLICT: completion operation '{op_str}' is still running"
+        ));
+    }
+
+    let status = if row.get::<String, _>("status") == "pending" {
+        match persist_terminal(
+            ctx,
+            &op_str,
+            &env.payload.expected_message_request_id,
+            &ids,
+            "",
+            &StreamCompletionOutcome::Interrupted,
+            None,
+            true,
+        )
+        .await
+        {
+            "succeeded" => "interrupted",
+            "already-resolved" => "already-resolved",
+            _ => {
+                return Err(
+                    "STORAGE_UNAVAILABLE: interrupted terminal could not be recorded".to_string(),
+                );
+            }
+        }
+    } else {
+        "already-resolved"
+    };
+
+    Ok(ok_result(
+        env.request_id,
+        MarkCompletionInterruptedResponse {
             status: status.to_string(),
         },
     ))
@@ -769,6 +861,7 @@ where
                 "",
                 &StreamCompletionOutcome::Interrupted,
                 None,
+                false,
             )
             .await;
         }
@@ -794,6 +887,7 @@ where
                 "",
                 &StreamCompletionOutcome::ContentFilter,
                 None,
+                false,
             )
             .await;
         }
@@ -906,7 +1000,17 @@ where
     ))
     .ok_or_log(op_id);
 
-    persist_terminal(ctx, op_id, request_id, ids, &acc, &outcome, usage.as_ref()).await
+    persist_terminal(
+        ctx,
+        op_id,
+        request_id,
+        ids,
+        &acc,
+        &outcome,
+        usage.as_ref(),
+        false,
+    )
+    .await
 }
 
 fn stream_event(op_id: &str, sequence: &mut u64, event: StreamEventPayloadDto) -> StreamEventDto {
@@ -933,6 +1037,7 @@ impl SinkLog for Result<(), String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn persist_terminal(
     ctx: &ApiContext,
     op_id: &str,
@@ -941,6 +1046,9 @@ async fn persist_terminal(
     text: &str,
     outcome: &StreamCompletionOutcome,
     usage: Option<&MessageUsageV1>,
+    // Recovery callers claim the pending row exactly once inside this tx:
+    // zero rows claimed means another call already recorded a terminal.
+    require_pending: bool,
 ) -> &'static str {
     let scope = EventScope {
         installation_id: ctx.installation_id,
@@ -951,6 +1059,8 @@ async fn persist_terminal(
     let sess_stream = format!("session:{}", ids.sess_id);
     let message_id = MessageId::new_v7();
     let content_id = ContentId::new_v7();
+    let now = OffsetDateTime::now_utc();
+    let now_us = (now.unix_timestamp_nanos() / 1_000) as i64;
 
     let mut tx = match ctx.pool.begin().await {
         Ok(tx) => tx,
@@ -959,6 +1069,33 @@ async fn persist_terminal(
             return "failed";
         }
     };
+
+    if require_pending {
+        let claimed = match sqlx::query(
+            "UPDATE pending_operations SET status = 'resolved', updated_at_us = ? \
+             WHERE operation_id = ? AND message_request_id = ? \
+               AND kind = 'provider-completion' AND status = 'pending'",
+        )
+        .bind(now_us)
+        .bind(op_id)
+        .bind(request_id)
+        .execute(&mut *tx)
+        .await
+        {
+            Ok(result) => result.rows_affected(),
+            Err(e) => {
+                tracing::error!("completion op {op_id}: pending claim failed: {e}");
+                let _ = tx.rollback().await;
+                return "failed";
+            }
+        };
+        if claimed == 0 {
+            // The claim and the terminal roll back together, so a crash
+            // between them leaves the op recoverable.
+            let _ = tx.rollback().await;
+            return "already-resolved";
+        }
+    }
 
     if let Err(e) = SqliteEventStore::put_content_tx(
         &mut tx,
@@ -988,8 +1125,6 @@ async fn persist_terminal(
         .map(|r| r.get::<i64, _>("current_sequence") as u64)
         .unwrap_or(0);
 
-    let now = OffsetDateTime::now_utc();
-    let now_us = (now.unix_timestamp_nanos() / 1_000) as i64;
     let completion = map_completion(outcome);
     let event_payload = MessageCompletedV1 {
         op_id: OperationId::from_string(op_id).unwrap_or_else(|_| OperationId::new_v7()),

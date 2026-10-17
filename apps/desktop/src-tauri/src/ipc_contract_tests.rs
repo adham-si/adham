@@ -471,7 +471,8 @@ fn provider_mock_app(ctx: ApiContext) -> tauri::App<MockRuntime> {
             discover_ollama_models,
             update_provider_account,
             complete_once_streaming,
-            stop_completion
+            stop_completion,
+            mark_completion_interrupted
         ])
         .build(app_context())
         .expect("build mock app")
@@ -2664,4 +2665,82 @@ fn unresolved_pending_operation_surfaces_and_never_autocompletes() {
         })
         .expect("pending row");
     assert_eq!(still, "pending", "no automatic resolution on read");
+}
+
+/// T8. Provider-op recovery through the typed IPC command: command name,
+/// camelCase payload, session context envelope, and a canonical interrupted
+/// terminal that closes the op exactly once (replay is idempotent).
+#[test]
+fn mark_completion_interrupted_closes_a_stale_provider_op_once() {
+    let (runtime, ctx) = disposable_context();
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    let op_id = OperationId::new_v7().to_string();
+    let request_id = uuid::Uuid::now_v7().to_string();
+    runtime.block_on(async {
+        let scope = EventScope {
+            installation_id: ctx.installation_id,
+            workspace_id: Some(WorkspaceId::from_string(&ws).expect("ws")),
+            project_id: Some(ProjectId::from_string(&proj).expect("proj")),
+            session_id: Some(SessionId::from_string(&sess).expect("sess")),
+        };
+        let mut tx = ctx.pool.begin().await.expect("tx");
+        SqliteEventStore::record_pending_operation_tx(
+            &mut tx,
+            ctx.content_key.as_ref(),
+            &op_id,
+            "provider-completion",
+            &scope,
+            None,
+            &request_id,
+            "",
+            None,
+        )
+        .await
+        .expect("record");
+        tx.commit().await.expect("commit");
+    });
+
+    let response = invoke(
+        &webview,
+        "mark_completion_interrupted",
+        args_for(
+            json!({ "workspaceId": ws, "projectId": proj, "sessionId": sess }),
+            json!({ "operationId": &op_id, "expectedMessageRequestId": &request_id }),
+        ),
+    )
+    .expect("mark_completion_interrupted");
+    assert_eq!(response["data"]["status"], json!("interrupted"));
+
+    let replay = invoke(
+        &webview,
+        "mark_completion_interrupted",
+        args_for(
+            json!({ "workspaceId": ws, "projectId": proj, "sessionId": sess }),
+            json!({ "operationId": &op_id, "expectedMessageRequestId": &request_id }),
+        ),
+    )
+    .expect("mark_completion_interrupted replay");
+    assert_eq!(replay["data"]["status"], json!("already-resolved"));
+
+    runtime.block_on(async {
+        let status: String =
+            sqlx::query_scalar("SELECT status FROM pending_operations WHERE operation_id = ?")
+                .bind(&op_id)
+                .fetch_one(&ctx.pool)
+                .await
+                .expect("pending row");
+        assert_eq!(status, "resolved");
+        let assistant_rows: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM conversation_messages WHERE session_id = ? AND role = 'assistant'",
+        )
+        .bind(&sess)
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("assistant rows");
+        assert_eq!(assistant_rows, 1, "one canonical terminal per op");
+    });
 }

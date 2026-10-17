@@ -3,7 +3,8 @@ use adham_desktop_api::{
     CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
     CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
     GetPreferencesResponse, ListProviderAccountsResponse, ListProviderModelsPayload,
-    ListProviderModelsResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
+    ListProviderModelsResponse, MarkCompletionInterruptedPayload,
+    MarkCompletionInterruptedResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
     ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
     RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
     SelectProjectPayload, SessionList, SessionSummary, StopCompletionPayload,
@@ -219,6 +220,16 @@ async fn stop_completion(
 }
 
 #[tauri::command]
+async fn mark_completion_interrupted(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<MarkCompletionInterruptedPayload>,
+) -> Result<CommandResult<MarkCompletionInterruptedResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_mark_completion_interrupted(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn admin_rebuild_projections(
     state: tauri::State<'_, ApiContext>,
 ) -> Result<RebuildProjectionsResponse, ErrorEnvelope> {
@@ -370,6 +381,7 @@ pub fn run() {
             update_provider_account,
             complete_once_streaming,
             stop_completion,
+            mark_completion_interrupted,
         ]);
 
     let app = builder

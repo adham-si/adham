@@ -238,6 +238,7 @@ impl SqliteEventStore {
                    create_request_id, message_request_id, content_id, title_content_id,
                    status, created_at_us
             FROM pending_operations
+            WHERE status = 'pending'
             ORDER BY created_at_us DESC
             LIMIT ?
             "#,

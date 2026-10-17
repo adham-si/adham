@@ -67,6 +67,21 @@
       "checkingTarget": "正在检查目标可用性…",
       "resendFailed": "重新发送失败。",
       "dismissFailed": "忽略失败。"
+    },
+    "providerRecovery": {
+      "title": "未完成的生成",
+      "description": "上一次运行中的生成未产生最终结果。",
+      "reviewAction": "查看",
+      "morePending": "处理后仍会保留其他未完成的操作。",
+      "dialogTitle": "将此生成标记为已中断？",
+      "dialogDescription": "该操作将被关闭，对话中会显示已取消的回答。原始提示和操作记录都会保留。",
+      "targetLabel": "对话",
+      "startedLabel": "开始于",
+      "confirmAction": "标记为已中断",
+      "cancelAction": "取消",
+      "failed": "无法将操作标记为已中断。",
+      "listFailed": "检查未完成的生成失败。",
+      "retryAction": "重试"
     }
   },
   "provision": {
