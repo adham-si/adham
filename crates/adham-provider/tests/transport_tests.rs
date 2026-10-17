@@ -32,7 +32,13 @@ where
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let addr = listener.local_addr().expect("addr");
     tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.expect("accept");
+        let (mut stream, _) = listener.accept().await.expect("accept");
+        // drain the request first: dropping a socket with unread receive data
+        // sends RST and can race the client's body read with buffer flushes
+        if let Err(e) = drain_request(&mut stream).await {
+            tracing::debug!("stub drain error: {e}");
+        }
+        let stream = stream;
         if let Err(e) = handler(stream).await {
             tracing::debug!("stub server error: {e}");
         }
@@ -343,7 +349,79 @@ async fn test_per_read_deadline_fires_on_stalled_body() {
     assert!(matches!(err, TransportError::Timeout(_)), "got {err:?}");
 }
 
-// --- 9. error status: body is bounded and redacted -----------------------------------
+// --- 10. JSON document fetches (GET + bounded POST) ----------------------------
+
+#[tokio::test]
+async fn test_get_json_parses_document() {
+    let url =
+        spawn_one_shot(|mut s: tokio::net::TcpStream| async move {
+            // spawn_one_shot drains the request before the handler runs
+            let body = br#"{"models":[{"name":"m:latest","digest":"sha256:x"}]}"#;
+            s.write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",
+                    body.len()
+                )
+                .as_bytes(),
+            )
+            .await?;
+            s.write_all(body).await?;
+            s.flush().await
+        })
+        .await;
+
+    let transport = HttpTransport::default();
+    let doc = transport.get_json(&url).await.expect("get_json");
+    assert_eq!(doc["models"][0]["digest"], "sha256:x");
+}
+
+#[tokio::test]
+async fn test_get_json_malformed_document_is_protocol_parse_error() {
+    let url = spawn_one_shot(|mut s| async move {
+        let body: &[u8] = b"{partial";
+        s.write_all(
+            format!(
+                "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",
+                body.len()
+            )
+            .as_bytes(),
+        )
+        .await?;
+        s.write_all(body).await?;
+        s.flush().await
+    })
+    .await;
+
+    let err = HttpTransport::default()
+        .get_json(&url)
+        .await
+        .expect_err("must fail");
+    assert!(
+        matches!(err, TransportError::ProtocolParse(_)),
+        "got {err:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_document_over_cap_is_frame_too_large() {
+    let url = spawn_one_shot(|mut s| async move {
+        let big = vec![b'a'; 2_000_000];
+        s.write_all(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", big.len()).as_bytes())
+            .await?;
+        s.write_all(&big).await?;
+        s.flush().await
+    })
+    .await;
+
+    let err = HttpTransport::default()
+        .get_json(&url)
+        .await
+        .expect_err("doc cap");
+    assert!(
+        matches!(err, TransportError::FrameTooLarge(_)),
+        "got {err:?}"
+    );
+}
 
 #[tokio::test]
 async fn test_status_error_body_bounded_and_redacted() {

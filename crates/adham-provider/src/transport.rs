@@ -51,6 +51,9 @@ pub enum TransportError {
 
     #[error("protocol frame too large: {0}")]
     FrameTooLarge(String),
+
+    #[error("protocol parse error: {0}")]
+    ProtocolParse(String),
 }
 
 impl TransportError {
@@ -62,6 +65,7 @@ impl TransportError {
         match self {
             TransportError::Policy(m) => P::EndpointPolicyViolation(m),
             TransportError::FrameTooLarge(m) => P::ProtocolParseError(m),
+            TransportError::ProtocolParse(m) => P::ProtocolParseError(m),
             TransportError::Status(429, body) => P::RateLimitExceeded(
                 body.error_message()
                     .unwrap_or_else(|| "rate limited".into()),
@@ -274,25 +278,8 @@ impl HttpTransport {
             .await
             .map_err(classify)?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let mut resp = response;
-            let mut collected: Vec<u8> = Vec::new();
-            while collected.len() < MAX_ERROR_BODY_BYTES {
-                match time::timeout(self.per_read, resp.chunk()).await {
-                    Err(_elapsed) => {
-                        return Err(TransportError::Timeout("error body read stalled".into()));
-                    }
-                    Ok(Ok(Some(bytes))) => collected.extend_from_slice(&bytes),
-                    Ok(Ok(None)) => break,
-                    Ok(Err(e)) => return Err(classify(e)),
-                }
-            }
-            collected.truncate(MAX_ERROR_BODY_BYTES);
-            return Err(TransportError::Status(
-                status.as_u16(),
-                RedactedBody { body: collected },
-            ));
+        if !response.status().is_success() {
+            return Err(read_error_status(response, self.per_read).await);
         }
 
         Ok(ByteStream {
@@ -302,6 +289,89 @@ impl HttpTransport {
             done: false,
         })
     }
+
+    /// GET JSON: a whole small document (discovery-style endpoints), bounded
+    /// by the same frame cap and per-read deadline as streaming reads.
+    pub async fn get_json(&self, url: &str) -> Result<Value, TransportError> {
+        EndpointDescriptor::validate_url(url).map_err(|e| TransportError::Policy(e.to_string()))?;
+        let response = self
+            .client
+            .get(url)
+            .timeout(self.total)
+            .send()
+            .await
+            .map_err(classify)?;
+        document_from(response, self.per_read).await
+    }
+
+    /// POST JSON expecting a whole small document back (not a stream).
+    pub async fn post_json_document(
+        &self,
+        url: &str,
+        body: &Value,
+    ) -> Result<Value, TransportError> {
+        EndpointDescriptor::validate_url(url).map_err(|e| TransportError::Policy(e.to_string()))?;
+        let response = self
+            .client
+            .post(url)
+            .json(body)
+            .timeout(self.total)
+            .send()
+            .await
+            .map_err(classify)?;
+        document_from(response, self.per_read).await
+    }
+}
+
+/// Bounded error-body read for any non-2xx response (shared by all methods).
+async fn read_error_status(mut response: reqwest::Response, per_read: Duration) -> TransportError {
+    let status = response.status().as_u16();
+    let mut collected: Vec<u8> = Vec::new();
+    while collected.len() < MAX_ERROR_BODY_BYTES {
+        match time::timeout(per_read, response.chunk()).await {
+            Err(_elapsed) => return TransportError::Timeout("error body read stalled".into()),
+            Ok(Ok(Some(bytes))) => collected.extend_from_slice(&bytes),
+            Ok(Ok(None)) => break,
+            Ok(Err(e)) => {
+                // a connection death mid-drain must not mask the status when
+                // we already hold a (bounded) partial error body
+                if collected.is_empty() {
+                    return classify(e);
+                }
+                break;
+            }
+        }
+    }
+    collected.truncate(MAX_ERROR_BODY_BYTES);
+    TransportError::Status(status, RedactedBody { body: collected })
+}
+
+/// A whole JSON document body, bounded at [`MAX_FRAME_BYTES`]; parse failure
+/// is a protocol error, never a guess.
+async fn document_from(
+    mut response: reqwest::Response,
+    per_read: Duration,
+) -> Result<Value, TransportError> {
+    if !response.status().is_success() {
+        return Err(read_error_status(response, per_read).await);
+    }
+    let mut doc: Vec<u8> = Vec::new();
+    loop {
+        match time::timeout(per_read, response.chunk()).await {
+            Err(_elapsed) => return Err(TransportError::Timeout("document read stalled".into())),
+            Ok(Ok(Some(bytes))) => {
+                if doc.len() + bytes.len() > MAX_FRAME_BYTES {
+                    return Err(TransportError::FrameTooLarge(format!(
+                        "document exceeded {MAX_FRAME_BYTES} bytes"
+                    )));
+                }
+                doc.extend_from_slice(&bytes);
+            }
+            Ok(Ok(None)) => break,
+            Ok(Err(e)) => return Err(classify(e)),
+        }
+    }
+    serde_json::from_slice(&doc).map_err(|e| TransportError::ProtocolParse(e.to_string()))
 }
 
 fn client_new(custom: Option<Arc<dyn Resolve>>) -> reqwest::Client {
