@@ -69,7 +69,7 @@ New files (all in existing crates):
 - Frontend: `shared/api/adham-client.ts` + `schemas.ts` additions; Providers page Ollama connect/test/discover (**A**, slimmed — no cloud section); Models page defaults from registry (**A**); composer picker reads registry + Stop button wired to `stop_completion` + reload renders persisted history (**A**); cloud account/key/approval UI (**B**).
 
 Dependency additions (each needs the P0 verification record in its task):
-- `reqwest = "0.13"` direct, features `json`, `stream`, default-tls (rustls + platform verifier + aws-lc; pure-Rust TLS matches repo posture). Reason: locked 0.13.5 (via Tauri) ships with NO TLS backend — HTTPS provider calls are impossible without it. Transitives to record: hyper-rustls, rustls, tokio-rustls, webpki roots.
+- `reqwest = "0.13"` direct, `default-features = false` + `json`, `stream`, `rustls` (rustls + platform verifier + aws-lc; pure-Rust TLS matches repo posture; default features OFF drops charset/http2/system-proxy — no ambient proxy by construction). Reason: locked 0.13.5 (via Tauri) ships with NO TLS backend — HTTPS provider calls are impossible without it. Transitives to record: hyper-rustls, rustls, tokio-rustls, webpki roots.
 - `tokio-util = "0.7"` (locked 0.7.x present) for `CancellationToken`. Reason: cooperative user-cancel distinct from drop/timeout.
 - Deliberately NOT added: `eventsource-stream` (hand-rolled SSE parser, tested), `async-openai` (hides wire behavior the contract requires us to own), `tauri-plugin-http` (frontend must never do provider HTTP).
 
@@ -101,10 +101,10 @@ Dependency additions (each needs the P0 verification record in its task):
 **Interfaces:**
 - Produces: `reqwest::Client` availability with `json`+`stream`+TLS; `tokio_util::sync::CancellationToken` for A1/B2.
 
-- [ ] **Step 1: Write the record shell** — create `docs/reports/provider-deps-verification.md` with empty fields per Global Constraints. Run: `ls docs/reports/provider-deps-verification.md` Expected: file exists.
-- [ ] **Step 2: Add direct deps** — `reqwest = { workspace = true }` with `version = "0.13", features = ["json", "stream"]` (default-tls on) + `tokio-util = { version = "0.7" }` in workspace + provider crate. Run: `cargo tree -p adham-provider -e normal | grep -E "reqwest|tokio-util|rustls|hyper-rustls"` Expected: single reqwest 0.13.x unified with lock.
-- [ ] **Step 3: Fill the verification record** — resolved versions, licenses (`cargo deny check`), release status, why `async-openai`/`eventsource-stream` were refused. Run: `cargo deny check` Expected: pass.
-- [ ] **Step 4: Commit** — `git add Cargo.toml Cargo.lock crates/adham-provider/Cargo.toml docs/reports/provider-deps-verification.md && git commit -m "feat(provider): verified HTTP deps"`
+- [x] **Step 1: Write the record shell** — create `docs/reports/provider-deps-verification.md` with empty fields per Global Constraints. Run: `ls docs/reports/provider-deps-verification.md` Expected: file exists.
+- [x] **Step 2: Add direct deps** — `reqwest = { workspace = true }` with `version = "0.13", default-features = false, features = ["json", "stream", "rustls"]` (`rustls` = aws-lc + platform verifier; `rustls-tls-manual-roots` does not exist as a public 0.13 feature — verified in crate source) + `tokio-util = { version = "0.7" }` in workspace + provider crate. Run: `cargo tree -p adham-provider -e normal | grep -E "reqwest|tokio-util|rustls|hyper-rustls"` Expected: single reqwest 0.13.x unified with lock.
+- [x] **Step 3: Fill the verification record** — resolved versions, licenses (`cargo deny check`), release status, why `async-openai`/`eventsource-stream` were refused. Run: `cargo deny check` Expected: pass.
+- [x] **Step 4: Commit** — `git add Cargo.toml Cargo.lock crates/adham-provider/Cargo.toml docs/reports/provider-deps-verification.md && git commit -m "feat(provider): verified HTTP deps"`
 
 ### Task A1: Shared HTTP transport
 
@@ -117,10 +117,10 @@ Dependency additions (each needs the P0 verification record in its task):
 - Consumes: `endpoint.rs` URL validation.
 - Produces: `HttpTransport::post_json(url, body) -> Result<ByteStream, TransportError>` with total timeout, per-read timeout, `retry(never())`, single shared `Client`; `TransportError::{Unreachable, Timeout, TlsRejected, Status(u16, RedactedBody)}` mapping into the 7-variant taxonomy. No credential parameter in A (Ollama needs none; B adds keyed requests).
 
-- [ ] **Step 1: Write the failing test** — stub returns 200 NDJSON; assert first bytes arrive; stub sleeps past timeout; assert `Timeout`; non-loopback `http://` URL rejected before any socket; 302 redirect NOT followed (client surfaces 3xx, no second request); ambient proxy env (`HTTP_PROXY` pointing at a black hole) does not affect the request; resolved private/link-local/metadata/unspecified addresses rejected for both IPv4 and IPv6; 2 MiB single frame → protocol error, not OOM; per-read deadline fires on a stalled body. Run: `cargo test -p adham-provider --test transport_tests` Expected: FAIL (module missing).
-- [ ] **Step 2: Implement** `transport.rs` per the signature above (deadline from `ProviderRequestV1`).
-- [ ] **Step 3: Run** `cargo test -p adham-provider` Expected: PASS + clippy clean.
-- [ ] **Step 4: Commit** `feat(provider): shared HTTP transport`.
+- [x] **Step 1: Write the failing test** — stub returns 200 NDJSON; assert first bytes arrive; stub sleeps past timeout; assert `Timeout`; non-loopback `http://` URL rejected before any socket; 302 redirect NOT followed (client surfaces 3xx, no second request); ambient proxy env (`HTTP_PROXY` pointing at a black hole) does not affect the request; resolved private/link-local/metadata/unspecified addresses rejected for both IPv4 and IPv6; 2 MiB single frame → protocol error, not OOM; per-read deadline fires on a stalled body. Run: `cargo test -p adham-provider --test transport_tests` Expected: FAIL (module missing).
+- [x] **Step 2: Implement** `transport.rs` per the signature above (deadline from `ProviderRequestV1`).
+- [x] **Step 3: Run** `cargo test -p adham-provider` Expected: PASS + clippy clean.
+- [x] **Step 4: Commit** `feat(provider): shared HTTP transport`.
 
 ### Task A2: Registry persistence (accounts + models)
 
@@ -131,10 +131,10 @@ Dependency additions (each needs the P0 verification record in its task):
 **Interfaces:**
 - Produces: `upsert_account`, `upsert_models(digest-pinned)`, `invalidate_on_endpoint_change` (clears models + bumps revision); stored JSON validated against `ModelDescriptor` on read (corrupt → integrity error, never live config).
 
-- [ ] **Step 1: Failing tests** — upsert→read round-trip; endpoint change wipes models; corrupt JSON row errors. Expected: FAIL.
-- [ ] **Step 2: Implement** migration + functions + registry cache wrapper.
-- [ ] **Step 3: Run** both crates' suites PASS.
-- [ ] **Step 4: Commit** `feat(provider): registry persistence`.
+- [x] **Step 1: Failing tests** — upsert→read round-trip; endpoint change wipes models; corrupt JSON row errors. Expected: FAIL.
+- [x] **Step 2: Implement** migration + functions + registry cache wrapper.
+- [x] **Step 3: Run** both crates' suites PASS.
+- [x] **Step 4: Commit** `feat(provider): registry persistence`.
 
 ### Task A3: Ollama HTTP adapter + discovery
 
@@ -146,10 +146,10 @@ Dependency additions (each needs the P0 verification record in its task):
 - Consumes: A1/A2 (transport, existing `OllamaStreamParser`, registry).
 - Produces: `discover() -> Vec<ModelDescriptor>` (digest-pinned, capabilities from `/api/show`, `revision-unverifiable` where unpinnable); `stream_chat()` yielding normalized events; `unknown` required capability → blocked dispatch.
 
-- [ ] **Step 1: Failing tests** — tags→descriptors with digests; show→capabilities incl. local-blob evidence fields; chat stream deltas in order; connection refused → `transport` error; `done_reason: length` → completed-with-`truncated:true`; model with no local evidence dispatches NOTHING under a local-only request (`unknown` blocks). Expected: FAIL.
-- [ ] **Step 2: Implement** adapter (loopback-only URLs enforced).
-- [ ] **Step 3: Run** suite PASS.
-- [ ] **Step 4: Commit** `feat(provider): Ollama HTTP adapter`.
+- [x] **Step 1: Failing tests** — tags→descriptors with digests; show→capabilities incl. local-blob evidence fields; chat stream deltas in order; connection refused → `transport` error; `done_reason: length` → completed-with-`truncated:true`; model with no local evidence dispatches NOTHING under a local-only request (`unknown` blocks). Expected: FAIL.
+- [x] **Step 2: Implement** adapter (loopback-only URLs enforced).
+- [x] **Step 3: Run** suite PASS.
+- [x] **Step 4: Commit** `feat(provider): Ollama HTTP adapter`.
 
 ### Task A4: Assistant persistence event + projection replay
 
@@ -160,10 +160,10 @@ Dependency additions (each needs the P0 verification record in its task):
 **Interfaces:**
 - Produces: `MessageCompletedV1 { message_id, text, completion: Completed|LengthExceeded|Interrupted, usage nullable }`; rebuild replays `MessageSubmitted` + `MessageCompleted`; interrupted partials replay as final text with their completion marker (no phantom completion on crash — crash persists nothing).
 
-- [ ] **Step 1: Failing tests** — submit user + complete assistant → rebuild → both rows in order with roles; interrupted replays with marker (never as completed context); failed replays with marker; length-limit replays completed-with-`truncated:true`; unknown completion value rejected; double terminal write for one op id → single row (Stop-vs-completion race); taxonomy round-trip. Expected: FAIL.
-- [ ] **Step 2: Implement** event type + payload + replay branch.
-- [ ] **Step 3: Run** event-log + projections + desktop-api suites PASS.
-- [ ] **Step 4: Commit** `feat(provider): assistant completion persistence`.
+- [x] **Step 1: Failing tests** — submit user + complete assistant → rebuild → both rows in order with roles; interrupted replays with marker (never as completed context); failed replays with marker; length-limit replays completed-with-`truncated:true`; unknown completion value rejected; double terminal write for one op id → single row (Stop-vs-completion race); taxonomy round-trip. Expected: FAIL.
+- [x] **Step 2: Implement** event type + payload + replay branch.
+- [x] **Step 3: Run** event-log + projections + desktop-api suites PASS.
+- [x] **Step 4: Commit** `feat(provider): assistant completion persistence`.
 
 ### Task A5: IPC — Ollama commands, streaming Channel, stop
 
