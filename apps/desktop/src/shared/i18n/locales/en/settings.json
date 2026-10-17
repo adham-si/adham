@@ -306,7 +306,7 @@
       "descOllama": "Local Llama 3.3, DeepSeek-R1, and Qwen 2.5 with zero network egress.",
       "descOpenai": "GPT-4o, o1, o3-mini, and Realtime API.",
       "descAnthropic": "Claude 3.7 Sonnet, Claude 3.5 Sonnet, and Claude 3.5 Haiku.",
-      "descGoogle": "Gemini 2.0 Flash, Gemini 2.0 Pro, and Gemini 1.5 Pro.",
+      "descGoogle": "Use Google's latest models — Gemini 2.5 Pro and more.",
       "descDeepseek": "DeepSeek-R1, DeepSeek-V3, and DeepSeek Coder.",
       "descMoonshot": "Kimi k1.5, Kimi k0-math, and Moonshot long-context reasoning.",
       "descQwen": "Qwen 2.5-Max, Qwen 2.5-Coder 32B, and QwQ-32B.",
@@ -369,7 +369,11 @@
       "googleFailedLine": "Google configuration failed: {{error}}",
       "googleUnreachable": "Last check {{time}} — no response from Google Gemini at {{url}}. Nothing was saved.",
       "googleTestLabel": "Test Google connection",
-      "googleDiscoverLabel": "Discover Google models"
+      "googleDiscoverLabel": "Discover Google models",
+      "cardManage": "Manage",
+      "statusChecking": "Checking…",
+      "statusIssue": "Issue",
+      "statusNotConnected": "Not connected"
     },
     "mcp": {
       "descPlaywright": "Browser automation server bounded to local scratch directory.",

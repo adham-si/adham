@@ -315,7 +315,7 @@
       "descOllama": "Llama 3.3 وDeepSeek-R1 وQwen 2.5 محليًا دون أي حركة شبكية.",
       "descOpenai": "GPT-4o وo1 وo3-mini وواجهة Realtime API.",
       "descAnthropic": "Claude 3.7 Sonnet وClaude 3.5 Sonnet وClaude 3.5 Haiku.",
-      "descGoogle": "Gemini 2.0 Flash وGemini 2.0 Pro وGemini 1.5 Pro.",
+      "descGoogle": "استخدم أحدث نماذج Google — Gemini 2.5 Pro وغيرها.",
       "descDeepseek": "DeepSeek-R1 وDeepSeek-V3 وDeepSeek Coder.",
       "descMoonshot": "Kimi k1.5 وKimi k0-math واستدلال Moonshot طويل السياق.",
       "descQwen": "Qwen 2.5-Max وQwen 2.5-Coder 32B وQwQ-32B.",
@@ -378,7 +378,11 @@
       "googleFailedLine": "فشل إعداد Google: {{error}}",
       "googleUnreachable": "آخر فحص {{time}} — لا استجابة من Google Gemini عبر {{url}}. لم يُحفظ أي شيء.",
       "googleTestLabel": "اختبار اتصال Google",
-      "googleDiscoverLabel": "اكتشاف نماذج Google"
+      "googleDiscoverLabel": "اكتشاف نماذج Google",
+      "cardManage": "إدارة",
+      "statusChecking": "جارٍ التحقق…",
+      "statusIssue": "مشكلة",
+      "statusNotConnected": "غير متصل"
     },
     "mcp": {
       "descPlaywright": "خادم أتمتة المتصفح مقيد بدليل مؤقت محلي.",

@@ -24,7 +24,8 @@
     "disabled": "معطّل",
     "small": "صغير",
     "large": "كبير",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "close": "إغلاق"
   },
   "error": {
     "validationFailed": "هذا الاسم غير صالح. صحّحه وحاول مجددًا.",

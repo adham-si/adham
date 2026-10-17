@@ -303,7 +303,7 @@
       "descOllama": "本地 Llama 3.3、DeepSeek-R1 和 Qwen 2.5，零网络出站。",
       "descOpenai": "GPT-4o、o1、o3-mini 和 Realtime API。",
       "descAnthropic": "Claude 3.7 Sonnet、Claude 3.5 Sonnet 和 Claude 3.5 Haiku。",
-      "descGoogle": "Gemini 2.0 Flash、Gemini 2.0 Pro 和 Gemini 1.5 Pro。",
+      "descGoogle": "使用 Google 最新模型 — Gemini 2.5 Pro 等。",
       "descDeepseek": "DeepSeek-R1、DeepSeek-V3 和 DeepSeek Coder。",
       "descMoonshot": "Kimi k1.5、Kimi k0-math 和 Moonshot 长上下文推理。",
       "descQwen": "Qwen 2.5-Max、Qwen 2.5-Coder 32B 和 QwQ-32B。",
@@ -366,7 +366,11 @@
       "googleFailedLine": "Google 配置失败：{{error}}",
       "googleUnreachable": "上次检查 {{time}}——{{url}} 处的 Google Gemini 无响应。未保存任何内容。",
       "googleTestLabel": "测试 Google 连接",
-      "googleDiscoverLabel": "发现 Google 模型"
+      "googleDiscoverLabel": "发现 Google 模型",
+      "cardManage": "管理",
+      "statusChecking": "检查中…",
+      "statusIssue": "异常",
+      "statusNotConnected": "未连接"
     },
     "mcp": {
       "descPlaywright": "绑定到本地临时目录的浏览器自动化服务器。",

@@ -312,7 +312,7 @@
       "descOllama": "Локальные Llama 3.3, DeepSeek-R1 и Qwen 2.5 без сетевого трафика.",
       "descOpenai": "GPT-4o, o1, o3-mini и Realtime API.",
       "descAnthropic": "Claude 3.7 Sonnet, Claude 3.5 Sonnet и Claude 3.5 Haiku.",
-      "descGoogle": "Gemini 2.0 Flash, Gemini 2.0 Pro и Gemini 1.5 Pro.",
+      "descGoogle": "Новейшие модели Google — Gemini 2.5 Pro и другие.",
       "descDeepseek": "DeepSeek-R1, DeepSeek-V3 и DeepSeek Coder.",
       "descMoonshot": "Kimi k1.5, Kimi k0-math и Moonshot-рассуждения с длинным контекстом.",
       "descQwen": "Qwen 2.5-Max, Qwen 2.5-Coder 32B и QwQ-32B.",
@@ -375,7 +375,11 @@
       "googleFailedLine": "Ошибка конфигурации Google: {{error}}",
       "googleUnreachable": "Последняя проверка {{time}} — нет ответа от Google Gemini на {{url}}. Ничего не сохранено.",
       "googleTestLabel": "Проверить соединение Google",
-      "googleDiscoverLabel": "Найти модели Google"
+      "googleDiscoverLabel": "Найти модели Google",
+      "cardManage": "Управление",
+      "statusChecking": "Проверка…",
+      "statusIssue": "Проблема",
+      "statusNotConnected": "Не подключён"
     },
     "mcp": {
       "descPlaywright": "Сервер автоматизации браузера в границах локального временного каталога.",

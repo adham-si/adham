@@ -57,6 +57,9 @@ export function SettingsPage() {
     if (!settingsOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // A nested provider connect dialog owns Escape while open; closing the
+        // whole settings surface from under it would drop the user's draft.
+        if (document.querySelector('[data-connect-dialog]') !== null) return;
         closeSettings();
       }
     };
