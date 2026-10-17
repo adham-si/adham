@@ -56,7 +56,7 @@
     "modeHintPlan": "执行前的结构化计划",
     "modeHintExecute": "直接的智能体操作和工具",
     "modeHintCode": "专注软件开发",
-    "localBoundaryNote": "数据不会离开本机",
+    "localBoundaryNote": "调度仅限你配置的仅本地服务商端点（通常为本机）。",
     "cloudBoundaryNote": "向 {{provider}} 发送出站请求",
     "localBadge": "本地",
     "cloudBadge": "云端",

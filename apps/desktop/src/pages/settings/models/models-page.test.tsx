@@ -37,13 +37,21 @@ afterEach(async () => {
 });
 
 describe('ModelsPage (preserved preview implementation)', () => {
-  it('renders the local-first note from locales, never hardcoded English', async () => {
+  it('renders the accurate local-only note from locales, never hardcoded English', async () => {
     renderPage();
     expect(
       screen.getByText(
-        'Local-first guarantee: When strict local boundary is enabled, requests with local models never cross to cloud providers without approval.',
+        'Dispatch is restricted to provider accounts classified local-only, configured to addresses you choose yourself. Cloud providers are not implemented in this delivery.',
       ),
     ).not.toBeNull();
+    // no Preview banner over the working controls (delivery-closure item 1)
+    expect(screen.queryByRole('note')).toBeNull();
+    // no fallback-chain advertising anywhere on the page
+    expect(
+      screen.queryByText(
+        'Configure default intelligence runtimes, model parameters, and automatic fallback chains.',
+      ),
+    ).toBeNull();
   });
 
   it('renders the note in Arabic with RTL intact', async () => {
@@ -51,9 +59,10 @@ describe('ModelsPage (preserved preview implementation)', () => {
     renderPage();
     expect(
       screen.getByText(
-        'ضمان الأولوية المحلية: عند تفعيل الحد المحلي الصارم، لا تعبر طلبات النماذج المحلية إلى مزودي السحابة دون موافقة.',
+        'الإرسال محصور بحسابات المزودين المصنفة محليًا فقط، مع عناوين تختارها بنفسك. مزودو السحابة غير مدعومين في هذا الإصدار.',
       ),
     ).not.toBeNull();
+    expect(screen.queryByRole('note')).toBeNull();
   });
 
   it('selects no default or fallback model', () => {
