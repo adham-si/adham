@@ -286,9 +286,8 @@ describe('ModelsPage (Delivery G: per-provider sections)', () => {
         };
       }
       if (cmd === 'list_provider_models') {
-        const accountId = (
-          args as { request: { payload: { accountId: string } } }
-        ).request.payload.accountId;
+        const accountId = (args as { request: { payload: { accountId: string } } }).request.payload
+          .accountId;
         return {
           data: { models: accountId === 'acc-google' ? [googleModel] : [ollamaModel] },
         };
