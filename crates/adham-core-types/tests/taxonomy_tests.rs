@@ -184,3 +184,70 @@ fn test_event_envelope_roundtrip() {
     assert_eq!(de.event_type, EVENT_TYPE_WORKSPACE_CREATED);
     assert_eq!(de.payload.name, "WS");
 }
+
+// ===== A4: assistant completion taxonomy =====
+#[test]
+fn test_message_completed_roundtrip_and_rejection() {
+    let usage = MessageUsageV1 {
+        prompt_tokens: Some(10),
+        completion_tokens: Some(5),
+        total_tokens: Some(15),
+    };
+    let completed = MessageCompletedV1 {
+        op_id: OperationId::new_v7(),
+        message_id: MessageId::new_v7(),
+        content_id: ContentId::new_v7(),
+        content_kind: "assistant_text".to_string(),
+        size_bytes: 123,
+        completion: MessageCompletionV1::Completed { truncated: false },
+        usage: Some(usage),
+    };
+    assert!(completed.validate().is_ok());
+
+    let json = serde_json::to_string(&completed).expect("serialize");
+    let back: MessageCompletedV1 = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, completed);
+
+    // truncated (length-limit) marker round-trips
+    let truncated = MessageCompletedV1 {
+        completion: MessageCompletionV1::Completed { truncated: true },
+        usage: None,
+        ..completed
+    };
+    let t_json = serde_json::to_string(&truncated).unwrap();
+    assert!(t_json.contains("\"truncated\":true"));
+    assert_eq!(
+        serde_json::from_str::<MessageCompletedV1>(&t_json).unwrap(),
+        truncated
+    );
+
+    // interrupted and failed markers round-trip
+    let interrupted = MessageCompletedV1 {
+        completion: MessageCompletionV1::Interrupted,
+        usage: None,
+        ..truncated
+    };
+    let interrupted: MessageCompletedV1 =
+        serde_json::from_str(&serde_json::to_string(&interrupted).unwrap()).unwrap();
+    assert_eq!(interrupted.completion, MessageCompletionV1::Interrupted);
+
+    let failed = MessageCompletedV1 {
+        completion: MessageCompletionV1::Failed,
+        ..interrupted
+    };
+    let failed: MessageCompletedV1 =
+        serde_json::from_str(&serde_json::to_string(&failed).unwrap()).unwrap();
+    assert_eq!(failed.completion, MessageCompletionV1::Failed);
+
+    // unknown completion value must be rejected, never guessed
+    let mut raw = serde_json::to_value(&failed).unwrap();
+    raw["completion"] = serde_json::json!({ "NotAnOutcome": null });
+    assert!(serde_json::from_value::<MessageCompletedV1>(raw).is_err());
+
+    // content_pointer only: kind must stay assistant_text
+    let bad_kind = MessageCompletedV1 {
+        content_kind: "user_text".to_string(),
+        ..failed
+    };
+    assert!(bad_kind.validate().is_err());
+}

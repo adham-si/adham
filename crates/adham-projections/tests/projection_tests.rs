@@ -2,7 +2,7 @@
 #![allow(clippy::clone_on_copy)]
 use adham_core_types::*;
 use adham_event_log::{create_sqlite_pool, AppendEventRequest, SqliteEventStore};
-use adham_projections::ConversationProjection;
+use adham_projections::{ConversationMessageView, ConversationProjection};
 use std::path::PathBuf;
 
 fn test_db_path() -> PathBuf {
@@ -202,4 +202,320 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
     );
 
     let _ = std::fs::remove_file(db_path);
+}
+
+// ===== A4: assistant completion persistence + replay =====
+struct Harness {
+    pool: sqlx::Pool<sqlx::Sqlite>,
+    store: SqliteEventStore,
+    provider: adham_event_log::InMemoryProvider,
+    inst_id: InstallationId,
+    sess_id: SessionId,
+    scope: EventScope,
+    stream_id: String,
+    db_path: std::path::PathBuf,
+    seq: u64,
+}
+
+impl Harness {
+    async fn new() -> Self {
+        let db_path = test_db_path();
+        let pool = create_sqlite_pool(&db_path)
+            .await
+            .expect("create test pool");
+        let store = SqliteEventStore::new(pool.clone());
+        let inst_id = InstallationId::new_v7();
+        let ws_id = WorkspaceId::new_v7();
+        let proj_id = ProjectId::new_v7();
+        let sess_id = SessionId::new_v7();
+        let scope = EventScope {
+            installation_id: inst_id,
+            workspace_id: Some(ws_id),
+            project_id: Some(proj_id),
+            session_id: Some(sess_id),
+        };
+        let stream_id = format!("session:{}", sess_id);
+        let provider = adham_event_log::InMemoryProvider::generate();
+        Self {
+            pool,
+            store,
+            provider,
+            inst_id,
+            sess_id,
+            scope,
+            stream_id,
+            db_path,
+            seq: 0,
+        }
+    }
+
+    async fn append(&mut self, event_type: &str, payload: &impl serde::Serialize) -> i64 {
+        let req = AppendEventRequest {
+            stream_id: self.stream_id.clone(),
+            stream_kind: "session".to_string(),
+            expected_sequence: self.seq,
+            event_type: event_type.to_string(),
+            event_version: 1,
+            scope: self.scope.clone(),
+            actor: EventActor {
+                actor_id: ActorId::new_v7(),
+                kind: ActorKind::LocalHuman,
+            },
+            request_id: RequestId::new_v7(),
+            correlation_id: CorrelationId::new_v7(),
+            causation_id: None,
+            payload_json: serde_json::to_vec(payload).unwrap(),
+            metadata_json: b"{}".to_vec(),
+        };
+        self.seq += 1;
+        self.store
+            .append_event(req)
+            .await
+            .expect("append event")
+            .global_position
+    }
+
+    async fn put_user(&mut self, text: &str) {
+        let content_id = ContentId::new_v7();
+        self.store
+            .put_content(
+                &self.provider,
+                &content_id,
+                "user_text",
+                "text/plain",
+                &self.scope,
+                text.as_bytes(),
+            )
+            .await
+            .expect("put user content");
+        self.append(
+            "MessageSubmitted",
+            &MessageSubmittedV1 {
+                message_id: MessageId::new_v7(),
+                content_id,
+                content_kind: "user_text".to_string(),
+                size_bytes: text.len() as u64,
+            },
+        )
+        .await;
+    }
+
+    /// Append an assistant terminal with protected content + replay data.
+    async fn put_assistant(
+        &mut self,
+        op_id: OperationId,
+        message_id: MessageId,
+        text: &str,
+        completion: MessageCompletionV1,
+        usage: Option<MessageUsageV1>,
+    ) {
+        let content_id = ContentId::new_v7();
+        self.store
+            .put_content(
+                &self.provider,
+                &content_id,
+                "assistant_text",
+                "text/plain",
+                &self.scope,
+                text.as_bytes(),
+            )
+            .await
+            .expect("put assistant content");
+        self.append(
+            EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED,
+            &MessageCompletedV1 {
+                op_id,
+                message_id,
+                content_id,
+                content_kind: "assistant_text".to_string(),
+                size_bytes: text.len() as u64,
+                completion,
+                usage,
+            },
+        )
+        .await;
+    }
+
+    async fn messages(&self) -> Vec<ConversationMessageView> {
+        ConversationProjection::get_session_messages(
+            &self.pool,
+            &self.provider,
+            &self.inst_id,
+            &self.sess_id,
+        )
+        .await
+        .expect("get messages")
+    }
+}
+
+impl Drop for Harness {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.db_path);
+    }
+}
+
+#[tokio::test]
+async fn test_assistant_completed_replays_in_order_with_roles_and_usage() {
+    let mut h = Harness::new().await;
+    h.put_user("Question").await;
+
+    let op_id = OperationId::new_v7();
+    h.put_assistant(
+        op_id,
+        MessageId::new_v7(),
+        "Answer",
+        MessageCompletionV1::Completed { truncated: false },
+        Some(MessageUsageV1 {
+            prompt_tokens: Some(10),
+            completion_tokens: Some(5),
+            total_tokens: Some(15),
+        }),
+    )
+    .await;
+
+    let replayed = ConversationProjection::rebuild(&h.pool)
+        .await
+        .expect("rebuild");
+    assert_eq!(replayed, 2);
+
+    let view = h.messages().await;
+    assert_eq!(view.len(), 2);
+    assert_eq!(view[0].role, "user");
+    assert_eq!(view[0].content, "Question");
+    assert_eq!(view[0].completion, None);
+    assert_eq!(view[1].role, "assistant");
+    assert_eq!(view[1].content, "Answer");
+    assert_eq!(
+        view[1].completion,
+        Some(MessageCompletionV1::Completed { truncated: false })
+    );
+    assert_eq!(view[1].usage.as_ref().unwrap().total_tokens, Some(15));
+    assert_eq!(view[1].op_id, Some(op_id));
+}
+
+#[tokio::test]
+async fn test_interrupted_failed_and_length_markers_survive_rebuild() {
+    let mut h = Harness::new().await;
+
+    h.put_assistant(
+        OperationId::new_v7(),
+        MessageId::new_v7(),
+        "interrupted partial",
+        MessageCompletionV1::Interrupted,
+        None,
+    )
+    .await;
+
+    h.put_assistant(
+        OperationId::new_v7(),
+        MessageId::new_v7(),
+        "failed partial",
+        MessageCompletionV1::Failed,
+        None,
+    )
+    .await;
+
+    h.put_assistant(
+        OperationId::new_v7(),
+        MessageId::new_v7(),
+        "cut at limit",
+        MessageCompletionV1::Completed { truncated: true },
+        Some(MessageUsageV1 {
+            prompt_tokens: Some(8),
+            completion_tokens: Some(2),
+            total_tokens: Some(10),
+        }),
+    )
+    .await;
+
+    let replayed = ConversationProjection::rebuild(&h.pool)
+        .await
+        .expect("rebuild");
+    assert_eq!(replayed, 3);
+
+    let view = h.messages().await;
+    assert_eq!(view.len(), 3);
+    assert_eq!(view[0].content, "interrupted partial");
+    assert_eq!(view[0].completion, Some(MessageCompletionV1::Interrupted));
+    assert_eq!(view[1].content, "failed partial");
+    assert_eq!(view[1].completion, Some(MessageCompletionV1::Failed));
+    assert_eq!(view[2].content, "cut at limit");
+    assert_eq!(
+        view[2].completion,
+        Some(MessageCompletionV1::Completed { truncated: true })
+    );
+    assert_eq!(view[2].usage.as_ref().unwrap().completion_tokens, Some(2));
+}
+
+#[tokio::test]
+async fn test_double_terminal_write_yields_single_first_won_row() {
+    let mut h = Harness::new().await;
+
+    // Stop racing completion: two terminals exist in the log for one op.
+    let op_id = OperationId::new_v7();
+    let message_id = MessageId::new_v7();
+    h.put_assistant(
+        op_id,
+        message_id,
+        "first body",
+        MessageCompletionV1::Completed { truncated: false },
+        None,
+    )
+    .await;
+    h.put_assistant(
+        op_id,
+        message_id,
+        "second body",
+        MessageCompletionV1::Interrupted,
+        None,
+    )
+    .await;
+
+    // an unrelated op must still be replayed normally
+    h.put_assistant(
+        OperationId::new_v7(),
+        MessageId::new_v7(),
+        "other",
+        MessageCompletionV1::Completed { truncated: false },
+        None,
+    )
+    .await;
+
+    ConversationProjection::rebuild(&h.pool)
+        .await
+        .expect("rebuild");
+    let view = h.messages().await;
+    assert_eq!(view.len(), 2, "double terminal collapses to one row");
+    let first_op_rows: Vec<_> = view.iter().filter(|m| m.op_id == Some(op_id)).collect();
+    assert_eq!(first_op_rows.len(), 1, "exactly one terminal row per op");
+    assert_eq!(
+        first_op_rows[0].completion,
+        Some(MessageCompletionV1::Completed { truncated: false }),
+        "first terminal in global order wins"
+    );
+    assert_eq!(first_op_rows[0].content, "first body");
+}
+
+#[tokio::test]
+async fn test_unknown_completion_value_is_rejected_by_rebuild() {
+    let mut h = Harness::new().await;
+    h.put_user("Question").await;
+
+    let raw = serde_json::json!({
+        "op_id": uuid::Uuid::now_v7().to_string(),
+        "message_id": uuid::Uuid::now_v7().to_string(),
+        "content_id": uuid::Uuid::now_v7().to_string(),
+        "content_kind": "assistant_text",
+        "size_bytes": 4,
+        "completion": { "TotallyUnknown": null },
+        "usage": null
+    });
+    h.append(EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED, &raw).await;
+
+    let err = ConversationProjection::rebuild(&h.pool).await;
+    let msg = format!(
+        "{:?}",
+        err.expect_err("unknown completion must be rejected")
+    );
+    assert!(msg.contains("Invalid MessageCompletedV1 payload"), "{msg}");
 }

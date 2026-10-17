@@ -7,6 +7,7 @@ pub const EVENT_TYPE_WORKSPACE_CREATED: &str = "workspace/created";
 pub const EVENT_TYPE_PROJECT_CREATED: &str = "project/created";
 pub const EVENT_TYPE_SESSION_CREATED: &str = "session/created";
 pub const EVENT_TYPE_USER_MESSAGE_SUBMITTED: &str = "user/message-submitted";
+pub const EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED: &str = "assistant/message-completed";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -154,6 +155,62 @@ impl MessageSubmittedV1 {
         }
         if self.size_bytes == 0 || self.size_bytes > 65536 {
             return Err("size_bytes must be between 1 and 65536");
+        }
+        Ok(())
+    }
+}
+
+/// Four terminal lifecycle outcomes for one provider-completion operation:
+/// completed (a length-limit stop maps to completed-with-`truncated:true`,
+/// never a silent full answer), interrupted (a user stop — the persisted
+/// partial is the record), failed, and unresolved (no terminal event at all —
+/// the pending operation stays visible; never auto-completed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum MessageCompletionV1 {
+    Completed {
+        truncated: bool,
+    },
+    #[allow(dead_code)] // wired by the runtime stop path
+    Interrupted,
+    #[allow(dead_code)] // wired by the runtime failure path
+    Failed,
+}
+
+/// Token usage as reported by the provider. Missing values stay unknown —
+/// missing usage is never rewritten to zero.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MessageUsageV1 {
+    pub prompt_tokens: Option<u64>,
+    pub completion_tokens: Option<u64>,
+    pub total_tokens: Option<u64>,
+}
+
+/// Symmetric reload counterpart of a submitted user message: an assistant
+/// turn is persisted at terminal time, keyed by the completion operation.
+///
+/// Review ruling on the planned inline `text` field: event payloads are
+/// plaintext (`payload_json`), and P0-03 requires that no table holds
+/// plaintext content when application-level protection is selected — so the
+/// assistant text persists through the same protected content store as user
+/// submits (`content_id`), keeping the counterpart genuinely symmetric.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MessageCompletedV1 {
+    pub op_id: OperationId,
+    pub message_id: MessageId,
+    pub content_id: ContentId,
+    pub content_kind: String,
+    pub size_bytes: u64,
+    pub completion: MessageCompletionV1,
+    pub usage: Option<MessageUsageV1>,
+}
+
+impl MessageCompletedV1 {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.content_kind != "assistant_text" {
+            return Err("content_kind must be assistant_text");
         }
         Ok(())
     }

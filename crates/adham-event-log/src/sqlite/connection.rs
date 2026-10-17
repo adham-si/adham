@@ -36,6 +36,7 @@ pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Er
     pool.execute(PENDING_OPERATIONS_SQL).await?;
     pool.execute(PREFERENCES_SQL).await?;
     pool.execute(PROVIDER_REGISTRY_SQL).await?;
+    ensure_assistant_columns(&pool).await?;
     info!("Database schema initialized successfully.");
 
     Ok(pool)
@@ -84,5 +85,29 @@ async fn ensure_content_scope_columns(pool: &Pool<Sqlite>) -> Result<(), sqlx::E
             pool.execute(stmt).await?;
         }
     }
+    Ok(())
+}
+
+/// Assistant-terminal columns on `conversation_messages` (user rows leave
+/// them NULL). `op_id` is unique: a second terminal write for the same
+/// completion operation — including a Stop racing completion — is a no-op, so
+/// exactly one terminal outcome wins.
+async fn ensure_assistant_columns(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
+    let cols: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM pragma_table_info('conversation_messages')")
+            .fetch_all(pool)
+            .await?;
+    for column in ["op_id", "completion_json", "usage_json"] {
+        if !cols.iter().any(|c| c == column) {
+            pool.execute(format!("ALTER TABLE conversation_messages ADD COLUMN {column}").as_str())
+                .await?;
+        }
+    }
+    sqlx::query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS conversation_messages_op_id \
+         ON conversation_messages(op_id)",
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }

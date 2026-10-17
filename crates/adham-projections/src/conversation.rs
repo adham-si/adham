@@ -1,6 +1,9 @@
 //! Conversation projection. ID newtypes are `Copy`; `.clone()` follows codebase style.
 #![allow(clippy::clone_on_copy)]
-use adham_core_types::{DomainError, MessageSubmittedV1, SessionId};
+use adham_core_types::{
+    DomainError, MessageCompletedV1, MessageCompletionV1, MessageSubmittedV1, MessageUsageV1,
+    OperationId, SessionId, EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED,
+};
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Row, Sqlite};
 use time::OffsetDateTime;
@@ -13,6 +16,11 @@ pub struct ConversationMessageView {
     pub role: String,
     pub content: String,
     pub created_at_us: i64,
+    /// Completion operation for assistant turns (None for user turns).
+    pub op_id: Option<OperationId>,
+    /// Terminal lifecycle outcome carried on assistant turns (None for user).
+    pub completion: Option<MessageCompletionV1>,
+    pub usage: Option<MessageUsageV1>,
 }
 
 pub struct ConversationProjection;
@@ -158,7 +166,8 @@ impl ConversationProjection {
         let rows = sqlx::query(
             r#"
             SELECT cm.message_id, cm.workspace_id, cm.project_id, cm.session_id, cm.role,
-                   cm.created_at_us, cm.content_id, cr.content_kind, cr.protection_scheme,
+                   cm.created_at_us, cm.content_id, cm.op_id, cm.completion_json, cm.usage_json,
+                   cr.content_kind, cr.protection_scheme,
                    cr.nonce, cr.protected_bytes
             FROM conversation_messages cm
             LEFT JOIN content_records cr ON cm.content_id = cr.content_id
@@ -217,12 +226,44 @@ impl ConversationProjection {
                 }
             };
 
+            // assistant terminal identity + markers: corrupt stored JSON is
+            // an integrity error, never a silently unmarked row
+            let op_id = row
+                .try_get::<Option<String>, _>("op_id")
+                .map_err(|e| DomainError::Storage(e.to_string()))?
+                .map(|s| OperationId::from_string(&s))
+                .transpose()
+                .map_err(|e| DomainError::Integrity(format!("assistant op id corrupt: {e}")))?;
+            let completion = match row
+                .try_get::<Option<String>, _>("completion_json")
+                .map_err(|e| DomainError::Storage(e.to_string()))?
+            {
+                Some(json) => Some(serde_json::from_str::<MessageCompletionV1>(&json).map_err(
+                    |e| DomainError::Integrity(format!("completion marker corrupt: {e}")),
+                )?),
+                None => None,
+            };
+            let usage = match row
+                .try_get::<Option<String>, _>("usage_json")
+                .map_err(|e| DomainError::Storage(e.to_string()))?
+            {
+                Some(json) => {
+                    Some(serde_json::from_str::<MessageUsageV1>(&json).map_err(|e| {
+                        DomainError::Integrity(format!("usage marker corrupt: {e}"))
+                    })?)
+                }
+                None => None,
+            };
+
             messages.push(ConversationMessageView {
                 message_id,
                 session_id: session_id_str,
                 role,
                 content,
                 created_at_us,
+                op_id,
+                completion,
+                usage,
             });
         }
 
@@ -242,16 +283,18 @@ impl ConversationProjection {
             .await
             .map_err(|e| DomainError::Storage(e.to_string()))?;
 
-        // 2. Query all message events in strict global order
-        let rows = sqlx::query(
+        // 2. Replay message events (user submits + assistant terminals) in
+        // strict global order so the rebuild is deterministic.
+        let rows = sqlx::query(&format!(
             r#"
-            SELECT global_position, event_id, workspace_id, project_id, session_id,
+            SELECT global_position, event_id, event_type, workspace_id, project_id, session_id,
                    occurred_at_us, payload_json
             FROM events
-            WHERE event_type = 'MessageSubmitted'
+            WHERE event_type IN ('MessageSubmitted', '{}')
             ORDER BY global_position ASC
             "#,
-        )
+            EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED
+        ))
         .fetch_all(&mut *tx)
         .await
         .map_err(|e| DomainError::Storage(e.to_string()))?;
@@ -262,37 +305,87 @@ impl ConversationProjection {
         for row in rows {
             let global_position: i64 = row.get("global_position");
             let event_id: String = row.get("event_id");
+            let event_type: String = row.get("event_type");
             let workspace_id: String = row.get("workspace_id");
             let project_id: String = row.get("project_id");
             let session_id: String = row.get("session_id");
             let occurred_at_us: i64 = row.get("occurred_at_us");
             let payload_bytes: Vec<u8> = row.get("payload_json");
 
-            let payload: MessageSubmittedV1 =
-                serde_json::from_slice(&payload_bytes).map_err(|e| {
-                    DomainError::Validation(format!("Invalid MessageSubmittedV1 payload: {e}"))
+            if event_type == EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED {
+                let payload: MessageCompletedV1 =
+                    serde_json::from_slice(&payload_bytes).map_err(|e| {
+                        DomainError::Validation(format!("Invalid MessageCompletedV1 payload: {e}"))
+                    })?;
+                payload.validate().map_err(|m| {
+                    DomainError::Validation(format!("Invalid MessageCompletedV1 payload: {m}"))
                 })?;
+                let completion_json = serde_json::to_string(&payload.completion).map_err(|e| {
+                    DomainError::Validation(format!("Invalid completion marker: {e}"))
+                })?;
+                let usage_json = payload
+                    .usage
+                    .map(|u| {
+                        serde_json::to_string(&u).map_err(|e| {
+                            DomainError::Validation(format!("Invalid usage marker: {e}"))
+                        })
+                    })
+                    .transpose()?;
 
-            sqlx::query(
-                r#"
-                INSERT INTO conversation_messages (
-                    message_id, workspace_id, project_id, session_id, role,
-                    content_id, source_event_id, source_global_position, created_at_us
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                "#,
-            )
-            .bind(payload.message_id.to_string())
-            .bind(&workspace_id)
-            .bind(&project_id)
-            .bind(&session_id)
-            .bind("user")
-            .bind(payload.content_id.to_string())
-            .bind(&event_id)
-            .bind(global_position)
-            .bind(occurred_at_us)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| DomainError::Storage(e.to_string()))?;
+                // keyed by op_id: a second terminal write for the same op is
+                // a no-op (exactly one terminal outcome wins)
+                sqlx::query(
+                    r#"
+                    INSERT INTO conversation_messages (
+                        message_id, workspace_id, project_id, session_id, role,
+                        content_id, source_event_id, source_global_position, created_at_us,
+                        op_id, completion_json, usage_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT DO NOTHING
+                    "#,
+                )
+                .bind(payload.message_id.to_string())
+                .bind(&workspace_id)
+                .bind(&project_id)
+                .bind(&session_id)
+                .bind("assistant")
+                .bind(payload.content_id.to_string())
+                .bind(&event_id)
+                .bind(global_position)
+                .bind(occurred_at_us)
+                .bind(payload.op_id.to_string())
+                .bind(completion_json)
+                .bind(usage_json)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DomainError::Storage(e.to_string()))?;
+            } else {
+                let payload: MessageSubmittedV1 =
+                    serde_json::from_slice(&payload_bytes).map_err(|e| {
+                        DomainError::Validation(format!("Invalid MessageSubmittedV1 payload: {e}"))
+                    })?;
+
+                sqlx::query(
+                    r#"
+                    INSERT INTO conversation_messages (
+                        message_id, workspace_id, project_id, session_id, role,
+                        content_id, source_event_id, source_global_position, created_at_us
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    "#,
+                )
+                .bind(payload.message_id.to_string())
+                .bind(&workspace_id)
+                .bind(&project_id)
+                .bind(&session_id)
+                .bind("user")
+                .bind(payload.content_id.to_string())
+                .bind(&event_id)
+                .bind(global_position)
+                .bind(occurred_at_us)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DomainError::Storage(e.to_string()))?;
+            }
 
             last_position = global_position;
             count += 1;
