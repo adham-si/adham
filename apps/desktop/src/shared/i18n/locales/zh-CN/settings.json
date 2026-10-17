@@ -118,7 +118,8 @@
       "tierLow": "低",
       "tierMedium": "中",
       "tierHigh": "高",
-      "noVision": "活动模型没有视觉能力"
+      "noVision": "活动模型没有视觉能力",
+      "ollamaTitle": "本机（Ollama）"
     },
     "storage": {
       "title": "存储与备份",
@@ -321,7 +322,18 @@
       "emptyHint": "切换到“{tab}”以连接 AI 提供商。",
       "badgeConnected": "已连接",
       "connect": "连接",
-      "disconnect": "断开"
+      "disconnect": "断开",
+      "ollamaSectionTitle": "Ollama（本地）",
+      "localOnlyBadge": "仅本地",
+      "ollamaAlias": "本地 Ollama",
+      "endpointLabel": "Ollama 端点",
+      "endpointPlaceholder": "http://127.0.0.1:11434",
+      "testConnection": "测试连接",
+      "testing": "测试中…",
+      "discoverModels": "发现模型",
+      "saved": "已连接。",
+      "discoveredCount": "已从此端点固定 {{count}} 个模型。",
+      "unreachable": "Ollama 在 {{url}} 无响应。未保存任何内容。"
     },
     "mcp": {
       "descPlaywright": "绑定到本地临时目录的浏览器自动化服务器。",

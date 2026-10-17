@@ -75,6 +75,9 @@
     "removeAttachment": "Remove {{name}}",
     "charsCompact_one": "{{formatted}}k character",
     "charsCompact_other": "{{formatted}}k characters",
-    "charsCompact_zero": "{{formatted}}k characters"
+    "charsCompact_zero": "{{formatted}}k characters",
+    "streamNotice": "Streaming with the selected model. Withheld: {{items}}.",
+    "withheldReasoning": "custom reasoning effort is not applied",
+    "selectModel": "Select a model"
   }
 }

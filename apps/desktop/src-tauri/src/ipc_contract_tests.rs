@@ -1614,3 +1614,106 @@ fn provider_models_are_listable_from_the_pinned_registry() {
     assert!(text.contains("InvalidRequest"), "{text}");
     assert_eq!(captures.accepts(), 0);
 }
+
+/// Provider management is app-level: the settings surface runs with no
+/// conversation session. Test/discover/create work with an empty context;
+/// streaming keeps its full-scope requirement.
+#[test]
+fn provider_management_runs_app_level_without_a_session() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let base_url = spawn_stub_ollama(&runtime, None, captures.clone(), ChatProgram::once(vec![]));
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let empty = json!({});
+
+    let response = invoke(
+        &webview,
+        "test_provider_connection",
+        args_for(
+            empty.clone(),
+            json!({"accountId": "", "endpointUrl": base_url}),
+        ),
+    )
+    .expect("app-level probe");
+    assert_eq!(response["data"]["reachable"], json!(true));
+
+    let response = invoke(
+        &webview,
+        "update_provider_account",
+        args_for(
+            empty.clone(),
+            json!({"accountId": null, "alias": "Settings Ollama", "endpointUrl": base_url}),
+        ),
+    )
+    .expect("app-level mint");
+    let account_id = response["data"]["accountId"]
+        .as_str()
+        .expect("minted")
+        .to_string();
+
+    let response = invoke(
+        &webview,
+        "discover_ollama_models",
+        args_for(empty, json!({"accountId": account_id})),
+    )
+    .expect("app-level discover");
+    assert!(
+        response["data"]["models"].is_array(),
+        "discovery is app-level too"
+    );
+
+    // boundary: streaming keeps the full-scope requirement (pinned at the
+    // handler level — the mock dispatch cannot carry a Channel; see A5 note)
+    let ctx_direct = app.state::<ApiContext>().inner().clone();
+    let sink = CollectSink(collector());
+    let accepts_before = captures.accepts();
+    let envelope = CommandEnvelope {
+        protocol_version: 1,
+        request_id: uuid::Uuid::now_v7().to_string(),
+        context: CommandContext {
+            workspace_id: None,
+            project_id: None,
+            session_id: None,
+        },
+        payload: CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "m:latest".to_string(),
+            text: "hi".to_string(),
+        },
+    };
+    let message = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx_direct, envelope, &sink).await
+        })
+        .unwrap_err();
+    assert!(
+        message.contains("VALIDATION_FAILED"),
+        "streaming still requires the full session scope: {message}"
+    );
+    assert_eq!(captures.accepts(), accepts_before, "no socket was opened");
+
+    // boundary: stop keeps the full-scope requirement too — an app-level
+    // (session-less) caller cannot cancel another session's run.
+    let stop_envelope = CommandEnvelope {
+        protocol_version: 1,
+        request_id: uuid::Uuid::now_v7().to_string(),
+        context: CommandContext {
+            workspace_id: None,
+            project_id: None,
+            session_id: None,
+        },
+        payload: StopCompletionPayload {
+            op_id: OperationId::new_v7().to_string(),
+        },
+    };
+    let message = runtime
+        .block_on(async {
+            adham_desktop_api::handle_stop_completion(&ctx_direct, stop_envelope).await
+        })
+        .unwrap_err();
+    assert!(
+        message.contains("VALIDATION_FAILED"),
+        "stop still requires the full session scope: {message}"
+    );
+}

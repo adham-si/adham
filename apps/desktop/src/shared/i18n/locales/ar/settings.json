@@ -118,7 +118,8 @@
       "tierLow": "منخفض",
       "tierMedium": "متوسط",
       "tierHigh": "مرتفع",
-      "noVision": "النموذج النشط لا يدعم الرؤية"
+      "noVision": "النموذج النشط لا يدعم الرؤية",
+      "ollamaTitle": "على هذه الآلة (أولاما)"
     },
     "storage": {
       "title": "التخزين والنسخ الاحتياطي",
@@ -333,7 +334,18 @@
       "emptyHint": "انتقل إلى «{tab}» لربط مزود ذكاء اصطناعي.",
       "badgeConnected": "متصل",
       "connect": "ربط",
-      "disconnect": "فصل"
+      "disconnect": "فصل",
+      "ollamaSectionTitle": "أولاما (محلي)",
+      "localOnlyBadge": "محلي فقط",
+      "ollamaAlias": "أولاما المحلي",
+      "endpointLabel": "عنوان خادم أولاما",
+      "endpointPlaceholder": "http://127.0.0.1:11434",
+      "testConnection": "اختبار الاتصال",
+      "testing": "جارٍ الاختبار…",
+      "discoverModels": "اكتشاف النماذج",
+      "saved": "تم الاتصال.",
+      "discoveredCount": "تم تثبيت {{count}} نموذجًا من هذا العنوان.",
+      "unreachable": "لا استجابة من أولاما على {{url}}. لم يُحفظ أي شيء."
     },
     "mcp": {
       "descPlaywright": "خادم أتمتة المتصفح مقيد بدليل مؤقت محلي.",

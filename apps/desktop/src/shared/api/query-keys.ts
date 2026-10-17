@@ -7,4 +7,6 @@ export const queryKeys = {
   projects: (workspaceId: string) => ['projects', workspaceId] as const,
   conversation: (workspaceId: string, projectId: string, sessionId: string) =>
     ['conversation', workspaceId, projectId, sessionId] as const,
+  providerAccounts: ['provider-accounts'] as const,
+  providerModels: (accountId: string) => ['provider-models', accountId] as const,
 };

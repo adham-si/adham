@@ -83,6 +83,9 @@
     "charsCompact_few": "{{formatted}}k символа",
     "charsCompact_many": "{{formatted}}k символов",
     "charsCompact_other": "{{formatted}}k символов",
-    "charsCompact_zero": "{{formatted}}k символов"
+    "charsCompact_zero": "{{formatted}}k символов",
+    "streamNotice": "Стриминг выбранной модели. Не применено: {{items}}.",
+    "withheldReasoning": "своё усилие рассуждения не применено",
+    "selectModel": "Выберите модель"
   }
 }

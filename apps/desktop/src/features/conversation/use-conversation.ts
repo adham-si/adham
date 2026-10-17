@@ -42,6 +42,9 @@ export type { PendingSend } from './conversation-identity';
 
 export type UiMessage = { id: string; role: string; text: string; createdAt: string };
 
+/** Live streaming state for the composer (deltas + terminal op handle). */
+export type StreamingSnapshot = { opId: string; text: string };
+
 export type ConversationStatus =
   | 'bootstrapping'
   | 'needs-workspace'
@@ -568,6 +571,139 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     [backend, bootstrap, context],
   );
 
+  // ===== Delivery A: streaming completion (complete_once_streaming) =====
+  const [streaming, setStreamingState] = React.useState<StreamingSnapshot | null>(null);
+  const streamingRef = React.useRef<StreamingSnapshot | null>(null);
+  const setStreaming = React.useCallback((next: StreamingSnapshot | null) => {
+    streamingRef.current = next;
+    setStreamingState(next);
+  }, []);
+
+  const streamOnce = React.useCallback(
+    async (text: string, accountId: string, modelId: string): Promise<SubmitOutcome> => {
+      const trimmed = text.trim();
+      if (!trimmed)
+        return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
+      if (!backend.completeOnceStreaming || !backend.stopCompletion) {
+        return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+      }
+      const ctx = context;
+      if (!ctx || !ctx.sessionId) {
+        return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+      }
+      const blocked = sendBlockedReason(scopeStaleRef.current);
+      if (blocked) return { ok: false, error: blocked, uncertain: false };
+      // Same controller-boundary guard as submit: one live dispatch at a time.
+      if (submitInFlightRef.current) {
+        return { ok: false, error: i18n.t('conversation.alreadySaving'), uncertain: false };
+      }
+      const preSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
+      if (preSwitch) return preSwitch;
+
+      submitInFlightRef.current = true;
+      const generation = generationRef.current;
+      setError(null);
+      // Optimistic user bubble; the terminal reload replaces the whole list
+      // with the authoritative persisted rows (including the streamed turn).
+      mutationSeqRef.current += 1;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'streaming-user-bubble',
+          role: 'user',
+          text: trimmed,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      let opId: string | null = null;
+      let terminalSeen = false;
+      let resolveTerminal!: (completion: 'completed' | 'interrupted' | 'failed') => void;
+      const terminalPromise = new Promise<'completed' | 'interrupted' | 'failed'>((resolve) => {
+        resolveTerminal = resolve;
+      });
+
+      try {
+        const start = await backend.completeOnceStreaming(
+          ctx.workspaceId,
+          ctx.projectId,
+          ctx.sessionId,
+          { accountId, modelId, text: trimmed },
+          (event) => {
+            if (!mountedRef.current || generationRef.current !== generation) return;
+            if (opId === null) opId = event.opId;
+            if (event.opId !== opId) return;
+            if (event.event.type === 'delta') {
+              const previous =
+                streamingRef.current?.opId === event.opId ? streamingRef.current.text : '';
+              setStreaming({ opId: event.opId, text: previous + event.event.text });
+            } else if (event.event.type === 'completed' && !terminalSeen) {
+              terminalSeen = true;
+              // Generated DTO types the completion as string; only the
+              // documented values pass through, unknowns resolve completed.
+              const completion = event.event.completion;
+              resolveTerminal(
+                completion === 'interrupted' || completion === 'failed' ? completion : 'completed',
+              );
+            }
+          },
+        );
+        if (!mountedRef.current || generationRef.current !== generation) {
+          return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
+        }
+        // First stream event may arrive before the start handle resolves.
+        if (opId === null) opId = start.opId;
+        if (streamingRef.current?.opId !== opId) setStreaming({ opId, text: '' });
+        await terminalPromise;
+        // Handoff ordering is atomic in the render sense: the live bubble is
+        // dropped BEFORE the authoritative rows land, so the persisted
+        // partial is never rendered alongside its streaming predecessor.
+        setStreaming(null);
+        try {
+          if (mountedRef.current && generationRef.current === generation) await reload();
+        } finally {
+          streamingRef.current = null;
+        }
+        return { ok: true };
+      } catch (err) {
+        setStreaming(null);
+        // Dispatch failed before/at the socket: the user turn was never
+        // persisted, so the optimistic bubble is removed.
+        setMessages((prev) => prev.filter((m) => m.id !== 'streaming-user-bubble'));
+        const code = err instanceof Error ? err.message : String(err);
+        setError(code);
+        setStatus('error');
+        return { ok: false, error: code, uncertain: true };
+      } finally {
+        submitInFlightRef.current = false;
+      }
+    },
+    [backend, context, reload, setStreaming],
+  );
+
+  const stop = React.useCallback(async (): Promise<SubmitOutcome> => {
+    const state = streamingRef.current;
+    const ctx = context;
+    if (!state || !backend.stopCompletion || !ctx?.sessionId) {
+      return {
+        ok: false,
+        error: i18n.t('conversation.stopUnavailable'),
+        uncertain: false,
+      };
+    }
+    try {
+      await backend.stopCompletion(ctx.workspaceId, ctx.projectId, ctx.sessionId, state.opId);
+      // The Interrupted terminal drives the reload through the stream.
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        uncertain: false,
+      };
+    }
+  }, [backend, context]);
+
   return {
     status,
     messages,
@@ -578,6 +714,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     storageWarning,
     pendingSend,
     submit,
+    streamOnce,
+    stop,
+    streaming,
     retry,
     reload,
     openSession,

@@ -71,6 +71,9 @@
     "attachedContext": "已附加上下文",
     "removeAttachment": "移除 {{name}}",
     "charsCompact_other": "{{formatted}}k 个字符",
-    "charsCompact_zero": "{{formatted}}k 个字符"
+    "charsCompact_zero": "{{formatted}}k 个字符",
+    "streamNotice": "正在向所选模型流式发送。未应用：{{items}}。",
+    "withheldReasoning": "自定义推理力度未应用",
+    "selectModel": "选择模型"
   }
 }

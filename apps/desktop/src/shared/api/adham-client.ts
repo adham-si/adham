@@ -428,17 +428,11 @@ export class AdhamApiClient implements AdhamClient {
   }
 
   async listProviderModels(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
     accountId: string,
+    context?: CommandContext,
     options?: { requestId?: string },
   ): Promise<ListProviderModelsResponse> {
-    const envelope = this.wrapCommand(
-      { accountId },
-      this.sessionContext(workspaceId, projectId, sessionId),
-      options?.requestId,
-    );
+    const envelope = this.wrapCommand({ accountId }, context, options?.requestId);
     const result = await invoke<CommandResult<ListProviderModelsResponse>>('list_provider_models', {
       request: envelope,
     });
@@ -446,15 +440,13 @@ export class AdhamApiClient implements AdhamClient {
   }
 
   async testProviderConnection(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
     accountId: string,
+    context?: CommandContext,
     options?: { requestId?: string; endpointUrl?: string },
   ): Promise<ProviderHealthResponse> {
     const envelope = this.wrapCommand(
       { accountId, endpointUrl: options?.endpointUrl ?? null },
-      this.sessionContext(workspaceId, projectId, sessionId),
+      context,
       options?.requestId,
     );
     const result = await invoke<CommandResult<ProviderHealthResponse>>('test_provider_connection', {
@@ -464,17 +456,11 @@ export class AdhamApiClient implements AdhamClient {
   }
 
   async discoverOllamaModels(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
     accountId: string,
+    context?: CommandContext,
     options?: { requestId?: string },
   ): Promise<ProviderModelsList> {
-    const envelope = this.wrapCommand(
-      { accountId },
-      this.sessionContext(workspaceId, projectId, sessionId),
-      options?.requestId,
-    );
+    const envelope = this.wrapCommand({ accountId }, context, options?.requestId);
     const result = await invoke<CommandResult<ProviderModelsList>>('discover_ollama_models', {
       request: envelope,
     });

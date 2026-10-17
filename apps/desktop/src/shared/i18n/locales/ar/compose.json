@@ -87,6 +87,9 @@
     "charsCompact_few": "{{formatted}}k أحرف",
     "charsCompact_many": "{{formatted}}k حرفًا",
     "charsCompact_other": "{{formatted}}k حرف",
-    "charsCompact_zero": "{{formatted}}k حرف"
+    "charsCompact_zero": "{{formatted}}k حرف",
+    "streamNotice": "بثٌّ إلى النموذج المحدد. المُستثنى: {{items}}.",
+    "withheldReasoning": "مستوى التفكير المخصص غير مطبَّق",
+    "selectModel": "اختر نموذجًا"
   }
 }

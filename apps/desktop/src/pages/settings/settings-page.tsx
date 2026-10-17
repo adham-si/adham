@@ -42,6 +42,8 @@ export const VISIBLE_SETTINGS_PAGES: ReadonlySet<SettingsPageId> = new Set([
   'preferences',
   'data',
   'info',
+  'providers',
+  'models',
 ]);
 
 export function SettingsPage() {

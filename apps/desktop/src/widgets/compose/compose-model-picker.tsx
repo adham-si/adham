@@ -93,7 +93,12 @@ export function ComposeModelPicker({
   const [isOpen, setIsOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const selectedModel = models.find((m) => m.id === selectedModelId) || models[0]!;
+  // Selection is explicit: nothing is auto-displayed as chosen before the
+  // user picks; discovery order is never a default.
+  const selectedModel = selectedModelId
+    ? (models.find((m) => m.id === selectedModelId) ?? null)
+    : null;
+  const selectedLabel = selectedModel?.name ?? t('compose.selectModel', 'Select a model');
 
   // Close popup when clicking outside or pressing Escape
   React.useEffect(() => {
@@ -115,7 +120,11 @@ export function ComposeModelPicker({
     };
   }, [isOpen]);
 
-  const isLocal = selectedModel.boundary === 'local';
+  // No registry models: no picker — the composer runs the honest text-only
+  // path, so unsupported "catalog" entries are never shown. (Placed after
+  // every hook: the early return must never skip a hook.)
+  if (models.length === 0) return null;
+  const isLocal = selectedModel?.boundary === 'local';
 
   return (
     <div ref={containerRef} className={`relative inline-flex items-center ${className}`}>
@@ -126,31 +135,37 @@ export function ComposeModelPicker({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label={`Select model. Current model is ${selectedModel.name}, ${
-          isLocal ? 'running locally' : 'cloud provider'
-        }`}
+        aria-label={
+          selectedModel
+            ? `Select model. Current model is ${selectedModel.name}, ${
+                isLocal ? 'running locally' : 'cloud provider'
+              }`
+            : 'Select a model'
+        }
         className="group flex min-h-control-xs items-center gap-1.5 rounded-lg border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
       >
         {/* Model Name */}
-        <span className="font-medium text-foreground">{selectedModel.name}</span>
+        <span className="font-medium text-foreground">{selectedLabel}</span>
 
         {/* Data Boundary Badge */}
-        <span
-          className={`flex items-center gap-1 rounded-sm px-1.5 py-0.2 text-[10px] font-semibold uppercase tracking-wider ${
-            isLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
-          }`}
-          title={
-            isLocal
-              ? t('compose.localBoundaryNote', 'Zero data leaves this machine')
-              : t('compose.cloudBoundaryNote', { provider: selectedModel.provider })
-          }
-        >
-          <HugeiconsIcon icon={isLocal ? CpuIcon : AiCloud01Icon} className="size-3" />
-          <span>{isLocal ? t('compose.localBadge', 'Local') : selectedModel.provider}</span>
-        </span>
+        {selectedModel && (
+          <span
+            className={`flex items-center gap-1 rounded-sm px-1.5 py-0.2 text-[10px] font-semibold uppercase tracking-wider ${
+              isLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
+            }`}
+            title={
+              isLocal
+                ? t('compose.localBoundaryNote', 'Zero data leaves this machine')
+                : t('compose.cloudBoundaryNote', { provider: selectedModel.provider })
+            }
+          >
+            <HugeiconsIcon icon={isLocal ? CpuIcon : AiCloud01Icon} className="size-3" />
+            <span>{isLocal ? t('compose.localBadge', 'Local') : selectedModel.provider}</span>
+          </span>
+        )}
 
         {/* Reasoning tag if active */}
-        {selectedModel.supportsReasoning && (
+        {selectedModel?.supportsReasoning && (
           <span className="hidden sm:inline-block rounded bg-surface px-1 py-0.2 text-[10px] text-foreground-muted border border-border-subtle">
             {effortLabels[reasoningEffort]}
           </span>
@@ -175,7 +190,7 @@ export function ComposeModelPicker({
 
           <div className="space-y-0.5">
             {models.map((model) => {
-              const isSelected = model.id === selectedModel.id;
+              const isSelected = selectedModel !== null && model.id === selectedModel.id;
               const modelLocal = model.boundary === 'local';
 
               return (
@@ -234,7 +249,7 @@ export function ComposeModelPicker({
           </div>
 
           {/* Reasoning Effort Section if current model supports reasoning */}
-          {selectedModel.supportsReasoning && onChangeReasoningEffort && (
+          {selectedModel?.supportsReasoning && onChangeReasoningEffort && (
             <div className="mt-2 border-t border-border-subtle pt-2 px-1">
               <div className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-1">
                 {t('settings.models.effortHeading', 'Reasoning Effort')}

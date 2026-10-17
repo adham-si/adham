@@ -118,7 +118,8 @@
       "tierLow": "Низкие",
       "tierMedium": "Средние",
       "tierHigh": "Высокие",
-      "noVision": "Активная модель не поддерживает зрение"
+      "noVision": "Активная модель не поддерживает зрение",
+      "ollamaTitle": "На этом устройстве (Ollama)"
     },
     "storage": {
       "title": "Хранилище и Копии",
@@ -330,7 +331,18 @@
       "emptyHint": "Перейдите на «{tab}», чтобы подключить провайдера ИИ.",
       "badgeConnected": "Подключён",
       "connect": "Подключить",
-      "disconnect": "Отключить"
+      "disconnect": "Отключить",
+      "ollamaSectionTitle": "Ollama (локально)",
+      "localOnlyBadge": "Только локально",
+      "ollamaAlias": "Локальная Ollama",
+      "endpointLabel": "Адрес Ollama",
+      "endpointPlaceholder": "http://127.0.0.1:11434",
+      "testConnection": "Проверить соединение",
+      "testing": "Проверка…",
+      "discoverModels": "Найти модели",
+      "saved": "Подключено.",
+      "discoveredCount": "Закреплено моделей с этого адреса: {{count}}.",
+      "unreachable": "Нет ответа от Ollama по адресу {{url}}. Ничего не сохранено."
     },
     "mcp": {
       "descPlaywright": "Сервер автоматизации браузера в границах локального временного каталога.",

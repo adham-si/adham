@@ -118,7 +118,8 @@
       "tierLow": "Low",
       "tierMedium": "Medium",
       "tierHigh": "High",
-      "noVision": "Active model has no vision"
+      "noVision": "Active model has no vision",
+      "ollamaTitle": "On this machine (Ollama)"
     },
     "storage": {
       "title": "Storage & Backup",
@@ -324,7 +325,18 @@
       "emptyHint": "Switch to “{tab}” to connect an AI provider.",
       "badgeConnected": "Connected",
       "connect": "Connect",
-      "disconnect": "Disconnect"
+      "disconnect": "Disconnect",
+      "ollamaSectionTitle": "Ollama (local)",
+      "localOnlyBadge": "Local only",
+      "ollamaAlias": "Local Ollama",
+      "endpointLabel": "Ollama endpoint",
+      "endpointPlaceholder": "http://127.0.0.1:11434",
+      "testConnection": "Test connection",
+      "testing": "Testing…",
+      "discoverModels": "Discover models",
+      "saved": "Connected.",
+      "discoveredCount": "{{count}} models pinned from this endpoint.",
+      "unreachable": "No response from Ollama at {{url}}. Nothing was saved."
     },
     "mcp": {
       "descPlaywright": "Browser automation server bounded to local scratch directory.",

@@ -84,28 +84,24 @@ describe('SettingsPage Component', () => {
 
     fireEvent.click(screen.getByText('Open'));
 
-    // Visible surface: Preferences, Data, About only.
+    // Visible surface: Preferences, Data, About — and the Delivery A
+    // provider pages (Models + Providers) now have a real backend.
     const categoriesAside = screen.getByLabelText('Settings Categories');
     expect(within(categoriesAside).getByText('Preferences')).not.toBeNull();
     expect(within(categoriesAside).getByText('Data')).not.toBeNull();
     expect(within(categoriesAside).getByText('About')).not.toBeNull();
-    for (const hidden of [
-      'AI Models',
-      'AI Providers',
-      'Routing',
-      'MCP',
-      'Skills',
-      'Plugins',
-      'Security',
-      'Budget',
-      'Usage',
-    ]) {
+    expect(within(categoriesAside).getByText('AI Models')).not.toBeNull();
+    expect(within(categoriesAside).getByText('AI Providers')).not.toBeNull();
+    for (const hidden of ['Routing', 'MCP', 'Skills', 'Plugins', 'Security', 'Budget', 'Usage']) {
       expect(within(categoriesAside).queryByText(hidden)).toBeNull();
     }
 
-    // A hidden id never exposes its controls: falls back to Preferences.
-    expect(screen.getByText('Appearance')).not.toBeNull();
-    expect(screen.queryByText('Available Models')).toBeNull();
+    // A visible id renders its page: the working Ollama section is here.
+    expect(
+      screen.getByText(
+        'Configure default intelligence runtimes, model parameters, and automatic fallback chains.',
+      ),
+    ).not.toBeNull();
   });
 
   it('filters settings pages list based on search input', () => {
@@ -136,5 +132,8 @@ describe('SettingsPage Component', () => {
 
     fireEvent.change(searchInput, { target: { value: 'Data' } });
     expect(within(categoriesAside).getByText('Data')).not.toBeNull();
+
+    fireEvent.change(searchInput, { target: { value: 'providers' } });
+    expect(within(categoriesAside).getByText('AI Providers')).not.toBeNull();
   });
 });

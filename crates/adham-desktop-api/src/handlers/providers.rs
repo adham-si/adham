@@ -123,8 +123,9 @@ pub async fn handle_test_provider_connection(
     ctx: &ApiContext,
     env: CommandEnvelope<TestProviderConnectionPayload>,
 ) -> Result<CommandResult<ProviderHealthResponse>, String> {
-    let ids = expect_full_scope(&env.context)?;
-    validate_session_scope(ctx, &ids).await?;
+    if let Some(ids) = optional_full_scope(&env.context)? {
+        validate_session_scope(ctx, &ids).await?;
+    }
     // URL probe without persistence: "failed test saves nothing"
     if env.payload.account_id.trim().is_empty() {
         if let Some(url) = env
@@ -266,6 +267,19 @@ struct StreamIds {
     ws_id: WorkspaceId,
     proj_id: ProjectId,
     sess_id: SessionId,
+}
+
+/// Provider-management commands are app-level: the settings surface has no
+/// active conversation session. A scope is validated only when supplied
+/// (all three ids present), never inferred from a partial one.
+fn optional_full_scope(context: &CommandContext) -> Result<Option<StreamIds>, String> {
+    if context.workspace_id.is_none()
+        && context.project_id.is_none()
+        && context.session_id.is_none()
+    {
+        return Ok(None);
+    }
+    expect_full_scope(context).map(Some)
 }
 
 fn expect_full_scope(context: &CommandContext) -> Result<StreamIds, String> {

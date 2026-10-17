@@ -152,12 +152,147 @@ describe('ConversationPanel', () => {
     expect(screen.queryByText(/Verified sandbox execution/i)).toBeNull();
   });
 
-  it('never renders a Stop button because no stop command exists', async () => {
+  it('does not offer a Stop affordance in the text-only fallback flow', async () => {
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
     await screen.findByRole('textbox', { name: /composer input/i });
 
     expect(screen.queryByRole('button', { name: /stop generation/i })).toBeNull();
+  });
+
+  it('streams with the picked registry model; stop_completion cancels and reload keeps the partial', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    // Boot reads getConversation twice (session resolution + history load);
+    // the turn's persisted rows land only on the post-terminal reload.
+    const bootRows = {
+      items: [
+        {
+          messageId: 'msg-0',
+          role: 'user',
+          text: 'earlier truth',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-0',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    };
+    const persistedRows = {
+      items: [
+        bootRows.items[0]!,
+        {
+          messageId: 'msg-u',
+          role: 'user',
+          text: 'hi',
+          createdAt: '2026-10-16T00:00:00Z',
+          sourceEventId: 'evt-u',
+        },
+        {
+          messageId: 'msg-a',
+          role: 'assistant',
+          text: 'partial answer',
+          createdAt: '2026-10-16T00:00:01Z',
+          sourceEventId: 'evt-a',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '9',
+    };
+    backend.getConversation.mockReset();
+    backend.getConversation
+      .mockResolvedValueOnce(bootRows)
+      .mockResolvedValueOnce(bootRows)
+      .mockResolvedValue(persistedRows);
+    let emit: ((event: unknown) => void) | null = null;
+    const provider = {
+      listAccounts: vi.fn(async () => ({
+        accounts: [
+          {
+            accountId: 'acc-1',
+            alias: 'Local Ollama',
+            endpointUrl: 'http://127.0.0.1:11434',
+            privacyClass: 'local_only',
+          },
+        ],
+      })),
+      listModels: vi.fn(async () => ({
+        models: [
+          {
+            modelId: 'qwen2.5:latest',
+            digest: 'sha256:abc',
+            humanLabel: 'Qwen 2.5 (latest)',
+            privacyClass: 'local_only',
+            capabilities: {
+              streaming: 'supported',
+              structuredOutput: 'unknown',
+              toolProposals: 'unknown',
+              thinking: 'unknown',
+            },
+          },
+        ],
+      })),
+    };
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
+      emit = onEvent;
+      onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
+      onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
+      return { opId: 'op-9', messageId: 'm-9' };
+    });
+    backend.stopCompletion = vi.fn(async () => {
+      emit?.({
+        opId: 'op-9',
+        sequence: 4,
+        event: { type: 'completed', completion: 'interrupted', truncated: false, usage: null },
+      });
+      return { opId: 'op-9', status: 'cancelled' };
+    });
+    render(
+      <ConversationPanel
+        backend={backend}
+        provider={provider as unknown as Parameters<typeof ConversationPanel>[0]['provider']}
+      />,
+    );
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+
+    // Registry models render, but nothing is pre-selected: the trigger shows
+    // the explicit placeholder and the unselected state claims no model.
+    const trigger = await screen.findByRole('button', { name: 'Select a model' });
+    await user.click(trigger);
+    await user.click(await screen.findByRole('option', { name: /Qwen 2\.5 \(latest\)/i }));
+
+    // The selection is now real: the model-gap disclaimer is gone and the
+    // trigger shows the chosen registry model.
+    expect(screen.queryByText(/model selection is not applied/i)).toBeNull();
+    expect(
+      screen.getByRole('button', { name: /Current model is Qwen 2\.5 \(latest\)/i }),
+    ).toBeDefined();
+
+    await user.type(box, 'hi');
+    await user.keyboard('{Enter}');
+
+    // Live stream: the partial renders exactly once — the streamed bubble is
+    // the only rendering of it (no duplicated persisted row yet).
+    await waitFor(() => expect(screen.getAllByText('partial answer')).toHaveLength(1));
+    const stop = screen.getByRole('button', { name: /stop generation/i });
+    // The streaming turn never re-runs the text-only submit path.
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+
+    await user.click(stop);
+
+    await waitFor(() =>
+      expect(backend.stopCompletion).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1', 'op-9'),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /stop generation/i })).toBeNull(),
+    );
+    // Handoff: the authoritative rows replace the live bubble — the persisted
+    // partial still renders exactly once, and history is not duplicated.
+    await waitFor(() => expect(screen.getAllByText('partial answer')).toHaveLength(1));
+    expect(screen.getAllByText('earlier truth')).toHaveLength(1);
+    await waitFor(() => expect(screen.getByRole('button', { name: /send/i })).toBeDefined());
   });
 
   it('discloses that pasted attachments are not transmitted', async () => {

@@ -56,6 +56,23 @@ export interface ConversationBackend {
     payload: import('@adham/contracts-generated').ClearPendingOperationPayload,
     options?: { requestId?: string },
   ): Promise<void>;
+  // Delivery A streaming (optional: capabilities-gated). The backend owns
+  // the full turn: it persists the user text and the terminal outcome.
+  completeOnceStreaming?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { accountId: string; modelId: string; text: string },
+    onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
+    options?: { requestId?: string },
+  ): Promise<import('@adham/contracts-generated').CompletionStartDto>;
+  stopCompletion?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    opId: string,
+    options?: { requestId?: string },
+  ): Promise<import('@adham/contracts-generated').StopCompletionResponse>;
 }
 
 export type ConversationContext = {
@@ -272,7 +289,7 @@ export type SubmitOutcome = { ok: true } | { ok: false; error: string; uncertain
 export const conversationCapabilities = {
   submitMessage: true,
   execution: false,
-  stop: false,
+  stop: true,
 } as const;
 
 export const toUiMessage = (dto: {

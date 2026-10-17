@@ -7,10 +7,12 @@ import {
   useDrafts,
   type ComposeAttachment,
   type ComposeMode,
+  type ModelOption,
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
-import { useConversation, type ConversationBackend } from './use-conversation';
+import { useConversation, type ConversationBackend, type UiMessage } from './use-conversation';
+import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
 import {
   announceScopeChanged,
   SCOPE_CHANGED_EVENT,
@@ -26,7 +28,6 @@ import {
   usePendingRecovery,
 } from './pending-recovery';
 
-const DEFAULT_MODEL_ID = 'local:qwen2.5-coder:32b';
 const PENDING_DRAFT_BUCKET = 'pending';
 
 function formatTimestamp(createdAt: string): string {
@@ -41,6 +42,8 @@ export interface ConversationPanelProps {
   provisioning?: ProvisioningBackend;
   /** Injectable selection backend for tests; defaults to the real client. */
   selection?: SelectionBackend;
+  /** Injectable provider-listing backend for tests; defaults to the IPC client. */
+  provider?: ProviderBackend;
   /** Backend preference (Settings → Send message on Enter). Defaults to true. */
   enterToSend?: boolean | undefined;
 }
@@ -55,6 +58,7 @@ export function ConversationPanel({
   backend = adhamClient,
   provisioning,
   selection,
+  provider = adhamProviderBackend,
   enterToSend = true,
 }: ConversationPanelProps) {
   const { t } = useTranslation();
@@ -100,12 +104,40 @@ export function ConversationPanel({
   draftRef.current = draft;
 
   const [mode, setMode] = React.useState<ComposeMode>('plan');
-  const [selectedModelId, setSelectedModelId] = React.useState(DEFAULT_MODEL_ID);
+  // Model choice is explicit: '' until the user picks from the registry, and
+  // discovery order never becomes a silent default.
+  const [selectedModelId, setSelectedModelId] = React.useState('');
   const [reasoningEffort, setReasoningEffort] = React.useState<'low' | 'medium' | 'high'>('medium');
   const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
   const [stopNotice, setStopNotice] = React.useState(false);
 
-  const busy = conv.status === 'submitting' || conv.status === 'bootstrapping';
+  // Registry-driven picker: when an Ollama account has pinned models, the
+  // composer options come from the provider registry (Delivery A). Without
+  // registry models the picker is hidden and dispatch falls back to the
+  // text-only path.
+  const ollama = useOllamaProvider({
+    backend: provider,
+    context:
+      conv.status === 'ready' && conv.context
+        ? {
+            workspaceId: conv.context.workspaceId,
+            projectId: conv.context.projectId,
+            sessionId: conv.context.sessionId,
+          }
+        : null,
+    enabled: conv.status === 'ready',
+  });
+  const pickerModels: ModelOption[] = ollama.models.map((m) => ({
+    id: m.modelId,
+    name: m.humanLabel,
+    provider: 'Ollama',
+    boundary: 'local' as const,
+  }));
+  const streamReady =
+    ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);
+
+  const busy =
+    conv.status === 'submitting' || conv.status === 'bootstrapping' || conv.streaming !== null;
   const refreshScope = conv.refreshScope;
   /// Workspace chosen for its first project (an existing workspace without
   /// projects). Project creation binds to it; the workspace itself is never
@@ -190,25 +222,42 @@ export function ConversationPanel({
     const text = draftRef.current.trim();
     if (!text || busy) return;
     const sent = text;
-    const outcome = await conv.submit(sent);
+    // Streaming dispatch when a registry model is wired; otherwise the
+    // honest text-only fallback persists just the message.
+    const outcome = streamReady
+      ? await conv.streamOnce(sent, ollama.account!.accountId, selectedModelId)
+      : await conv.submit(sent);
     // Retain the draft on failure; never erase edits typed meanwhile.
     if (outcome.ok && draftRef.current === sent) {
       commitPrompt(sent);
     }
-  }, [busy, commitPrompt, conv]);
+  }, [busy, commitPrompt, conv, streamReady, ollama.account, selectedModelId]);
 
   const handleStop = React.useCallback(() => {
-    // No backend stop command exists; the button is unreachable because the
-    // composer never enters a streaming state. Defensive notice only.
+    if (conv.streaming) {
+      void conv.stop();
+      return;
+    }
     setStopNotice(true);
-  }, []);
+  }, [conv]);
 
-  const notice = submissionNotice({
-    attachmentCount: attachments.length,
-    hasCustomSettings: selectedModelId !== DEFAULT_MODEL_ID || reasoningEffort !== 'medium',
-  });
+  const notice = streamReady
+    ? submissionNotice({
+        attachmentCount: attachments.length,
+        hasCustomSettings: reasoningEffort !== 'medium',
+        modelApplied: true,
+      })
+    : submissionNotice({
+        attachmentCount: attachments.length,
+        hasCustomSettings: reasoningEffort !== 'medium',
+      });
+  const composeStatus = conv.streaming
+    ? ('streaming' as const)
+    : conv.status === 'submitting'
+      ? ('sending' as const)
+      : ('idle' as const);
   const executionUnavailable = mode === 'execute';
-  const isEmpty = conv.messages.length === 0;
+  const isEmpty = conv.messages.length === 0 && conv.streaming === null;
 
   // Partial provisioning replaces the composer: there is no session yet, so
   // nothing may be submitted. The form drives one deliberate creation step.
@@ -268,11 +317,19 @@ export function ConversationPanel({
           {conv.messages.map((m) => (
             <MessageCard
               key={m.id}
-              role={m.role === 'agent' ? 'assistant' : 'user'}
+              role={m.role === 'assistant' || m.role === 'agent' ? 'assistant' : 'user'}
               text={m.text}
               timestamp={formatTimestamp(m.createdAt)}
             />
           ))}
+          {conv.streaming && (
+            <MessageCard
+              key={conv.streaming.opId || 'streaming'}
+              role="assistant"
+              text={conv.streaming.text}
+              timestamp={formatTime(new Date())}
+            />
+          )}
         </div>
       </div>
 
@@ -361,12 +418,13 @@ export function ConversationPanel({
           onChangeInput={setDraft}
           onSubmit={() => void handleSubmit()}
           onStop={handleStop}
-          status="idle"
+          status={composeStatus}
           enterToSend={enterToSend}
           mode={mode}
           onChangeMode={setMode}
           selectedModelId={selectedModelId}
           onSelectModel={setSelectedModelId}
+          models={pickerModels}
           reasoningEffort={reasoningEffort}
           onChangeReasoningEffort={setReasoningEffort}
           attachments={attachments}

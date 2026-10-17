@@ -352,9 +352,17 @@ describe('IPC contract fixture (cross-language)', () => {
     });
 
     const client = new AdhamApiClient();
-    const health = await client.testProviderConnection('ws', 'proj', 'sess', 'acc-1');
+    const health = await client.testProviderConnection('acc-1', {
+      workspaceId: 'ws',
+      projectId: 'proj',
+      sessionId: 'sess',
+    });
     expect(health.reachable).toBe(true);
-    const models = await client.discoverOllamaModels('ws', 'proj', 'sess', 'acc-1');
+    const models = await client.discoverOllamaModels('acc-1', {
+      workspaceId: 'ws',
+      projectId: 'proj',
+      sessionId: 'sess',
+    });
     expect(models.models[0]?.capabilities.streaming).toBe('supported');
     const stop = await client.stopCompletion('ws', 'proj', 'sess', 'op-1');
     expect(stop.status).toBe('cancelled');
@@ -440,7 +448,7 @@ describe('IPC contract fixture (cross-language)', () => {
     const client = new AdhamApiClient();
     const listed = await client.listProviderAccounts();
     expect(listed.accounts[0]?.accountId).toBe('acc-1');
-    const probe = await client.testProviderConnection('ws', 'proj', 'sess', '', {
+    const probe = await client.testProviderConnection('', undefined, {
       endpointUrl: 'http://127.0.0.1:11434',
     });
     expect(probe.reachable).toBe(false);
