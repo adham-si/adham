@@ -1,5 +1,12 @@
 import { vi, type Mock } from 'vitest';
+import type { ConversationBackend } from './use-conversation';
 
+// Streaming dispatch signatures straight from the real backend contract, so
+// test double assignments typecheck exactly like production wiring.
+export type CompletionStreamFn = NonNullable<ConversationBackend['completeOnceStreaming']>;
+export type StopCompletionFn = NonNullable<ConversationBackend['stopCompletion']>;
+/** The stream-event callback parameter of the completion dispatch. */
+export type StreamEventParam = Parameters<CompletionStreamFn>[4];
 // Explicit, publicly-nameable mock signatures: bare vi.fn() infers vitest's
 // private Procedure type, which declaration emit (TS2883) cannot name.
 // Argument tuples stay precise (call indexing and hook assignability);
@@ -32,6 +39,10 @@ export interface ConversationFakeBackend {
   recordPendingOperation: Mock<(...args: any[]) => any>;
   listPendingOperations: Mock<() => any>;
   clearPendingOperation: Mock<(...args: any[]) => any>;
+  // Optional: absent means the capability gate stays closed, matching the
+  // contract represented by `ConversationBackend` itself.
+  completeOnceStreaming?: Mock<CompletionStreamFn>;
+  stopCompletion?: Mock<StopCompletionFn>;
 }
 
 export function fakeBackend(): ConversationFakeBackend {

@@ -188,16 +188,16 @@ Dependency additions (each needs the P0 verification record in its task):
 **Interfaces:**
 - Consumes: A5 client methods.
 
-- [ ] **Step 1: Failing tests** — as above, plus nav/search visibility for Providers + Models. Expected: FAIL.
-- [ ] **Step 2: Implement** UI flows in all 4 locales; extend `VISIBLE_SETTINGS_PAGES` with `providers` + `models` (working Ollama row, model defaults, and fallback guard cover the rest — non-working rows stay in disabled fieldsets).
-- [ ] **Step 3: Run** settings + composer suites + locale coverage PASS.
+- [x] **Step 1: Failing tests** — as above, plus nav/search visibility for Providers + Models. Expected: FAIL. (Done: sequence-aware boot stub tests written first; see progress ledger at reset a1033d14.)
+- [x] **Step 2: Implement** UI flows in all 4 locales; extend `VISIBLE_SETTINGS_PAGES` with `providers` + `models` (working Ollama row, model defaults, and fallback guard cover the rest — non-working rows stay in disabled fieldsets). (Done at a1033d14.)
+- [x] **Step 3: Run** settings + composer suites + locale coverage PASS. (Root vitest 621/621 at a1033d14; 624/624 at the A7 revision.)
 - [ ] **Step 4: Commit** `feat(settings): Ollama wiring + composer dispatch`.
 
 ### Task A7: Delivery A acceptance (fixtures + Ollama E2E)
 
-- [ ] **Step 1: Fixture suite green** — truncated NDJSON mid-line, missing usage frame, connection refused, `done_reason` variants, double-stop idempotency. Run: `cargo test --workspace` Expected: PASS.
-- [ ] **Step 2: Ollama E2E (requires local Ollama + one pulled model; approved separately as a model download)** — full conversation persists across reload; Stop mid-stream persists partial as `Interrupted` and halts; kill -9 mid-stream → startup reconciles the pending op as unresolved (surfaced in UI as interrupted/unresolved, never auto-completed) → reload shows history without the tail. Record results in `docs/reports/provider-delivery-a.md`.
-- [ ] **Step 3: Commit evidence** `docs(reports): delivery A acceptance`.
+- [x] **Step 1: Fixture suite green** — truncated NDJSON mid-line, missing usage frame, connection refused, `done_reason` variants, double-stop idempotency. Run: `cargo test --workspace` Expected: PASS. (Done: adapter 9/9 incl. new missing-usage + unknown-done_reason fixtures; ipc 15/15 incl. new premature-EOF and unresolved-op acceptance tests; double-stop pinned inside `stop_mid_stream_persists_interrupted_partial`.)
+- [ ] **Step 2: Ollama E2E (requires local Ollama + one pulled model; approved separately as a model download)** — full conversation persists across reload; Stop mid-stream persists partial as `Interrupted` and halts; kill -9 mid-stream → startup reconciles the pending op as unresolved (surfaced in UI as interrupted/unresolved, never auto-completed) → reload shows history without the tail. Record results in `docs/reports/provider-delivery-a.md`. (NOT RUN — approval-gated; the automated acceptance pass ran the fixture equivalents of every listed scenario instead: `premature_eof_persists_failed_terminal_once`, `unresolved_pending_operation_surfaces_and_never_autocompletes`, interrupted-terminal-on-stop; live native hands-on testing of the running dev app is the user's activity.)
+- [x] **Step 3: Commit evidence** `docs(reports): delivery A acceptance`. (Evidence: `docs/reports/provider-delivery-a-20261017.md` — the file itself records the exact revision.)
 
 ## Tasks — Delivery B (Responses cloud proof; fixtures by default)
 

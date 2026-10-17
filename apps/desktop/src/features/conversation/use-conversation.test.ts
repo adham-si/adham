@@ -3,7 +3,7 @@ import * as React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';
 import { submissionNotice } from './submission-notice';
-import { fakeBackend } from './conversation-test-utils';
+import { fakeBackend, type StreamEventParam } from './conversation-test-utils';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -212,11 +212,8 @@ describe('submissionNotice', () => {
 
 describe('useConversation streaming (Delivery A)', () => {
   function streamingBackend(holdTerminal: boolean) {
-    const backend = fakeBackend() as Awaited<ReturnType<typeof fakeBackend>> & {
-      completeOnceStreaming: ReturnType<typeof vi.fn>;
-      stopCompletion: ReturnType<typeof vi.fn>;
-    };
-    let emit: ((event: unknown) => void) | null = null;
+    const backend = fakeBackend();
+    let emit: StreamEventParam | null = null;
     backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
       emit = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
@@ -259,7 +256,8 @@ describe('useConversation streaming (Delivery A)', () => {
 
   it('streams deltas, appends them, and reloads the persisted history on the terminal', async () => {
     const backend = streamingBackend(false);
-    backend.completeOnceStreaming.mockImplementation(async (_ws, _p, _s, _payload, onEvent) => {
+    const dispatch = backend.completeOnceStreaming!;
+    dispatch.mockImplementation(async (_ws, _p, _s, _payload, onEvent) => {
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
       onEvent({
@@ -277,8 +275,8 @@ describe('useConversation streaming (Delivery A)', () => {
       outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
     });
 
-    expect(backend.completeOnceStreaming).toHaveBeenCalledTimes(1);
-    expect(backend.completeOnceStreaming.mock.calls[0]?.[3]).toEqual({
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls[0]?.[3]).toEqual({
       accountId: 'acc-1',
       modelId: 'qwen2.5:latest',
       text: 'hi',
@@ -380,7 +378,7 @@ describe('useConversation streaming (Delivery A)', () => {
       )
       .mockResolvedValue(persistedRows as never);
     let releaseReload: (() => void) | null = null;
-    let emitLocal: ((e: unknown) => void) | null = null;
+    let emitLocal: StreamEventParam | null = null;
     backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
       emitLocal = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
@@ -464,7 +462,7 @@ describe('useConversation streaming (Delivery A)', () => {
       .mockResolvedValueOnce(bootRows as never)
       .mockResolvedValueOnce(bootRows as never)
       .mockResolvedValue(persistedRows as never);
-    let emitLocal: ((e: unknown) => void) | null = null;
+    let emitLocal: StreamEventParam | null = null;
     backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
       emitLocal = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
@@ -517,6 +515,128 @@ describe('useConversation streaming (Delivery A)', () => {
     expect(backend.getConversation.mock.calls.length).toBe(reloadsAfterStop);
     expect(result.current.streaming).toBeNull();
     expect(result.current.messages.filter((m) => m.text === 'partial answer')).toHaveLength(1);
+  });
+
+  it('keeps the streamed answer as a recovery snapshot when the terminal reload fails, then swaps to authoritative history on retry', async () => {
+    const backend = fakeBackend();
+    const bootRows = {
+      items: [
+        {
+          messageId: 'msg-0',
+          role: 'user',
+          text: 'earlier truth',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-0',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    };
+    const persistedRows = {
+      items: [
+        {
+          messageId: 'msg-0',
+          role: 'user',
+          text: 'earlier truth',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-0',
+        },
+        {
+          messageId: 'msg-u',
+          role: 'user',
+          text: 'hi',
+          createdAt: '2026-10-16T00:00:00Z',
+          sourceEventId: 'evt-u',
+        },
+        {
+          messageId: 'msg-a',
+          role: 'assistant',
+          text: 'partial answer',
+          createdAt: '2026-10-16T00:00:01Z',
+          sourceEventId: 'evt-a',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '9',
+    };
+    // boot ×2 → post-terminal reload REJECTS → retry succeeds
+    backend.getConversation
+      .mockResolvedValueOnce(bootRows as never)
+      .mockResolvedValueOnce(bootRows as never)
+      .mockRejectedValueOnce(new Error('history read failed'))
+      .mockResolvedValue(persistedRows as never);
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
+      onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
+      onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
+      onEvent({
+        opId: 'op-9',
+        sequence: 2,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return { opId: 'op-9', messageId: 'm-9' };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+    });
+
+    // The turn itself succeeded (terminal, persisted server-side); the
+    // answer stays visible as a non-authoritative snapshot, the history
+    // read failure is surfaced as the retryable sync error, and nothing
+    // was re-generated.
+    expect(outcome).toEqual({ ok: true });
+    expect(backend.completeOnceStreaming).toHaveBeenCalledTimes(1);
+    expect(result.current.streaming).toBeNull();
+    expect(result.current.recoverySnapshot).toEqual(
+      expect.objectContaining({ role: 'assistant', text: 'partial answer' }),
+    );
+    expect(result.current.messages.filter((m) => m.text === 'partial answer')).toHaveLength(0);
+    expect(result.current.status).toBe('error');
+
+    // Retry is a history reload, never a second generation.
+    await act(async () => {
+      outcome = await result.current.reload();
+    });
+    expect(backend.completeOnceStreaming).toHaveBeenCalledTimes(1);
+    expect(result.current.recoverySnapshot).toBeNull();
+    expect(result.current.messages.filter((m) => m.text === 'partial answer')).toHaveLength(1);
+    expect(result.current.status).toBe('ready');
+  });
+
+  it('never leaves an empty recovery bubble when the terminal arrived before any delta', async () => {
+    const backend = fakeBackend();
+    const emptyTurn = {
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    };
+    backend.getConversation
+      .mockResolvedValueOnce(emptyTurn as never)
+      .mockResolvedValueOnce(emptyTurn as never)
+      .mockResolvedValue(emptyTurn as never);
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
+      onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId: 'op-9',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return { opId: 'op-9', messageId: 'm-9' };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
+    const { result } = renderHook(() => useConversation({ backend }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+    });
+    expect(outcome).toEqual({ ok: true });
+    expect(result.current.recoverySnapshot).toBeNull();
   });
 
   it('rejects an overlapping dispatch while a completion is streaming', async () => {

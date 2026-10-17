@@ -11,7 +11,7 @@ import {
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
-import { useConversation, type ConversationBackend, type UiMessage } from './use-conversation';
+import { useConversation, type ConversationBackend } from './use-conversation';
 import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
 import {
   announceScopeChanged,
@@ -328,6 +328,16 @@ export function ConversationPanel({
               role="assistant"
               text={conv.streaming.text}
               timestamp={formatTime(new Date())}
+            />
+          )}
+          {/* Non-authoritative recovery: only when the post-terminal history
+              reload failed; replaced atomically by authoritative rows. */}
+          {conv.recoverySnapshot && (
+            <MessageCard
+              key={conv.recoverySnapshot.id}
+              role="assistant"
+              text={conv.recoverySnapshot.text}
+              timestamp={formatTimestamp(conv.recoverySnapshot.createdAt)}
             />
           )}
         </div>

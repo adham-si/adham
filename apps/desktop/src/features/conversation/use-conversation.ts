@@ -134,6 +134,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         const items = page.items.map(toUiMessage);
         setContext(ctx);
         setMessages(items);
+        // Same-flush swap: the recovery snapshot (if any) is replaced by the
+        // authoritative rows atomically — never two copies of an answer.
+        setRecoverySnapshot(null);
         setError(null);
         setStatus('ready');
         if (verifiedScope) scopeStaleRef.current = false;
@@ -195,6 +198,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setContext(resolved.context);
         createdRef.current = resolved.context;
         setMessages([]);
+        setRecoverySnapshot(null);
         const pendingFirst = readPendingFirstSend();
         if (
           pendingFirst &&
@@ -263,6 +267,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     createdRef.current = null;
     setContext(null);
     setMessages([]);
+    setRecoverySnapshot(null);
     scopeStaleRef.current = true;
     setStatus('bootstrapping');
     setError(null);
@@ -369,6 +374,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setContext(next);
         createdRef.current = next;
         setMessages([]);
+        setRecoverySnapshot(null);
         const pendingFirst = readPendingFirstSend();
         if (
           pendingFirst &&
@@ -397,6 +403,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       const seq = { loadSeq: loadSeqRef.current, mutationSeq: mutationSeqRef.current };
       setStatus('bootstrapping');
       setMessages([]);
+      setRecoverySnapshot(null);
       setError(null);
       if ((await loadHistory(next, generation, seq.loadSeq, seq.mutationSeq)) !== null) {
         const instId = base.installationId ?? installationIdRef.current;
@@ -573,6 +580,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
 
   // ===== Delivery A: streaming completion (complete_once_streaming) =====
   const [streaming, setStreamingState] = React.useState<StreamingSnapshot | null>(null);
+  // Non-authoritative recovery snapshot: the streamed answer kept visible
+  // after a terminal whose authoritative history reload failed. Cleared in
+  // the same flush as the authoritative rows inside loadHistory.
+  const [recoverySnapshot, setRecoverySnapshot] = React.useState<UiMessage | null>(null);
   const streamingRef = React.useRef<StreamingSnapshot | null>(null);
   const setStreaming = React.useCallback((next: StreamingSnapshot | null) => {
     streamingRef.current = next;
@@ -656,11 +667,31 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (streamingRef.current?.opId !== opId) setStreaming({ opId, text: '' });
         await terminalPromise;
         // Handoff ordering is atomic in the render sense: the live bubble is
-        // dropped BEFORE the authoritative rows land, so the persisted
-        // partial is never rendered alongside its streaming predecessor.
+        // dropped BEFORE the authoritative rows land, and on a failed history
+        // reload the streamed answer stays visible as a non-authoritative
+        // recovery snapshot — the generation itself is never repeated.
+        const answerText = streamingRef.current?.text ?? '';
         setStreaming(null);
         try {
-          if (mountedRef.current && generationRef.current === generation) await reload();
+          if (mountedRef.current && generationRef.current === generation) {
+            loadSeqRef.current += 1;
+            const reloadSeq = loadSeqRef.current;
+            const items = await loadHistory(ctx, generation, reloadSeq, mutationSeqRef.current);
+            if (
+              items === null &&
+              answerText !== '' &&
+              mountedRef.current &&
+              generationRef.current === generation &&
+              !isStale(generation, reloadSeq, mutationSeqRef.current, ctx.sessionId)
+            ) {
+              setRecoverySnapshot({
+                id: `recovery-${opId ?? 'terminal'}`,
+                role: 'assistant',
+                text: answerText,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
         } finally {
           streamingRef.current = null;
         }
@@ -678,7 +709,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         submitInFlightRef.current = false;
       }
     },
-    [backend, context, reload, setStreaming],
+    [backend, context, loadHistory, isStale, setStreaming],
   );
 
   const stop = React.useCallback(async (): Promise<SubmitOutcome> => {
@@ -717,6 +748,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     streamOnce,
     stop,
     streaming,
+    recoverySnapshot,
     retry,
     reload,
     openSession,

@@ -367,8 +367,9 @@ describe('IPC contract fixture (cross-language)', () => {
     const stop = await client.stopCompletion('ws', 'proj', 'sess', 'op-1');
     expect(stop.status).toBe('cancelled');
 
-    const [probeCall] = vi.mocked(invoke).mock.calls;
-    const envelope = (probeCall?.[1] as { request: Record<string, unknown> }).request;
+    const calls = vi.mocked(invoke).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const envelope = (calls[0]![1] as { request: Record<string, unknown> }).request;
     expect(envelope.protocolVersion).toBe(1);
     expect(envelope.context).toEqual({ workspaceId: 'ws', projectId: 'proj', sessionId: 'sess' });
     expect((envelope.payload as { accountId: string }).accountId).toBe('acc-1');

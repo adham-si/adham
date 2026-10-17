@@ -1046,6 +1046,50 @@ fn complete_once_streams_in_order_and_persists_terminal() {
         let usage = rows[1].usage.clone().expect("usage");
         assert_eq!(usage.total_tokens, Some(19));
 
+        // exactly one canonical terminal event on the wire
+        let terminal_count = got
+            .iter()
+            .filter(|e| matches!(e.event, StreamEventPayloadDto::Completed { .. }))
+            .count();
+        assert_eq!(terminal_count, 1, "no duplicate terminal broadcast: {got:?}");
+
+        // no plaintext content at rest: assistant text appears in no event
+        // payload and never unprotected in the content store.
+        let payloads: Vec<String> =
+            sqlx::query_scalar::<_, String>("SELECT CAST(payload_json AS TEXT) FROM events")
+                .fetch_all(&ctx.pool)
+                .await
+                .expect("event payloads");
+        assert!(
+            payloads.iter().all(|p| !p.contains("Hello world")),
+            "assistant text leaked into event payloads"
+        );
+        assert!(
+            payloads.iter().all(|p| !p.contains("Hello world")),
+            "assistant text leaked into event payloads"
+        );
+        let protected_hits: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM content_records \
+             WHERE plaintext_size > 0 AND CAST(protected_bytes AS TEXT) LIKE '%Hello world%'",
+        )
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("content records scan");
+        assert_eq!(
+            protected_hits, 0,
+            "assistant text must reach storage only through the AEAD protected bytes"
+        );
+        let schemes: Vec<String> = sqlx::query_scalar(
+            "SELECT DISTINCT protection_scheme FROM content_records WHERE content_kind = 'assistant_text'",
+        )
+        .fetch_all(&ctx.pool)
+        .await
+        .expect("schemes");
+        assert!(
+            !schemes.contains(&"none".to_string()),
+            "assistant content must never rest unprotected: {schemes:?}"
+        );
+
         // op resolved
         let status: String =
             sqlx::query_scalar("SELECT status FROM pending_operations WHERE operation_id = ?")
@@ -1422,6 +1466,12 @@ fn stop_mid_stream_persists_interrupted_partial() {
         }
         other => panic!("interrupted terminal expected: {other:?}"),
     }
+    // exactly one canonical terminal event reached the renderer
+    let terminal_count = got
+        .iter()
+        .filter(|e| matches!(e.event, StreamEventPayloadDto::Completed { .. }))
+        .count();
+    assert_eq!(terminal_count, 1, "stop must not broadcast twice: {got:?}");
 
     runtime.block_on(async {
         let sess_id = SessionId::from_string(&sess).expect("sess");
@@ -1447,6 +1497,48 @@ fn stop_mid_stream_persists_interrupted_partial() {
                 .await
                 .expect("pending row");
         assert_eq!(status, "resolved", "the stopped op still resolves");
+    });
+
+    // double-stop idempotency: the second stop is already-resolved, emits
+    // no second terminal, and leaves exactly one Interrupted row.
+    let stop_env2 = CommandEnvelope {
+        protocol_version: 1,
+        request_id: uuid::Uuid::now_v7().to_string(),
+        context: CommandContext {
+            workspace_id: Some(ws.clone()),
+            project_id: Some(proj.clone()),
+            session_id: Some(sess.clone()),
+        },
+        payload: StopCompletionPayload {
+            op_id: op_id.clone(),
+        },
+    };
+    let again = runtime
+        .block_on(async { adham_desktop_api::handle_stop_completion(&ctx, stop_env2).await })
+        .expect("second stop is observed idempotently");
+    assert_eq!(again.data.status, "already-resolved", "{again:?}");
+    let terminal_count2 = events
+        .lock()
+        .expect("collector")
+        .iter()
+        .filter(|e| matches!(e.event, StreamEventPayloadDto::Completed { .. }))
+        .count();
+    assert_eq!(terminal_count2, 1, "no second terminal on replay stop");
+    runtime.block_on(async {
+        let sess_id = SessionId::from_string(&sess).expect("sess");
+        let rows = adham_projections::ConversationProjection::get_session_messages(
+            &ctx.pool,
+            ctx.content_key.as_ref(),
+            &ctx.installation_id,
+            &sess_id,
+        )
+        .await
+        .expect("rows");
+        let interrupted_rows = rows
+            .iter()
+            .filter(|r| r.completion == Some(MessageCompletionV1::Interrupted))
+            .count();
+        assert_eq!(interrupted_rows, 1, "single canonical Interrupted row");
     });
 }
 
@@ -1716,4 +1808,210 @@ fn provider_management_runs_app_level_without_a_session() {
         message.contains("VALIDATION_FAILED"),
         "stop still requires the full session scope: {message}"
     );
+}
+
+/// A7 acceptance #1. Premature EOF: the stub streams deltas and ends the
+/// body without a terminal frame. The handler must broadcast exactly one
+/// `failed` terminal (never a completion), resolve the op (no dangling
+/// pending), and the replay must hold the partial exactly once.
+#[test]
+fn premature_eof_persists_failed_terminal_once() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let base_url = spawn_stub_ollama(
+        &runtime,
+        Some(ctx.pool.clone()),
+        captures.clone(),
+        ChatProgram {
+            pre: vec![ndjson_delta("before the line went "), ndjson_delta("dead")],
+            post: vec![],
+            gate: None,
+        },
+    );
+    let account_id = seed_local_account_with_model(&runtime, &ctx, &base_url);
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    let events = collector();
+    let env = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "m:latest".to_string(),
+            text: "stream until you die".to_string(),
+        },
+    );
+    let sink = CollectSink(events.clone());
+    let result = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, env, &sink).await
+        })
+        .expect("EOF still resolves the handler with a failed terminal");
+
+    let got = events.lock().expect("collector").clone();
+    let terminal_count = got
+        .iter()
+        .filter(|e| matches!(e.event, StreamEventPayloadDto::Completed { .. }))
+        .count();
+    assert_eq!(terminal_count, 1, "exactly one terminal broadcast: {got:?}");
+    match &got.last().expect("terminal").event {
+        StreamEventPayloadDto::Completed { completion, .. } => {
+            assert_eq!(
+                completion, "failed",
+                "EOF is a failed terminal, never a completion"
+            );
+        }
+        other => panic!("terminal expected: {other:?}"),
+    }
+
+    runtime.block_on(async {
+        assert_eq!(
+            result.data.message_id.len(),
+            usize::try_from(36).expect("uuid len"),
+            "failed terminal still produced a durable assistant row"
+        );
+        let sess_id = SessionId::from_string(&sess).expect("sess");
+        let rows = adham_projections::ConversationProjection::get_session_messages(
+            &ctx.pool,
+            ctx.content_key.as_ref(),
+            &ctx.installation_id,
+            &sess_id,
+        )
+        .await
+        .expect("rows");
+        assert_eq!(rows.len(), 2, "user turn + failed-tail assistant: {rows:?}");
+        assert_eq!(
+            rows.iter().filter(|r| r.role == "assistant").count(),
+            1,
+            "the partial persists exactly once"
+        );
+        let assistant = rows.iter().find(|r| r.role == "assistant").expect("assistant");
+        assert_eq!(assistant.content, "before the line went dead");
+        assert_eq!(
+            assistant.completion,
+            Some(MessageCompletionV1::Failed),
+            "EOF maps to the failed taxonomy, not completed"
+        );
+
+        // no dangling unresolved op: the wire failure resolved it
+        let status: String =
+            sqlx::query_scalar("SELECT status FROM pending_operations WHERE operation_id = ?")
+                .bind(&result.data.op_id)
+                .fetch_one(&ctx.pool)
+                .await
+                .expect("pending row");
+        assert_eq!(status, "resolved", "EOF resolved the op");
+
+        // at rest: the partial lives only in protected bytes
+        let protected_hits: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM content_records \
+             WHERE plaintext_size > 0 AND CAST(protected_bytes AS TEXT) LIKE '%before the line went%'",
+        )
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("content scan");
+        assert_eq!(protected_hits, 0, "no plaintext at rest");
+    });
+}
+
+/// A7 acceptance #2. Crash/unresolved-op recovery: an op recorded durable at
+/// socket time but never resolved (the process died before the terminal) must
+/// surface as unresolved, never auto-complete, and leave history without the
+/// tail.
+#[test]
+fn unresolved_pending_operation_surfaces_and_never_autocompletes() {
+    let (runtime, ctx) = disposable_context();
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    let op_id = OperationId::new_v7().to_string();
+    // the user turn persisted before the crash; the assistant tail never happened
+    seed_history_row(
+        &runtime,
+        &ctx,
+        &ws,
+        &proj,
+        &sess,
+        true,
+        None,
+        "the message that was streaming",
+    );
+    runtime.block_on(async {
+        let scope = EventScope {
+            installation_id: ctx.installation_id,
+            workspace_id: Some(WorkspaceId::from_string(&ws).expect("ws")),
+            project_id: Some(ProjectId::from_string(&proj).expect("proj")),
+            session_id: Some(SessionId::from_string(&sess).expect("sess")),
+        };
+        let mut tx = ctx.pool.begin().await.expect("tx");
+        SqliteEventStore::record_pending_operation_tx(
+            &mut tx,
+            ctx.content_key.as_ref(),
+            &op_id,
+            "provider-completion",
+            &scope,
+            None,
+            &uuid::Uuid::now_v7().to_string(),
+            "",
+            None,
+        )
+        .await
+        .expect("record crash-time op");
+        tx.commit().await.expect("commit");
+    });
+
+    // reopen: the pending list surfaces the op as unresolved
+    let list = runtime
+        .block_on(async { adham_desktop_api::handle_list_pending_operations(&ctx).await })
+        .expect("pending list");
+    let unresolved = list
+        .operations
+        .iter()
+        .find(|o| o.operation_id == op_id)
+        .expect("the crash-time op survives restart");
+    assert_eq!(unresolved.status, "pending", "{unresolved:?}");
+
+    // replay: history has the user turn but NO assistant tail for the op
+    let page = runtime
+        .block_on(async {
+            adham_desktop_api::handle_get_conversation(
+                &ctx,
+                CommandContext {
+                    workspace_id: Some(ws.clone()),
+                    project_id: Some(proj.clone()),
+                    session_id: Some(sess.clone()),
+                },
+            )
+            .await
+        })
+        .expect("replay read");
+    let assistant_tails = page.items.iter().filter(|m| m.role == "assistant").count();
+    assert_eq!(
+        assistant_tails, 0,
+        "history must have no tail for the crashed op: {:?}",
+        page.items
+    );
+    assert_eq!(
+        page.items.len(),
+        1,
+        "the user turn is there: {:?}",
+        page.items
+    );
+
+    // reads never auto-resolve: the op stays unresolved until explicit
+    // reconciliation (clear/recovery), never a phantom completion.
+    let still: String = runtime
+        .block_on(async {
+            sqlx::query_scalar("SELECT status FROM pending_operations WHERE operation_id = ?")
+                .bind(&op_id)
+                .fetch_one(&ctx.pool)
+                .await
+        })
+        .expect("pending row");
+    assert_eq!(still, "pending", "no automatic resolution on read");
 }

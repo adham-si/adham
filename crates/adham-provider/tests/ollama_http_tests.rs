@@ -383,3 +383,79 @@ async fn local_only_without_digest_blocks_before_socket() {
         "got {err:?}"
     );
 }
+
+// --- 7. missing usage frame: done without counts completes Stop, no Progress ----
+
+#[tokio::test]
+async fn done_without_usage_completes_stop_without_progress() {
+    let base = spawn_routed(|req| {
+        if req.path == "/api/chat" {
+            Some(ndjson_response(&[
+                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":"one"},"done":false}"#,
+                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":""},"done":true}"#,
+            ]))
+        } else {
+            None
+        }
+    })
+    .await;
+
+    let adapter = adapter(&base);
+    let mut stream = adapter
+        .stream_chat(
+            &pinned("llama3.2:latest", "sha256:aaa"),
+            &request("llama3.2:latest"),
+        )
+        .await
+        .expect("chat started");
+    let mut got = Vec::new();
+    while let Some(event) = stream.next_event().await {
+        got.push(event.expect("stream events"));
+    }
+    assert_eq!(
+        got,
+        vec![
+            NormalizedStreamEvent::StreamStarted,
+            NormalizedStreamEvent::TextDelta("one".into()),
+            NormalizedStreamEvent::StreamCompleted(StreamCompletionOutcome::Stop),
+        ],
+        "a missing usage frame must not block the terminal: {got:?}"
+    );
+}
+
+// --- 8. unknown done_reason: documented older-daemon mapping to clean stop ------
+
+#[tokio::test]
+async fn unknown_done_reason_maps_to_stop() {
+    let base = spawn_routed(|req| {
+        if req.path == "/api/chat" {
+            Some(ndjson_response(&[
+                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":"tail"},"done":false}"#,
+                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":""},"done":true,"done_reason":"cuda"}"#,
+            ]))
+        } else {
+            None
+        }
+    })
+    .await;
+
+    let adapter = adapter(&base);
+    let mut stream = adapter
+        .stream_chat(
+            &pinned("llama3.2:latest", "sha256:aaa"),
+            &request("llama3.2:latest"),
+        )
+        .await
+        .expect("chat started");
+    let mut got = Vec::new();
+    while let Some(event) = stream.next_event().await {
+        got.push(event.expect("stream events"));
+    }
+    assert_eq!(
+        got.last(),
+        Some(&NormalizedStreamEvent::StreamCompleted(
+            StreamCompletionOutcome::Stop
+        )),
+        "unknown done_reason terminates the stream (never hangs, never silent EOF)"
+    );
+}
