@@ -125,6 +125,13 @@ export interface LazyFirstSendParams {
   isStale: () => boolean;
 }
 
+export type LazyFirstSendFailure = {
+  ok: false;
+  error: string;
+  uncertain: boolean;
+  createdContext?: ConversationContext;
+};
+
 export type LazyFirstSendOutcome =
   | {
       ok: true;
@@ -133,24 +140,37 @@ export type LazyFirstSendOutcome =
       message: UiMessage;
       cleanupWarning?: string;
     }
+  | LazyFirstSendFailure;
+
+export type LazyFirstSendPrepareOutcome =
   | {
-      ok: false;
-      error: string;
-      uncertain: boolean;
-      createdContext?: ConversationContext;
-    };
+      ok: true;
+      /** Trimmed text the tracked identity belongs to. */
+      text: string;
+      context: ConversationContext;
+      sessionId: string;
+      title: string;
+      /** Identity of the message request; also the durable operation id. */
+      messageRequestId: string;
+    }
+  | LazyFirstSendFailure;
 
 /**
- * Execute a tracked lazy session creation and first-message send.
+ * Prepare the tracked lazy creation of an unsaved conversation's session.
  *
- * Captures request identities and derived/explicit title before any backend call.
- * If createSession succeeds but submitMessage fails, createdSessionId is stored
- * in PendingFirstSend so that an explicit retry continues into the created session
- * without creating a second empty session (addressing the non-atomic two-command limitation).
+ * Captures request identities and the derived/explicit title before any
+ * backend call, records the durable `first_send` operation, and creates the
+ * session — reusing a tracked identity (and an already created session) on an
+ * explicit retry instead of minting another empty session.
+ *
+ * The caller owns the turn itself: the text-only path submits through
+ * `performLazyFirstSend`, the streaming path dispatches into the returned
+ * context and resolves the tracked identity once the dispatch is confirmed
+ * persisted.
  */
-export async function performLazyFirstSend(
+export async function prepareLazyFirstSend(
   params: LazyFirstSendParams,
-): Promise<LazyFirstSendOutcome> {
+): Promise<LazyFirstSendPrepareOutcome> {
   const { backend, workspaceId, projectId, text, installationId, isStale } = params;
   const trimmed = text.trim();
   if (!trimmed) {
@@ -273,7 +293,7 @@ export async function performLazyFirstSend(
     }
   }
 
-  // 2. Step 1: Create session if not already created
+  // Create the session if the tracked identity has none yet
   if (!createdSessionId) {
     try {
       const created = await backend.createSession(
@@ -338,12 +358,39 @@ export async function performLazyFirstSend(
     ...(installationId ? { installationId } : {}),
   };
 
-  // 3. Step 2: Submit message
+  return {
+    ok: true,
+    text: trimmed,
+    context: createdCtx,
+    sessionId: createdSessionId,
+    title,
+    messageRequestId,
+  };
+}
+
+/**
+ * Execute the tracked lazy session creation and first-message send.
+ *
+ * If createSession succeeds but submitMessage fails, the created session id is
+ * kept in PendingFirstSend so an explicit retry continues into the created
+ * session without creating a second empty session (the non-atomic two-command
+ * limitation).
+ */
+export async function performLazyFirstSend(
+  params: LazyFirstSendParams,
+): Promise<LazyFirstSendOutcome> {
+  const { backend, isStale } = params;
+  const prepared = await prepareLazyFirstSend(params);
+  if (!prepared.ok) return prepared;
+  const { context: createdCtx, title, messageRequestId, text: trimmed, sessionId } = prepared;
+  const { workspaceId, projectId } = createdCtx;
+
+  // Step 2: Submit message
   try {
     const submitted = await backend.submitMessage(
       workspaceId,
       projectId,
-      createdSessionId,
+      sessionId,
       { text: trimmed },
       { requestId: messageRequestId },
     );
@@ -355,7 +402,7 @@ export async function performLazyFirstSend(
 
     // Success! Clear pending first send
     const clearRes = await clearDurablePendingOperation(backend, {
-      operationId,
+      operationId: messageRequestId,
       expectedMessageRequestId: messageRequestId,
       reason: 'resolved',
     });

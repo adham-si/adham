@@ -10,9 +10,11 @@ import {
 } from './conversation-identity';
 import {
   performLazyFirstSend,
+  prepareLazyFirstSend,
   readPendingFirstSend,
   pendingFirstSendBlockedReason,
 } from './lazy-session-creation';
+import { clearDurablePendingOperation } from './pending-recovery/durable-pending-operations';
 import { performSingleMessageSend } from './single-message-send';
 import {
   type ConversationBackend,
@@ -635,8 +637,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       if (!backend.completeOnceStreaming || !backend.stopCompletion) {
         return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
       }
-      const ctx = context;
-      if (!ctx || !ctx.sessionId) {
+      let ctx = context;
+      if (!ctx) {
         return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
       }
       const blocked = sendBlockedReason(scopeStaleRef.current);
@@ -648,8 +650,50 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       const preSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
       if (preSwitch) return preSwitch;
 
-      submitInFlightRef.current = true;
       const generation = generationRef.current;
+      // First turn of an unsaved conversation: streaming needs a session, so
+      // create it first under the tracked first-send identity (the same durable
+      // record the text-only path uses). The identity is resolved once the
+      // dispatch is confirmed persisted; the provider operation written by the
+      // backend is then the durable record of the turn itself.
+      let firstSend: { messageRequestId: string; title: string } | null = null;
+      let sessionId = ctx.sessionId;
+      if (!sessionId) {
+        // The creation step holds the single-dispatch gate too, so a second
+        // Enter cannot mint a second identity for the same turn.
+        submitInFlightRef.current = true;
+        const blockedFirst = pendingFirstSendBlockedReason(ctx.workspaceId, ctx.projectId, trimmed);
+        if (blockedFirst) {
+          submitInFlightRef.current = false;
+          return { ok: false, error: blockedFirst, uncertain: true };
+        }
+        const prepared = await prepareLazyFirstSend({
+          backend,
+          workspaceId: ctx.workspaceId,
+          projectId: ctx.projectId,
+          text: trimmed,
+          installationId: ctx.installationId ?? installationIdRef.current,
+          isStale: () => !mountedRef.current || generationRef.current !== generation,
+        });
+        if (!mountedRef.current || generationRef.current !== generation) {
+          submitInFlightRef.current = false;
+          return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
+        }
+        if (!prepared.ok) {
+          submitInFlightRef.current = false;
+          setError(prepared.error);
+          setStatus('error');
+          return prepared;
+        }
+        firstSend = { messageRequestId: prepared.messageRequestId, title: prepared.title };
+        ctx = prepared.context;
+        sessionId = prepared.sessionId;
+        setContext(ctx);
+        createdRef.current = ctx;
+        requestedRef.current = ctx;
+      }
+
+      submitInFlightRef.current = true;
       setError(null);
       // Optimistic user bubble; the terminal reload replaces the whole list
       // with the authoritative persisted rows (including the streamed turn).
@@ -683,7 +727,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         const start = await backend.completeOnceStreaming(
           ctx.workspaceId,
           ctx.projectId,
-          ctx.sessionId,
+          sessionId,
           { accountId, modelId, text: trimmed, mode, ...(think === undefined ? {} : { think }) },
           (event) => {
             if (!mountedRef.current || generationRef.current !== generation) return;
@@ -693,9 +737,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
               if (state) setStreaming({ ...state, opId: event.opId });
               // A Stop clicked before the op handle arrived is effectuated
               // here: cancellation never waits for an answer delta.
-              if (stopRequestedRef.current && backend.stopCompletion && ctx.sessionId) {
+              if (stopRequestedRef.current && backend.stopCompletion) {
                 void backend
-                  .stopCompletion(ctx.workspaceId, ctx.projectId, ctx.sessionId, event.opId)
+                  .stopCompletion(ctx.workspaceId, ctx.projectId, sessionId, event.opId)
                   .catch(() => undefined);
               }
             }
@@ -727,6 +771,24 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
             }
           },
         );
+        if (firstSend) {
+          // The dispatch is confirmed persisted, so the tracked first-send
+          // identity has done its job: resolve it now. A recovery surface must
+          // never offer to resend a message that already landed; an unresolved
+          // turn is the backend's provider operation, not this record.
+          const cleared = await clearDurablePendingOperation(backend, {
+            operationId: firstSend.messageRequestId,
+            expectedMessageRequestId: firstSend.messageRequestId,
+            reason: 'resolved',
+          });
+          if (!cleared.ok) {
+            setStorageWarning(cleared.error ?? i18n.t('conversation.recovery.cleanupFailed'));
+          }
+          const instId = ctx.installationId ?? installationIdRef.current;
+          if (!persistAndAnnounceActiveSession({ ...ctx, title: firstSend.title }, instId)) {
+            setStorageWarning(i18n.t('conversation.storageUnavailable'));
+          }
+        }
         if (!mountedRef.current || generationRef.current !== generation) {
           return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
         }
@@ -756,7 +818,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
               answerText !== '' &&
               mountedRef.current &&
               generationRef.current === generation &&
-              !isStale(generation, reloadSeq, mutationSeqRef.current, ctx.sessionId)
+              !isStale(generation, reloadSeq, mutationSeqRef.current, sessionId)
             ) {
               setRecoverySnapshot({
                 id: `recovery-${opId ?? 'terminal'}`,
@@ -775,6 +837,17 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         // Dispatch failed before/at the socket: the user turn was never
         // persisted, so the optimistic bubble is removed.
         setMessages((prev) => prev.filter((m) => m.id !== 'streaming-user-bubble'));
+        if (firstSend) {
+          // The session now exists, so the first-send identity is superseded:
+          // if the turn did persist, the backend's provider operation is its
+          // durable record; if it did not, the text is back in the composer.
+          // Leaving the record pending would offer a duplicate resend.
+          await clearDurablePendingOperation(backend, {
+            operationId: firstSend.messageRequestId,
+            expectedMessageRequestId: firstSend.messageRequestId,
+            reason: 'dismissed',
+          });
+        }
         const code = err instanceof Error ? err.message : String(err);
         setError(code);
         setStatus('error');

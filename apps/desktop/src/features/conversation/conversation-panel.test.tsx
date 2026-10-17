@@ -217,7 +217,7 @@ describe('ConversationPanel', () => {
     expect(provider.listModels).not.toHaveBeenCalled();
   });
 
-  it('carries a pre-session pick into the session the first send materialized', async () => {
+  it('carries a stale pre-session pick into the session the first text-only send created', async () => {
     const user = userEvent.setup();
     // A pre-session pick that discovery no longer lists: the honest text-only
     // path creates the session, and the claim moves with it instead of being
@@ -244,6 +244,84 @@ describe('ConversationPanel', () => {
     // was briefly unresolved, so the explained block returns only after ready.)
     await screen.findByText(/no longer available/i);
     expect(backend.completeOnceStreaming).not.toHaveBeenCalled();
+  });
+
+  it('streams the first message into the session the first send creates', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.listSessions = vi.fn().mockResolvedValue({ sessions: [], truncated: false });
+    const payloads: Array<{ modelId?: string; text?: string }> = [];
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as { modelId?: string; text?: string });
+      onEvent({ opId: 'op-1', sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId: 'op-1',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return { opId: 'op-1', messageId: 'm-1', context: null };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-1', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    await pickRegistryModel(user);
+    expect(localStorage.getItem('adham:compose:model:pending')).toBe('qwen2.5:latest');
+
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await user.type(box, 'first words');
+    await user.keyboard('{Enter}');
+
+    // The turn streams into the session the first send created — the text-only
+    // path is never used, and the pick travels with the session.
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(backend.completeOnceStreaming).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'sess-1',
+      expect.objectContaining({ modelId: 'qwen2.5:latest', text: 'first words' }),
+      expect.any(Function),
+    );
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(backend.clearPendingOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'resolved' }),
+        undefined,
+      ),
+    );
+    expect(localStorage.getItem('adham:compose:model:sess-1')).toBe('qwen2.5:latest');
+    expect(localStorage.getItem('adham:compose:model:pending')).toBeNull();
+  });
+
+  it('returns the first message to the composer when its first dispatch is refused', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.listSessions = vi.fn().mockResolvedValue({ sessions: [], truncated: false });
+    backend.completeOnceStreaming = vi.fn(async () => {
+      throw new Error('policy denied');
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-1', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    await pickRegistryModel(user);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await user.type(box, 'first words');
+    await user.keyboard('{Enter}');
+
+    // The refusal is visible, the text returns to the composer, and the
+    // tracked identity is dismissed rather than left as a phantom resend.
+    await waitFor(() => expect(screen.getAllByText(/policy denied/i).length).toBeGreaterThan(0));
+    await waitFor(() => expect((box as HTMLTextAreaElement).value).toBe('first words'));
+    await waitFor(() =>
+      expect(backend.clearPendingOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'dismissed' }),
+        undefined,
+      ),
+    );
+    expect(backend.submitMessage).not.toHaveBeenCalled();
   });
 
   it('submits text and shows the backend-issued message while clearing the draft', async () => {
