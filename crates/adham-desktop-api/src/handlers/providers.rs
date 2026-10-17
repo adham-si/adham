@@ -257,6 +257,7 @@ pub async fn handle_update_provider_account(
             alias: account.alias.clone(),
             endpoint_url: account.base_url.clone(),
             privacy_class: serde_plain_repr(&account.privacy_class).to_string(),
+            kind: serde_plain_repr(&account.kind).to_string(),
         },
     ))
 }
@@ -1033,6 +1034,7 @@ pub async fn handle_list_provider_accounts(
             alias: a.alias.clone(),
             endpoint_url: a.base_url.clone(),
             privacy_class: serde_plain_repr(&a.privacy_class).to_string(),
+            kind: serde_plain_repr(&a.kind).to_string(),
         })
         .collect();
     Ok(ok_result(

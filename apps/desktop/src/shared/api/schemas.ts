@@ -183,6 +183,8 @@ export const ProviderAccountDtoSchema = z.object({
   alias: z.string(),
   endpointUrl: z.string(),
   privacyClass: z.string(),
+  // additive Delivery G1: adapter family; branch on it, never on URL/model names
+  kind: z.string(),
 });
 
 export const ProviderHealthResponseSchema = z.object({

@@ -25,6 +25,7 @@ pub enum ProviderKind {
     OpenAiCompatible,
     Anthropic,
     CustomLoopback,
+    GoogleGemini,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

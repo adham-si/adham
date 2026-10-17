@@ -438,6 +438,9 @@ pub struct ProviderAccountDto {
     pub alias: String,
     pub endpoint_url: String,
     pub privacy_class: String,
+    /// Additive (Delivery G1): adapter family of the account — the frontend
+    /// must branch on this kind, never on URLs or model names.
+    pub kind: String,
 }
 
 /// Metadata-only health: reachable + tag count. No prompt is ever sent and

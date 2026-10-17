@@ -138,7 +138,12 @@ export type DiscoverOllamaModelsPayload = { accountId: string, };
 
 export type UpdateProviderAccountPayload = { accountId: string | null, alias: string | null, endpointUrl: string | null, };
 
-export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl: string, privacyClass: string, };
+export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl: string, privacyClass: string, 
+/**
+ * Additive (Delivery G1): adapter family of the account — the frontend
+ * must branch on this kind, never on URLs or model names.
+ */
+kind: string, };
 
 export type ProviderModelDto = { modelId: string, digest: string, humanLabel: string, privacyClass: string, capabilities: ProviderCapabilitiesDto, };
 

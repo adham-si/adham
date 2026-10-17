@@ -85,6 +85,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
                   alias: 'Local Ollama',
                   endpointUrl: 'http://127.0.0.1:11434',
                   privacyClass: 'local_only',
+                  kind: 'ollama_local',
                 },
               ],
             },
@@ -98,6 +99,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
                   digest: 'sha256:abc',
                   humanLabel: 'Qwen 2.5 (latest)',
                   privacyClass: 'local_only',
+                  kind: 'ollama_local',
                   capabilities: {
                     streaming: 'supported',
                     structuredOutput: 'unknown',
@@ -134,6 +136,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
                 alias: 'Local Ollama',
                 endpointUrl: 'http://127.0.0.1:11434',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
               },
             ],
           },
@@ -149,6 +152,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
                 digest: 'd9c89605f39a',
                 humanLabel: 'qwen3.5:0.8b',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
                 capabilities: {
                   streaming: 'supported',
                   structuredOutput: 'unknown',
@@ -181,6 +185,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
                 alias: 'Local Ollama',
                 endpointUrl: 'http://127.0.0.1:11434',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
               },
             ],
           },
@@ -197,6 +202,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
                 digest: 'aa11bb22cc33',
                 humanLabel: 'DeepSeek R1 1.5B',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
                 capabilities: {
                   streaming: 'supported',
                   structuredOutput: 'unknown',

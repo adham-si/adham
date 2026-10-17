@@ -217,6 +217,7 @@ describe('ConversationPanel', () => {
             alias: 'Local Ollama',
             endpointUrl: 'http://127.0.0.1:11434',
             privacyClass: 'local_only',
+            kind: 'ollama_local',
           },
         ],
       })),
@@ -227,6 +228,7 @@ describe('ConversationPanel', () => {
             digest: 'sha256:abc',
             humanLabel: 'Qwen 2.5 (latest)',
             privacyClass: 'local_only',
+            kind: 'ollama_local',
             capabilities: {
               streaming: 'supported',
               structuredOutput: 'unknown',
@@ -363,6 +365,7 @@ describe('ConversationPanel', () => {
             alias: 'Local Ollama',
             endpointUrl: 'http://127.0.0.1:11434',
             privacyClass: 'local_only',
+            kind: 'ollama_local',
           },
         ],
       })),
@@ -373,6 +376,7 @@ describe('ConversationPanel', () => {
             digest: 'sha256:abc',
             humanLabel: 'Qwen 2.5 (latest)',
             privacyClass: 'local_only',
+            kind: 'ollama_local',
             capabilities: {
               streaming: 'supported',
               structuredOutput: 'unknown',

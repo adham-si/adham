@@ -41,3 +41,14 @@ fn test_ollama_invalid_ndjson_rejection() {
     let res = OllamaStreamParser::parse_line(malformed);
     assert!(res.is_err());
 }
+
+#[test]
+fn provider_kind_google_gemini_serializes_snake_case() {
+    use adham_provider::domain::account::ProviderKind;
+    // serde contract: Google's kind persists on the wire and in DB rows as
+    // `google_gemini` (snake_case like every other kind — G1 additive).
+    let json = serde_json::to_string(&ProviderKind::GoogleGemini).expect("serialize");
+    assert_eq!(json, r#""google_gemini""#);
+    let back: ProviderKind = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, ProviderKind::GoogleGemini);
+}

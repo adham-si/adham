@@ -1630,6 +1630,7 @@ fn provider_accounts_are_listable_and_unsaved_probe_persists_nothing() {
     assert_eq!(accounts.len(), 1);
     assert_eq!(accounts[0]["accountId"], json!(account_id));
     assert_eq!(accounts[0]["privacyClass"], json!("local_only"));
+    assert_eq!(accounts[0]["kind"], json!("ollama_local"));
 
     // URL probe of an unsaved endpoint: hits the wire, persists nothing
     let response = invoke(

@@ -337,6 +337,7 @@ describe('IPC contract fixture (cross-language)', () => {
                 digest: 'sha256:abc',
                 humanLabel: 'm:latest',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
                 capabilities: {
                   streaming: 'supported',
                   structuredOutput: 'unknown',
@@ -381,6 +382,7 @@ describe('IPC contract fixture (cross-language)', () => {
         alias: 'A',
         endpointUrl: 'http://127.0.0.1:1',
         privacyClass: 'local_only',
+        kind: 'ollama_local',
       },
     }));
     const minted = await client.updateProviderAccount(
@@ -433,6 +435,7 @@ describe('IPC contract fixture (cross-language)', () => {
                 alias: 'Local',
                 endpointUrl: 'http://127.0.0.1:11434',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
               },
             ],
           },

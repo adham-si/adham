@@ -26,6 +26,7 @@ const mintedAccount = (): ProviderAccountDto => ({
   alias: 'Local Ollama',
   endpointUrl: 'http://127.0.0.1:11434',
   privacyClass: 'local_only',
+  kind: 'ollama_local',
 });
 
 const modelDto = () => ({
@@ -33,6 +34,7 @@ const modelDto = () => ({
   digest: 'sha256:abc',
   humanLabel: 'Qwen 2.5 (latest)',
   privacyClass: 'local_only',
+  kind: 'ollama_local',
   capabilities: {
     streaming: 'supported' as const,
     structuredOutput: 'unknown' as const,
