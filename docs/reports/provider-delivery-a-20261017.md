@@ -268,6 +268,8 @@ byte-matched the live daemon's `/api/tags`.
 3. The compose widget's dormant `DEFAULT_MODELS` catalog constant was left
    untouched (cleanup ban); both production callers always pass registry
    models explicitly.
-4. `privacy_class`/`verified_revision` richer metadata (e.g. parameter sizes)
-   is not exposed by the backend DTO; rows show exactly what the registry
-   records.
+4. `privacy_class`/`verified_revision` richer metadata (e.g. parameter sizes) is
+   not exposed by the backend DTO; rows show exactly what the registry records.
+   The model/server capability evidence and the per-hop metadata drop map are in
+   `provider-capability-handoff-20261017.md` (same date), including the proposed
+   shared-contract delta requiring #32 coordination.
