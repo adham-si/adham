@@ -121,6 +121,43 @@ additive-contract proposal (`docs/reports/provider-capability-handoff-20261017.m
 5. **Unknown stays unknown:** no fabricated capabilities or context values; the
    managed-provider matrix renders record-only chips.
 
+## Cross-check vs yoagent (external framework, 2026-10-17)
+
+Compared against a mature multi-provider agent framework (7 protocols —
+Anthropic/OpenAI(a,b,c)/Azure/Google(GenAI,Vertex)/Bedrock — `StreamProvider`
+trait, retries, presets, wasm). Neither side is "wrong": they are an
+SDK where the developer hands over `ModelConfig` (explicit `reasoning`,
+`context_window`, quirk flags); Adham is a security-first desktop client whose
+capability evidence must come from the wire. Adopted/flagged changes to this plan:
+
+- **Absorb — mid-stream failure semantics (G-Task 3 fixture set):** a stream that
+  ends or drops before any `finishReason` is a distinct "clean-end/drop" case
+  handling; a drop AFTER a finishReason keeps the response (no double billing);
+  503/`UNAVAILABLE` honors `Retry-After`, while 429/`RESOURCE_EXHAUSTED` stays
+  non-retried by our policy; `MALFORMED_FUNCTION_CALL`-family ends as a failed
+  terminal with `finishMessage` in the reason; `promptFeedback.blockReason` and
+  the `SAFETY`/`PROHIBITED_CONTENT`/`BLOCKLIST`/`SPII`/`IMAGE_SAFETY` family end
+  as `ContentFilter`. Their header-history note ("key moved out of URL because
+  transport errors could echo it") is external confirmation of the
+  `x-goog-api-key`-header-only decision already fixed here.
+- **Absorb — request-control design margin (follow-up, #32-coordinated):** when
+  thinking controls ship, the control field/level choice must be evidence-driven
+  (the coordinated `thinking_control` additive + optionally a live-probed
+  acceptance matrix), NOT parsed from model ids the way they parse
+  `gemini-<major>` version rules. Their `MINIMAL`-acceptance matrix and
+  "both-levels-in-one-request errors" caution go into that follow-up's spec.
+- **Do not adopt:** env-var API-key resolution (desktop-weak: plaintext keys in
+  process env; our model is explicit consented vault storage, key never renders),
+  name-derived capability/context presets (violates the no-model-name-conditions
+  spec rule for a discovery-first client — their presets are developer-declared
+  config, legal there), and auto-retry loops (violate the no-auto-fallback/no-
+  auto-retry policy; user-driven retry belongs to #32's composer plan).
+- **Different-by-design:** their breadth (7 protocols), per-provider quirk flag
+  structs, OpenAI-compat transport for Ollama, and channel-based
+  `StreamProvider` trait — vs our narrower trusted set, native Ollama protocol
+  (digest pinning + thinking-frame robustness), enum dispatch, vaulted creds,
+  idempotent receipts, event-sourced durable ops, bounded/AEAD content.
+
 ## Tasks
 
 ### G-Task 1: Contract variant + account DTO additive (coordinate note)
