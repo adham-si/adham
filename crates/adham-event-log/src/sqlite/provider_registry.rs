@@ -235,9 +235,25 @@ pub async fn read_provider_models(
     Ok(out)
 }
 
+/// Delete an account row. Model rows and the sealed credential cascade;
+/// `NotFound` if the account does not exist.
+pub async fn delete_provider_account(
+    pool: &Pool<Sqlite>,
+    account_id: &str,
+) -> Result<(), ProviderRegistryError> {
+    let result = sqlx::query("DELETE FROM provider_accounts WHERE account_id = ?")
+        .bind(account_id)
+        .execute(pool)
+        .await
+        .map_err(ProviderRegistryError::from)?;
+    if result.rows_affected() == 0 {
+        return Err(ProviderRegistryError::NotFound(account_id.to_string()));
+    }
+    Ok(())
+}
+
 /// Wipe an account's model rows and bump the registry revision. Callers use
-/// this when cached model evidence is no longer valid (endpoint change).
-/// Single-transaction: the bump and the wipe land together or not at all.
+/// this when cached model evidence is no longer valid (endpoint change)./// Single-transaction: the bump and the wipe land together or not at all.
 pub async fn invalidate_provider_models(
     pool: &Pool<Sqlite>,
     account_id: &str,

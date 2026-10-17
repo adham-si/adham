@@ -13,6 +13,8 @@ const PENDING_OPERATIONS_SQL: &str =
 const PREFERENCES_SQL: &str = include_str!("../../migrations/20261016000000_preferences.sql");
 const PROVIDER_REGISTRY_SQL: &str =
     include_str!("../../migrations/20261016000001_provider_registry.sql");
+const PROVIDER_CREDENTIALS_SQL: &str =
+    include_str!("../../migrations/20261017000000_provider_credentials.sql");
 
 pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(&format!("sqlite://{}", db_path.display()))?
@@ -36,6 +38,7 @@ pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Er
     pool.execute(PENDING_OPERATIONS_SQL).await?;
     pool.execute(PREFERENCES_SQL).await?;
     pool.execute(PROVIDER_REGISTRY_SQL).await?;
+    pool.execute(PROVIDER_CREDENTIALS_SQL).await?;
     ensure_assistant_columns(&pool).await?;
     info!("Database schema initialized successfully.");
 

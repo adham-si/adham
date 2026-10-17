@@ -5,6 +5,7 @@ pub mod fingerprint;
 pub mod health;
 pub mod identity;
 pub mod preferences;
+pub mod provider_credentials;
 pub mod provider_registry;
 pub mod store;
 
@@ -23,10 +24,14 @@ pub use preferences::{
     read_preferences, reset_preferences, write_preferences, PreferenceWriteError,
     StoredPreferences, PREFERENCES_SCHEMA_VERSION,
 };
+pub use provider_credentials::{
+    put_provider_credential, read_provider_credential_plaintext, remove_provider_credential,
+};
 pub use provider_registry::{
-    invalidate_provider_models, read_provider_accounts, read_provider_models,
-    read_provider_registry_revision, upsert_provider_account, upsert_provider_models,
-    ProviderAccountRow, ProviderModelRow, ProviderRegistryError, PROVIDER_REGISTRY_SCHEMA_VERSION,
+    delete_provider_account, invalidate_provider_models, read_provider_accounts,
+    read_provider_models, read_provider_registry_revision, upsert_provider_account,
+    upsert_provider_models, ProviderAccountRow, ProviderModelRow, ProviderRegistryError,
+    PROVIDER_REGISTRY_SCHEMA_VERSION,
 };
 pub use store::{
     AppendEventRequest, AppendEventResult, CommandReceiptRecord, HydratedPendingOperation,

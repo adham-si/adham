@@ -1,15 +1,17 @@
 use adham_desktop_api::{
     ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
-    CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
-    CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
-    GetPreferencesResponse, ListProviderAccountsResponse, ListProviderModelsPayload,
-    ListProviderModelsResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
-    ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
-    RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
-    SelectProjectPayload, SessionList, SessionSummary, StopCompletionPayload,
-    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
-    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
-    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
+    CommandResult, CompleteOncePayload, CompletionStartDto, ConfigureGoogleAccountPayload,
+    ConversationPage, CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
+    DisconnectGoogleAccountPayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
+    GetPreferencesResponse, GoogleAccountDisconnected, ListProviderAccountsResponse,
+    ListProviderModelsPayload, ListProviderModelsResponse, PendingOperationDto,
+    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
+    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
+    RecordPendingOperationPayload, ResetPreferencesResponse, SelectProjectPayload, SessionList,
+    SessionSummary, StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
+    SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
+    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
+    WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -197,6 +199,26 @@ async fn update_provider_account(
 }
 
 #[tauri::command]
+async fn configure_google_account(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<ConfigureGoogleAccountPayload>,
+) -> Result<CommandResult<ProviderAccountDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_configure_google_account(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn disconnect_google_account(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<DisconnectGoogleAccountPayload>,
+) -> Result<CommandResult<GoogleAccountDisconnected>, ErrorEnvelope> {
+    adham_desktop_api::handle_disconnect_google_account(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn complete_once_streaming(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<CompleteOncePayload>,
@@ -368,6 +390,8 @@ pub fn run() {
             discover_ollama_models,
             list_provider_models,
             update_provider_account,
+            configure_google_account,
+            disconnect_google_account,
             complete_once_streaming,
             stop_completion,
         ]);

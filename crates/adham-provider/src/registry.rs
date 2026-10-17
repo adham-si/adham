@@ -158,6 +158,17 @@ impl ProviderRegistry {
         Ok(())
     }
 
+    /// Remove an account row; model rows and the sealed credential cascade in
+    /// the store. The cache drops so stale model entries cannot outlive the
+    /// account.
+    pub async fn delete_account(&self, account: &ProviderAccountId) -> Result<(), ProviderError> {
+        store::delete_provider_account(self.store(), &account.0)
+            .await
+            .map_err(integrity)?;
+        self.drop_cache();
+        Ok(())
+    }
+
     /// Replace the account's digest-pinned model rows (discovery output).
     pub async fn replace_models(
         &self,

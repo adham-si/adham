@@ -482,6 +482,34 @@ pub struct UpdateProviderAccountPayload {
     pub endpoint_url: Option<String>,
 }
 
+/// G2: Google account configuration. Write-only: the API key is sealed into
+/// the credential vault at storage level and echoed back to nobody. Rotation
+/// targets an existing Google account via `accountId`; `acknowledgeCloudTransfer`
+/// must be true before anything is persisted.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ConfigureGoogleAccountPayload {
+    pub account_id: Option<String>,
+    pub alias: Option<String>,
+    pub api_key: String,
+    pub acknowledge_cloud_transfer: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DisconnectGoogleAccountPayload {
+    pub account_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GoogleAccountDisconnected {
+    pub account_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
