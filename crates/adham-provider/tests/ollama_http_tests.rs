@@ -459,3 +459,89 @@ async fn unknown_done_reason_maps_to_stop() {
         "unknown done_reason terminates the stream (never hangs, never silent EOF)"
     );
 }
+
+// --- 9. real qwen3.5 thinking-model shape: contentless frames must not panic ---
+
+#[tokio::test]
+async fn thinking_frames_do_not_panic_and_stream_continues() {
+    // qwen3.5:0.8b (live shape, 2026-10-17): thinking runs emit frames with
+    // empty content and a `thinking` string; the parser normalizes none of
+    // them in Delivery A. The old `expect("events queued")` panicked on the
+    // first of these, aborting the whole completion op.
+    let base = spawn_routed(|req| {
+        if req.path == "/api/chat" {
+            Some(ndjson_response(&[
+                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"","thinking":"let me think"},"done":false}"#,
+                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"","thinking":"more"},"done":false}"#,
+                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"OK"},"done":false}"#,
+                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":9,"eval_count":4}"#,
+            ]))
+        } else {
+            None
+        }
+    })
+    .await;
+
+    let adapter = adapter(&base);
+    let mut stream = adapter
+        .stream_chat(
+            &pinned("qwen3.5:0.8b", "sha256:bbb"),
+            &request("qwen3.5:0.8b"),
+        )
+        .await
+        .expect("chat started");
+    let mut got = Vec::new();
+    while let Some(event) = stream.next_event().await {
+        got.push(event.expect("stream events"));
+    }
+    assert_eq!(
+        got,
+        vec![
+            NormalizedStreamEvent::StreamStarted,
+            NormalizedStreamEvent::TextDelta("OK".into()),
+            NormalizedStreamEvent::Progress(StreamUsage {
+                prompt_tokens: 9,
+                completion_tokens: 4,
+                total_tokens: 13,
+            }),
+            NormalizedStreamEvent::StreamCompleted(StreamCompletionOutcome::Stop),
+        ],
+        "contentless thinking frames are skipped, the answer still streams: {got:?}"
+    );
+}
+
+// --- 10. bare heartbeat frames (no thinking field) are equally inert -----------
+
+#[tokio::test]
+async fn heartbeat_frames_are_skipped_without_events() {
+    let base = spawn_routed(|req| {
+        if req.path == "/api/chat" {
+            Some(ndjson_response(&[
+                r#"{"model":"m","message":{"role":"assistant","content":""},"done":false}"#,
+                r#"{"model":"m","message":{"role":"assistant","content":"hi"},"done":false}"#,
+                r#"{"model":"m","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}"#,
+            ]))
+        } else {
+            None
+        }
+    })
+    .await;
+
+    let adapter = adapter(&base);
+    let mut stream = adapter
+        .stream_chat(&pinned("m", "sha256:ccc"), &request("m"))
+        .await
+        .expect("chat started");
+    let mut got = Vec::new();
+    while let Some(event) = stream.next_event().await {
+        got.push(event.expect("stream events"));
+    }
+    assert_eq!(
+        got,
+        vec![
+            NormalizedStreamEvent::StreamStarted,
+            NormalizedStreamEvent::TextDelta("hi".into()),
+            NormalizedStreamEvent::StreamCompleted(StreamCompletionOutcome::Stop),
+        ]
+    );
+}

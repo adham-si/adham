@@ -1707,6 +1707,92 @@ fn provider_models_are_listable_from_the_pinned_registry() {
     assert_eq!(captures.accepts(), 0);
 }
 
+/// A7 follow-up. The owner-observed failure: a thinking-capable model
+/// (qwen3.5:0.8b) streams contentless `thinking` frames; the adapter used to
+/// panic on the first one, aborting the streaming task and leaving the op
+/// dangling `pending` with no assistant content. End-to-end regression: the
+/// thinking run is skipped, the answer persists once as `completed`, and the
+/// op resolves.
+#[test]
+fn thinking_model_stream_persists_answer_and_resolves() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let chat = ChatProgram::once(vec![
+        r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"","thinking":"the model reasons"},"done":false}"#.to_string() + "\n",
+        r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"","thinking":"more"},"done":false}"#.to_string() + "\n",
+        ndjson_delta("the answer"),
+        ndjson_done(7, 3),
+    ]);
+    let base_url = spawn_stub_ollama(&runtime, Some(ctx.pool.clone()), captures.clone(), chat);
+    let account_id = seed_local_account_with_model(&runtime, &ctx, &base_url);
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    let events = collector();
+    let env = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "m:latest".to_string(),
+            text: "hello".to_string(),
+        },
+    );
+    let sink = CollectSink(events.clone());
+    let response = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, env.clone(), &sink).await
+        })
+        .expect("thinking frames must not abort the completion");
+
+    let got = events.lock().expect("collector").clone();
+    let terminal_count = got
+        .iter()
+        .filter(|e| matches!(e.event, StreamEventPayloadDto::Completed { .. }))
+        .count();
+    assert_eq!(terminal_count, 1, "single terminal broadcast: {got:?}");
+    match &got.last().expect("terminal").event {
+        StreamEventPayloadDto::Completed { completion, .. } => {
+            assert_eq!(completion, "completed", "thinking stream failed: {got:?}");
+        }
+        other => panic!("completed terminal expected: {other:?}"),
+    }
+
+    runtime.block_on(async {
+        let sess_id = SessionId::from_string(&sess).expect("sess");
+        let rows = adham_projections::ConversationProjection::get_session_messages(
+            &ctx.pool,
+            ctx.content_key.as_ref(),
+            &ctx.installation_id,
+            &sess_id,
+        )
+        .await
+        .expect("rows");
+        assert_eq!(rows.len(), 2, "user turn + one answer: {rows:?}");
+        let assistant = rows
+            .iter()
+            .find(|r| r.role == "assistant")
+            .expect("assistant row");
+        assert_eq!(assistant.content, "the answer");
+        assert_eq!(
+            assistant.completion,
+            Some(MessageCompletionV1::Completed { truncated: false }),
+            "the thinking run never leaks into the recorded answer"
+        );
+
+        // the op that the owner saw dangling is resolved
+        let status: String =
+            sqlx::query_scalar("SELECT status FROM pending_operations WHERE operation_id = ?")
+                .bind(&response.data.op_id)
+                .fetch_one(&ctx.pool)
+                .await
+                .expect("pending row");
+        assert_eq!(status, "resolved");
+    });
+}
+
 /// Provider management is app-level: the settings surface runs with no
 /// conversation session. Test/discover/create work with an empty context;
 /// streaming keeps its full-scope requirement.

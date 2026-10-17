@@ -4,6 +4,7 @@ import type { PendingOperationDto } from '@adham/contracts-generated';
 import { PendingRecoveryBanner } from './pending-recovery-banner';
 import { PendingRecoveryReviewDialog } from './pending-recovery-review-dialog';
 import { usePendingRecovery } from './use-pending-recovery';
+import { listDurablePendingOperations } from './durable-pending-operations';
 import { performSingleMessageSend } from '../single-message-send';
 import { performLazyFirstSend } from '../lazy-session-creation';
 import type { ConversationBackend } from '../conversation-scope';
@@ -42,6 +43,52 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
     status: 'pending',
     createdAt: '2026-10-14T10:05:00Z',
   };
+
+  // A7 regression: provider dispatch handles recorded at socket time must
+  // never enter the message-recovery flow. (Owner evidence 2026-10-17: a
+  // stuck `provider-completion` op rendered as "Unresolved message —
+  // Review & Resend".) The record itself is not touched — only the view.
+  const providerOp: PendingOperationDto = {
+    ...sampleSingleOp,
+    operationId: '01a14a4e-912d-728d-9a5b-235e6098ccb0',
+    kind: 'provider-completion',
+    text: '',
+    messageRequestId: 'provider-op-1',
+  };
+
+  it('excludes provider-completion ops from the message-recovery list and banner', async () => {
+    const backend = {
+      listPendingOperations: vi
+        .fn()
+        .mockResolvedValue({ operations: [providerOp, sampleSingleOp], truncated: false }),
+      recordPendingOperation: vi.fn(),
+      clearPendingOperation: vi.fn(async () => undefined),
+    } as unknown as ConversationBackend;
+
+    // composited list layer
+    const listed = await listDurablePendingOperations(backend);
+    if (!listed.ok) throw new Error(`list failed: ${listed.error}`);
+    expect(listed.list.operations.map((op) => op.kind)).toEqual(['single_message']);
+
+    // hook + banner surface
+    const { result } = renderHook(() => usePendingRecovery({ backend, onSessionOpened: vi.fn() }));
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.operations).toHaveLength(1);
+    expect(result.current.operations[0]?.kind).toBe('single_message');
+
+    const { container } = render(
+      <PendingRecoveryBanner
+        operations={result.current.operations}
+        truncated={false}
+        onReview={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  });
 
   it('renders banner with target and discloses truncation when present', () => {
     const onReview = vi.fn();

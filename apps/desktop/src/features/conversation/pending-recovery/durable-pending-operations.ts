@@ -31,7 +31,15 @@ export async function recordDurablePendingOperation(
 /**
  * List all unresolved pending operations across all scopes from SQLite.
  * Harmonizes with existing session-scoped records without silently erasing them.
+ *
+ * Only the message-recovery kinds are listed here: the banner's Review &
+ * Resend flow applies to unsent message text, not to provider dispatch
+ * handles (`provider-completion`), which have their own lifecycle — a
+ * crashed provider op stays pending and must never be presented (or
+ * resolvable) as an unsent message.
  */
+export const MESSAGE_RECOVERY_KINDS = ['single_message', 'first_send'] as const;
+
 export async function listDurablePendingOperations(
   backend: ConversationBackend,
 ): Promise<{ ok: true; list: PendingOperationList } | { ok: false; error: string }> {
@@ -40,7 +48,10 @@ export async function listDurablePendingOperations(
     const legacyFirst = readPendingFirstSend();
 
     const list = await backend.listPendingOperations();
-    const ops: PendingOperationDto[] = [...list.operations];
+    const ops: PendingOperationDto[] = [...list.operations].filter(
+      (op): op is PendingOperationDto =>
+        (MESSAGE_RECOVERY_KINDS as readonly string[]).includes(op.kind),
+    );
     const truncated = list.truncated;
 
     // Conservative handling of existing session-scoped records: include if not already present

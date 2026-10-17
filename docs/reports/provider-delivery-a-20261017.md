@@ -61,3 +61,112 @@ Typecheck note: running the full `pnpm typecheck` (root config) surfaced pre-exi
 
 - No raw app-data paths, key material, or secrets in this file. All test data is synthetic (`Hello world`, `partial answer`, fake ids).
 - The A7 E2E section of the plan is intentionally left unticked in `docs/superpowers/plans/2026-10-16-provider-model-integration.md` with its gating noted in place.
+
+---
+
+# Addendum: 2026-10-17 defect investigation (owner-reported, Delivery A)
+
+## Symptom
+
+Owner selected `qwen3.5:0.8b` (Local Ollama) and sent repeated user messages: no
+assistant answer ever appeared, and an "Unresolved message" banner (Review &
+Resend / Dismiss) persisted.
+
+## Running build verification
+
+- App process: PID alive at the time of inspection, launched 15:11:30Z from
+  `target/debug/adham-desktop` (mtime 14:52Z, i.e. post-`a1033d1` non-test
+  semantics = A5/A6 handlers; `b8e6f65`'s Rust delta is test-only). Frontend is
+  HMR-served from the working tree.
+- Data root: `~/Library/Application Support/Adham/data/` (`adham.db` + WAL);
+  inspected read-only via copies in the OpenCode scratch dir.
+
+## Model-discovery provenance (question 2)
+
+- `provider_accounts`: one row, kind `ollama_local`, base_url
+  `http://localhost:11434`, status active (created 14:39:50Z).
+- `provider_models`: `qwen3.5:0.8b`, digest `d9c89605…2402d88f1c` — byte-equal
+  to the live daemon's `/api/tags` digest at inspection time. Recorded 14:39:55Z,
+  ~30s before the first failed dispatch: real Discover output, not a fixture.
+- Capabilities: streaming supported, thinking supported. Dispatch consumed
+  exactly this account/model identity (dispatching-log + op correlation).
+
+## Event-log + DB trace (questions 3–5)
+
+- Session scope matches the banner ids. `conversation_messages`: 3 `user`
+  rows, 0 assistant rows. `events`: only 3 `MessageSubmitted` at positions 4–6;
+  no provider events of any kind.
+- `pending_operations`: **two** rows, both `kind='provider-completion'`,
+  `status='pending'`, created 14:40:25Z and 14:53:00Z (the 02:40/02:53 sends).
+  Not the older message-recovery chain — dispatch DID reach the provider path;
+  there was **no silent fallback to text-only recording** (no
+  `single_message`/`first_send` op exists for these turns).
+- Dev log: both dispatches end in
+  `thread 'tokio-rt-worker' panicked at crates/adham-provider/src/adapters/ollama_http.rs:281:56:
+  events queued`.
+- Provider-completion ops WERE incorrectly entering the older message-recovery
+  flow: `listDurablePendingOperations` returned all pending kinds and the
+  banner rendered the first one as "unsent message text".
+
+## Root cause
+
+`OllamaChatStream::next_event()` popped its normalized-event queue with
+`expect("events queued")`. A structurally valid, contentless frame — thinking
+models emit `{"content":"","thinking":"…"}` runs first (`qwen3.5` family) —
+parses to an **empty** event list, the queue is empty, the panic fires, the
+tokio streaming task aborts, the completion op is never resolved → dangling
+`pending` op, no terminal, no answer.
+
+## Fixes (root-cause first, no symptom patching)
+
+1. `ollama_http.rs` `next_event()`: empty parse results are skipped (loop
+   continues reading); only EOF-without-terminal and wire errors terminate.
+   Session-quoted comment marks the panic-must-not-return invariant.
+2. `handlers/providers.rs`: `tracing::warn!` on mid-wire stream errors (the
+   boundary was previously silent in logs).
+3. `durable-pending-operations.ts`: message-recovery list filters to
+   `MESSAGE_RECOVERY_KINDS` (`single_message`, `first_send`);
+   `provider-completion` ops no longer enter the Review & Resend banner. The
+   stuck rows themselves were **not** dismissed, deleted or resent.
+
+## Regression tests at the failing boundaries
+
+- `crates/adham-provider/tests/ollama_http_tests.rs`:
+  `thinking_frames_do_not_panic_and_stream_continues` (live qwen3.5 shape),
+  `heartbeat_frames_are_skipped_without_events`. Both fail by panic on the old
+  code. Adapter battery: 11 passed.
+- `apps/desktop/src-tauri/src/ipc_contract_tests.rs`:
+  `thinking_model_stream_persists_answer_and_resolves` — end-to-end through the
+  real handler: exactly one user turn + one answer, single `completed`
+  terminal, op resolved, thinking run never leaks into the record. 16 passed.
+- `apps/desktop/src/features/conversation/pending-recovery/pending-recovery.test.tsx`:
+  `excludes provider-completion ops from the message-recovery list and banner`.
+
+## Bounded live verification (authorized: local model + disposable context, no cloud)
+
+A throwaway `#[ignore]` probe drove the real handler against
+`http://127.0.0.1:11434` with the real `qwen3.5:0.8b` (disposable temp SQLite,
+synthetic prompt, hard 90s cap; transport also enforces a 120s total deadline).
+Result (13.9s): exactly one `completed` terminal, exactly 2 rows (1 user + 1
+assistant), answer non-empty, reload-stable second read returns the identical
+row, op `resolved`. Probe deleted after the run; recorded here only.
+
+## Owner-session expected behavior after the fix
+
+- The running dev app binary already contains the fix at the time of writing
+  (watcher relaunched post-fix; bin 15:46Z > adapter fix 15:45Z); the frontend
+  filter is live via HMR. The next dev relaunch after further Rust edits
+  picks both up regardless.
+- The two historical `provider-completion` rows remain in the owner database
+  untouched; the banner no longer claims them. Opposite-direction residue to
+  verify: new sends stream normally.
+
+## Gate results (final tree)
+
+| Gate | Result |
+| --- | --- |
+| `cargo test --workspace --locked` | **339 passed**, 0 failed (+3: 2 adapter, 1 ipc) |
+| `cargo clippy --workspace --all-targets --locked` | 0 warnings |
+| `cargo fmt --all` | clean |
+| Vitest affected suites (pending-recovery, use-conversation, panel) | 6 files, **65/65** |
+| `pnpm check` (full, repo root) | exit 0 |

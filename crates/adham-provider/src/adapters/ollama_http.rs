@@ -250,6 +250,14 @@ impl OllamaChatStream {
 
     /// Next normalized event; `None` only after a terminal event. Frame caps
     /// and deadlines come from the transport (`MAX_FRAME_BYTES` ≈ 1 MiB).
+    ///
+    /// A structurally valid frame can still yield NO normalized events —
+    /// thinking-model frames (`content: ""` + `thinking: "…"`, Delivery A
+    /// records no thinking surface) and keep-alive frames parse to an empty
+    /// event list. Those are skipped here; only end-of-stream and wire errors
+    /// terminate the event flow. Never panic on an empty parse result — a
+    /// panicked streaming task aborts the completion op and leaves it
+    /// dangling unresolved.
     pub async fn next_event(&mut self) -> Option<Result<NormalizedStreamEvent, ProviderError>> {
         // queued events (e.g. Progress paired with the terminal frame) drain
         // first — `done` must not swallow them
@@ -264,38 +272,46 @@ impl OllamaChatStream {
             return Some(Ok(NormalizedStreamEvent::StreamStarted));
         }
 
-        match self.bytes.next_line().await {
-            Ok(Some(line)) => {
-                if line.len() > MAX_FRAME_BYTES {
-                    self.done = true;
-                    return Some(Err(ProviderError::ProtocolParseError(format!(
-                        "frame exceeded {MAX_FRAME_BYTES} bytes"
-                    ))));
-                }
-                match OllamaStreamParser::parse_line(&line) {
-                    Ok(events) => {
-                        self.done = events
-                            .iter()
-                            .any(|e| matches!(e, NormalizedStreamEvent::StreamCompleted(_)));
-                        self.queue.extend(events);
-                        Some(Ok(self.queue.pop_front().expect("events queued")))
-                    }
-                    Err(e) => {
+        loop {
+            match self.bytes.next_line().await {
+                Ok(Some(line)) => {
+                    if line.len() > MAX_FRAME_BYTES {
                         self.done = true;
-                        Some(Err(e))
+                        return Some(Err(ProviderError::ProtocolParseError(format!(
+                            "frame exceeded {MAX_FRAME_BYTES} bytes"
+                        ))));
+                    }
+                    match OllamaStreamParser::parse_line(&line) {
+                        Ok(events) => {
+                            self.done = events
+                                .iter()
+                                .any(|e| matches!(e, NormalizedStreamEvent::StreamCompleted(_)));
+                            self.queue.extend(events);
+                            match self.queue.pop_front() {
+                                Some(event) => return Some(Ok(event)),
+                                // terminal parsed; done is set, nothing left to yield
+                                None if self.done => return None,
+                                // contentless frame (thinking/keep-alive): keep reading
+                                None => continue,
+                            }
+                        }
+                        Err(e) => {
+                            self.done = true;
+                            return Some(Err(e));
+                        }
                     }
                 }
-            }
-            Ok(None) => {
-                // clean end without a terminal frame = truncated stream
-                self.done = true;
-                Some(Err(ProviderError::TransportError(
-                    "stream ended without terminal frame".into(),
-                )))
-            }
-            Err(e) => {
-                self.done = true;
-                Some(Err(e.into_provider_error()))
+                Ok(None) => {
+                    // clean end without a terminal frame = truncated stream
+                    self.done = true;
+                    return Some(Err(ProviderError::TransportError(
+                        "stream ended without terminal frame".into(),
+                    )));
+                }
+                Err(e) => {
+                    self.done = true;
+                    return Some(Err(e.into_provider_error()));
+                }
             }
         }
     }

@@ -809,6 +809,7 @@ where
                     break;
                 }
                 Some(Err(e)) => {
+                    tracing::warn!("completion op {op_id}: stream error mid-wire: {e}");
                     failed_reason = Some(e.to_string());
                     break;
                 }
