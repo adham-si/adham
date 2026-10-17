@@ -119,7 +119,11 @@
       "tierMedium": "متوسط",
       "tierHigh": "مرتفع",
       "noVision": "النموذج النشط لا يدعم الرؤية",
-      "ollamaTitle": "على هذه الآلة (أولاما)"
+      "ollamaTitle": "على هذه الآلة (أولاما)",
+      "capStreaming": "بث تدفقي",
+      "capThinking": "تفكير",
+      "capToolProposals": "مقترحات أدوات",
+      "capStructuredOutput": "مخرجات مهيكلة"
     },
     "storage": {
       "title": "التخزين والنسخ الاحتياطي",

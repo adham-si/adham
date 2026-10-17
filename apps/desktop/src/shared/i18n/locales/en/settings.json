@@ -119,7 +119,11 @@
       "tierMedium": "Medium",
       "tierHigh": "High",
       "noVision": "Active model has no vision",
-      "ollamaTitle": "On this machine (Ollama)"
+      "ollamaTitle": "On this machine (Ollama)",
+      "capStreaming": "Streaming",
+      "capThinking": "Thinking",
+      "capToolProposals": "Tool proposals",
+      "capStructuredOutput": "Structured output"
     },
     "storage": {
       "title": "Storage & Backup",

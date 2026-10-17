@@ -119,7 +119,11 @@
       "tierMedium": "中",
       "tierHigh": "高",
       "noVision": "活动模型没有视觉能力",
-      "ollamaTitle": "本机（Ollama）"
+      "ollamaTitle": "本机（Ollama）",
+      "capStreaming": "流式",
+      "capThinking": "思考",
+      "capToolProposals": "工具调用",
+      "capStructuredOutput": "结构化输出"
     },
     "storage": {
       "title": "存储与备份",

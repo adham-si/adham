@@ -119,7 +119,11 @@
       "tierMedium": "Средние",
       "tierHigh": "Высокие",
       "noVision": "Активная модель не поддерживает зрение",
-      "ollamaTitle": "На этом устройстве (Ollama)"
+      "ollamaTitle": "На этом устройстве (Ollama)",
+      "capStreaming": "Стриминг",
+      "capThinking": "Мышление",
+      "capToolProposals": "Предложения инструментов",
+      "capStructuredOutput": "Структурированный вывод"
     },
     "storage": {
       "title": "Хранилище и Копии",
