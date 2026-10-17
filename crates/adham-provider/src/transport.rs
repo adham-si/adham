@@ -321,6 +321,46 @@ impl HttpTransport {
             .map_err(classify)?;
         document_from(response, self.per_read).await
     }
+
+    /// GET JSON carrying explicit headers (G3: `x-goog-api-key`; header-only
+    /// authorization — never a query parameter).
+    pub async fn get_json_with_headers(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+    ) -> Result<Value, TransportError> {
+        EndpointDescriptor::validate_url(url).map_err(|e| TransportError::Policy(e.to_string()))?;
+        let mut request = self.client.get(url);
+        for (name, value) in headers {
+            request = request.header(name, value);
+        }
+        let response = request.timeout(self.total).send().await.map_err(classify)?;
+        document_from(response, self.per_read).await
+    }
+
+    /// POST JSON carrying explicit headers, returning a stream (G3 SSE).
+    pub async fn post_json_with_headers(
+        &self,
+        url: &str,
+        body: &Value,
+        headers: &[(String, String)],
+    ) -> Result<ByteStream, TransportError> {
+        EndpointDescriptor::validate_url(url).map_err(|e| TransportError::Policy(e.to_string()))?;
+        let mut request = self.client.post(url).json(body);
+        for (name, value) in headers {
+            request = request.header(name, value);
+        }
+        let response = request.timeout(self.total).send().await.map_err(classify)?;
+        if !response.status().is_success() {
+            return Err(read_error_status(response, self.per_read).await);
+        }
+        Ok(ByteStream {
+            response,
+            per_read: self.per_read,
+            buf: Vec::new(),
+            done: false,
+        })
+    }
 }
 
 /// Bounded error-body read for any non-2xx response (shared by all methods).
