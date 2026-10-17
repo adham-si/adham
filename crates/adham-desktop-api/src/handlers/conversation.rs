@@ -68,6 +68,7 @@ pub async fn handle_get_conversation(
             text: m.content,
             created_at: dt.format(&Rfc3339).unwrap_or_default(),
             source_event_id: String::new(),
+            completion: m.completion,
         });
         max_pos += 1;
     }

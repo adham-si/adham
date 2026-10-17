@@ -1,4 +1,4 @@
-use adham_core_types::MessageUsageV1;
+use adham_core_types::{MessageCompletionV1, MessageUsageV1};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -179,6 +179,9 @@ pub struct ConversationMessageDto {
     pub text: String,
     pub created_at: String,
     pub source_event_id: String,
+    /// Terminal lifecycle of assistant turns (None for user turns). The UI
+    /// labels failed/interrupted/truncated turns from this, never from text.
+    pub completion: Option<MessageCompletionV1>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -549,6 +552,9 @@ pub struct StreamEventDto {
 #[ts(export)]
 pub enum StreamEventPayloadDto {
     Started,
+    /// Reasoning activity marker: the reasoning text itself never crosses
+    /// this boundary (no text, nothing to persist or display).
+    Thinking,
     Delta {
         text: String,
     },

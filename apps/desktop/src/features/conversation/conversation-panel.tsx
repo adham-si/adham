@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { MessageCard } from '@adham/ui';
 import {
   Composer,
@@ -11,8 +12,9 @@ import {
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
-import { useConversation, type ConversationBackend } from './use-conversation';
+import { useConversation, type ConversationBackend, type UiMessage } from './use-conversation';
 import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
+import { TurnStatus } from './turn-status';
 import {
   announceScopeChanged,
   SCOPE_CHANGED_EVENT,
@@ -34,6 +36,26 @@ function formatTimestamp(createdAt: string): string {
   const parsed = new Date(createdAt);
   if (Number.isNaN(parsed.getTime())) return createdAt;
   return formatTime(parsed);
+}
+
+/**
+ * Honest lifecycle note for a persisted assistant turn. Derived from the
+ * stored completion only — never from text length or timing.
+ */
+function messageNote(m: UiMessage, t: TFunction): { text: string; tone: 'muted' | 'error' } | null {
+  const completion = m.completion;
+  if (!completion) return null;
+  if (completion.state === 'interrupted') {
+    return { text: t('conversation.turnInterrupted', 'Cancelled'), tone: 'muted' };
+  }
+  if (completion.state === 'failed') {
+    return m.text === ''
+      ? { text: t('conversation.turnNoAnswer', 'No answer was produced.'), tone: 'error' }
+      : { text: t('conversation.turnFailed', 'Generation failed.'), tone: 'error' };
+  }
+  return completion.truncated
+    ? { text: t('conversation.turnTruncated', 'Truncated by the length limit.'), tone: 'muted' }
+    : null;
 }
 
 export interface ConversationPanelProps {
@@ -110,6 +132,7 @@ export function ConversationPanel({
   const [reasoningEffort, setReasoningEffort] = React.useState<'low' | 'medium' | 'high'>('medium');
   const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
   const [stopNotice, setStopNotice] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   // Registry-driven picker: when an Ollama account has pinned models, the
   // composer options come from the provider registry (Delivery A). Without
@@ -221,12 +244,16 @@ export function ConversationPanel({
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
     if (!text || busy) return;
+    setSubmitError(null);
     const sent = text;
     // Streaming dispatch when a registry model is wired; otherwise the
     // honest text-only fallback persists just the message.
     const outcome = streamReady
       ? await conv.streamOnce(sent, ollama.account!.accountId, selectedModelId)
       : await conv.submit(sent);
+    // A rejected streaming dispatch (e.g. a send racing the in-flight turn)
+    // must be visible, never a silent no-op.
+    if (streamReady && !outcome.ok) setSubmitError(outcome.error);
     // Retain the draft on failure; never erase edits typed meanwhile.
     if (outcome.ok && draftRef.current === sent) {
       commitPrompt(sent);
@@ -314,21 +341,38 @@ export function ConversationPanel({
         }`}
       >
         <div className="flex w-full flex-1 flex-col gap-4 p-4">
-          {conv.messages.map((m) => (
-            <MessageCard
-              key={m.id}
-              role={m.role === 'assistant' || m.role === 'agent' ? 'assistant' : 'user'}
-              text={m.text}
-              timestamp={formatTimestamp(m.createdAt)}
-            />
-          ))}
-          {conv.streaming && (
+          {conv.messages.map((m) => {
+            const note = messageNote(m, t);
+            return (
+              <React.Fragment key={m.id}>
+                <MessageCard
+                  role={m.role === 'assistant' || m.role === 'agent' ? 'assistant' : 'user'}
+                  text={m.text}
+                  timestamp={formatTimestamp(m.createdAt)}
+                />
+                {note && (
+                  <p
+                    role="status"
+                    className={`px-1 text-xs ${
+                      note.tone === 'error' ? 'text-destructive' : 'text-foreground-muted'
+                    }`}
+                  >
+                    {note.text}
+                  </p>
+                )}
+              </React.Fragment>
+            );
+          })}
+          {conv.streaming && conv.streaming.text !== '' && (
             <MessageCard
               key={conv.streaming.opId || 'streaming'}
               role="assistant"
               text={conv.streaming.text}
               timestamp={formatTime(new Date())}
             />
+          )}
+          {conv.streaming && conv.streaming.phase !== 'streaming' && (
+            <TurnStatus phase={conv.streaming.phase} startedAt={conv.streaming.startedAt} />
           )}
           {/* Non-authoritative recovery: only when the post-terminal history
               reload failed; replaced atomically by authoritative rows. */}
@@ -397,6 +441,11 @@ export function ConversationPanel({
               'Stop is unavailable: there is no running operation to cancel.',
             )}
           </p>
+        )}
+        {submitError && (
+          <div role="alert">
+            <p>{submitError}</p>
+          </div>
         )}
         {recovery.error && (
           <div role="alert" className="p-2 text-xs text-destructive bg-destructive/10 rounded">

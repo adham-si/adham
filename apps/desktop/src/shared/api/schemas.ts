@@ -80,12 +80,19 @@ export const SubmittedMessageSchema = z.object({
   projectionPosition: z.string(),
 });
 
+export const MessageCompletionV1Schema = z.union([
+  z.object({ Completed: z.object({ truncated: z.boolean() }) }),
+  z.literal('Interrupted'),
+  z.literal('Failed'),
+]);
+
 export const ConversationMessageDtoSchema = z.object({
   messageId: z.string(),
   role: z.string(),
   text: z.string(),
   createdAt: z.string(),
   sourceEventId: z.string(),
+  completion: MessageCompletionV1Schema.nullable(),
 });
 
 export const ConversationPageSchema = z.object({
@@ -152,12 +159,6 @@ export const MessageUsageV1Schema = z.object({
   completionTokens: z.number().int().nonnegative().nullable(),
   totalTokens: z.number().int().nonnegative().nullable(),
 });
-
-export const MessageCompletionV1Schema = z.union([
-  z.object({ Completed: z.object({ truncated: z.boolean() }) }),
-  z.literal('Interrupted'),
-  z.literal('Failed'),
-]);
 
 export const ProviderCapabilitiesDtoSchema = z.object({
   streaming: z.enum(['supported', 'unsupported', 'unknown']),

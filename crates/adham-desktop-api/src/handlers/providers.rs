@@ -662,7 +662,10 @@ fn terminal_status(outcome: &StreamCompletionOutcome) -> (&'static str, bool) {
         StreamCompletionOutcome::Stop => ("completed", false),
         StreamCompletionOutcome::LengthExceeded => ("completed", true),
         StreamCompletionOutcome::Interrupted => ("interrupted", false),
-        StreamCompletionOutcome::ContentFilter => ("failed", false),
+        StreamCompletionOutcome::ContentFilter
+        | StreamCompletionOutcome::EmptyAnswer
+        | StreamCompletionOutcome::StructuredOnly
+        | StreamCompletionOutcome::Unknown { .. } => ("failed", false),
     }
 }
 
@@ -673,7 +676,10 @@ fn map_completion(outcome: &StreamCompletionOutcome) -> MessageCompletionV1 {
             MessageCompletionV1::Completed { truncated: true }
         }
         StreamCompletionOutcome::Interrupted => MessageCompletionV1::Interrupted,
-        StreamCompletionOutcome::ContentFilter => MessageCompletionV1::Failed,
+        StreamCompletionOutcome::ContentFilter
+        | StreamCompletionOutcome::EmptyAnswer
+        | StreamCompletionOutcome::StructuredOnly
+        | StreamCompletionOutcome::Unknown { .. } => MessageCompletionV1::Failed,
     }
 }
 
@@ -692,6 +698,16 @@ async fn run_stream<S>(
 where
     S: EventSink,
 {
+    // The op handle is announced before dispatch: the renderer must be able
+    // to Stop while the socket is still connecting, before any frame.
+    let mut sequence: u64 = 0;
+    sink.send(stream_event(
+        op_id,
+        &mut sequence,
+        StreamEventPayloadDto::Started,
+    ))
+    .ok_or_log(op_id);
+
     // bounded history from protected content (server-side, never the renderer's)
     let history_rows = adham_projections::ConversationProjection::get_session_messages(
         &ctx.pool,
@@ -723,16 +739,46 @@ where
         temperature: None,
     };
 
-    let stream = match adapter.stream_chat(pinned, &request).await {
-        Ok(s) => s,
-        Err(e) => {
+    // A user Stop during connect cancels the in-flight request instead of
+    // waiting for a first frame; `biased` also observes a token cancelled
+    // before dispatch (no socket is kept). Cancellation never depends on an
+    // answer delta.
+    let dispatch = tokio::select! {
+        biased;
+        _ = token.cancelled() => None,
+        res = adapter.stream_chat(pinned, &request) => Some(res),
+    };
+    let mut stream = match dispatch {
+        None => {
+            // cancelled while connecting: Interrupted, even with no text yet
+            sink.send(stream_event(
+                op_id,
+                &mut sequence,
+                StreamEventPayloadDto::Completed {
+                    completion: "interrupted".to_string(),
+                    truncated: false,
+                    usage: None,
+                },
+            ))
+            .ok_or_log(op_id);
+            return persist_terminal(
+                ctx,
+                op_id,
+                request_id,
+                ids,
+                "",
+                &StreamCompletionOutcome::Interrupted,
+                None,
+            )
+            .await;
+        }
+        Some(Err(e)) => {
             tracing::debug!("completion op {op_id}: dispatch failed pre-wire: {e}");
             // after the op handle exists: a pre-wire dispatch failure is a
             // failed terminal, never a vanished generation
-            let mut seq = 0u64;
             sink.send(stream_event(
                 op_id,
-                &mut seq,
+                &mut sequence,
                 StreamEventPayloadDto::Completed {
                     completion: "failed".to_string(),
                     truncated: false,
@@ -751,22 +797,15 @@ where
             )
             .await;
         }
+        Some(Ok(s)) => s,
     };
-
-    // StreamStarted first, per-op sequence numbers increase in order.
-    let mut sequence: u64 = 0;
-    sink.send(stream_event(
-        op_id,
-        &mut sequence,
-        StreamEventPayloadDto::Started,
-    ))
-    .ok_or_log(op_id);
 
     let mut acc = String::new();
     let mut usage: Option<MessageUsageV1> = None;
-    let mut stream = stream;
     let mut terminal_outcome: Option<StreamCompletionOutcome> = None;
     let mut failed_reason: Option<String> = None;
+    let mut saw_thinking = false;
+    let mut saw_structured = false;
 
     loop {
         if token.is_cancelled() {
@@ -800,9 +839,25 @@ where
                         total_tokens: Some(total_tokens as u64),
                     });
                 }
-                Some(Ok(NormalizedStreamEvent::ThinkingDelta(_))) => {
-                    // provider-internal reasoning: not part of the persisted
-                    // assistant answer in Delivery A
+                Some(Ok(NormalizedStreamEvent::ThinkingActivity))
+                | Some(Ok(NormalizedStreamEvent::ThinkingDelta(_))) => {
+                    // reasoning text never crosses this boundary: exactly one
+                    // activity marker per op, so the UI can say "Thinking…"
+                    // without ever seeing the model's reasoning
+                    if !saw_thinking {
+                        saw_thinking = true;
+                        sink.send(stream_event(
+                            op_id,
+                            &mut sequence,
+                            StreamEventPayloadDto::Thinking,
+                        ))
+                        .ok_or_log(op_id);
+                    }
+                }
+                Some(Ok(NormalizedStreamEvent::StructuredActivity)) => {
+                    // non-text output seen: the empty-answer rule must not
+                    // claim this turn as a silent refusal
+                    saw_structured = true;
                 }
                 Some(Ok(NormalizedStreamEvent::StreamCompleted(outcome))) => {
                     terminal_outcome = Some(outcome);
@@ -817,47 +872,39 @@ where
         }
     }
 
-    let outcome = terminal_outcome.unwrap_or(StreamCompletionOutcome::ContentFilter);
-    // sink failure path: log; persistence below is unconditional
-    if failed_reason.is_some()
-        || matches!(
-            outcome,
-            StreamCompletionOutcome::ContentFilter | StreamCompletionOutcome::Interrupted
-        )
-    {
-        sink.send(stream_event(
-            op_id,
-            &mut sequence,
-            StreamEventPayloadDto::Completed {
-                completion: if failed_reason.is_some() {
-                    "failed"
+    let mut outcome = terminal_outcome.unwrap_or(StreamCompletionOutcome::ContentFilter);
+    if let Some(reason) = &failed_reason {
+        // bounded: transport/accounting reason only, never model output
+        tracing::debug!("completion op {op_id}: error terminal ({reason})");
+    }
+    if failed_reason.is_none() && acc.is_empty() {
+        // A normal terminal with no answer text at all is not a success:
+        // thinking-only runs and silent refusals fail visibly. Tool-only
+        // output is its own outcome, never an "empty answer" error.
+        outcome = match outcome {
+            StreamCompletionOutcome::Stop | StreamCompletionOutcome::LengthExceeded => {
+                if saw_structured {
+                    StreamCompletionOutcome::StructuredOnly
                 } else {
-                    "interrupted"
+                    StreamCompletionOutcome::EmptyAnswer
                 }
-                .to_string(),
-                truncated: false,
-                usage: usage.clone(),
-            },
-        ))
-        .ok_or_log(op_id);
+            }
+            other => other,
+        };
     }
-    // completed terminals go straight to the same DTO shape
-    if matches!(
-        outcome,
-        StreamCompletionOutcome::Stop | StreamCompletionOutcome::LengthExceeded
-    ) {
-        let (completion, truncated) = terminal_status(&outcome);
-        sink.send(stream_event(
-            op_id,
-            &mut sequence,
-            StreamEventPayloadDto::Completed {
-                completion: completion.to_string(),
-                truncated,
-                usage: usage.clone(),
-            },
-        ))
-        .ok_or_log(op_id);
-    }
+
+    // one honest terminal on the wire, in contract order (Started is first)
+    let (completion, truncated) = terminal_status(&outcome);
+    sink.send(stream_event(
+        op_id,
+        &mut sequence,
+        StreamEventPayloadDto::Completed {
+            completion: completion.to_string(),
+            truncated,
+            usage: usage.clone(),
+        },
+    ))
+    .ok_or_log(op_id);
 
     persist_terminal(ctx, op_id, request_id, ids, &acc, &outcome, usage.as_ref()).await
 }

@@ -70,7 +70,12 @@ export type SubmitMessagePayload = { text: string, };
 
 export type SubmittedMessage = { messageId: string, sessionId: string, text: string, createdAt: string, streamSequence: string, projectionPosition: string, };
 
-export type ConversationMessageDto = { messageId: string, role: string, text: string, createdAt: string, sourceEventId: string, };
+export type ConversationMessageDto = { messageId: string, role: string, text: string, createdAt: string, sourceEventId: string, 
+/**
+ * Terminal lifecycle of assistant turns (None for user turns). The UI
+ * labels failed/interrupted/truncated turns from this, never from text.
+ */
+completion: MessageCompletionV1 | null, };
 
 export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, };
 
@@ -162,7 +167,7 @@ export type StopCompletionResponse = { opId: string, status: string, };
 
 export type StreamEventDto = { opId: string, sequence: number, event: StreamEventPayloadDto, };
 
-export type StreamEventPayloadDto = { "type": "started" } | { "type": "delta", text: string, } | { "type": "completed", 
+export type StreamEventPayloadDto = { "type": "started" } | { "type": "thinking" } | { "type": "delta", text: string, } | { "type": "completed", 
 /**
  * "completed" | "interrupted" | "failed"
  */

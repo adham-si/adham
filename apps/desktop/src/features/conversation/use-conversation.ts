@@ -17,6 +17,7 @@ import { performSingleMessageSend } from './single-message-send';
 import {
   type ConversationBackend,
   type ConversationContext,
+  type UiCompletion,
   resolveAuthoritativeSession,
   switchUnresolved,
   toUiMessage,
@@ -40,10 +41,26 @@ export type {
 } from './conversation-scope';
 export type { PendingSend } from './conversation-identity';
 
-export type UiMessage = { id: string; role: string; text: string; createdAt: string };
+export type UiMessage = {
+  id: string;
+  role: string;
+  text: string;
+  createdAt: string;
+  /** Assistant terminal lifecycle; absent on optimistic/streaming bubbles. */
+  completion?: UiCompletion | null;
+};
 
-/** Live streaming state for the composer (deltas + terminal op handle). */
-export type StreamingSnapshot = { opId: string; text: string };
+/** Live streaming state for the timeline (phase drives the visible status). */
+export type StreamingSnapshot = {
+  /** Server op handle: '' until the first stream event lands. */
+  opId: string;
+  text: string;
+  /** waiting = dispatch in flight, thinking = reasoning activity seen,
+   * streaming = answer text arriving. Never advanced from elapsed time. */
+  phase: 'waiting' | 'thinking' | 'streaming';
+  /** Dispatch start (epoch ms), for the elapsed display. */
+  startedAt: number;
+};
 
 export type ConversationStatus =
   | 'bootstrapping'
@@ -95,6 +112,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // before any dispatch, not merely hidden by a later busy render. Held
   // across the bootstrap await so two early submits cannot both proceed.
   const submitInFlightRef = React.useRef(false);
+  // Stop clicked before the op handle arrived: effectuated on first event.
+  const stopRequestedRef = React.useRef(false);
 
   React.useEffect(() => {
     mountedRef.current = true;
@@ -627,6 +646,12 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         },
       ]);
 
+      // Waiting begins at dispatch: the live snapshot exists before the
+      // socket does, so Stop is reachable during connect and thinking.
+      stopRequestedRef.current = false;
+      const startedAt = Date.now();
+      setStreaming({ opId: '', text: '', phase: 'waiting', startedAt });
+
       let opId: string | null = null;
       let terminalSeen = false;
       let resolveTerminal!: (completion: 'completed' | 'interrupted' | 'failed') => void;
@@ -642,19 +667,42 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           { accountId, modelId, text: trimmed },
           (event) => {
             if (!mountedRef.current || generationRef.current !== generation) return;
-            if (opId === null) opId = event.opId;
+            if (opId === null) {
+              opId = event.opId;
+              const state = streamingRef.current;
+              if (state) setStreaming({ ...state, opId: event.opId });
+              // A Stop clicked before the op handle arrived is effectuated
+              // here: cancellation never waits for an answer delta.
+              if (stopRequestedRef.current && backend.stopCompletion && ctx.sessionId) {
+                void backend
+                  .stopCompletion(ctx.workspaceId, ctx.projectId, ctx.sessionId, event.opId)
+                  .catch(() => undefined);
+              }
+            }
             if (event.opId !== opId) return;
             if (event.event.type === 'delta') {
               const previous =
                 streamingRef.current?.opId === event.opId ? streamingRef.current.text : '';
-              setStreaming({ opId: event.opId, text: previous + event.event.text });
+              setStreaming({
+                opId: event.opId,
+                text: previous + event.event.text,
+                phase: 'streaming',
+                startedAt: streamingRef.current?.startedAt ?? startedAt,
+              });
+            } else if (event.event.type === 'thinking') {
+              // Thinking is surfaced only on real reasoning activity; elapsed
+              // time never fabricates this status.
+              const state = streamingRef.current;
+              if (state && state.phase === 'waiting') {
+                setStreaming({ ...state, phase: 'thinking' });
+              }
             } else if (event.event.type === 'completed' && !terminalSeen) {
               terminalSeen = true;
-              // Generated DTO types the completion as string; only the
-              // documented values pass through, unknowns resolve completed.
+              // Only the documented values pass through; anything else is a
+              // contract violation and resolves failed, never completed.
               const completion = event.event.completion;
               resolveTerminal(
-                completion === 'interrupted' || completion === 'failed' ? completion : 'completed',
+                completion === 'completed' || completion === 'interrupted' ? completion : 'failed',
               );
             }
           },
@@ -664,7 +712,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         }
         // First stream event may arrive before the start handle resolves.
         if (opId === null) opId = start.opId;
-        if (streamingRef.current?.opId !== opId) setStreaming({ opId, text: '' });
+        const pending = streamingRef.current;
+        if (pending && pending.opId === '') setStreaming({ ...pending, opId: start.opId });
         await terminalPromise;
         // Handoff ordering is atomic in the render sense: the live bubble is
         // dropped BEFORE the authoritative rows land, and on a failed history
@@ -706,6 +755,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setStatus('error');
         return { ok: false, error: code, uncertain: true };
       } finally {
+        stopRequestedRef.current = false;
         submitInFlightRef.current = false;
       }
     },
@@ -721,6 +771,12 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         error: i18n.t('conversation.stopUnavailable'),
         uncertain: false,
       };
+    }
+    // The op handle may still be in flight (dispatch just started): queue
+    // the intent; the stream callback effectuates it once Started lands.
+    if (!state.opId) {
+      stopRequestedRef.current = true;
+      return { ok: true };
     }
     try {
       await backend.stopCompletion(ctx.workspaceId, ctx.projectId, ctx.sessionId, state.opId);

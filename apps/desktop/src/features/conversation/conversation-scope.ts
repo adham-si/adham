@@ -292,16 +292,43 @@ export const conversationCapabilities = {
   stop: true,
 } as const;
 
+/**
+ * UI-normalized terminal lifecycle of an assistant turn. The wire carries
+ * the core `MessageCompletionV1` shape; the UI works with a flat state so
+ * labels never depend on string matching at render time.
+ */
+export type UiCompletion =
+  | { state: 'completed'; truncated: boolean }
+  | { state: 'interrupted' }
+  | { state: 'failed' };
+
+const normalizeCompletion = (
+  completion: { Completed: { truncated: boolean } } | 'Interrupted' | 'Failed' | null | undefined,
+): UiCompletion | null => {
+  if (completion === null || completion === undefined) return null;
+  if (completion === 'Interrupted') return { state: 'interrupted' };
+  if (completion === 'Failed') return { state: 'failed' };
+  return { state: 'completed', truncated: completion.Completed.truncated === true };
+};
+
 export const toUiMessage = (dto: {
   messageId: string;
   role?: string;
   text: string;
   createdAt: string;
-}): { id: string; role: string; text: string; createdAt: string } => ({
+  completion?: { Completed: { truncated: boolean } } | 'Interrupted' | 'Failed' | null;
+}): {
+  id: string;
+  role: string;
+  text: string;
+  createdAt: string;
+  completion: UiCompletion | null;
+} => ({
   id: dto.messageId,
   role: dto.role ?? 'user',
   text: dto.text,
   createdAt: dto.createdAt,
+  completion: normalizeCompletion(dto.completion),
 });
 
 export const switchUnresolved = (

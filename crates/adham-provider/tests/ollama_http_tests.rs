@@ -423,10 +423,47 @@ async fn done_without_usage_completes_stop_without_progress() {
     );
 }
 
-// --- 8. unknown done_reason: documented older-daemon mapping to clean stop ------
+// --- 8. done_reason semantics: missing reason keeps legacy stop; an explicit
+// --- reason this build does not know is never a successful completion -------
 
 #[tokio::test]
-async fn unknown_done_reason_maps_to_stop() {
+async fn missing_done_reason_on_terminal_frame_stays_stop() {
+    // legacy compatibility: an older daemon sends done:true without a reason
+    let base = spawn_routed(|req| {
+        if req.path == "/api/chat" {
+            Some(ndjson_response(&[
+                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":"tail"},"done":false}"#,
+                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":""},"done":true}"#,
+            ]))
+        } else {
+            None
+        }
+    })
+    .await;
+
+    let adapter = adapter(&base);
+    let mut stream = adapter
+        .stream_chat(
+            &pinned("llama3.2:latest", "sha256:aaa"),
+            &request("llama3.2:latest"),
+        )
+        .await
+        .expect("chat started");
+    let mut got = Vec::new();
+    while let Some(event) = stream.next_event().await {
+        got.push(event.expect("stream events"));
+    }
+    assert_eq!(
+        got.last(),
+        Some(&NormalizedStreamEvent::StreamCompleted(
+            StreamCompletionOutcome::Stop
+        )),
+        "a missing reason on a valid done:true frame keeps the legacy stop"
+    );
+}
+
+#[tokio::test]
+async fn explicit_unknown_done_reason_is_not_stop() {
     let base = spawn_routed(|req| {
         if req.path == "/api/chat" {
             Some(ndjson_response(&[
@@ -454,9 +491,11 @@ async fn unknown_done_reason_maps_to_stop() {
     assert_eq!(
         got.last(),
         Some(&NormalizedStreamEvent::StreamCompleted(
-            StreamCompletionOutcome::Stop
+            StreamCompletionOutcome::Unknown {
+                reason: "cuda".to_string(),
+            }
         )),
-        "unknown done_reason terminates the stream (never hangs, never silent EOF)"
+        "an explicit unknown reason terminates (never hangs) but is not a successful stop"
     );
 }
 
@@ -465,9 +504,9 @@ async fn unknown_done_reason_maps_to_stop() {
 #[tokio::test]
 async fn thinking_frames_do_not_panic_and_stream_continues() {
     // qwen3.5:0.8b (live shape, 2026-10-17): thinking runs emit frames with
-    // empty content and a `thinking` string; the parser normalizes none of
-    // them in Delivery A. The old `expect("events queued")` panicked on the
-    // first of these, aborting the whole completion op.
+    // empty content and a `thinking` string. The old `expect("events queued")`
+    // panicked on the first of these, aborting the whole completion op; now
+    // they normalize to a payload-free activity marker and the answer streams.
     let base = spawn_routed(|req| {
         if req.path == "/api/chat" {
             Some(ndjson_response(&[
@@ -498,6 +537,8 @@ async fn thinking_frames_do_not_panic_and_stream_continues() {
         got,
         vec![
             NormalizedStreamEvent::StreamStarted,
+            NormalizedStreamEvent::ThinkingActivity,
+            NormalizedStreamEvent::ThinkingActivity,
             NormalizedStreamEvent::TextDelta("OK".into()),
             NormalizedStreamEvent::Progress(StreamUsage {
                 prompt_tokens: 9,
@@ -506,7 +547,50 @@ async fn thinking_frames_do_not_panic_and_stream_continues() {
             }),
             NormalizedStreamEvent::StreamCompleted(StreamCompletionOutcome::Stop),
         ],
-        "contentless thinking frames are skipped, the answer still streams: {got:?}"
+        "each thinking frame becomes a payload-free marker, the answer still streams: {got:?}"
+    );
+    assert!(
+        !format!("{got:?}").contains("let me think") && !format!("{got:?}").contains("more"),
+        "reasoning text never leaves the parser: {got:?}"
+    );
+}
+
+#[tokio::test]
+async fn tool_call_frames_emit_structured_activity_without_payload() {
+    // A tool-only frame (no text) is structured output, not an empty answer.
+    let base = spawn_routed(|req| {
+        if req.path == "/api/chat" {
+            Some(ndjson_response(&[
+                r#"{"model":"m","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"search","arguments":{"q":"secret needle"}}}]},"done":false}"#,
+                r#"{"model":"m","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}"#,
+            ]))
+        } else {
+            None
+        }
+    })
+    .await;
+
+    let adapter = adapter(&base);
+    let mut stream = adapter
+        .stream_chat(&pinned("m", "sha256:ddd"), &request("m"))
+        .await
+        .expect("chat started");
+    let mut got = Vec::new();
+    while let Some(event) = stream.next_event().await {
+        got.push(event.expect("stream events"));
+    }
+    assert_eq!(
+        got,
+        vec![
+            NormalizedStreamEvent::StreamStarted,
+            NormalizedStreamEvent::StructuredActivity,
+            NormalizedStreamEvent::StreamCompleted(StreamCompletionOutcome::Stop),
+        ],
+        "tool presence becomes a payload-free activity marker: {got:?}"
+    );
+    assert!(
+        !format!("{got:?}").contains("secret needle"),
+        "tool arguments never leave the parser: {got:?}"
     );
 }
 

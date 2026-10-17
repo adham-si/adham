@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConversationPanel } from './conversation-panel';
 import { ConversationSetupSlot, type ConversationSetupSlotProps } from './conversation-setup-slot';
@@ -78,6 +78,46 @@ function fakeBackend(): ConversationFakeBackend {
     }),
     clearPendingOperation: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+type PanelProvider = NonNullable<Parameters<typeof ConversationPanel>[0]['provider']>;
+
+/** Provider registry double with one pinned local model, mirroring Delivery A. */
+function registryProvider(): PanelProvider {
+  return {
+    listAccounts: vi.fn(async () => ({
+      accounts: [
+        {
+          accountId: 'acc-1',
+          alias: 'Local Ollama',
+          endpointUrl: 'http://127.0.0.1:11434',
+          privacyClass: 'local_only',
+        },
+      ],
+    })),
+    listModels: vi.fn(async () => ({
+      models: [
+        {
+          modelId: 'qwen2.5:latest',
+          digest: 'sha256:abc',
+          humanLabel: 'Qwen 2.5 (latest)',
+          privacyClass: 'local_only',
+          capabilities: {
+            streaming: 'supported',
+            structuredOutput: 'unknown',
+            toolProposals: 'unknown',
+            thinking: 'unknown',
+          },
+        },
+      ],
+    })),
+  } as unknown as PanelProvider;
+}
+
+async function pickRegistryModel(user: ReturnType<typeof userEvent.setup>) {
+  const trigger = await screen.findByRole('button', { name: 'Select a model' });
+  await user.click(trigger);
+  await user.click(await screen.findByRole('option', { name: /Qwen 2\.5 \(latest\)/i }));
 }
 
 describe('ConversationPanel', () => {
@@ -299,6 +339,246 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(screen.getAllByText('partial answer')).toHaveLength(1));
     expect(screen.getAllByText('earlier truth')).toHaveLength(1);
     await waitFor(() => expect(screen.getByRole('button', { name: /send/i })).toBeDefined());
+  });
+
+  it('shows waiting from dispatch and effectuates a stop queued before the op handle; the turn is labelled cancelled', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    const bootRows = {
+      items: [
+        {
+          messageId: 'msg-0',
+          role: 'user',
+          text: 'earlier truth',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-0',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '1',
+    };
+    const persistedRows = {
+      items: [
+        ...bootRows.items,
+        {
+          messageId: 'msg-u',
+          role: 'user',
+          text: 'hi',
+          createdAt: '2026-10-16T00:00:00Z',
+          sourceEventId: 'evt-u',
+        },
+        {
+          messageId: 'msg-a',
+          role: 'assistant',
+          text: '',
+          createdAt: '2026-10-16T00:00:01Z',
+          sourceEventId: 'evt-a',
+          completion: 'Interrupted',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '9',
+    };
+    backend.getConversation.mockReset();
+    backend.getConversation
+      .mockResolvedValueOnce(bootRows)
+      .mockResolvedValueOnce(bootRows)
+      .mockResolvedValue(persistedRows);
+    let emit: StreamEventParam | null = null;
+    let resolveDispatch!: (start: { opId: string; messageId: string }) => void;
+    backend.completeOnceStreaming = vi.fn((_ws, _p, _s, _payload, onEvent) => {
+      // Connecting: the command (and its op handle) resolves at the terminal,
+      // exactly like the real backend.
+      emit = onEvent;
+      return new Promise((resolve) => {
+        resolveDispatch = resolve;
+      });
+    });
+    backend.stopCompletion = vi.fn(async (_ws, _p, _s, opId) => {
+      emit?.({
+        opId,
+        sequence: 9,
+        event: { type: 'completed', completion: 'interrupted', truncated: false, usage: null },
+      });
+      resolveDispatch({ opId, messageId: 'm-9' });
+      return { opId, status: 'cancelled' };
+    });
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+
+    await user.type(box, 'hi');
+    await user.keyboard('{Enter}');
+
+    // Waiting begins at dispatch, before any channel event.
+    await waitFor(() => expect(screen.getByText(/waiting for the model/i)).toBeDefined());
+    // The stop affordance is reachable before any answer delta arrives.
+    const stop = screen.getByRole('button', { name: /stop generation/i });
+    await user.click(stop);
+    // No op handle yet: the intent is queued, never dropped.
+    expect(backend.stopCompletion).not.toHaveBeenCalled();
+
+    // The first event carries the handle: the queued stop fires.
+    await act(async () => {
+      emit!({ opId: 'op-9', sequence: 1, event: { type: 'started' } });
+    });
+    await waitFor(() =>
+      expect(backend.stopCompletion).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1', 'op-9'),
+    );
+
+    // The authoritative rows carry the interruption, labelled honestly.
+    await waitFor(() => expect(screen.getByText('Cancelled')).toBeDefined());
+    expect(screen.queryByText(/no answer was produced/i)).toBeNull();
+    expect(screen.queryByText(/waiting for the model/i)).toBeNull();
+  });
+
+  it('shows thinking only on real activity; the streamed answer replaces the status', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    const bootRows = { items: [], nextCursor: null, projectionPosition: '0' };
+    const persistedRows = {
+      items: [
+        {
+          messageId: 'msg-u',
+          role: 'user',
+          text: 'hi',
+          createdAt: '2026-10-16T00:00:00Z',
+          sourceEventId: 'evt-u',
+        },
+        {
+          messageId: 'msg-a',
+          role: 'assistant',
+          text: 'the answer',
+          createdAt: '2026-10-16T00:00:01Z',
+          sourceEventId: 'evt-a',
+          completion: { Completed: { truncated: false } },
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '2',
+    };
+    backend.getConversation.mockReset();
+    backend.getConversation
+      .mockResolvedValueOnce(bootRows)
+      .mockResolvedValueOnce(bootRows)
+      .mockResolvedValue(persistedRows);
+    let emit: StreamEventParam | null = null;
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
+      emit = onEvent;
+      return { opId: 'op-9', messageId: 'm-9' };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+
+    await user.type(box, 'hi');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByText(/waiting for the model/i)).toBeDefined());
+    // No activity yet: the status never claims thinking on its own.
+    expect(screen.queryByText(/thinking/i)).toBeNull();
+
+    await act(async () => {
+      emit!({ opId: 'op-9', sequence: 1, event: { type: 'thinking' } });
+    });
+    await waitFor(() => expect(screen.getByText(/thinking/i)).toBeDefined());
+
+    await act(async () => {
+      emit!({ opId: 'op-9', sequence: 2, event: { type: 'delta', text: 'the answer' } });
+    });
+    await waitFor(() => expect(screen.getAllByText('the answer')).toHaveLength(1));
+    expect(screen.queryByText(/thinking/i)).toBeNull();
+    expect(screen.queryByText(/waiting for the model/i)).toBeNull();
+
+    await act(async () => {
+      emit!({
+        opId: 'op-9',
+        sequence: 3,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+    });
+    // Handoff is exact: one rendering of the answer, and a normal completion
+    // carries no lifecycle note.
+    await waitFor(() => expect(screen.getAllByText('the answer')).toHaveLength(1));
+    expect(screen.queryByText(/truncated by the length limit/i)).toBeNull();
+    expect(screen.queryByText('Cancelled')).toBeNull();
+  });
+
+  it('labels persisted failed, cancelled, and truncated turns from the stored completion only', async () => {
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValue({
+      items: [
+        {
+          messageId: 'm1',
+          role: 'user',
+          text: 'did it work?',
+          createdAt: '2026-10-16T00:00:00Z',
+          sourceEventId: 'e1',
+        },
+        {
+          messageId: 'm2',
+          role: 'assistant',
+          text: '',
+          createdAt: '2026-10-16T00:00:01Z',
+          sourceEventId: 'e2',
+          completion: 'Failed',
+        },
+        {
+          messageId: 'm3',
+          role: 'assistant',
+          text: 'half',
+          createdAt: '2026-10-16T00:00:02Z',
+          sourceEventId: 'e3',
+          completion: { Completed: { truncated: true } },
+        },
+        {
+          messageId: 'm4',
+          role: 'assistant',
+          text: 'partial',
+          createdAt: '2026-10-16T00:00:03Z',
+          sourceEventId: 'e4',
+          completion: 'Interrupted',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '4',
+    });
+    render(<ConversationPanel backend={backend} />);
+
+    await screen.findByText('No answer was produced.');
+    expect(screen.getByText('Truncated by the length limit.')).toBeDefined();
+    expect(screen.getByText('Cancelled')).toBeDefined();
+  });
+
+  it('rejects a same-frame double send visibly instead of a silent no-op', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.completeOnceStreaming = vi.fn(
+      (_ws, _p, _s, _payload, _onEvent) =>
+        new Promise<{ opId: string; messageId: string }>(() => {}),
+    );
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+    await user.type(box, 'hi');
+
+    // Two Enter presses in one React batch (no re-render in between): the
+    // controller boundary rejects the second dispatch.
+    await act(async () => {
+      fireEvent.keyDown(box, { key: 'Enter' });
+      fireEvent.keyDown(box, { key: 'Enter' });
+    });
+
+    expect(backend.completeOnceStreaming).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText(/already being saved/i)).toBeDefined());
   });
 
   it('keeps the answer as a recovery snapshot on a failed terminal reload; the retry replaces it without rerunning the dispatch', async () => {

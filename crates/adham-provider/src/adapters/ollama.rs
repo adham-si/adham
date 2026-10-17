@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 pub struct OllamaChatMessage {
     pub role: Option<String>,
     pub content: Option<String>,
+    /// Reasoning-model chain-of-thought; never leaves the parser as text.
+    pub thinking: Option<String>,
+    /// Tool/structured output; only presence is observed (never content).
+    pub tool_calls: Option<Vec<serde_json::Value>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -37,6 +41,18 @@ impl OllamaStreamParser {
         let mut events = Vec::new();
 
         if let Some(msg) = chunk.message {
+            if msg.thinking.as_deref().is_some_and(|t| !t.is_empty()) {
+                // activity marker only: the reasoning text itself is dropped here
+                events.push(NormalizedStreamEvent::ThinkingActivity);
+            }
+            if msg
+                .tool_calls
+                .as_deref()
+                .is_some_and(|calls| !calls.is_empty())
+            {
+                // presence only: call payloads are neither logged nor stored
+                events.push(NormalizedStreamEvent::StructuredActivity);
+            }
             if let Some(content) = msg.content {
                 if !content.is_empty() {
                     events.push(NormalizedStreamEvent::TextDelta(content));
@@ -55,12 +71,18 @@ impl OllamaStreamParser {
         }
 
         if chunk.done {
-            // done_reason is authoritative for terminal semantics: `length`
-            // means generation hit num_predict (truncated), everything else
-            // (including a missing reason on older daemons) is a clean stop.
+            // done_reason is authoritative on a valid terminal (done:true)
+            // frame: `length` means num_predict truncated the answer. A
+            // missing reason keeps legacy compatibility for older daemons,
+            // but an explicit reason this build does not know is never a
+            // successful stop.
             let outcome = match chunk.done_reason.as_deref() {
+                Some("stop") | None => StreamCompletionOutcome::Stop,
                 Some("length") => StreamCompletionOutcome::LengthExceeded,
-                _ => StreamCompletionOutcome::Stop,
+                Some(reason) => StreamCompletionOutcome::Unknown {
+                    // bounded: provider-controlled metadata, never reasoning text
+                    reason: reason.chars().take(64).collect(),
+                },
             };
             events.push(NormalizedStreamEvent::StreamCompleted(outcome));
         }
