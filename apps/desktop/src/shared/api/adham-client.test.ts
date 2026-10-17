@@ -344,6 +344,15 @@ describe('IPC contract fixture (cross-language)', () => {
                   structuredOutput: 'unknown',
                   toolProposals: 'supported',
                   thinking: 'unknown',
+                  imageInput: 'supported',
+                },
+                contextLimit: 131072,
+                configuredContext: 8192,
+                effectiveContextBudget: 8192,
+                evidence: {
+                  source: 'ollama /api/show',
+                  serverVersion: '0.12.3',
+                  observedAt: '2026-10-17T00:00:00Z',
                 },
               },
             ],
@@ -366,6 +375,8 @@ describe('IPC contract fixture (cross-language)', () => {
       sessionId: 'sess',
     });
     expect(models.models[0]?.capabilities.streaming).toBe('supported');
+    expect(models.models[0]?.effectiveContextBudget).toBe(8192);
+    expect(models.models[0]?.evidence.serverVersion).toBe('0.12.3');
     const stop = await client.stopCompletion('ws', 'proj', 'sess', 'op-1');
     expect(stop.status).toBe('cancelled');
 

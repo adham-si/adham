@@ -12,7 +12,9 @@ use crate::adapters::ollama::OllamaStreamParser;
 use crate::domain::account::PrivacyClass;
 use crate::domain::endpoint::EndpointDescriptor;
 use crate::domain::error::ProviderError;
-use crate::domain::model::{CapabilityStatus, ModelCapabilities, ModelDescriptor, ModelId};
+use crate::domain::model::{
+    CapabilityStatus, ModelCapabilities, ModelDescriptor, ModelEvidence, ModelId,
+};
 use crate::domain::request::{MessageRole, ProviderRequestV1};
 use crate::domain::stream::NormalizedStreamEvent;
 use crate::registry::PinnedModel;
@@ -42,15 +44,25 @@ impl OllamaHttpAdapter {
     }
 
     /// `GET /api/tags` + `POST /api/show` per model: digest pins the local
-    /// blob; `/api/show` capabilities become the tri-state. A model whose
-    /// `/api/show` call fails is still listed, with unknown capabilities
-    /// (unverifiable stays unverifiable — never claimed as present).
+    /// blob; `/api/show` capabilities/limits become the tri-states, and the
+    /// descriptor records where and when that evidence was observed. A model
+    /// whose `/api/show` call fails is still listed, with unknown
+    /// capabilities (unverifiable stays unverifiable — never claimed).
     pub async fn discover(&self) -> Result<Vec<PinnedModel>, ProviderError> {
         let tags = self
             .transport
             .get_json(&format!("{}/api/tags", self.base_url))
             .await
             .map_err(transport_err)?;
+
+        // Advisory evidence only: an older daemon without /api/version must
+        // not fail discovery; the absence is recorded, not guessed.
+        let server_version = self
+            .transport
+            .get_json(&format!("{}/api/version", self.base_url))
+            .await
+            .ok()
+            .and_then(|v| v.get("version").and_then(Value::as_str).map(str::to_string));
 
         let mut out = Vec::new();
         let entries = tags
@@ -69,7 +81,7 @@ impl OllamaHttpAdapter {
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .to_string();
-            let capabilities = match self
+            let wire = match self
                 .transport
                 .post_json_document(
                     &format!("{}/api/show", self.base_url),
@@ -77,8 +89,8 @@ impl OllamaHttpAdapter {
                 )
                 .await
             {
-                Ok(show) => map_show_capabilities(&show),
-                Err(TransportError::Status(_, _)) => ModelCapabilities::default(),
+                Ok(show) => map_show(&show),
+                Err(TransportError::Status(_, _)) => WireEvidence::unavailable(),
                 Err(e) => return Err(transport_err(e)),
             };
             out.push(PinnedModel {
@@ -88,7 +100,14 @@ impl OllamaHttpAdapter {
                     model_id: ModelId::new(name),
                     human_label: name.to_string(),
                     privacy_class: PrivacyClass::LocalOnly,
-                    capabilities,
+                    capabilities: wire.capabilities,
+                    evidence: ModelEvidence {
+                        source: "ollama /api/show".into(),
+                        server_version: server_version.clone(),
+                        observed_at_us: now_us(),
+                    },
+                    context_limit: wire.context_limit,
+                    configured_context: wire.configured_context,
                 },
             });
         }
@@ -152,36 +171,109 @@ fn is_loopback_base(url: &str) -> bool {
     )
 }
 
-/// wire → tri-state. `streaming` is protocol-structural for `/api/chat`
-/// (Ollama's only transport); the rest come from the `capabilities` list,
-/// with anything absent left unknown — unknown never upgrades itself.
-fn map_show_capabilities(show: &Value) -> ModelCapabilities {
+/// `/api/show` → descriptor claims. Every claim names its evidence basis:
+/// the `capabilities` array (an absent array is no evidence at all — older
+/// daemons), `model_info` for the model's maximum context, and the
+/// `parameters` block for an endpoint-configured `num_ctx`.
+struct WireEvidence {
+    capabilities: ModelCapabilities,
+    context_limit: Option<u32>,
+    configured_context: Option<u32>,
+}
+
+impl WireEvidence {
+    /// `/api/show` failed with a status: nothing may be claimed except what
+    /// the transport itself proves — `/api/chat` streams for every listed
+    /// Ollama model (protocol-structural, not a per-model claim).
+    fn unavailable() -> Self {
+        Self {
+            capabilities: ModelCapabilities {
+                streaming: CapabilityStatus::Supported,
+                ..ModelCapabilities::default()
+            },
+            context_limit: None,
+            configured_context: None,
+        }
+    }
+}
+
+fn map_show(show: &Value) -> WireEvidence {
+    // A `capabilities` array present on the wire is the server stating what
+    // this model supports; an absent array (older daemon) is no evidence and
+    // every member stays unknown.
+    let caps_known = show.get("capabilities").and_then(Value::as_array).is_some();
     let caps: Vec<&str> = show
         .get("capabilities")
         .and_then(Value::as_array)
         .map(|a| a.iter().filter_map(Value::as_str).collect())
         .unwrap_or_default();
     let has = |name: &str| caps.contains(&name);
-    let truth = |present: bool| {
-        if present {
+    let evidenced = |present: bool| {
+        if !caps_known {
+            CapabilityStatus::Unknown
+        } else if present {
             CapabilityStatus::Supported
         } else {
             CapabilityStatus::Unsupported
         }
     };
-    ModelCapabilities {
-        streaming: CapabilityStatus::Supported,
-        // no wire evidence in /api/show for structured output — stays unknown
-        structured_output: CapabilityStatus::Unknown,
-        tool_proposals: truth(has("tools")),
-        // `thinking` capability absent ⇒ not evidenced (could be true on some
-        // models); unknown blocks feature use rather than guessing
-        thinking: if has("thinking") {
-            CapabilityStatus::Supported
-        } else {
-            CapabilityStatus::Unknown
+    WireEvidence {
+        capabilities: ModelCapabilities {
+            // /api/chat is Ollama's only transport and streams for every
+            // listed model: structural to this endpoint, not a per-model claim.
+            streaming: CapabilityStatus::Supported,
+            // no wire evidence in /api/show for structured output — stays unknown
+            structured_output: CapabilityStatus::Unknown,
+            tool_proposals: evidenced(has("tools")),
+            // `thinking` absent stays unknown even with the array present:
+            // the field is newer than some valid thinking models, so absence
+            // is not proof of unsupported (unknown blocks feature use).
+            thinking: if has("thinking") {
+                CapabilityStatus::Supported
+            } else {
+                CapabilityStatus::Unknown
+            },
+            image_input: evidenced(has("vision")),
         },
+        context_limit: context_length(show),
+        configured_context: configured_context(show),
     }
+}
+
+/// Model maximum context from `/api/show` `model_info`; the architecture
+/// prefix (`llama.`, `qwen3.`, …) varies per family, so match the suffix.
+fn context_length(show: &Value) -> Option<u32> {
+    let info = show.get("model_info")?.as_object()?;
+    info.iter().find_map(|(key, value)| {
+        if key.ends_with(".context_length") {
+            value.as_u64().and_then(|n| u32::try_from(n).ok())
+        } else {
+            None
+        }
+    })
+}
+
+/// `num_ctx` from the `/api/show` `parameters` block (Modelfile default),
+/// e.g. "num_ctx 8192\nstop \"<|im_end|>\"". The server-wide context default
+/// is not exposed by the API: absent stays unknown, never a 4096 guess.
+fn configured_context(show: &Value) -> Option<u32> {
+    let raw = show.get("parameters")?;
+    let text = match raw {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    };
+    text.lines().find_map(|line| {
+        let mut parts = line.split_whitespace();
+        if parts.next() != Some("num_ctx") {
+            return None;
+        }
+        parts.next().and_then(|v| v.parse::<u32>().ok())
+    })
+}
+
+fn now_us() -> i64 {
+    // Repo timestamp convention (see event-log): micros since Unix epoch UTC.
+    (time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64
 }
 
 fn chat_request_body(pinned: &PinnedModel, request: &ProviderRequestV1) -> Value {

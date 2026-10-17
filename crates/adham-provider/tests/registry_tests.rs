@@ -40,6 +40,9 @@ fn descriptor(id: &str) -> ModelDescriptor {
             streaming: CapabilityStatus::Supported,
             ..Default::default()
         },
+        evidence: Default::default(),
+        context_limit: None,
+        configured_context: None,
     }
 }
 

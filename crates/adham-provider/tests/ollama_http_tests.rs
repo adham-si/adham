@@ -105,7 +105,7 @@ fn adapter(base: &str) -> OllamaHttpAdapter {
 }
 
 fn pinned(model_id: &str, digest: &str) -> PinnedModel {
-    use adham_provider::domain::model::{ModelCapabilities, ModelDescriptor};
+    use adham_provider::domain::model::{ModelCapabilities, ModelDescriptor, ModelEvidence};
     PinnedModel {
         model_id: ModelId::new(model_id),
         digest: digest.into(),
@@ -114,6 +114,9 @@ fn pinned(model_id: &str, digest: &str) -> PinnedModel {
             human_label: model_id.into(),
             privacy_class: PrivacyClass::LocalOnly,
             capabilities: ModelCapabilities::default(),
+            evidence: ModelEvidence::default(),
+            context_limit: None,
+            configured_context: None,
         },
     }
 }
@@ -147,6 +150,7 @@ async fn discover_pins_digests_and_maps_show_capabilities() {
                 {"name": "smol:latest", "digest": "sha256:bbb", "size": 50}
             ]
         }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.12.3"}))),
         "/api/show" => Some(http_200_json(&json!({
             "capabilities": ["completion", "tools"]
         }))),
@@ -168,6 +172,71 @@ async fn discover_pins_digests_and_maps_show_capabilities() {
         models[0].descriptor.capabilities.streaming,
         CapabilityStatus::Supported
     );
+    // A capabilities array present without "vision" is the server stating
+    // image input is unsupported — absence is evidence here, not unknown.
+    assert_eq!(
+        models[0].descriptor.capabilities.image_input,
+        CapabilityStatus::Unsupported
+    );
+}
+
+#[tokio::test]
+async fn discover_maps_show_evidence_limits_and_modalities() {
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "qwen3.5:0.8b", "digest": "sha256:qqq", "size": 100}]
+        }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.12.3"}))),
+        "/api/show" => Some(http_200_json(&json!({
+            "capabilities": ["completion", "tools", "vision", "thinking"],
+            "model_info": {"qwen3.context_length": 131072},
+            "parameters": "num_ctx 8192\nstop \"<|im_end|>\""
+        }))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    let descriptor = &models[0].descriptor;
+    assert_eq!(
+        descriptor.capabilities.thinking,
+        CapabilityStatus::Supported
+    );
+    assert_eq!(
+        descriptor.capabilities.image_input,
+        CapabilityStatus::Supported
+    );
+    // model maximum from model_info; configured num_ctx from parameters
+    assert_eq!(descriptor.context_limit, Some(131072));
+    assert_eq!(descriptor.configured_context, Some(8192));
+    assert_eq!(descriptor.evidence.source, "ollama /api/show");
+    assert_eq!(
+        descriptor.evidence.server_version.as_deref(),
+        Some("0.12.3")
+    );
+    assert!(
+        descriptor.evidence.observed_at_us > 0,
+        "observation time must be recorded"
+    );
+}
+
+#[tokio::test]
+async fn discover_tolerates_an_unavailable_version_endpoint() {
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "llama3.2:latest", "digest": "sha256:aaa", "size": 100}]
+        }))),
+        // old daemons lack /api/version: a status error must not fail discovery
+        "/api/version" => Some(http_500()),
+        "/api/show" => Some(http_200_json(&json!({"capabilities": ["completion"]}))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    assert_eq!(models.len(), 1);
+    assert_eq!(models[0].descriptor.evidence.server_version, None);
+    assert!(models[0].descriptor.evidence.observed_at_us > 0);
 }
 
 #[tokio::test]
@@ -176,6 +245,7 @@ async fn discover_marks_capabilities_unknown_when_show_fails() {
         "/api/tags" => Some(http_200_json(&json!({
             "models": [{"name": "llama3.2:latest", "digest": "sha256:aaa", "size": 100}]
         }))),
+        "/api/version" => Some(http_500()),
         "/api/show" => Some(http_500()),
         _ => None,
     })
@@ -189,6 +259,18 @@ async fn discover_marks_capabilities_unknown_when_show_fails() {
         models[0].descriptor.capabilities.tool_proposals,
         CapabilityStatus::Unknown
     );
+    assert_eq!(
+        models[0].descriptor.capabilities.image_input,
+        CapabilityStatus::Unknown
+    );
+    // nothing beyond the transport-structural stream claim may be asserted
+    assert_eq!(
+        models[0].descriptor.capabilities.streaming,
+        CapabilityStatus::Supported
+    );
+    assert_eq!(models[0].descriptor.context_limit, None);
+    assert_eq!(models[0].descriptor.configured_context, None);
+    assert!(models[0].descriptor.evidence.observed_at_us > 0);
 }
 
 // --- 2. chat stream: deltas in order, StreamStarted first, usage on final ------

@@ -38,7 +38,12 @@ const modelDto = () => ({
     structuredOutput: 'unknown' as const,
     toolProposals: 'unknown' as const,
     thinking: 'unknown' as const,
+    imageInput: 'unknown' as const,
   },
+  contextLimit: null,
+  configuredContext: null,
+  effectiveContextBudget: null,
+  evidence: { source: '', serverVersion: null, observedAt: null },
 });
 
 function renderPage() {

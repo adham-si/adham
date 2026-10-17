@@ -338,7 +338,8 @@ impl ChatProgram {
 }
 
 const TAGS_BODY: &str = r#"{"models":[{"name":"m:latest","digest":"sha256:unittest-digest"},{"name":"tiny2:1b","digest":""}]}"#;
-const SHOW_BODY: &str = r#"{"capabilities":["streaming","tools"]}"#;
+const VERSION_BODY: &str = r#"{"version":"0.12.3"}"#;
+const SHOW_BODY: &str = r#"{"capabilities":["completion","tools"],"model_info":{"llama.context_length":131072},"parameters":"num_ctx 8192"}"#;
 
 /// Minimal loopback Ollama stub. `/api/chat` bodies stream chunked so a
 /// mid-stream stall is representable (no content-length lie).
@@ -408,7 +409,20 @@ fn spawn_stub_ollama(
 
             let response: Vec<u8> = match path.as_str() {
                 "/api/tags" => http_ok("application/json", TAGS_BODY.as_bytes()),
-                "/api/show" => http_ok("application/json", SHOW_BODY.as_bytes()),
+                "/api/version" => http_ok("application/json", VERSION_BODY.as_bytes()),
+                "/api/show" => {
+                    // per-model show: tiny2 evidences only the model maximum,
+                    // so its effective budget must stay unclaimed
+                    let body = String::from_utf8_lossy(&request_body);
+                    if body.contains("tiny2") {
+                        http_ok(
+                            "application/json",
+                            br#"{"capabilities":["completion"],"model_info":{"llama.context_length":131072}}"#,
+                        )
+                    } else {
+                        http_ok("application/json", SHOW_BODY.as_bytes())
+                    }
+                }
                 "/api/chat" => {
                     // from the socket's side: is the pending op already durable?
                     if let Some(pool) = &observe_pool {
@@ -574,6 +588,9 @@ fn model_descriptor(id: &str) -> ModelDescriptor {
         human_label: id.to_string(),
         privacy_class: PrivacyClass::LocalOnly,
         capabilities: Default::default(),
+        evidence: Default::default(),
+        context_limit: None,
+        configured_context: None,
     }
 }
 
@@ -906,11 +923,29 @@ fn account_lifecycle_and_discovery_pins_models() {
     assert_eq!(pinned["capabilities"]["streaming"], json!("supported"));
     assert_eq!(pinned["capabilities"]["toolProposals"], json!("supported"));
     assert_eq!(pinned["capabilities"]["thinking"], json!("unknown"));
+    // a present capabilities array without "vision" evidences unsupported
+    assert_eq!(pinned["capabilities"]["imageInput"], json!("unsupported"));
+    assert_eq!(pinned["contextLimit"], json!(131072));
+    assert_eq!(pinned["configuredContext"], json!(8192));
+    assert_eq!(pinned["effectiveContextBudget"], json!(8192));
+    assert_eq!(pinned["evidence"]["source"], json!("ollama /api/show"));
+    assert_eq!(pinned["evidence"]["serverVersion"], json!("0.12.3"));
+    assert!(
+        pinned["evidence"]["observedAt"]
+            .as_str()
+            .is_some_and(|s| s.ends_with('Z')),
+        "observedAt must be RFC3339 UTC: {pinned}"
+    );
     let empty = models
         .iter()
         .find(|m| m["modelId"] == json!("tiny2:1b"))
         .expect("tiny2 pinned");
     assert_eq!(empty["digest"], json!(""));
+    // only the model maximum is evidenced: no configured context, and the
+    // effective budget stays unclaimed rather than overstating
+    assert_eq!(empty["contextLimit"], json!(131072));
+    assert_eq!(empty["configuredContext"], json!(null));
+    assert_eq!(empty["effectiveContextBudget"], json!(null));
 
     // alias-only update keeps the endpoint
     let response = invoke(

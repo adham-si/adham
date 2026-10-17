@@ -169,6 +169,13 @@ export const ProviderCapabilitiesDtoSchema = z.object({
   structuredOutput: z.enum(['supported', 'unsupported', 'unknown']),
   toolProposals: z.enum(['supported', 'unsupported', 'unknown']),
   thinking: z.enum(['supported', 'unsupported', 'unknown']),
+  imageInput: z.enum(['supported', 'unsupported', 'unknown']),
+});
+
+export const ProviderModelEvidenceDtoSchema = z.object({
+  source: z.string(),
+  serverVersion: z.string().nullable(),
+  observedAt: z.string().nullable(),
 });
 
 export const ProviderModelDtoSchema = z.object({
@@ -177,6 +184,10 @@ export const ProviderModelDtoSchema = z.object({
   humanLabel: z.string(),
   privacyClass: z.string(),
   capabilities: ProviderCapabilitiesDtoSchema,
+  contextLimit: z.number().int().positive().nullable(),
+  configuredContext: z.number().int().positive().nullable(),
+  effectiveContextBudget: z.number().int().positive().nullable(),
+  evidence: ProviderModelEvidenceDtoSchema,
 });
 
 export const ProviderModelsListSchema = z.object({

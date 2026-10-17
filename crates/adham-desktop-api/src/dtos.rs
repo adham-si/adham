@@ -413,6 +413,20 @@ pub struct ProviderCapabilitiesDto {
     pub structured_output: String,
     pub tool_proposals: String,
     pub thinking: String,
+    /// Image input (vision); unknown never renders as unsupported.
+    pub image_input: String,
+}
+
+/// Where a model descriptor's claims came from; empty source = legacy row.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProviderModelEvidenceDto {
+    pub source: String,
+    pub server_version: Option<String>,
+    /// RFC3339 UTC when discovery observed this descriptor; None means never
+    /// observed (legacy stored row) and must render as unknown, not fresh.
+    pub observed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -424,6 +438,13 @@ pub struct ProviderModelDto {
     pub human_label: String,
     pub privacy_class: String,
     pub capabilities: ProviderCapabilitiesDto,
+    /// Model maximum context in tokens (model metadata), when evidenced.
+    pub context_limit: Option<u32>,
+    /// Endpoint-configured context (e.g. Modelfile num_ctx), when reported.
+    pub configured_context: Option<u32>,
+    /// Model max ∩ configured context; None when either bound is unknown.
+    pub effective_context_budget: Option<u32>,
+    pub evidence: ProviderModelEvidenceDto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

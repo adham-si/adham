@@ -154,9 +154,32 @@ export type UpdateProviderAccountPayload = { accountId: string | null, alias: st
 
 export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl: string, privacyClass: string, };
 
-export type ProviderModelDto = { modelId: string, digest: string, humanLabel: string, privacyClass: string, capabilities: ProviderCapabilitiesDto, };
+export type ProviderModelDto = { modelId: string, digest: string, humanLabel: string, privacyClass: string, capabilities: ProviderCapabilitiesDto, 
+/**
+ * Model maximum context in tokens (model metadata), when evidenced.
+ */
+contextLimit: number | null, 
+/**
+ * Endpoint-configured context (e.g. Modelfile num_ctx), when reported.
+ */
+configuredContext: number | null, 
+/**
+ * Model max ∩ configured context; None when either bound is unknown.
+ */
+effectiveContextBudget: number | null, evidence: ProviderModelEvidenceDto, };
 
-export type ProviderCapabilitiesDto = { streaming: string, structuredOutput: string, toolProposals: string, thinking: string, };
+export type ProviderCapabilitiesDto = { streaming: string, structuredOutput: string, toolProposals: string, thinking: string, 
+/**
+ * Image input (vision); unknown never renders as unsupported.
+ */
+imageInput: string, };
+
+export type ProviderModelEvidenceDto = { source: string, serverVersion: string | null, 
+/**
+ * RFC3339 UTC when discovery observed this descriptor; None means never
+ * observed (legacy stored row) and must render as unknown, not fresh.
+ */
+observedAt: string | null, };
 
 export type ProviderModelsList = { models: Array<ProviderModelDto>, };
 

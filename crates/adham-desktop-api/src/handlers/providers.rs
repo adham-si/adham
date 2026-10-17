@@ -204,7 +204,41 @@ fn provider_model_dto(descriptor: &ModelDescriptor, digest: &str) -> ProviderMod
             structured_output: cap_str(descriptor.capabilities.structured_output).to_string(),
             tool_proposals: cap_str(descriptor.capabilities.tool_proposals).to_string(),
             thinking: cap_str(descriptor.capabilities.thinking).to_string(),
+            image_input: cap_str(descriptor.capabilities.image_input).to_string(),
         },
+        context_limit: descriptor.context_limit,
+        configured_context: descriptor.configured_context,
+        effective_context_budget: effective_context_budget(descriptor),
+        evidence: ProviderModelEvidenceDto {
+            source: descriptor.evidence.source.clone(),
+            server_version: descriptor.evidence.server_version.clone(),
+            observed_at: format_observed_at(descriptor.evidence.observed_at_us),
+        },
+    }
+}
+
+/// Micros → RFC3339 UTC (the DTO timestamp convention). Zero/negative means
+/// never observed → None, never a fabricated epoch date.
+fn format_observed_at(observed_at_us: i64) -> Option<String> {
+    if observed_at_us <= 0 {
+        return None;
+    }
+    let dt =
+        time::OffsetDateTime::from_unix_timestamp_nanos((observed_at_us * 1_000) as i128).ok()?;
+    Some(
+        dt.format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default(),
+    )
+}
+
+/// The request-time budget is only claimed when both bounds are evidenced —
+/// the model maximum and the endpoint-configured context. Either one alone
+/// overstates: the server-wide default is not queryable, and a configured
+/// value above the model maximum is not a real budget.
+fn effective_context_budget(descriptor: &ModelDescriptor) -> Option<u32> {
+    match (descriptor.context_limit, descriptor.configured_context) {
+        (Some(model_max), Some(configured)) => Some(model_max.min(configured)),
+        _ => None,
     }
 }
 
