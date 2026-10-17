@@ -40,19 +40,24 @@ const TEST_MODELS: ModelOption[] = [
 ];
 
 describe('ComposeModeSelector', () => {
-  it('keeps ask/plan/code selectable and disables execute with the runtime reason', () => {
+  it('selects ask/plan/code from the dropdown and explains the unavailable execute', () => {
     const onChangeMode = vi.fn();
     render(<ComposeModeSelector mode="plan" onChangeMode={onChangeMode} />);
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Ask' }));
-    expect(onChangeMode).toHaveBeenCalledWith('ask');
-    fireEvent.click(screen.getByRole('radio', { name: 'Code' }));
-    expect(onChangeMode).toHaveBeenCalledWith('code');
+    // Trigger reads the current mode; the menu carries the choices.
+    const trigger = screen.getByRole('button', { name: /execution mode/i });
+    expect(trigger.textContent).toContain('Plan');
+    fireEvent.click(trigger);
 
-    // Execute has no policy/tool runtime: it is not selectable and says why.
-    const execute = screen.getByRole('radio', { name: 'Execute' }) as HTMLButtonElement;
-    expect(execute.disabled).toBe(true);
-    expect(execute.getAttribute('title')).toMatch(/policy and tool runtime/i);
+    fireEvent.click(screen.getByRole('option', { name: /ask/i }));
+    expect(onChangeMode).toHaveBeenCalledWith('ask');
+
+    // Re-open for the unavailable entry: focusable, explained, refused.
+    fireEvent.click(trigger);
+    const execute = screen.getByRole('option', { name: /execute/i });
+    expect(execute.getAttribute('aria-disabled')).toBe('true');
+    expect(execute.textContent).toMatch(/policy and tool runtime/i);
+    fireEvent.click(execute);
     expect(onChangeMode).not.toHaveBeenCalledWith('execute');
   });
 });

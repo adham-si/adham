@@ -24,6 +24,7 @@ import {
 import { useSelection, type SelectionBackend } from '../workspace-selection';
 import { ConversationSetupSlot } from './conversation-setup-slot';
 import { submissionNotice } from './submission-notice';
+import { readComposeModePreference, writeComposeModePreference } from './compose-mode-preference';
 import {
   PendingRecoveryBanner,
   PendingRecoveryReviewDialog,
@@ -127,7 +128,13 @@ export function ConversationPanel({
   const draftRef = React.useRef(draft);
   draftRef.current = draft;
 
-  const [mode, setMode] = React.useState<ComposeMode>('plan');
+  // Last-used mode is restored across launches; the previous default ('plan')
+  // only applies on first run or after a stale/unreadable value.
+  const [mode, setMode] = React.useState<ComposeMode>(() => readComposeModePreference() ?? 'plan');
+  const handleChangeMode = React.useCallback((next: ComposeMode) => {
+    setMode(next);
+    writeComposeModePreference(next);
+  }, []);
   // Model choice is explicit: '' until the user picks from the registry, and
   // discovery order never becomes a silent default.
   const [selectedModelId, setSelectedModelId] = React.useState('');
@@ -495,7 +502,7 @@ export function ConversationPanel({
           status={composeStatus}
           enterToSend={enterToSend}
           mode={mode}
-          onChangeMode={setMode}
+          onChangeMode={handleChangeMode}
           selectedModelId={selectedModelId}
           onSelectModel={setSelectedModelId}
           models={pickerModels}

@@ -221,20 +221,26 @@ describe('ConversationPanel', () => {
   });
 
   it('disables execute mode with the runtime explanation instead of offering a turn', async () => {
+    const user = userEvent.setup();
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
     await screen.findByRole('textbox', { name: /composer input/i });
 
-    // No policy/tool runtime exists to execute under: the mode is not
-    // enterable, and the reason rides on the control itself.
-    const execute = screen.getByRole('radio', { name: /execute/i }) as HTMLButtonElement;
-    expect(execute.disabled).toBe(true);
-    expect(execute.getAttribute('title')).toMatch(/policy and tool runtime/i);
-    expect(execute.getAttribute('aria-checked')).toBe('false');
+    // No policy/tool runtime exists to execute under: the entry is present
+    // for discoverability, explains itself, and refuses activation.
+    const trigger = screen.getByRole('button', { name: /execution mode/i });
+    const before = trigger.getAttribute('aria-label');
+    await user.click(trigger);
+    const execute = screen.getByRole('option', { name: /execute/i });
+    expect(execute.getAttribute('aria-disabled')).toBe('true');
+    expect(execute.textContent).toMatch(/policy and tool runtime/i);
+    await user.click(execute);
+    expect(trigger.getAttribute('aria-label')).toBe(before);
+    expect(window.localStorage.getItem('adham:compose:mode')).toBeNull();
     expect(screen.queryByText(/Verified sandbox execution/i)).toBeNull();
   });
 
-  it('dispatches the selected mode with the turn', async () => {
+  it('dispatches the selected mode with the turn and remembers it', async () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
     backend.getConversation.mockResolvedValue({
@@ -260,12 +266,30 @@ describe('ConversationPanel', () => {
     })) as HTMLTextAreaElement;
     await pickRegistryModel(user);
 
-    await user.click(screen.getByRole('radio', { name: /ask/i }));
+    await user.click(screen.getByRole('button', { name: /execution mode/i }));
+    await user.click(screen.getByRole('option', { name: /ask/i }));
     await user.type(box, 'a question');
     await user.keyboard('{Enter}');
 
     await waitFor(() => expect(payloads).toHaveLength(1));
     expect(payloads[0]!.mode).toBe('ask');
+    expect(window.localStorage.getItem('adham:compose:mode')).toBe('ask');
+  });
+
+  it('restores the last used mode and never restores execute', async () => {
+    window.localStorage.setItem('adham:compose:mode', 'execute');
+    render(<ConversationPanel backend={fakeBackend()} />);
+    await screen.findByRole('textbox', { name: /composer input/i });
+    // A stored execute is stale: it is not selectable, so the first-run
+    // default applies instead of resurrecting an unavailable mode.
+    expect(
+      screen.getByRole('button', { name: /execution mode/i }).getAttribute('aria-label'),
+    ).toMatch(/plan/i);
+
+    window.localStorage.setItem('adham:compose:mode', 'code');
+    render(<ConversationPanel backend={fakeBackend()} />);
+    const triggers = await screen.findAllByRole('button', { name: /execution mode/i });
+    expect(triggers.at(-1)!.getAttribute('aria-label')).toMatch(/code/i);
   });
 
   it('does not offer a Stop affordance in the text-only fallback flow', async () => {
