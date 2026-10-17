@@ -99,7 +99,7 @@ describe('SettingsPage Component', () => {
     // A visible id renders its page: the working Ollama section is here.
     expect(
       screen.getByText(
-        'Configure default intelligence runtimes, model parameters, and automatic fallback chains.',
+        'Models discovered from your registered Ollama endpoint. Nothing is assigned as default; there is no fallback chain.',
       ),
     ).not.toBeNull();
   });
