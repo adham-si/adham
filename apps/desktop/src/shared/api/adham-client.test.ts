@@ -410,9 +410,11 @@ describe('IPC contract fixture (cross-language)', () => {
   it('streams through the tauri channel with schema validation', async () => {
     vi.mocked(invoke).mockReset();
     const sinkRef = vi.fn();
+    const payloads: Array<Record<string, unknown>> = [];
     channelSinks.length = 0;
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {
       expect(cmd).toBe('complete_once_streaming');
+      payloads.push((args as { request: { payload: Record<string, unknown> } }).request.payload);
       // backend fans events into the registered channel sink
       channelSinks[0]?.({ opId: 'op-1', sequence: 1, event: { type: 'started' } });
       channelSinks[0]?.({ opId: 'op-1', sequence: 2, event: { type: 'delta', text: 'hello' } });
@@ -425,10 +427,11 @@ describe('IPC contract fixture (cross-language)', () => {
       'ws',
       'proj',
       'sess',
-      { accountId: 'acc', modelId: 'm:latest', text: 'q' },
+      { accountId: 'acc', modelId: 'm:latest', text: 'q', mode: 'plan' },
       (event) => received.push(event as unknown as { sequence: number; event: { type: string } }),
     );
     expect(start.opId).toBe('op-1');
+    expect(payloads[0]?.mode).toBe('plan');
     expect(received.map((r) => r.sequence)).toEqual([1, 2]);
     expect(received[1]?.event.type).toBe('delta');
     expect(sinkRef).not.toHaveBeenCalled();

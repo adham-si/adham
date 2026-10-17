@@ -7,6 +7,7 @@ import {
   isRtlText,
   ComposeContextChips,
   ComposeModelPicker,
+  ComposeModeSelector,
   ComposeStatusStrip,
   ComposeApprovalBar,
   migratePendingDraft,
@@ -37,6 +38,24 @@ const TEST_MODELS: ModelOption[] = [
     supportsReasoning: true,
   },
 ];
+
+describe('ComposeModeSelector', () => {
+  it('keeps ask/plan/code selectable and disables execute with the runtime reason', () => {
+    const onChangeMode = vi.fn();
+    render(<ComposeModeSelector mode="plan" onChangeMode={onChangeMode} />);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Ask' }));
+    expect(onChangeMode).toHaveBeenCalledWith('ask');
+    fireEvent.click(screen.getByRole('radio', { name: 'Code' }));
+    expect(onChangeMode).toHaveBeenCalledWith('code');
+
+    // Execute has no policy/tool runtime: it is not selectable and says why.
+    const execute = screen.getByRole('radio', { name: 'Execute' }) as HTMLButtonElement;
+    expect(execute.disabled).toBe(true);
+    expect(execute.getAttribute('title')).toMatch(/policy and tool runtime/i);
+    expect(onChangeMode).not.toHaveBeenCalledWith('execute');
+  });
+});
 
 describe('useComposeState', () => {
   it('handles state transitions cleanly', () => {

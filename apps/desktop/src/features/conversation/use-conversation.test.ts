@@ -272,7 +272,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
 
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -280,6 +280,7 @@ describe('useConversation streaming (Delivery A)', () => {
       accountId: 'acc-1',
       modelId: 'qwen2.5:latest',
       text: 'hi',
+      mode: 'plan',
     });
     expect(outcome).toEqual({ ok: true });
     expect(result.current.streaming).toBeNull();
@@ -298,7 +299,7 @@ describe('useConversation streaming (Delivery A)', () => {
     let stopOutcome: unknown;
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     // Live streamed deltas render in the composer state; no terminal yet.
     expect(result.current.streaming?.text).toBe('partial answer');
@@ -370,7 +371,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     // waiting begins at dispatch, before any channel event
     expect(result.current.streaming?.phase).toBe('waiting');
@@ -431,7 +432,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(result.current.streaming?.phase).toBe('waiting');
 
@@ -535,7 +536,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(result.current.streaming?.text).toBe('partial answer');
 
@@ -627,7 +628,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(result.current.streaming?.text).toBe('partial answer');
 
@@ -725,7 +726,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
 
     // The turn itself succeeded (terminal, persisted server-side); the
@@ -777,7 +778,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(outcome).toEqual({ ok: true });
     expect(result.current.recoverySnapshot).toBeNull();
@@ -806,10 +807,10 @@ describe('useConversation streaming (Delivery A)', () => {
     let first!: Promise<unknown>;
     let second: unknown;
     await act(async () => {
-      first = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      first = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     await act(async () => {
-      second = await result.current.streamOnce('again', 'acc-1', 'qwen2.5:latest');
+      second = await result.current.streamOnce('again', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(second).toMatchObject({ ok: false });
 

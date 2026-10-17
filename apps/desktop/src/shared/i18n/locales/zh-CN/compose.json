@@ -58,6 +58,7 @@
     "selectedFolder": "所选项目文件夹",
     "modeHintAsk": "只读回答和指导",
     "modeHintPlan": "执行前的结构化计划",
+    "modeExecuteUnavailable": "执行需要策略与工具运行时，目前尚未构建",
     "modeHintExecute": "直接的智能体操作和工具",
     "modeHintCode": "专注软件开发",
     "localBoundaryNote": "数据不会离开本机",

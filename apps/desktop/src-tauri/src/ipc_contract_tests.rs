@@ -1016,6 +1016,7 @@ fn complete_once_streams_in_order_and_persists_terminal() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "Tell me about rust generics".to_string(),
+            mode: None,
         },
     );
 
@@ -1207,6 +1208,7 @@ fn completion_history_is_bounded_and_tamper_proofed() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1225,6 +1227,7 @@ fn completion_history_is_bounded_and_tamper_proofed() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "the latest question".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1277,6 +1280,127 @@ fn completion_history_is_bounded_and_tamper_proofed() {
     });
 }
 
+/// T4b. Modes are declarations with real semantics: the instruction reaches
+/// the provider request only (the persisted user text stays exactly what the
+/// user wrote) and "execute" is refused before any socket because no policy or
+/// tool runtime exists to execute under.
+#[test]
+fn mode_instruction_is_request_only_and_execute_is_refused() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let base_url = spawn_stub_ollama(
+        &runtime,
+        None,
+        captures.clone(),
+        ChatProgram::once(vec![ndjson_delta("answer"), ndjson_done(4, 2)]),
+    );
+    let account_id = seed_local_account_with_model(&runtime, &ctx, &base_url);
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    // code mode: dispatched as a leading system instruction
+    let env = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "m:latest".to_string(),
+            text: "write the handler".to_string(),
+            mode: Some("code".to_string()),
+        },
+    );
+    let sink = CollectSink(collector());
+    runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, env, &sink).await
+        })
+        .expect("completion ok");
+    let bodies = captures.request_bodies();
+    assert_eq!(bodies.len(), 1, "one chat request");
+    let body: Value = serde_json::from_str(&bodies[0]).expect("chat body json");
+    let messages = body["messages"].as_array().expect("messages");
+    assert_eq!(
+        messages[0]["role"],
+        json!("system"),
+        "mode instruction first"
+    );
+    assert!(
+        messages[0]["content"]
+            .as_str()
+            .expect("content")
+            .contains("Mode: Code"),
+        "code instruction dispatched"
+    );
+    assert_eq!(
+        messages.last().expect("last")["content"],
+        json!("write the handler"),
+        "user text unchanged by the instruction"
+    );
+
+    // the instruction is request-only: history holds exactly the user text
+    runtime.block_on(async {
+        let sess_id = SessionId::from_string(&sess).expect("sess");
+        let rows = adham_projections::ConversationProjection::get_session_messages(
+            &ctx.pool,
+            ctx.content_key.as_ref(),
+            &ctx.installation_id,
+            &sess_id,
+        )
+        .await
+        .expect("rows");
+        let submitted = rows.iter().find(|r| r.role == "user").expect("user row");
+        assert_eq!(submitted.content, "write the handler");
+        assert!(
+            rows.iter().all(|r| !r.content.contains("Mode: Code")),
+            "instructions never persist"
+        );
+    });
+
+    // execute: refused before any socket — capability is not authorization
+    let env = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "m:latest".to_string(),
+            text: "run the tests".to_string(),
+            mode: Some("execute".to_string()),
+        },
+    );
+    let sink = CollectSink(collector());
+    let err = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, env, &sink).await
+        })
+        .expect_err("execute must be refused");
+    assert!(err.contains("EXECUTE_UNAVAILABLE"), "{err}");
+
+    // unknown modes never dispatch either
+    let env = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "m:latest".to_string(),
+            text: "hi".to_string(),
+            mode: Some("yolo".to_string()),
+        },
+    );
+    let sink = CollectSink(collector());
+    let err = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, env, &sink).await
+        })
+        .expect_err("unknown mode must be refused");
+    assert!(err.contains("VALIDATION_FAILED"), "{err}");
+
+    assert_eq!(
+        captures.request_bodies().len(),
+        1,
+        "refusals never reach the provider"
+    );
+}
+
 /// T5. Unknown model/account ids are refused before any socket and never
 /// leave a pending op behind.
 #[test]
@@ -1302,6 +1426,7 @@ fn unknown_model_blocked_before_socket() {
             account_id: account_id.clone(),
             model_id: "nosuchmodel:latest".to_string(),
             text: "hi".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1323,6 +1448,7 @@ fn unknown_model_blocked_before_socket() {
                         account_id: "ghost".to_string(),
                         model_id: "m:latest".to_string(),
                         text: "hi".to_string(),
+                        mode: None,
                     },
                 ),
                 &sink,
@@ -1458,6 +1584,7 @@ fn stop_mid_stream_persists_interrupted_partial() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "say something".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -1613,6 +1740,7 @@ fn renderer_disconnect_still_persists_terminal() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "disconnect test".to_string(),
+            mode: None,
         },
     );
     let sink = FailingSink;
@@ -1784,6 +1912,7 @@ fn thinking_model_stream_persists_answer_and_resolves() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hello".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -1897,6 +2026,7 @@ fn stop_during_connect_persists_interrupted_and_resolves() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "slow one".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2029,6 +2159,7 @@ fn stop_after_thinking_activity_stays_interrupted() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "think then answer".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2149,6 +2280,7 @@ fn empty_stop_persists_failed_terminal_and_resolves() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "say nothing".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2238,6 +2370,7 @@ fn tool_only_stop_persists_failed_not_completed() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "use a tool".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2316,6 +2449,7 @@ fn two_dispatches_carry_prior_turn_and_persist_both() {
                 account_id: account_id.clone(),
                 model_id: "m:latest".to_string(),
                 text: text.to_string(),
+                mode: None,
             },
         );
         let sink = CollectSink(collector());
@@ -2457,6 +2591,7 @@ fn provider_management_runs_app_level_without_a_session() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),
+            mode: None,
         },
     };
     let message = runtime
@@ -2528,6 +2663,7 @@ fn premature_eof_persists_failed_terminal_once() {
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "stream until you die".to_string(),
+            mode: None,
         },
     );
     let sink = CollectSink(events.clone());

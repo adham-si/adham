@@ -220,18 +220,52 @@ describe('ConversationPanel', () => {
     expect(backend.submitMessage).not.toHaveBeenCalled();
   });
 
-  it('marks execution unavailable in execute mode without any approval flow', async () => {
-    const user = userEvent.setup();
+  it('disables execute mode with the runtime explanation instead of offering a turn', async () => {
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
     await screen.findByRole('textbox', { name: /composer input/i });
 
-    expect(screen.queryByText(/execution.*unavailable|unavailable.*execution/i)).toBeNull();
-    // Switch to execute mode via the mode radiogroup.
-    await user.click(screen.getByRole('radio', { name: /execute/i }));
-
-    expect(screen.getByText(/execution.*unavailable|unavailable.*execution/i)).toBeDefined();
+    // No policy/tool runtime exists to execute under: the mode is not
+    // enterable, and the reason rides on the control itself.
+    const execute = screen.getByRole('radio', { name: /execute/i }) as HTMLButtonElement;
+    expect(execute.disabled).toBe(true);
+    expect(execute.getAttribute('title')).toMatch(/policy and tool runtime/i);
+    expect(execute.getAttribute('aria-checked')).toBe('false');
     expect(screen.queryByText(/Verified sandbox execution/i)).toBeNull();
+  });
+
+  it('dispatches the selected mode with the turn', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    const payloads: Array<{ mode?: string }> = [];
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as { mode?: string });
+      onEvent({ opId: 'op-m', sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId: 'op-m',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return { opId: 'op-m', messageId: 'm-m' };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-m', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+
+    await user.click(screen.getByRole('radio', { name: /ask/i }));
+    await user.type(box, 'a question');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(payloads[0]!.mode).toBe('ask');
   });
 
   it('does not offer a Stop affordance in the text-only fallback flow', async () => {

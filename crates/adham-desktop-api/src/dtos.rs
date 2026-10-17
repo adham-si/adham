@@ -510,6 +510,10 @@ pub struct CompleteOncePayload {
     pub account_id: String,
     pub model_id: String,
     pub text: String,
+    /// Turn mode ("ask" | "plan" | "code"): dispatched as a system instruction
+    /// for this request only, never persisted to history. Absent = no
+    /// instruction. "execute" is refused: no policy/tool runtime exists.
+    pub mode: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

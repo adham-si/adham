@@ -255,7 +255,7 @@ export function ConversationPanel({
     // Streaming dispatch when a registry model is wired; otherwise the
     // honest text-only fallback persists just the message.
     const outcome = streamReady
-      ? await conv.streamOnce(sent, ollama.account!.accountId, selectedModelId)
+      ? await conv.streamOnce(sent, ollama.account!.accountId, selectedModelId, mode)
       : await conv.submit(sent);
     // A rejected streaming dispatch (e.g. a send racing the in-flight turn)
     // must be visible, never a silent no-op. Text-only refusals and failures

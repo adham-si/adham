@@ -70,6 +70,7 @@
     "selectedFolder": "مجلد المشروع المحدد",
     "modeHintAsk": "إجابات وإرشادات للقراءة فقط",
     "modeHintPlan": "خطة منظمة قبل التنفيذ",
+    "modeExecuteUnavailable": "يتطلب التنفيذ وقت تشغيل السياسات والأدوات، وهو غير مُنشأ بعد",
     "modeHintExecute": "إجراءات وأدوات مباشرة للوكيل",
     "modeHintCode": "تركيز على تطوير البرمجيات",
     "localBoundaryNote": "لا تغادر أي بيانات هذا الجهاز",

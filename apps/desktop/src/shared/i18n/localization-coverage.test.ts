@@ -27,7 +27,7 @@ function collectUsedKeys(): string[] {
         keys.add(key);
       }
     }
-    for (const match of clean.matchAll(/\blabelKey:\s*'([^']+)'/g)) {
+    for (const match of clean.matchAll(/\b(?:labelKey|unavailableKey):\s*'([^']+)'/g)) {
       const key = match[1];
       if (key) keys.add(key);
     }

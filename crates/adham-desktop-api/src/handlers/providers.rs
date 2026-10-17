@@ -533,6 +533,20 @@ where
     if trimmed.len() > 65536 {
         return Err("VALIDATION_FAILED: text exceeds 65536 bytes".to_string());
     }
+    // Modes are declarations with real semantics. "execute" has no runtime to
+    // execute under, so it is refused rather than silently downgraded; unknown
+    // modes never reach a socket.
+    if let Some(mode) = env.payload.mode.as_deref() {
+        if mode == "execute" {
+            return Err(
+                "EXECUTE_UNAVAILABLE: execution requires the policy and tool runtime, which is not built"
+                    .to_string(),
+            );
+        }
+        if mode_instruction(mode).is_none() {
+            return Err(format!("VALIDATION_FAILED: unknown mode '{mode}'"));
+        }
+    }
     let ids = expect_full_scope(&env.context)?;
     validate_session_scope(ctx, &ids).await?;
     let request_id = RequestId::from_client_str(&env.request_id)
@@ -715,6 +729,7 @@ where
         &request_id.to_string(),
         &ids,
         &token,
+        env.payload.mode.as_deref(),
         sink,
     )
     .await;
@@ -783,6 +798,27 @@ fn bounded_history(
         .collect()
 }
 
+/// System instruction for a declared turn mode. Request-only: mode semantics
+/// never persist and no mode grants permissions — tools do not exist yet, so
+/// "execute" (refused in the handler) is the only mode with nothing to bind to.
+fn mode_instruction(mode: &str) -> Option<&'static str> {
+    match mode {
+        "ask" => Some(
+            "Mode: Ask. Hold a conversation: answer and discuss directly. Do not claim to change \
+             files, run commands, or take any action.",
+        ),
+        "plan" => Some(
+            "Mode: Plan. Respond with a read-only plan: steps, trade-offs and risks. Do not claim \
+             to have changed or executed anything.",
+        ),
+        "code" => Some(
+            "Mode: Code. Respond with code ready to review and apply by hand (complete snippets \
+             or diffs). You cannot execute anything.",
+        ),
+        _ => None,
+    }
+}
+
 fn terminal_status(outcome: &StreamCompletionOutcome) -> (&'static str, bool) {
     match outcome {
         StreamCompletionOutcome::Stop => ("completed", false),
@@ -819,6 +855,7 @@ async fn run_stream<S>(
     request_id: &str,
     ids: &StreamIds,
     token: &CancellationToken,
+    mode: Option<&str>,
     sink: &S,
 ) -> &'static str
 where
@@ -850,6 +887,17 @@ where
             role: MessageRole::User,
             content: "(empty prompt)".to_string(),
         });
+    }
+    // Turn-mode instruction: part of this request only. The stored user text
+    // stays exactly what the user wrote; the mode is frozen at dispatch.
+    if let Some(instruction) = mode.and_then(mode_instruction) {
+        messages.insert(
+            0,
+            ChatMessage {
+                role: MessageRole::System,
+                content: instruction.to_string(),
+            },
+        );
     }
 
     let request = ProviderRequestV1 {

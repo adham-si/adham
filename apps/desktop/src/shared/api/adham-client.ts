@@ -494,7 +494,12 @@ export class AdhamApiClient implements AdhamClient {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-    payload: { accountId: string; modelId: string; text: string },
+    payload: {
+      accountId: string;
+      modelId: string;
+      text: string;
+      mode: 'ask' | 'plan' | 'code' | 'execute';
+    },
     onEvent: (event: StreamEventDto) => void,
     options?: { requestId?: string },
   ): Promise<CompletionStartDto> {

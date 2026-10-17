@@ -62,7 +62,13 @@ export interface ConversationBackend {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-    payload: { accountId: string; modelId: string; text: string },
+    payload: {
+      accountId: string;
+      modelId: string;
+      text: string;
+      /** Turn mode; dispatched as a request-only system instruction. */
+      mode: 'ask' | 'plan' | 'code' | 'execute';
+    },
     onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
     options?: { requestId?: string },
   ): Promise<import('@adham/contracts-generated').CompletionStartDto>;

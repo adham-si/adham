@@ -183,7 +183,13 @@ observedAt: string | null, };
 
 export type ProviderModelsList = { models: Array<ProviderModelDto>, };
 
-export type CompleteOncePayload = { accountId: string, modelId: string, text: string, };
+export type CompleteOncePayload = { accountId: string, modelId: string, text: string, 
+/**
+ * Turn mode ("ask" | "plan" | "code"): dispatched as a system instruction
+ * for this request only, never persisted to history. Absent = no
+ * instruction. "execute" is refused: no policy/tool runtime exists.
+ */
+mode: string | null, };
 
 export type CompletionStartDto = { opId: string, messageId: string, };
 

@@ -616,7 +616,12 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   }, []);
 
   const streamOnce = React.useCallback(
-    async (text: string, accountId: string, modelId: string): Promise<SubmitOutcome> => {
+    async (
+      text: string,
+      accountId: string,
+      modelId: string,
+      mode: 'ask' | 'plan' | 'code' | 'execute',
+    ): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed)
         return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
@@ -670,7 +675,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           ctx.workspaceId,
           ctx.projectId,
           ctx.sessionId,
-          { accountId, modelId, text: trimmed },
+          { accountId, modelId, text: trimmed, mode },
           (event) => {
             if (!mountedRef.current || generationRef.current !== generation) return;
             if (opId === null) {

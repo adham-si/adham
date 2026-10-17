@@ -61,6 +61,7 @@
     "selectedFolder": "Selected project folder",
     "modeHintAsk": "Read-only answers and guidance",
     "modeHintPlan": "Structured plan before execution",
+    "modeExecuteUnavailable": "Execution requires the policy and tool runtime, which is not built yet",
     "modeHintExecute": "Direct agent actions & tools",
     "modeHintCode": "Software development focus",
     "localBoundaryNote": "Zero data leaves this machine",
