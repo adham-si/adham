@@ -345,7 +345,16 @@
       "discoverModels": "اكتشاف النماذج",
       "saved": "تم الاتصال.",
       "discoveredCount": "تم تثبيت {{count}} نموذجًا من هذا العنوان.",
-      "unreachable": "لا استجابة من أولاما على {{url}}. لم يُحفظ أي شيء."
+      "unreachable": "آخر فحص {{time}} — لا استجابة من Ollama على {{url}}. لم يُحفظ أي شيء.",
+      "configuredLine": "مضبوط — {{alias}} على {{url}}",
+      "notConfiguredLine": "لا نقطة نهاية مضبوطة بعد. اختبر واحدة لتسجيلها.",
+      "inventoryLine": "تم تسجيل {{count}} من النماذج من {{url}}.",
+      "inventoryNone": "لم يُسجَّل أي نموذج من {{url}} بعد.",
+      "lastCheckReachable": "آخر فحص {{time}}: متاح — {{count}} من النماذج معلنة.",
+      "probeFailed": "تعذر تنفيذ الفحص لـ {{url}} ({{error}}). لم يُحفظ أي شيء.",
+      "checkPending": "لا توجد نتيجة فحص مسجلة لـ {{url}} بعد.",
+      "lastDiscovery": "اكتُشف {{count}} من النماذج في {{time}} (محفوظة في السجل).",
+      "unsavedAttribution": "النماذج المسجلة أعلاه تعود إلى {{url}}؛ أعد فحص نقطة النهاية المعدلة قبل الاكتشاف."
     },
     "mcp": {
       "descPlaywright": "خادم أتمتة المتصفح مقيد بدليل مؤقت محلي.",

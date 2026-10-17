@@ -333,7 +333,16 @@
       "discoverModels": "发现模型",
       "saved": "已连接。",
       "discoveredCount": "已从此端点固定 {{count}} 个模型。",
-      "unreachable": "Ollama 在 {{url}} 无响应。未保存任何内容。"
+      "unreachable": "上次检查 {{time}} — Ollama 在 {{url}} 无响应。未保存任何内容。",
+      "configuredLine": "已配置 — {{alias}}（{{url}}）",
+      "notConfiguredLine": "尚未配置任何端点。先测试以注册。",
+      "inventoryLine": "已从 {{url}} 记录 {{count}} 个模型。",
+      "inventoryNone": "尚未从 {{url}} 记录任何模型。",
+      "lastCheckReachable": "上次检查 {{time}}：可达 — 端点公布了 {{count}} 个模型。",
+      "probeFailed": "无法对 {{url}} 执行检查（{{error}}）。未保存任何内容。",
+      "checkPending": "尚未记录 {{url}} 的检查结果。",
+      "lastDiscovery": "在 {{time}} 发现了 {{count}} 个模型（已存入注册表）。",
+      "unsavedAttribution": "上方已记录的模型属于 {{url}}；发现前请先重新测试修改后的端点。"
     },
     "mcp": {
       "descPlaywright": "绑定到本地临时目录的浏览器自动化服务器。",

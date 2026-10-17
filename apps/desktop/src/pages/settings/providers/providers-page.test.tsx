@@ -88,6 +88,8 @@ beforeEach(async () => {
       }
       case 'discover_ollama_models':
         return { data: { models: [modelDto()] } };
+      case 'list_provider_models':
+        return { data: { models: [modelDto()] } };
       default:
         throw new Error(`unexpected command ${cmd}`);
     }
@@ -108,9 +110,7 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     await user.type(input, 'http://127.0.0.1:11434');
 
     await user.click(screen.getByRole('button', { name: /test connection/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/models pinned from this endpoint/i)).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByText(/models recorded from/i)).toBeDefined());
     expect(invokeMock).toHaveBeenCalledWith(
       'test_provider_connection',
       expect.objectContaining({
@@ -159,6 +159,105 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     );
   });
 
+  it('shows configured endpoint and recorded inventory on reopen without any check', async () => {
+    accounts = [mintedAccount()];
+    renderPage();
+    expect(await screen.findByText(/models recorded from/i)).toBeDefined();
+    expect(screen.getByText(/configured/i)).toBeDefined();
+    // a registry read restores state; it must never print as a fresh health check
+    expect(screen.queryByText(/reachable/i)).toBeNull();
+    expect(screen.getByText(/no check result recorded for/i)).toBeDefined();
+    const checked = invokeMock.mock.calls.filter(
+      ([cmd]) => cmd === 'test_provider_connection' || cmd === 'discover_ollama_models',
+    );
+    expect(checked).toHaveLength(0);
+  });
+
+  it('editing the endpoint invalidates prior results and never discovers against the old account (stale attribution regression)', async () => {
+    const user = userEvent.setup();
+    accounts = [mintedAccount()];
+    renderPage();
+    const input = (await screen.findByLabelText(/ollama endpoint/i)) as HTMLInputElement;
+    await waitFor(() => expect(input.value).toBe('http://127.0.0.1:11434'));
+
+    // make the saved endpoint's check + discovery current, then edit
+    await user.click(screen.getByRole('button', { name: /test connection/i }));
+    await waitFor(() => expect(screen.getByText(/models recorded from/i)).toBeDefined());
+    const discoverCallsBefore = invokeMock.mock.calls.filter(
+      ([cmd]) => cmd === 'discover_ollama_models',
+    ).length;
+    await user.clear(input);
+    await user.type(input, 'http://127.0.0.1:11435');
+
+    // old results disappear the moment the endpoint differs
+    expect(screen.queryByText(/reachable/i)).toBeNull();
+    expect(screen.getByText(/no check result recorded for/i)).toBeDefined();
+    // the recorded inventory is still attributed to the endpoint it came from
+    expect(screen.getByText(/recorded from http:\/\/127\.0\.0\.1:11434/i)).toBeDefined();
+    expect(screen.getByText(/belong to http:\/\/127\.0\.0\.1:11434/i)).toBeDefined();
+
+    // Discover stays locked until the edited endpoint is saved
+    const discoverBtn = screen.getByRole('button', { name: /discover models/i });
+    expect(discoverBtn.hasAttribute('disabled')).toBe(true);
+    await user.click(discoverBtn);
+    const discoverCallsAfter = invokeMock.mock.calls.filter(
+      ([cmd]) => cmd === 'discover_ollama_models',
+    ).length;
+    expect(discoverCallsAfter).toBe(discoverCallsBefore);
+
+    // re-test probes the edited address transiently, saves onto the account,
+    // then discovery runs against that updated identity
+    await user.click(screen.getByRole('button', { name: /test connection/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/recorded from http:\/\/127\.0\.0\.1:11435/i)).toBeDefined(),
+    );
+    expect(invokeMock).toHaveBeenCalledWith(
+      'test_provider_connection',
+      expect.objectContaining({
+        request: expect.objectContaining({
+          payload: { accountId: '', endpointUrl: 'http://127.0.0.1:11435' },
+        }),
+      }),
+    );
+  });
+
+  it('a failed last check under the old endpoint never shows as the edited endpoint status', async () => {
+    const user = userEvent.setup();
+    accounts = [mintedAccount()];
+    renderPage();
+    const input = (await screen.findByLabelText(/ollama endpoint/i)) as HTMLInputElement;
+    await waitFor(() => expect(input.value).toBe('http://127.0.0.1:11434'));
+
+    await user.clear(input);
+    await user.type(input, 'http://127.0.0.1:99999');
+    await user.click(screen.getByRole('button', { name: /test connection/i }));
+    await waitFor(() => expect(screen.getByText(/no response from/i)).toBeDefined());
+
+    await user.clear(input);
+    await user.type(input, 'http://127.0.0.1:11440');
+    expect(screen.queryByText(/no response from/i)).toBeNull();
+    expect(screen.getByText(/no check result recorded for/i)).toBeDefined();
+  });
+
+  it('renders a distinct probe-failure error when the request itself errors', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const input = await screen.findByLabelText(/ollama endpoint/i);
+    await user.type(input, 'http://127.0.0.1:77777');
+    const failing = invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === 'test_provider_connection') {
+        throw new Error('connection refused');
+      }
+      return { data: { accounts: [] } };
+    });
+    void failing;
+
+    await user.click(screen.getByRole('button', { name: /test connection/i }));
+    await waitFor(() => expect(screen.getByText(/could not run the check/i)).toBeDefined());
+    const mintCalls = invokeMock.mock.calls.filter(([cmd]) => cmd === 'update_provider_account');
+    expect(mintCalls).toHaveLength(0);
+  });
+
   it('re-tests a saved endpoint by account id without minting again', async () => {
     const user = userEvent.setup();
     accounts = [mintedAccount()];
@@ -167,9 +266,7 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     await waitFor(() => expect(input.value).toBe('http://127.0.0.1:11434'));
 
     await user.click(screen.getByRole('button', { name: /test connection/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/models pinned from this endpoint/i)).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByText(/models recorded from/i)).toBeDefined());
     expect(invokeMock).toHaveBeenCalledWith(
       'test_provider_connection',
       expect.objectContaining({

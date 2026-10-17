@@ -336,7 +336,16 @@
       "discoverModels": "Discover models",
       "saved": "Connected.",
       "discoveredCount": "{{count}} models pinned from this endpoint.",
-      "unreachable": "No response from Ollama at {{url}}. Nothing was saved."
+      "unreachable": "Last check {{time}} — no response from Ollama at {{url}}. Nothing was saved.",
+      "configuredLine": "Configured — {{alias}} at {{url}}",
+      "notConfiguredLine": "No endpoint configured yet. Test one to register it.",
+      "inventoryLine": "{{count}} models recorded from {{url}}.",
+      "inventoryNone": "No models recorded from {{url}} yet.",
+      "lastCheckReachable": "Last check {{time}}: reachable — {{count}} models advertised.",
+      "probeFailed": "Could not run the check for {{url}} ({{error}}). Nothing was saved.",
+      "checkPending": "No check result recorded for {{url}} yet.",
+      "lastDiscovery": "Discovered {{count}} models at {{time}} (saved to the registry).",
+      "unsavedAttribution": "The recorded models above belong to {{url}}; re-test the edited endpoint before discovering."
     },
     "mcp": {
       "descPlaywright": "Browser automation server bounded to local scratch directory.",
