@@ -13,6 +13,7 @@ use crate::dtos::*;
 use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::adapters::ollama_http::OllamaHttpAdapter;
+use adham_provider::adapters::AnyAdapter;
 use adham_provider::domain::account::{PrivacyClass, ProviderAccountId};
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId, ModelSelectionSnapshot};
@@ -107,6 +108,58 @@ fn ollama_adapter(account: &LocalAccount) -> Result<OllamaHttpAdapter, String> {
     OllamaHttpAdapter::new(HttpTransport::default(), &account.base_url).map_err(|e| e.to_string())
 }
 
+/// Loopback host base_url (the same trust boundary the Ollama adapter trusts
+/// for the local daemon). Used to admit mirror endpoints for Google kinds
+/// without opening the external-host surface: official HTTPS is always
+/// allowed; anything else must loop back.
+fn is_loopback_base(base_url: &str) -> bool {
+    let no_scheme = base_url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://");
+    let host = no_scheme.split(['/', '?', ':']).next().unwrap_or_default();
+    matches!(host, "127.0.0.1" | "localhost" | "::1")
+}
+
+/// Kind-routed adapter construction: the single branching point for dispatch.
+/// Ollama stays loopback-only (its own policy); Google accepts only the
+/// official endpoint or a loopback mirror — external hosts never construct.
+fn any_adapter(account: &LocalAccount, credential: Option<String>) -> Result<AnyAdapter, String> {
+    match account.kind {
+        adham_provider::domain::account::ProviderKind::OllamaLocal => {
+            Ok(AnyAdapter::Ollama(ollama_adapter(account)?))
+        }
+        adham_provider::domain::account::ProviderKind::GoogleGemini => {
+            let key = credential.ok_or_else(|| {
+                "VALIDATION_FAILED: no stored credential for this Google account — set the API key in settings first".to_string()
+            })?;
+            let key = adham_provider::adapters::gemini_http::GoogleApiKey::new(&key)
+                .map_err(|e| format!("VALIDATION_FAILED: {e}"))?;
+            let transport = HttpTransport::default();
+            let base = account.base_url.trim_end_matches('/');
+            let is_official =
+                base == adham_provider::adapters::gemini_http::GeminiHttpAdapter::OFFICIAL_BASE_URL;
+            if !is_official && !is_loopback_base(base) {
+                return Err(format!(
+                    "VALIDATION_FAILED: Google endpoints accept only the official host or a loopback mirror, got '{base}'"
+                ));
+            }
+            let adapter = if is_official {
+                adham_provider::adapters::gemini_http::GeminiHttpAdapter::new(transport, base, key)
+            } else {
+                adham_provider::adapters::gemini_http::GeminiHttpAdapter::new_unchecked(
+                    transport, base, key,
+                )
+            }
+            .map_err(|e| e.to_string())?;
+            Ok(AnyAdapter::Gemini(adapter))
+        }
+        other => Err(format!(
+            "VALIDATION_FAILED: account '{}' kind '{other:?}' is not dispatchable yet",
+            account.account_id.0
+        )),
+    }
+}
+
 fn ok_result<T: Serialize + TS>(request_id: String, data: T) -> CommandResult<T> {
     CommandResult {
         protocol_version: 1,
@@ -169,8 +222,28 @@ pub async fn handle_discover_ollama_models(
     env: CommandEnvelope<DiscoverOllamaModelsPayload>,
 ) -> Result<CommandResult<ProviderModelsList>, String> {
     let account = local_account(ctx, &env.payload.account_id).await?;
-    let adapter = ollama_adapter(&account)?;
-    let pinned = adapter.discover().await.map_err(|e| e.to_string())?;
+    // kind-routed discovery: Google kinds load the sealed credential the same
+    // way dispatch does; official-host or loopback-mirror only.
+    let pinned = match account.kind {
+        adham_provider::domain::account::ProviderKind::GoogleGemini => {
+            let credential = adham_event_log::read_provider_credential_plaintext(
+                &ctx.pool,
+                ctx.content_key.as_ref(),
+                &account.account_id.0,
+                &ctx.installation_id.0.to_string(),
+            )
+            .await
+            .map_err(|e| {
+                format!("VALIDATION_FAILED: no usable credential for this Google account: {e}")
+            })?;
+            any_adapter(&account, Some(credential))?
+        }
+        _ => {
+            let adapter = ollama_adapter(&account)?;
+            AnyAdapter::Ollama(adapter)
+        }
+    };
+    let pinned = pinned.discover().await.map_err(|e| e.to_string())?;
     let tuples: Vec<(ModelId, String, ModelDescriptor)> = pinned
         .iter()
         .map(|m| (m.model_id.clone(), m.digest.clone(), m.descriptor.clone()))
@@ -517,18 +590,28 @@ where
 
     // Model evidence before ANY socket: unknown ids dispatch nothing.
     let account = local_account(ctx, &env.payload.account_id).await?;
-    if !matches!(
-        account.kind,
-        adham_provider::domain::account::ProviderKind::OllamaLocal
-    ) {
-        return Err(format!(
-            "VALIDATION_FAILED: account '{}' is not a local Ollama account",
-            env.payload.account_id
-        ));
-    }
     let pinned = resolve_pinned(ctx, &account.account_id, &env.payload.model_id).await?;
 
-    let adapter = ollama_adapter(&account)?;
+    // Google-style kinds hold their credential in the sealed vault; it is
+    // loaded per-dispatch, moved into the adapter, and dropped with it. A
+    // missing or unopenable seal refuses pre-session — before op creation,
+    // so no pending op ever leaks.
+    let credential = match account.kind {
+        adham_provider::domain::account::ProviderKind::GoogleGemini => Some(
+            adham_event_log::read_provider_credential_plaintext(
+                &ctx.pool,
+                ctx.content_key.as_ref(),
+                &account.account_id.0,
+                &ctx.installation_id.0.to_string(),
+            )
+            .await
+            .map_err(|e| {
+                format!("VALIDATION_FAILED: no usable credential for this Google account: {e}")
+            })?,
+        ),
+        _ => None,
+    };
+    let adapter = any_adapter(&account, credential)?;
     let op_id = OperationId::new_v7();
     let message_id = MessageId::new_v7();
     let scope = EventScope {
@@ -783,7 +866,7 @@ fn map_completion(outcome: &StreamCompletionOutcome) -> MessageCompletionV1 {
 #[allow(clippy::too_many_arguments)]
 async fn run_stream<S>(
     ctx: &ApiContext,
-    adapter: &OllamaHttpAdapter,
+    adapter: &AnyAdapter,
     pinned: &PinnedModel,
     account: &LocalAccount,
     op_id: &str,

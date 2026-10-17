@@ -14,9 +14,9 @@ use adham_provider::domain::request::{ChatMessage, MessageRole, ProviderRequestV
 use adham_provider::domain::stream::{NormalizedStreamEvent, StreamCompletionOutcome, StreamUsage};
 use adham_provider::registry::PinnedModel;
 use adham_provider::transport::HttpTransport;
-use serde_json::{Value, json};
-use std::sync::Arc;
+use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 const FIXTURE_KEY: &str = "AIza-fixture-key";
@@ -116,7 +116,7 @@ fn http_status(status: u16) -> Vec<u8> {
 }
 
 fn adapter_for(base: &str) -> GeminiHttpAdapter {
-    GeminiHttpAdapter::new_for_test(
+    GeminiHttpAdapter::new_unchecked(
         HttpTransport::default(),
         base,
         GoogleApiKey::new(FIXTURE_KEY).expect("key"),

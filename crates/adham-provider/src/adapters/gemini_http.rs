@@ -88,11 +88,12 @@ impl GeminiHttpAdapter {
         })
     }
 
-    /// TEST SEAM — integration fixtures hit a local listener stub; production
-    /// construction must use `new` (the official-endpoint allowlist). This is
-    /// never called from production dispatch paths.
+    /// Construction WITHOUT the official-host policy — the only seam a local
+    /// mirror or fixture base_url may enter through. Production dispatch must
+    /// construct via `new` (official host); the dispatch factory calls this
+    /// only after confining base_url to the loopback trust boundary.
     #[doc(hidden)]
-    pub fn new_for_test(
+    pub fn new_unchecked(
         transport: HttpTransport,
         base_url: &str,
         api_key: GoogleApiKey,
