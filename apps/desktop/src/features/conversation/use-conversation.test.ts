@@ -187,6 +187,34 @@ describe('submissionNotice', () => {
   it('warns that attachments are not transmitted', () => {
     expect(submissionNotice({ attachmentCount: 2 })).toMatch(/attachment/i);
   });
+
+  it('names the reason generation is off instead of a generic claim', () => {
+    expect(submissionNotice({ attachmentCount: 0, modelGapReason: 'no-selection' })).toMatch(
+      /no model is selected/i,
+    );
+    expect(submissionNotice({ attachmentCount: 0, modelGapReason: 'no-provider' })).toMatch(
+      /no model provider is connected/i,
+    );
+    expect(submissionNotice({ attachmentCount: 0, modelGapReason: 'no-models' })).toMatch(
+      /no discovered models/i,
+    );
+  });
+
+  it('names the vanished id when a stored selection went stale', () => {
+    const notice = submissionNotice({
+      attachmentCount: 0,
+      modelGapReason: 'stale-selection',
+      staleModelId: 'gpt-oss:20b',
+    });
+    expect(notice).toMatch(/gpt-oss:20b/);
+    expect(notice).toMatch(/no longer available/i);
+  });
+
+  it('falls back to the generic claim while the provider state is unknown', () => {
+    expect(submissionNotice({ attachmentCount: 0, modelGapReason: 'unknown' })).toMatch(
+      /model selection is not applied/i,
+    );
+  });
 });
 
 describe('useConversation streaming (Delivery A)', () => {

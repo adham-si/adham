@@ -31,14 +31,20 @@ export interface OllamaPicker {
   account: ProviderAccountDto | null;
   /** Pinned registry models for that account; empty before discovery. */
   models: ProviderModelDto[];
+  /** True once the account list has resolved (found or empty). Until then a
+   *  missing model must not be reported as "no provider". */
+  accountsLoaded: boolean;
+  /** True once this account's model list has resolved. Until then an empty
+   *  list is "not known yet", not "none exist". */
+  modelsLoaded: boolean;
   /** True only with a connected account and at least one pinned model. */
   ready: boolean;
 }
 
 /**
- * Lists the persisted Ollama account and its pinned models. Failures are
- * swallowed into the empty state: settings pages remain usable and the
- * composer stays in its honest text-only path.
+ * Lists the persisted Ollama account and its pinned models. Failures stay
+ * unresolved — never an empty claim — and the composer keeps its honest
+ * text-only path saying only what is known.
  */
 export function useOllamaProvider({
   backend = adhamProviderBackend,
@@ -66,7 +72,8 @@ export function useOllamaProvider({
         if (!stale && fetchSeq === fetchRef.current) setAccounts(data.accounts);
       })
       .catch(() => {
-        if (!stale && fetchSeq === fetchRef.current) setAccounts([]);
+        // Left unresolved on failure: an unreachable list is "not known yet",
+        // never proof that no provider is connected.
       });
     return () => {
       stale = true;
@@ -88,7 +95,7 @@ export function useOllamaProvider({
         if (!stale && fetchSeq === fetchRef.current) setModels(data.models);
       })
       .catch(() => {
-        if (!stale && fetchSeq === fetchRef.current) setModels([]);
+        // Same rule as accounts: a failed list is unresolved, not empty.
       });
     return () => {
       stale = true;
@@ -100,6 +107,8 @@ export function useOllamaProvider({
   return {
     account,
     models: models ?? [],
+    accountsLoaded: accounts !== null,
+    modelsLoaded: models !== null,
     ready: account !== null && models !== null && models.length > 0,
   };
 }

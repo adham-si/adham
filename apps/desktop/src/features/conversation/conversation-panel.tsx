@@ -24,8 +24,13 @@ import {
 } from '../provisioning';
 import { useSelection, type SelectionBackend } from '../workspace-selection';
 import { ConversationSetupSlot } from './conversation-setup-slot';
-import { submissionNotice } from './submission-notice';
+import { submissionNotice, type ModelGapReason } from './submission-notice';
 import { readComposeModePreference, writeComposeModePreference } from './compose-mode-preference';
+import {
+  migratePendingModelChoice,
+  readComposeModelPreference,
+  writeComposeModelPreference,
+} from './compose-model-preference';
 import {
   PendingRecoveryBanner,
   PendingRecoveryReviewDialog,
@@ -123,8 +128,9 @@ export function ConversationPanel({
     step: 'workspace' | 'project';
     origin: 'created' | 'selected';
   } | null>(null);
+  const sessionBucket = conv.sessionId ?? PENDING_DRAFT_BUCKET;
   const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({
-    sessionId: conv.sessionId ?? PENDING_DRAFT_BUCKET,
+    sessionId: sessionBucket,
   });
   const draftRef = React.useRef(draft);
   draftRef.current = draft;
@@ -137,8 +143,12 @@ export function ConversationPanel({
     writeComposeModePreference(next);
   }, []);
   // Model choice is explicit: '' until the user picks from the registry, and
-  // discovery order never becomes a silent default.
-  const [selectedModelId, setSelectedModelId] = React.useState('');
+  // discovery order never becomes a silent default. The pick is remembered per
+  // session bucket (the same one drafts use) so a rerender, a session switch
+  // or reopening restores exactly the choice the user made for that session.
+  const [selectedModelId, setSelectedModelId] = React.useState(
+    () => readComposeModelPreference(sessionBucket) ?? '',
+  );
   /** Documented `think` value for the next turn; null = model default. */
   const [think, setThink] = React.useState<boolean | string | null>(null);
   /** Sends that arrived while a turn was running, shown above the input. */
@@ -151,6 +161,19 @@ export function ConversationPanel({
     queuedRef.current = next;
     setQueued(next);
   }, []);
+
+  // A session switch hydrates that session's remembered model choice, carrying
+  // a pre-session pick into the session a first send materialized (never
+  // overwriting a choice the target session already made). The thinking choice
+  // resets in the same step: it was validated against the previous model.
+  const prevModelSessionRef = React.useRef(sessionBucket);
+  React.useEffect(() => {
+    if (prevModelSessionRef.current === sessionBucket) return;
+    prevModelSessionRef.current = sessionBucket;
+    migratePendingModelChoice(sessionBucket);
+    setSelectedModelId(readComposeModelPreference(sessionBucket) ?? '');
+    setThink(null);
+  }, [sessionBucket]);
   const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
   const [stopNotice, setStopNotice] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -186,6 +209,23 @@ export function ConversationPanel({
   const selectedDescriptor = ollama.models.find((m) => m.modelId === selectedModelId) ?? null;
   const streamReady =
     ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);
+  /// Why generation is off for the next send, named from what is actually
+  /// known: nothing loaded = unknown; no account = connect one; no pinned
+  /// models = discover them; an unpicked or vanished choice = pick one. The
+  /// composer says which, so a send never silently becomes a note.
+  const modelGapReason: ModelGapReason | null = streamReady
+    ? null
+    : !ollama.accountsLoaded
+      ? 'unknown'
+      : ollama.account === null
+        ? 'no-provider'
+        : !ollama.modelsLoaded
+          ? 'unknown'
+          : pickerModels.length === 0
+            ? 'no-models'
+            : selectedModelId === ''
+              ? 'no-selection'
+              : 'stale-selection';
 
   const busy =
     conv.status === 'submitting' || conv.status === 'bootstrapping' || conv.streaming !== null;
@@ -343,10 +383,14 @@ export function ConversationPanel({
   /// A new model invalidates the thinking choice: a level documented for the
   /// previous model may be undocumented for the next one (the backend refuses
   /// undocumented values, so carrying it over would refuse an honest send).
-  const handleSelectModel = React.useCallback((modelId: string) => {
-    setSelectedModelId(modelId);
-    setThink(null);
-  }, []);
+  const handleSelectModel = React.useCallback(
+    (modelId: string) => {
+      setSelectedModelId(modelId);
+      writeComposeModelPreference(sessionBucket, modelId);
+      setThink(null);
+    },
+    [sessionBucket],
+  );
 
   const handleStop = React.useCallback(() => {
     if (conv.streaming) {
@@ -356,14 +400,12 @@ export function ConversationPanel({
     setStopNotice(true);
   }, [conv]);
 
-  const notice = streamReady
-    ? submissionNotice({
-        attachmentCount: attachments.length,
-        modelApplied: true,
-      })
-    : submissionNotice({
-        attachmentCount: attachments.length,
-      });
+  const notice = submissionNotice({
+    attachmentCount: attachments.length,
+    modelApplied: streamReady,
+    modelGapReason,
+    staleModelId: modelGapReason === 'stale-selection' ? selectedModelId : undefined,
+  });
   const composeStatus = conv.streaming
     ? ('streaming' as const)
     : conv.status === 'submitting'
