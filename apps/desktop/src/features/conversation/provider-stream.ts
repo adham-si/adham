@@ -93,7 +93,9 @@ export function useOllamaProvider({
     return () => {
       stale = true;
     };
-  }, [backend, enabled, account, context]);
+    // Scope fields, not the context object: callers pass a fresh literal per
+    // render, and an identity dep would refetch (and re-render) forever.
+  }, [backend, enabled, account, context?.workspaceId, context?.projectId, context?.sessionId]);
 
   return {
     account,
