@@ -125,6 +125,21 @@ pub async fn handle_test_provider_connection(
 ) -> Result<CommandResult<ProviderHealthResponse>, String> {
     let ids = expect_full_scope(&env.context)?;
     validate_session_scope(ctx, &ids).await?;
+    // URL probe without persistence: "failed test saves nothing"
+    if env.payload.account_id.trim().is_empty() {
+        if let Some(url) = env
+            .payload
+            .endpoint_url
+            .as_deref()
+            .filter(|u| !u.trim().is_empty())
+        {
+            let health = transient_probe(ctx, url).await?;
+            return Ok(ok_result(env.request_id, health));
+        }
+        return Err(
+            "VALIDATION_FAILED: accountId or endpointUrl required to test a connection".to_string(),
+        );
+    }
     let account = local_account(ctx, &env.payload.account_id).await?;
     let adapter = ollama_adapter(&account)?;
     let response = match adapter.connection_test().await {
@@ -985,4 +1000,57 @@ async fn persist_terminal(
     // op_id doubles as the pending op's message_request_id? No — resolve by op
     // id only; the request-id guard applies to client-minted flows.
     "succeeded"
+}
+
+/// Ollama local accounts for the settings UI (reload-safe source of truth).
+pub async fn handle_list_provider_accounts(
+    ctx: &ApiContext,
+) -> Result<CommandResult<ListProviderAccountsResponse>, String> {
+    let accounts = ctx
+        .registry
+        .list_accounts()
+        .await
+        .map_err(|e| e.to_string())?;
+    let dtos = accounts
+        .iter()
+        .map(|a| ProviderAccountDto {
+            account_id: a.account_id.0.clone(),
+            alias: a.alias.clone(),
+            endpoint_url: a.base_url.clone(),
+            privacy_class: serde_plain_repr(&a.privacy_class).to_string(),
+        })
+        .collect();
+    Ok(ok_result(
+        CorrelationId::new_v7().to_string(),
+        ListProviderAccountsResponse { accounts: dtos },
+    ))
+}
+
+/// Test an un-persisted endpoint URL: probing against `endpointUrl` with no
+/// saved account NEVER writes a row ("failed test saves nothing").
+pub async fn transient_probe(
+    ctx: &ApiContext,
+    endpoint_url: &str,
+) -> Result<ProviderHealthResponse, String> {
+    let synthetic = LocalAccount {
+        account_id: ProviderAccountId::new(uuid::Uuid::now_v7().to_string()),
+        kind: adham_provider::domain::account::ProviderKind::OllamaLocal,
+        alias: "probe".to_string(),
+        privacy_class: PrivacyClass::LocalOnly,
+        endpoint_id: EndpointId::new("local-ollama"),
+        base_url: endpoint_url.to_string(),
+        approved_destination: false,
+    };
+    let adapter = ollama_adapter(&synthetic)?;
+    let _ = ctx; // transport is validated against the shared policy below
+    match adapter.connection_test().await {
+        Ok(count) => Ok(ProviderHealthResponse {
+            reachable: true,
+            model_tag_count: count,
+        }),
+        Err(_) => Ok(ProviderHealthResponse {
+            reachable: false,
+            model_tag_count: 0,
+        }),
+    }
 }

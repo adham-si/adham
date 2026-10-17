@@ -125,7 +125,12 @@ export type PendingOperationList = { operations: Array<PendingOperationDto>, tru
 
 export type ClearPendingOperationPayload = { operationId: string, expectedMessageRequestId: string, reason: string, };
 
-export type TestProviderConnectionPayload = { accountId: string, };
+export type TestProviderConnectionPayload = { accountId: string, 
+/**
+ * When set (with an empty `accountId`), probe this URL without saving
+ * anything ("failed test saves nothing").
+ */
+endpointUrl: string | null, };
 
 export type ProviderHealthResponse = { reachable: boolean, modelTagCount: number, };
 
@@ -144,6 +149,8 @@ export type ProviderModelsList = { models: Array<ProviderModelDto>, };
 export type CompleteOncePayload = { accountId: string, modelId: string, text: string, };
 
 export type CompletionStartDto = { opId: string, messageId: string, };
+
+export type ListProviderAccountsResponse = { accounts: Array<ProviderAccountDto>, };
 
 export type StopCompletionPayload = { opId: string, };
 

@@ -8,6 +8,7 @@ import type {
   CommandResult,
   CompletionStartDto,
   ConversationMessageDto,
+  ListProviderAccountsResponse,
   ConversationPage,
   GetPreferencesResponse,
   PendingOperationDto,
@@ -52,6 +53,7 @@ import {
   WorkspaceListSchema,
   WorkspaceSummarySchema,
   CompletionStartDtoSchema,
+  ListProviderAccountsResponseSchema,
   ProviderAccountDtoSchema,
   ProviderHealthResponseSchema,
   ProviderModelsListSchema,
@@ -67,6 +69,7 @@ export type {
   CommandResult,
   CompletionStartDto,
   ConversationMessageDto,
+  ListProviderAccountsResponse,
   ConversationPage,
   GetPreferencesResponse,
   PlatformInfo,
@@ -416,15 +419,20 @@ export class AdhamApiClient implements AdhamClient {
     return { workspaceId, projectId, sessionId };
   }
 
+  async listProviderAccounts(): Promise<ListProviderAccountsResponse> {
+    const raw = (await invoke('list_provider_accounts')) as unknown;
+    return ListProviderAccountsResponseSchema.parse((raw as { data: unknown }).data);
+  }
+
   async testProviderConnection(
     workspaceId: string,
     projectId: string,
     sessionId: string,
     accountId: string,
-    options?: { requestId?: string },
+    options?: { requestId?: string; endpointUrl?: string },
   ): Promise<ProviderHealthResponse> {
     const envelope = this.wrapCommand(
-      { accountId },
+      { accountId, endpointUrl: options?.endpointUrl ?? null },
       this.sessionContext(workspaceId, projectId, sessionId),
       options?.requestId,
     );

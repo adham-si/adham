@@ -455,6 +455,10 @@ pub struct ProviderHealthResponse {
 #[ts(export)]
 pub struct TestProviderConnectionPayload {
     pub account_id: String,
+    /// When set (with an empty `accountId`), probe this URL without saving
+    /// anything ("failed test saves nothing").
+    #[serde(default)]
+    pub endpoint_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -502,6 +506,13 @@ pub struct StopCompletionPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
+pub struct ListProviderAccountsResponse {
+    pub accounts: Vec<ProviderAccountDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
 pub struct StopCompletionResponse {
     pub op_id: String,
     pub status: String,

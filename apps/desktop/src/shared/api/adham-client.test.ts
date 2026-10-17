@@ -411,4 +411,38 @@ describe('IPC contract fixture (cross-language)', () => {
     expect(received[1]?.event.type).toBe('delta');
     expect(sinkRef).not.toHaveBeenCalled();
   });
+
+  it('lists saved provider accounts and probes unsaved endpoint URLs', async () => {
+    vi.mocked(invoke).mockReset();
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === 'list_provider_accounts') {
+        return {
+          data: {
+            accounts: [
+              {
+                accountId: 'acc-1',
+                alias: 'Local',
+                endpointUrl: 'http://127.0.0.1:11434',
+                privacyClass: 'local_only',
+              },
+            ],
+          },
+        };
+      }
+      expect(cmd).toBe('test_provider_connection');
+      const req = (args as { request: { payload: { accountId: string; endpointUrl: string } } })
+        .request;
+      expect(req.payload.accountId).toBe('');
+      expect(req.payload.endpointUrl).toBe('http://127.0.0.1:11434');
+      return { data: { reachable: false, modelTagCount: 0 } };
+    });
+
+    const client = new AdhamApiClient();
+    const listed = await client.listProviderAccounts();
+    expect(listed.accounts[0]?.accountId).toBe('acc-1');
+    const probe = await client.testProviderConnection('ws', 'proj', 'sess', '', {
+      endpointUrl: 'http://127.0.0.1:11434',
+    });
+    expect(probe.reachable).toBe(false);
+  });
 });

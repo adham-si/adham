@@ -2,13 +2,14 @@ use adham_desktop_api::{
     ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
     CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
     CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
-    GetPreferencesResponse, PendingOperationDto, PendingOperationList, PlatformInfo, ProjectList,
-    ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
-    RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
-    SelectProjectPayload, SessionList, SessionSummary, StopCompletionPayload,
-    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
-    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
-    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
+    GetPreferencesResponse, ListProviderAccountsResponse, PendingOperationDto,
+    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
+    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
+    RecordPendingOperationPayload, ResetPreferencesResponse, SelectProjectPayload, SessionList,
+    SessionSummary, StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
+    SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
+    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
+    WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -144,6 +145,15 @@ impl adham_desktop_api::EventSink for TauriEventSink {
     fn send(&self, event: StreamEventDto) -> Result<(), String> {
         self.channel.send(event).map_err(|e| e.to_string())
     }
+}
+
+#[tauri::command]
+async fn list_provider_accounts(
+    state: tauri::State<'_, ApiContext>,
+) -> Result<CommandResult<ListProviderAccountsResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_list_provider_accounts(&state)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
 #[tauri::command]
@@ -343,6 +353,7 @@ pub fn run() {
             record_pending_operation,
             list_pending_operations,
             clear_pending_operation,
+            list_provider_accounts,
             test_provider_connection,
             discover_ollama_models,
             update_provider_account,

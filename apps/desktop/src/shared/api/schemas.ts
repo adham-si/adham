@@ -218,3 +218,7 @@ export const StreamEventDtoSchema = z.object({
 });
 
 export type ValidatedStreamEvent = z.infer<typeof StreamEventDtoSchema>;
+
+export const ListProviderAccountsResponseSchema = z.object({
+  accounts: z.array(ProviderAccountDtoSchema),
+});

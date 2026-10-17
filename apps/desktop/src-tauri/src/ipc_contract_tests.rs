@@ -456,6 +456,7 @@ fn provider_mock_app(ctx: ApiContext) -> tauri::App<MockRuntime> {
             create_project,
             create_session,
             get_conversation,
+            list_provider_accounts,
             test_provider_connection,
             discover_ollama_models,
             update_provider_account,
@@ -1513,4 +1514,60 @@ fn renderer_disconnect_still_persists_terminal() {
                 .expect("pending row");
         assert_eq!(status, "resolved");
     });
+}
+
+/// A6 support: saved Ollama accounts are listing-reachable (reload survives),
+/// and probing an unsaved URL persists nothing ("failed test saves nothing").
+#[test]
+fn provider_accounts_are_listable_and_unsaved_probe_persists_nothing() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let dead_base = "http://127.0.0.1:9";
+    let base_url = spawn_stub_ollama(&runtime, None, captures.clone(), ChatProgram::once(vec![]));
+    let account_id = seed_local_account_with_model(&runtime, &ctx, &base_url);
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let _ctx = app.state::<ApiContext>().inner().clone();
+
+    // listing includes the seeded local account
+    let response = invoke(&webview, "list_provider_accounts", json!({})).expect("list");
+    let accounts = response["data"]["accounts"].as_array().expect("accounts");
+    assert_eq!(accounts.len(), 1);
+    assert_eq!(accounts[0]["accountId"], json!(account_id));
+    assert_eq!(accounts[0]["privacyClass"], json!("local_only"));
+
+    // URL probe of an unsaved endpoint: hits the wire, persists nothing
+    let response = invoke(
+        &webview,
+        "test_provider_connection",
+        args_for(
+            context_for(&ws, &proj, &sess),
+            json!({"accountId": "", "endpointUrl": base_url}),
+        ),
+    )
+    .expect("transient probe");
+    assert_eq!(response["data"]["reachable"], json!(true));
+    assert_eq!(
+        captures.accepts(),
+        1,
+        "probe went to the wire with no account row"
+    );
+
+    // the dead endpoint probe reports unreachable, still no row written
+    let response = invoke(
+        &webview,
+        "test_provider_connection",
+        args_for(
+            context_for(&ws, &proj, &sess),
+            json!({"accountId": "", "endpointUrl": dead_base}),
+        ),
+    )
+    .expect("dead probe");
+    assert_eq!(response["data"]["reachable"], json!(false));
+
+    let response = invoke(&webview, "list_provider_accounts", json!({})).expect("list again");
+    let accounts = response["data"]["accounts"].as_array().expect("accounts");
+    assert_eq!(accounts.len(), 1, "probes never persisted an account row");
 }
