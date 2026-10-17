@@ -195,8 +195,35 @@ pub async fn handle_test_provider_connection(
         );
     }
     let account = local_account(ctx, &env.payload.account_id).await?;
-    let adapter = ollama_adapter(&account)?;
-    let response = match adapter.connection_test().await {
+    // kind-routed probe: Ollama → /api/tags; Google → metadata-only models
+    // count (same policy surface as dispatch: official or loopback mirror,
+    // sealed credential required).
+    let reachable_count: Result<usize, String> = match account.kind {
+        adham_provider::domain::account::ProviderKind::GoogleGemini => {
+            let credential = adham_event_log::read_provider_credential_plaintext(
+                &ctx.pool,
+                ctx.content_key.as_ref(),
+                &account.account_id.0,
+                &ctx.installation_id.0.to_string(),
+            )
+            .await
+            .map_err(|e| {
+                format!("VALIDATION_FAILED: no usable credential for this Google account: {e}")
+            });
+            match credential.and_then(|c| any_adapter(&account, Some(c))) {
+                Ok(adapter) => {
+                    let count = adapter.connection_test().await;
+                    Ok(count.map_err(|e| e.to_string())?)
+                }
+                Err(e) => Err(e),
+            }
+        }
+        _ => ollama_adapter(&account)?
+            .connection_test()
+            .await
+            .map_err(|e| e.to_string()),
+    };
+    let response = match reachable_count {
         Ok(count) => ok_result(
             env.request_id,
             ProviderHealthResponse {

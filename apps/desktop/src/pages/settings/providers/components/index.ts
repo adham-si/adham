@@ -2,3 +2,4 @@ export { ProviderFilterTabs, type ProviderFilterTab } from './provider-filter-ta
 export { ProviderCard, type ProviderItem } from './provider-card';
 export { ProvidersList } from './providers-list';
 export { OllamaConnect } from './ollama-connect';
+export { GoogleConnect } from './google-connect';

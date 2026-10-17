@@ -8,6 +8,7 @@ import type {
   CommandResult,
   CompletionStartDto,
   ConversationMessageDto,
+  GoogleAccountDisconnected,
   ListProviderAccountsResponse,
   ListProviderModelsResponse,
   ConversationPage,
@@ -39,6 +40,7 @@ import {
   BootstrapStateSchema,
   ConversationPageSchema,
   GetPreferencesResponseSchema,
+  GoogleAccountDisconnectedSchema,
   PendingOperationDtoSchema,
   PendingOperationListSchema,
   ProjectListSchema,
@@ -71,6 +73,7 @@ export type {
   CommandResult,
   CompletionStartDto,
   ConversationMessageDto,
+  GoogleAccountDisconnected,
   ListProviderAccountsResponse,
   ListProviderModelsResponse,
   ConversationPage,
@@ -485,6 +488,45 @@ export class AdhamApiClient implements AdhamClient {
       request: envelope,
     });
     return ProviderAccountDtoSchema.parse(result.data);
+  }
+
+  /** G2: write-only Google configuration — the API key is sealed backend-side
+   * and echoed back to nobody (the response carries no key material). */
+  async configureGoogleAccount(
+    payload: {
+      accountId: string | null;
+      alias: string | null;
+      apiKey: string;
+      acknowledgeCloudTransfer: boolean;
+    },
+    options?: { requestId?: string },
+  ): Promise<ProviderAccountDto> {
+    const envelope = this.wrapCommand(
+      payload,
+      { workspaceId: null, projectId: null, sessionId: null },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<ProviderAccountDto>>('configure_google_account', {
+      request: envelope,
+    });
+    return ProviderAccountDtoSchema.parse(result.data);
+  }
+
+  /** G2: disconnect removes the Google account; models and the sealed key
+   * cascade away on the backend. */
+  async disconnectGoogleAccount(
+    accountId: string,
+    options?: { requestId?: string },
+  ): Promise<{ accountId: string }> {
+    const envelope = this.wrapCommand(
+      { accountId },
+      { workspaceId: null, projectId: null, sessionId: null },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<{ accountId: string }>>('disconnect_google_account', {
+      request: envelope,
+    });
+    return GoogleAccountDisconnectedSchema.parse(result.data);
   }
 
   async completeOnceStreaming(

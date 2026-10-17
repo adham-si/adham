@@ -41,7 +41,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
     renderPage();
     expect(
       screen.getByText(
-        'Dispatch is restricted to provider accounts classified local-only, configured to addresses you choose yourself. Cloud providers are not implemented in this delivery.',
+        'Nothing is assigned as default and there is no fallback chain. Local-only accounts dispatch on your device; cloud accounts dispatch to the configured cloud service only after explicit consent in Providers.',
       ),
     ).not.toBeNull();
     // no Preview banner over the working controls (delivery-closure item 1)
@@ -59,7 +59,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
     renderPage();
     expect(
       screen.getByText(
-        'الإرسال محصور بحسابات المزودين المصنفة محليًا فقط، مع عناوين تختارها بنفسك. مزودو السحابة غير مدعومين في هذا الإصدار.',
+        'لا يُعيَّن أي نموذج افتراضي ولا توجد سلسلة بدائل. حسابات «محلي فقط» تعمل على جهازك؛ حسابات السحابة تُرسل إلى الخدمة السحابية المضبوطة فقط بعد موافقة صريحة في صفحة «المزودون».',
       ),
     ).not.toBeNull();
     expect(screen.queryByRole('note')).toBeNull();
@@ -218,7 +218,7 @@ describe('ModelsPage (preserved preview implementation)', () => {
     });
     renderPage();
     expect(await screen.findByText('DeepSeek R1 1.5B')).toBeDefined();
-    expect(screen.getByText(/local ollama/i)).toBeDefined();
+    expect(screen.getAllByText(/local ollama/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/sha256:aa11bb22cc33/)).toBeDefined();
     expect(screen.getByText(/streaming/i)).toBeDefined();
     // unknown stays unknown: no thinking/tool/structured chips of any locale
@@ -229,5 +229,106 @@ describe('ModelsPage (preserved preview implementation)', () => {
     expect(
       screen.queryByText(/structured output|مخرجات مهيكلة|Структурированный вывод|结构化输出/),
     ).toBeNull();
+  });
+});
+
+describe('ModelsPage (Delivery G: per-provider sections)', () => {
+  const googleModel = {
+    modelId: 'gemini-2.5-flash',
+    digest: '',
+    humanLabel: 'Gemini 2.5 Flash',
+    privacyClass: 'cloud_standard',
+    kind: 'google_gemini',
+    capabilities: {
+      streaming: 'supported',
+      structuredOutput: 'unknown',
+      toolProposals: 'unknown',
+      thinking: 'unknown',
+    },
+  };
+  const ollamaModel = {
+    modelId: 'qwen2.5:latest',
+    digest: 'abc123def456',
+    humanLabel: 'Qwen 2.5 (latest)',
+    privacyClass: 'local_only',
+    kind: 'ollama_local',
+    capabilities: {
+      streaming: 'supported',
+      structuredOutput: 'unknown',
+      toolProposals: 'unknown',
+      thinking: 'unknown',
+    },
+  };
+
+  function mockBothAccounts(invokeMock: ReturnType<typeof vi.fn>) {
+    invokeMock.mockReset();
+    invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === 'list_provider_accounts') {
+        return {
+          data: {
+            accounts: [
+              {
+                accountId: 'acc-ollama',
+                alias: 'Local Ollama',
+                endpointUrl: 'http://127.0.0.1:11434',
+                privacyClass: 'local_only',
+                kind: 'ollama_local',
+              },
+              {
+                accountId: 'acc-google',
+                alias: 'Google Gemini',
+                endpointUrl: 'https://generativelanguage.googleapis.com',
+                privacyClass: 'cloud_standard',
+                kind: 'google_gemini',
+              },
+            ],
+          },
+        };
+      }
+      if (cmd === 'list_provider_models') {
+        const accountId = (
+          args as { request: { payload: { accountId: string } } }
+        ).request.payload.accountId;
+        return {
+          data: { models: accountId === 'acc-google' ? [googleModel] : [ollamaModel] },
+        };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+  }
+
+  it('renders a section per connected account regardless of kind, with no digest line when the digest is empty', async () => {
+    const invokeMock = vi.mocked(invoke);
+    mockBothAccounts(invokeMock);
+    renderPage();
+    expect(await screen.findByText('Gemini 2.5 Flash')).toBeDefined();
+    expect(screen.getByText('Qwen 2.5 (latest)')).toBeDefined();
+    // each account owns its own section, keyed by alias — no name/prefix rules
+    // and no kind or privacy-class filter
+    const googleSection = screen
+      .getByRole('heading', { name: 'Google Gemini' })
+      .closest('section') as HTMLElement;
+    expect(googleSection.textContent).toContain('Gemini 2.5 Flash');
+    expect(googleSection.textContent).not.toContain('Qwen');
+    // recorded digests still print as sha256:…, empty digests (cloud models)
+    // never invent a fake digest line
+    expect(screen.getByText(/sha256:abc123/)).toBeDefined();
+    const digestLines = Array.from(googleSection.querySelectorAll('p')).filter((el) =>
+      el.closest('li')?.textContent?.includes('Gemini 2.5 Flash'),
+    );
+    expect(digestLines.some((el) => el.textContent!.startsWith('Google Gemini · sha256:'))).toBe(
+      false,
+    );
+  });
+
+  it('says nothing about connected providers when no accounts exist', async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockReset();
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === 'list_provider_accounts') return { data: { accounts: [] } };
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    renderPage();
+    expect(await screen.findByText('No provider accounts are connected yet.')).toBeDefined();
   });
 });

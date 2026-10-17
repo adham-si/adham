@@ -161,6 +161,12 @@ export type ListProviderModelsPayload = { accountId: string, };
 
 export type ListProviderModelsResponse = { models: Array<ProviderModelDto>, };
 
+export type ConfigureGoogleAccountPayload = { accountId: string | null, alias: string | null, apiKey: string, acknowledgeCloudTransfer: boolean, };
+
+export type DisconnectGoogleAccountPayload = { accountId: string, };
+
+export type GoogleAccountDisconnected = { accountId: string, };
+
 export type StopCompletionPayload = { opId: string, };
 
 export type StopCompletionResponse = { opId: string, status: string, };

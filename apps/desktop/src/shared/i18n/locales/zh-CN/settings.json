@@ -73,7 +73,7 @@
     },
     "models": {
       "title": "模型与服务商",
-      "desc": "显示从已注册的 Ollama 端点发现的模型。不会指派默认值，也不存在回退链。",
+      "desc": "显示从已注册的服务商端点发现的模型。不会指派默认值，也不存在回退链。",
       "provider": "当前服务商",
       "model": "默认模型",
       "fallback": "备用策略链",
@@ -92,7 +92,7 @@
       "pageTitle": "AI 模型",
       "pageDesc": "配置默认智能运行时、模型参数和自动回退链。",
       "listTitle": "可用模型",
-      "localFirstNote": "调度仅限使用你自行配置的、归类为仅本地的服务商账户。此版本未实现云服务商。",
+      "localFirstNote": "不会指派默认值，也不存在回退链。仅本地账户在你的设备上处理；云账户仅在「服务商」页明确同意后才会发送到已配置的云端服务。",
       "defaultsTitle": "工作区默认值与路由",
       "defaultsHint": "配置默认智能运行时和自动恢复链。",
       "primaryLabel": "主默认模型",
@@ -123,7 +123,8 @@
       "capStreaming": "流式",
       "capThinking": "思考",
       "capToolProposals": "工具调用",
-      "capStructuredOutput": "结构化输出"
+      "capStructuredOutput": "结构化输出",
+      "noneConnected": "尚未连接任何服务商账户。"
     },
     "storage": {
       "title": "存储与备份",
@@ -346,7 +347,26 @@
       "probeFailed": "无法对 {{url}} 执行检查（{{error}}）。未保存任何内容。",
       "checkPending": "尚未记录 {{url}} 的检查结果。",
       "lastDiscovery": "在 {{time}} 发现了 {{count}} 个模型（已存入注册表）。",
-      "unsavedAttribution": "上方已记录的模型属于 {{url}}；发现前请先重新测试修改后的端点。"
+      "unsavedAttribution": "上方已记录的模型属于 {{url}}；发现前请先重新测试修改后的端点。",
+      "googleSectionTitle": "Google Gemini (云端)",
+      "googleKeyLabel": "Gemini API 密钥",
+      "googleKeyPlaceholder": "粘贴 API 密钥——之后将不再显示",
+      "googleConsentLabel": "我理解生成过程会由 Google 云端处理",
+      "googleConnect": "连接",
+      "googleKeySealedNote": "密钥加密保存在本应用的保险库中,不会再次显示,也不会以明文保存。",
+      "googleConfiguredLine": "已连接为 {{alias}} 于 {{url}}",
+      "googleRotated": "密钥已于 {{time}} 更新并重新加密",
+      "googleDisconnect": "断开连接",
+      "googleConfirmDisconnect": "断开 Google Gemini?模型清单与已保存的密钥会一并移除。",
+      "googleConsentRequired": "连接前必须先确认云端传输。",
+      "googleModelsSectionTitle": "Google Gemini 模型",
+      "cloudBadge": "云端",
+      "googleDisconnectedLine": "未连接。连接需要 API 密钥并须明确同意云端传输。",
+      "googleDisconnectConfirmLabel": "确认断开",
+      "googleFailedLine": "Google 配置失败：{{error}}",
+      "googleUnreachable": "上次检查 {{time}}——{{url}} 处的 Google Gemini 无响应。未保存任何内容。",
+      "googleTestLabel": "测试 Google 连接",
+      "googleDiscoverLabel": "发现 Google 模型"
     },
     "mcp": {
       "descPlaywright": "绑定到本地临时目录的浏览器自动化服务器。",

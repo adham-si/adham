@@ -38,6 +38,14 @@ impl AnyAdapter {
             Self::Gemini(a) => a.discover().await,
         }
     }
+
+    /// Metadata-only health probe; returns the model count for the UI.
+    pub async fn connection_test(&self) -> Result<usize, ProviderError> {
+        match self {
+            Self::Ollama(a) => a.connection_test().await,
+            Self::Gemini(a) => a.connection_test().await,
+        }
+    }
 }
 
 /// Shared event plumbing: both wire parsers normalize into the same stream

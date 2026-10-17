@@ -73,7 +73,7 @@
     },
     "models": {
       "title": "Models & Providers",
-      "desc": "Models discovered from your registered Ollama endpoint. Nothing is assigned as default; there is no fallback chain.",
+      "desc": "Models discovered from your registered provider endpoints. Nothing is assigned as default; there is no fallback chain.",
       "provider": "Active Provider",
       "model": "Default Model",
       "fallback": "Fallback Chain",
@@ -92,7 +92,7 @@
       "pageTitle": "AI Models",
       "pageDesc": "Configure default intelligence runtimes, model parameters, and automatic fallback chains.",
       "listTitle": "Available Models",
-      "localFirstNote": "Dispatch is restricted to provider accounts classified local-only, configured to addresses you choose yourself. Cloud providers are not implemented in this delivery.",
+      "localFirstNote": "Nothing is assigned as default and there is no fallback chain. Local-only accounts dispatch on your device; cloud accounts dispatch to the configured cloud service only after explicit consent in Providers.",
       "defaultsTitle": "Workspace Defaults & Routing",
       "defaultsHint": "Configure the default intelligence runtime and automatic recovery chain.",
       "primaryLabel": "Primary Default Model",
@@ -123,7 +123,8 @@
       "capStreaming": "Streaming",
       "capThinking": "Thinking",
       "capToolProposals": "Tool proposals",
-      "capStructuredOutput": "Structured output"
+      "capStructuredOutput": "Structured output",
+      "noneConnected": "No provider accounts are connected yet."
     },
     "storage": {
       "title": "Storage & Backup",
@@ -349,7 +350,26 @@
       "probeFailed": "Could not run the check for {{url}} ({{error}}). Nothing was saved.",
       "checkPending": "No check result recorded for {{url}} yet.",
       "lastDiscovery": "Discovered {{count}} models at {{time}} (saved to the registry).",
-      "unsavedAttribution": "The recorded models above belong to {{url}}; re-test the edited endpoint before discovering."
+      "unsavedAttribution": "The recorded models above belong to {{url}}; re-test the edited endpoint before discovering.",
+      "googleSectionTitle": "Google Gemini (cloud)",
+      "googleKeyLabel": "Gemini API key",
+      "googleKeyPlaceholder": "Paste an API key — it is never shown again",
+      "googleConsentLabel": "I understand prompts and answers are processed by Google as a cloud provider",
+      "googleConnect": "Connect",
+      "googleKeySealedNote": "The key is stored sealed in this app's vault and never displayed or saved in plaintext.",
+      "googleConfiguredLine": "Connected as {{alias}} at {{url}}",
+      "googleRotated": "Key updated and resealed at {{time}}",
+      "googleDisconnect": "Disconnect",
+      "googleConfirmDisconnect": "Disconnect Google Gemini? The model inventory and the stored key are removed together.",
+      "googleConsentRequired": "You must acknowledge cloud transfer before connecting.",
+      "googleModelsSectionTitle": "Google Gemini models",
+      "cloudBadge": "cloud",
+      "googleDisconnectedLine": "Not connected. Connecting requires an API key and explicit cloud-transfer consent.",
+      "googleDisconnectConfirmLabel": "Yes, disconnect",
+      "googleFailedLine": "Google configuration failed: {{error}}",
+      "googleUnreachable": "Last check {{time}} — no response from Google Gemini at {{url}}. Nothing was saved.",
+      "googleTestLabel": "Test Google connection",
+      "googleDiscoverLabel": "Discover Google models"
     },
     "mcp": {
       "descPlaywright": "Browser automation server bounded to local scratch directory.",

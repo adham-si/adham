@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { OllamaModels } from './components';
+import { ProviderModelSections } from './components';
 
 export function ModelsPage() {
   const { t } = useTranslation();
@@ -14,10 +14,11 @@ export function ModelsPage() {
         <p className="text-xs text-foreground-secondary mt-1">{t('settings.models.desc')}</p>
       </div>
 
-      {/* Registry-pinned Ollama models (Delivery A). No static catalog and no
-          default/fallback chain are shown: supported models are exactly the
-          ones pinned from a connected Ollama endpoint. */}
-      <OllamaModels />
+      {/* Registry-pinned models for every connected provider account
+          (Delivery A + G). No static catalog and no default/fallback chain
+          are shown: supported models are exactly the ones pinned from
+          working provider connections. */}
+      <ProviderModelSections />
 
       {/* Implemented local-only wording (not a guarantee — see the delivery
           note in the locale resources). */}

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { OllamaConnect } from './components';
+import { GoogleConnect, OllamaConnect } from './components';
 
 export function ProvidersPage() {
   const { t } = useTranslation();
@@ -14,9 +14,11 @@ export function ProvidersPage() {
         <p className="text-xs text-foreground-secondary mt-1">{t('settings.providers.desc')}</p>
       </div>
 
-      {/* Working Ollama row (Delivery A). No static provider catalog is shown:
-          supported providers are exactly the working connections below. */}
+      {/* Working Ollama row (Delivery A) and consent-gated Google Gemini card
+          (Delivery G). No static provider catalog is shown: supported
+          providers are exactly the working connections below. */}
       <OllamaConnect />
+      <GoogleConnect />
     </div>
   );
 }

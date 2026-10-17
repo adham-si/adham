@@ -5,11 +5,13 @@ import { adhamClient } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
 
 /**
- * Pinned Ollama models for the connected local account (registry read —
- * no network). Listing is order-of-discovery; the composer requires an
+ * Registry-pinned models for EVERY connected provider account (Delivery G
+ * generalization of the Ollama-only list). Sections come from
+ * providerAccounts × providerModels — no account-name, prefix or kind
+ * conditions. Listing is order-of-discovery; the composer requires an
  * explicit user selection and promotes none automatically.
  */
-export function OllamaModels() {
+export function ProviderModelSections() {
   const { t } = useTranslation();
   const accountsQuery = useQuery({
     queryKey: queryKeys.providerAccounts,
@@ -17,16 +19,34 @@ export function OllamaModels() {
     staleTime: 60_000,
     retry: false,
   });
-  const saved = accountsQuery.data?.accounts.find((a) => a.privacyClass === 'local_only') ?? null;
+  const accounts = accountsQuery.data?.accounts ?? [];
+
+  return (
+    <div className="space-y-6">
+      {accounts.map((account) => (
+        <ProviderModelSection
+          key={account.accountId}
+          accountId={account.accountId}
+          alias={account.alias}
+        />
+      ))}
+      {accounts.length === 0 && (
+        <p className="text-xs text-foreground-secondary">{t('settings.models.noneConnected')}</p>
+      )}
+    </div>
+  );
+}
+
+function ProviderModelSection({ accountId, alias }: { accountId: string; alias: string }) {
+  const { t } = useTranslation();
   const modelsQuery = useQuery({
-    queryKey: queryKeys.providerModels(saved?.accountId ?? 'none'),
-    queryFn: () => adhamClient.listProviderModels(saved!.accountId),
-    enabled: saved !== null,
+    queryKey: queryKeys.providerModels(accountId),
+    queryFn: () => adhamClient.listProviderModels(accountId),
     staleTime: 60_000,
     retry: false,
   });
   const models = modelsQuery.data?.models ?? [];
-  if (saved === null || models.length === 0) return null;
+  if (models.length === 0) return null;
 
   // Only recorded `supported` capabilities render; the registry's `unknown`
   // values stay unknown — nothing is inferred from the model's name.
@@ -38,10 +58,13 @@ export function OllamaModels() {
   ] as const;
 
   return (
-    <section aria-labelledby="ollama-models-heading" className="space-y-3">
+    <section aria-labelledby={`provider-models-heading-${accountId}`} className="space-y-3">
       <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
-        <h3 id="ollama-models-heading" className="text-sm font-semibold text-foreground">
-          {t('settings.models.ollamaTitle')}
+        <h3
+          id={`provider-models-heading-${accountId}`}
+          className="text-sm font-semibold text-foreground"
+        >
+          {alias}
         </h3>
         <span className="text-xs text-foreground-secondary">
           {t('settings.providers.discoveredCount', { count: models.length })}
@@ -61,9 +84,13 @@ export function OllamaModels() {
                   <p className="truncate text-xs text-foreground-secondary">{m.modelId}</p>
                 )}
                 <p className="truncate text-[11px] text-foreground-muted">
-                  {saved.alias}
-                  {' · '}
-                  {`sha256:${m.digest.slice(0, 12)}…`}
+                  {alias}
+                  {m.digest.length > 0 && (
+                    <>
+                      {' · '}
+                      {`sha256:${m.digest.slice(0, 12)}…`}
+                    </>
+                  )}
                 </p>
               </div>
               {caps.length > 0 && (

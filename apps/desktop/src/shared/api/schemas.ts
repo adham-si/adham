@@ -187,6 +187,11 @@ export const ProviderAccountDtoSchema = z.object({
   kind: z.string(),
 });
 
+// Delivery G2: disconnect response (account removal confirmation only)
+export const GoogleAccountDisconnectedSchema = z.object({
+  accountId: z.string(),
+});
+
 export const ProviderHealthResponseSchema = z.object({
   reachable: z.boolean(),
   modelTagCount: z.number().int().nonnegative(),
