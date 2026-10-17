@@ -1,5 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { ComposeInput } from './compose-input';
 import type { ComposeAttachment } from './compose-context-chips';
 import { ComposeContextChips } from './compose-context-chips';
@@ -11,11 +13,22 @@ import type { ComposeMode } from './compose-mode-selector';
 import type { ComposeStatus } from './use-compose-state';
 import type { ModelOption } from './compose-model-picker';
 
+/** A send that arrived while a turn was running; it stays visible here until
+ *  it is dispatched (or removed) — never injected into the active call. */
+export interface QueuedInstruction {
+  id: string;
+  text: string;
+}
+
 export interface ComposerProps {
   inputText: string;
   onChangeInput: (text: string) => void;
   onSubmit: () => void;
   onStop?: (() => void) | undefined;
+  /** Instructions waiting for the running turn to settle, shown above the
+   *  input so a queueing send is never a silent no-op. */
+  queued?: QueuedInstruction[] | undefined;
+  onRemoveQueued?: ((id: string) => void) | undefined;
   status?: ComposeStatus | undefined;
   mode?: ComposeMode | undefined;
   onChangeMode?: ((mode: ComposeMode) => void) | undefined;
@@ -47,6 +60,8 @@ export function Composer({
   onChangeInput,
   onSubmit,
   onStop = () => {},
+  queued = [],
+  onRemoveQueued,
   status = 'idle',
   mode = 'plan',
   onChangeMode = () => {},
@@ -155,6 +170,35 @@ export function Composer({
         {/* Attached Context Chips (Files, Folders, Pasted Text Blobs) */}
         <ComposeContextChips attachments={attachments} onRemove={onRemoveAttachment} />
 
+        {/* Queued instructions: visible while a turn runs; each is dispatched
+            when the turn settles unless the user removes it first. */}
+        {queued.length > 0 && (
+          <div aria-live="polite" className="space-y-1 px-3 pt-2">
+            {queued.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground-secondary"
+              >
+                <span className="shrink-0 rounded border border-border-subtle bg-surface px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                  {t('compose.queuedHeading', 'Queued')}
+                </span>
+                <span className="truncate" title={item.text}>
+                  {item.text}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveQueued?.(item.id)}
+                  aria-label={t('compose.removeQueued', 'Remove queued instruction')}
+                  title={t('compose.removeQueued', 'Remove queued instruction')}
+                  className="ms-auto shrink-0 rounded p-0.5 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* RTL-aware Textarea */}
         <ComposeInput
           value={inputText}
@@ -164,7 +208,6 @@ export function Composer({
           onRecallNext={onRecallNext}
           onAttachPastedBlob={handleAttachPastedBlob}
           placeholder={placeholder}
-          disabled={status === 'sending' || status === 'streaming'}
           enterToSend={enterToSend}
         />
 

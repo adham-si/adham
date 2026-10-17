@@ -87,6 +87,9 @@
     "thinkingOffTag": "No thinking",
     "thinkingHeading": "Thinking",
     "thinkingDefault": "Model default",
+    "queue": "Queue instruction",
+    "queuedHeading": "Queued",
+    "removeQueued": "Remove queued instruction",
     "selectModel": "Select a model"
   }
 }

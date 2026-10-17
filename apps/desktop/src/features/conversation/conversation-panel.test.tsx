@@ -354,6 +354,122 @@ describe('ConversationPanel', () => {
     expect('think' in payloads[2]!).toBe(false);
   });
 
+  it('queues a send during a run visibly and dispatches it when the turn settles', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    const payloads: Array<Record<string, unknown>> = [];
+    let emit: StreamEventParam | null = null;
+    let resolveDispatch!: (start: CompletionStartDto) => void;
+    backend.completeOnceStreaming = vi.fn((_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as Record<string, unknown>);
+      if (payloads.length === 1) {
+        // First turn: held open so a send arrives while it is running.
+        emit = onEvent;
+        return new Promise((resolve) => {
+          resolveDispatch = resolve;
+        });
+      }
+      onEvent({ opId: 'op-2', sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId: 'op-2',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return Promise.resolve({ opId: 'op-2', messageId: 'm-2', context: null });
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-1', status: 'cancelled' }));
+
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+
+    await user.type(box, 'first');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(payloads).toHaveLength(1));
+
+    // The composer stays usable during the run; Enter queues the instruction
+    // visibly and acknowledges it (draft cleared, nothing injected).
+    await user.type(box, 'second');
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('second')).toBeDefined();
+    expect(screen.getByText(/^queued$/i)).toBeDefined();
+    expect(box.value).toBe('');
+
+    // The settled turn dispatches the queued instruction through the same
+    // path as a direct send.
+    await act(async () => {
+      emit!({
+        opId: 'op-1',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      resolveDispatch({ opId: 'op-1', messageId: 'm-1', context: null });
+    });
+    await waitFor(() => expect(payloads).toHaveLength(2));
+    expect(payloads[1]!.text).toBe('second');
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Remove queued instruction' })).toBeNull(),
+    );
+  });
+
+  it('removes a queued instruction before it is dispatched', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    const payloads: Array<Record<string, unknown>> = [];
+    let emit: StreamEventParam | null = null;
+    let resolveDispatch!: (start: CompletionStartDto) => void;
+    backend.completeOnceStreaming = vi.fn((_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as Record<string, unknown>);
+      emit = onEvent;
+      return new Promise((resolve) => {
+        resolveDispatch = resolve;
+      });
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-1', status: 'cancelled' }));
+
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+
+    await user.type(box, 'first');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(payloads).toHaveLength(1));
+
+    // The pointer path queues too, and the visible queue has a cancel.
+    await user.type(box, 'second');
+    await user.click(screen.getByRole('button', { name: 'Queue instruction' }));
+    await user.click(screen.getByRole('button', { name: 'Remove queued instruction' }));
+    expect(screen.queryByRole('button', { name: 'Remove queued instruction' })).toBeNull();
+
+    await act(async () => {
+      emit!({
+        opId: 'op-1',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      resolveDispatch({ opId: 'op-1', messageId: 'm-1', context: null });
+    });
+    // The run settled with nothing left to dispatch.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /stop generation/i })).toBeNull(),
+    );
+    expect(payloads).toHaveLength(1);
+  });
+
   it('restores the last used mode and never restores execute', async () => {
     window.localStorage.setItem('adham:compose:mode', 'execute');
     render(<ConversationPanel backend={fakeBackend()} />);

@@ -70,19 +70,34 @@ export function ComposeActionBar({
           disabled={isRunning}
         />
 
-        {/* Morphing Send / Stop Button */}
+        {/* Morphing Send / Stop Button; while running, a queued send has its
+            own visible affordance instead of the send slot. */}
         {isRunning ? (
-          <Button
-            size="xs"
-            variant="danger"
-            iconOnly
-            onClick={onStop}
-            aria-label={t('compose.stop', 'Stop generation')}
-            title={t('compose.stop', 'Stop generation')}
-          >
-            {/* Square Stop Glyphs */}
-            <span className="size-2.5 rounded-xs bg-current" />
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {canSubmit && (
+              <Button
+                size="xs"
+                variant="primary"
+                iconOnly
+                onClick={onSubmit}
+                aria-label={t('compose.queue', 'Queue instruction')}
+                title={t('compose.queue', 'Queue instruction')}
+              >
+                <HugeiconsIcon icon={ArrowUp01Icon} className="size-4 stroke-[2.5]" />
+              </Button>
+            )}
+            <Button
+              size="xs"
+              variant="danger"
+              iconOnly
+              onClick={onStop}
+              aria-label={t('compose.stop', 'Stop generation')}
+              title={t('compose.stop', 'Stop generation')}
+            >
+              {/* Square Stop Glyphs */}
+              <span className="size-2.5 rounded-xs bg-current" />
+            </Button>
+          </div>
         ) : (
           <Button
             size="xs"

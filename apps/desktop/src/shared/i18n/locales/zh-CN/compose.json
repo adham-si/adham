@@ -83,6 +83,9 @@
     "thinkingOffTag": "无思考",
     "thinkingHeading": "思考",
     "thinkingDefault": "模型默认",
+    "queue": "排队发送",
+    "queuedHeading": "排队中",
+    "removeQueued": "移除排队消息",
     "selectModel": "选择模型"
   }
 }

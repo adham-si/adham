@@ -99,6 +99,9 @@
     "thinkingOffTag": "دون تفكير",
     "thinkingHeading": "التفكير",
     "thinkingDefault": "افتراضي النموذج",
+    "queue": "إرسال بعد انتهاء الرد",
+    "queuedHeading": "في الانتظار",
+    "removeQueued": "إزالة الرسالة المنتظرة",
     "selectModel": "اختر نموذجًا"
   }
 }

@@ -95,6 +95,9 @@
     "thinkingOffTag": "Без рассуждений",
     "thinkingHeading": "Рассуждения",
     "thinkingDefault": "По умолчанию у модели",
+    "queue": "Поставить в очередь",
+    "queuedHeading": "В очереди",
+    "removeQueued": "Убрать сообщение из очереди",
     "selectModel": "Выберите модель"
   }
 }

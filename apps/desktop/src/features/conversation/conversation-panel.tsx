@@ -9,6 +9,7 @@ import {
   type ComposeAttachment,
   type ComposeMode,
   type ModelOption,
+  type QueuedInstruction,
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
@@ -140,6 +141,16 @@ export function ConversationPanel({
   const [selectedModelId, setSelectedModelId] = React.useState('');
   /** Documented `think` value for the next turn; null = model default. */
   const [think, setThink] = React.useState<boolean | string | null>(null);
+  /** Sends that arrived while a turn was running, shown above the input. */
+  const [queued, setQueued] = React.useState<QueuedInstruction[]>([]);
+  // The ref mirrors `queued` as the drain's source of truth: drains run in
+  // async continuations after a settled dispatch, where render state lags.
+  const queuedRef = React.useRef<QueuedInstruction[]>([]);
+  const queuedIdRef = React.useRef(0);
+  const setQueuedBoth = React.useCallback((next: QueuedInstruction[]) => {
+    queuedRef.current = next;
+    setQueued(next);
+  }, []);
   const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
   const [stopNotice, setStopNotice] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -258,32 +269,76 @@ export function ConversationPanel({
 
   const formWorking = prov.working || sel.working || provisionTransition !== null;
 
+  /// Runs one turn with the parameters current at dispatch; a queued
+  /// instruction drains through exactly the same path as a direct send.
+  const dispatchTurn = React.useCallback(
+    async (sent: string) => {
+      setSubmitError(null);
+      // Streaming dispatch when a registry model is wired; otherwise the
+      // honest text-only fallback persists just the message.
+      const outcome = streamReady
+        ? await conv.streamOnce(
+            sent,
+            ollama.account!.accountId,
+            selectedModelId,
+            mode,
+            // The documented `think` value; null = model default (omitted).
+            think ?? undefined,
+          )
+        : await conv.submit(sent);
+      // A rejected dispatch (e.g. an undocumented think value) must be
+      // visible, never a silent no-op. Text-only failures go through the
+      // hook's error state, which the panel renders below.
+      if (streamReady && !outcome.ok) setSubmitError(outcome.error);
+      // Nothing was persisted (the hook drops its optimistic bubble), so the
+      // instruction returns to the composer — never clobbering edits typed
+      // meanwhile.
+      if (!outcome.ok && !draftRef.current) setDraft(sent);
+      return outcome;
+    },
+    [conv, streamReady, ollama.account, selectedModelId, mode, think, setDraft],
+  );
+
+  /// Dispatches one turn, then drains the visible queue. The hook accepts one
+  /// live dispatch at a time, so a queued instruction may only go once the
+  /// previous dispatch has fully settled (terminal + authoritative reload);
+  /// a refusal stops the drain, since its reason applies to what follows too.
+  const dispatchAndDrain = React.useCallback(
+    async (sent: string) => {
+      let outcome = await dispatchTurn(sent);
+      while (outcome.ok && queuedRef.current.length > 0) {
+        const next = queuedRef.current[0]!;
+        setQueuedBoth(queuedRef.current.slice(1));
+        outcome = await dispatchTurn(next.text);
+      }
+    },
+    [dispatchTurn, setQueuedBoth],
+  );
+
+  // Queued instructions belong to the session they were typed in: a session
+  // switch drops them rather than dispatching them into another thread.
+  React.useEffect(() => {
+    setQueuedBoth([]);
+  }, [conv.sessionId, setQueuedBoth]);
+
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
-    if (!text || busy) return;
-    setSubmitError(null);
-    const sent = text;
-    // Streaming dispatch when a registry model is wired; otherwise the
-    // honest text-only fallback persists just the message.
-    const outcome = streamReady
-      ? await conv.streamOnce(
-          sent,
-          ollama.account!.accountId,
-          selectedModelId,
-          mode,
-          // The documented `think` value; null = model default (omitted).
-          think ?? undefined,
-        )
-      : await conv.submit(sent);
-    // A rejected streaming dispatch (e.g. a send racing the in-flight turn)
-    // must be visible, never a silent no-op. Text-only refusals and failures
-    // go through the hook's error state, which the panel renders below.
-    if (streamReady && !outcome.ok) setSubmitError(outcome.error);
-    // Retain the draft on failure; never erase edits typed meanwhile.
-    if (outcome.ok && draftRef.current === sent) {
-      commitPrompt(sent);
+    if (!text) return;
+    // Sending while a turn runs queues the instruction visibly: it is never
+    // injected into the active call and never a silent no-op. It dispatches
+    // (with the parameters current then) once the turn settles.
+    if (busy) {
+      queuedIdRef.current += 1;
+      setQueuedBoth([...queuedRef.current, { id: `queued-${queuedIdRef.current}`, text }]);
+      if (draftRef.current === text) commitPrompt(text);
+      return;
     }
-  }, [busy, commitPrompt, conv, streamReady, ollama.account, selectedModelId, mode, think]);
+    // Clear now, not at stream end: submission is the acknowledgment (the
+    // user bubble appears and the turn persists), and a follow-up typed while
+    // the answer streams must not append to an already-sent instruction.
+    if (draftRef.current === text) commitPrompt(text);
+    await dispatchAndDrain(text);
+  }, [busy, commitPrompt, dispatchAndDrain, setQueuedBoth]);
 
   /// A new model invalidates the thinking choice: a level documented for the
   /// previous model may be undocumented for the next one (the backend refuses
@@ -530,6 +585,8 @@ export function ConversationPanel({
           onChangeInput={setDraft}
           onSubmit={() => void handleSubmit()}
           onStop={handleStop}
+          queued={queued}
+          onRemoveQueued={(id) => setQueuedBoth(queuedRef.current.filter((item) => item.id !== id))}
           status={composeStatus}
           enterToSend={enterToSend}
           mode={mode}
