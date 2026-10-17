@@ -456,6 +456,20 @@ export function ConversationPanel({
             )}
           </p>
         )}
+        {conv.omittedMessages > 0 && (
+          <div
+            role="status"
+            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
+          >
+            <p>
+              {t(
+                'conversation.contextTruncated',
+                'Older messages were omitted so this request fits the model context (estimated).',
+              )}{' '}
+              {t('conversation.omittedMessagesLabel', 'Omitted messages')}: {conv.omittedMessages}
+            </p>
+          </div>
+        )}
         {stopNotice && (
           <p>
             {t(

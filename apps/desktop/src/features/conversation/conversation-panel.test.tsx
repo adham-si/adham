@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { CompletionStartDto } from '@adham/contracts-generated';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConversationPanel } from './conversation-panel';
@@ -257,7 +258,7 @@ describe('ConversationPanel', () => {
         sequence: 1,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-m', messageId: 'm-m' };
+      return { opId: 'op-m', messageId: 'm-m', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-m', status: 'cancelled' }));
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
@@ -290,6 +291,43 @@ describe('ConversationPanel', () => {
     render(<ConversationPanel backend={fakeBackend()} />);
     const triggers = await screen.findAllByRole('button', { name: /execution mode/i });
     expect(triggers.at(-1)!.getAttribute('aria-label')).toMatch(/code/i);
+  });
+
+  it('surfaces omitted context from the dispatch assembly, never silently', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
+      onEvent({ opId: 'op-c', sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId: 'op-c',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return {
+        opId: 'op-c',
+        messageId: 'm-c',
+        context: { estimatedInputTokens: 900, inputBudgetTokens: 512, droppedMessages: 3 },
+      };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-c', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+
+    await user.type(box, 'a question');
+    await user.keyboard('{Enter}');
+
+    // The turn completed, but history was trimmed to fit: the user sees how
+    // many messages were omitted instead of a silent drop.
+    await screen.findByText(/Older messages were omitted/i);
+    expect(screen.getByText(/Omitted messages:\s*3/)).not.toBeNull();
   });
 
   it('does not offer a Stop affordance in the text-only fallback flow', async () => {
@@ -377,7 +415,7 @@ describe('ConversationPanel', () => {
       emit = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => {
       emit?.({
@@ -481,7 +519,7 @@ describe('ConversationPanel', () => {
       .mockResolvedValueOnce(bootRows)
       .mockResolvedValue(persistedRows);
     let emit: StreamEventParam | null = null;
-    let resolveDispatch!: (start: { opId: string; messageId: string }) => void;
+    let resolveDispatch!: (start: CompletionStartDto) => void;
     backend.completeOnceStreaming = vi.fn((_ws, _p, _s, _payload, onEvent) => {
       // Connecting: the command (and its op handle) resolves at the terminal,
       // exactly like the real backend.
@@ -496,7 +534,7 @@ describe('ConversationPanel', () => {
         sequence: 9,
         event: { type: 'completed', completion: 'interrupted', truncated: false, usage: null },
       });
-      resolveDispatch({ opId, messageId: 'm-9' });
+      resolveDispatch({ opId, messageId: 'm-9', context: null });
       return { opId, status: 'cancelled' };
     });
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
@@ -563,7 +601,7 @@ describe('ConversationPanel', () => {
     let emit: StreamEventParam | null = null;
     backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
       emit = onEvent;
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
@@ -655,8 +693,7 @@ describe('ConversationPanel', () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
     backend.completeOnceStreaming = vi.fn(
-      (_ws, _p, _s, _payload, _onEvent) =>
-        new Promise<{ opId: string; messageId: string }>(() => {}),
+      (_ws, _p, _s, _payload, _onEvent) => new Promise<CompletionStartDto>(() => {}),
     );
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
@@ -728,7 +765,7 @@ describe('ConversationPanel', () => {
         sequence: 2,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     const provider = {

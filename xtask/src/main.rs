@@ -1,8 +1,8 @@
 use adham_core_types::{ActorKind, EventActor, EventScope, MessageCompletionV1, MessageUsageV1};
 use adham_desktop_api::{
     AppPreferences, BootstrapState, ClearPendingOperationPayload, CommandContext,
-    CompleteOncePayload, CompletionStartDto, ConversationMessageDto, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
+    CompleteOncePayload, CompletionStartDto, ContextAssemblyDto, ConversationMessageDto,
+    ConversationPage, CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
     DiscoverOllamaModelsPayload, GetPreferencesResponse, ListProviderAccountsResponse,
     ListProviderModelsPayload, ListProviderModelsResponse, MarkCompletionInterruptedPayload,
     MarkCompletionInterruptedResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
@@ -99,6 +99,7 @@ fn generate_contracts() -> Result<(), Box<dyn std::error::Error>> {
         ProviderModelEvidenceDto::decl(),
         ProviderModelsList::decl(),
         CompleteOncePayload::decl(),
+        ContextAssemblyDto::decl(),
         CompletionStartDto::decl(),
         ListProviderAccountsResponse::decl(),
         ListProviderModelsPayload::decl(),

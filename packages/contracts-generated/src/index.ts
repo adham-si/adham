@@ -191,7 +191,24 @@ export type CompleteOncePayload = { accountId: string, modelId: string, text: st
  */
 mode: string | null, };
 
-export type CompletionStartDto = { opId: string, messageId: string, };
+export type ContextAssemblyDto = { estimatedInputTokens: number, 
+/**
+ * Evidenced input budget (model max ∩ configured num_ctx, minus the
+ * output reserve). None when either bound is unevidenced.
+ */
+inputBudgetTokens: number | null, 
+/**
+ * Older messages dropped to fit caps/budget. Reported so history loss is
+ * never silent.
+ */
+droppedMessages: number, };
+
+export type CompletionStartDto = { opId: string, messageId: string, 
+/**
+ * Assembly summary for this dispatch (#[serde] None only when a legacy
+ * receipt is replayed: fresh dispatches always carry it).
+ */
+context: ContextAssemblyDto | null, };
 
 export type ListProviderAccountsResponse = { accounts: Array<ProviderAccountDto>, };
 

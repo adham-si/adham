@@ -206,9 +206,16 @@ export const ProviderHealthResponseSchema = z.object({
   modelTagCount: z.number().int().nonnegative(),
 });
 
+export const ContextAssemblyDtoSchema = z.object({
+  estimatedInputTokens: z.number().int().nonnegative(),
+  inputBudgetTokens: z.number().int().nonnegative().nullable(),
+  droppedMessages: z.number().int().nonnegative(),
+});
+
 export const CompletionStartDtoSchema = z.object({
   opId: z.string(),
   messageId: z.string(),
+  context: ContextAssemblyDtoSchema.nullable(),
 });
 
 export const StopCompletionResponseSchema = z.object({

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import type { CompletionStartDto } from '@adham/contracts-generated';
 import * as React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';
@@ -218,7 +219,7 @@ describe('useConversation streaming (Delivery A)', () => {
       emit = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => {
       if (holdTerminal && emit) {
@@ -265,7 +266,7 @@ describe('useConversation streaming (Delivery A)', () => {
         sequence: 2,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     const { result } = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
@@ -347,7 +348,7 @@ describe('useConversation streaming (Delivery A)', () => {
       projectionPosition: '2',
     });
     let emit: StreamEventParam | null = null;
-    let resolveDispatch!: (start: { opId: string; messageId: string }) => void;
+    let resolveDispatch!: (start: CompletionStartDto) => void;
     backend.completeOnceStreaming = vi.fn((_ws, _p, _s, _payload, onEvent) => {
       // connecting: the command (and its op handle) resolves only at the
       // terminal, exactly like the real backend
@@ -362,7 +363,7 @@ describe('useConversation streaming (Delivery A)', () => {
         sequence: 9,
         event: { type: 'completed', completion: 'interrupted', truncated: false, usage: null },
       });
-      resolveDispatch({ opId, messageId: 'm-9' });
+      resolveDispatch({ opId, messageId: 'm-9', context: null });
       return { opId, status: 'cancelled' };
     });
 
@@ -423,7 +424,7 @@ describe('useConversation streaming (Delivery A)', () => {
     let emit: StreamEventParam | null = null;
     backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
       emit = onEvent;
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn();
 
@@ -528,7 +529,7 @@ describe('useConversation streaming (Delivery A)', () => {
       emitLocal = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     const { result } = renderHook(() => useConversation({ backend }));
@@ -612,7 +613,7 @@ describe('useConversation streaming (Delivery A)', () => {
       emitLocal = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => {
       // Server-side Interrupted terminal arrives with the stop response.
@@ -718,7 +719,7 @@ describe('useConversation streaming (Delivery A)', () => {
         sequence: 2,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     const { result } = renderHook(() => useConversation({ backend }));
@@ -770,7 +771,7 @@ describe('useConversation streaming (Delivery A)', () => {
         sequence: 1,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     const { result } = renderHook(() => useConversation({ backend }));
@@ -797,7 +798,7 @@ describe('useConversation streaming (Delivery A)', () => {
               sequence: 1,
               event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
             });
-            resolve({ opId: 'op-9', messageId: 'm-9' });
+            resolve({ opId: 'op-9', messageId: 'm-9', context: null });
           };
         }),
     );

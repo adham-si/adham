@@ -5,6 +5,8 @@
     "uncertainHint": "如果消息可能未保存，请在重新发送前重新加载历史记录。",
     "reloadHistory": "重新加载历史记录",
     "executionUnavailable": "此版本不支持执行。消息仅保存为纯文本。",
+    "contextTruncated": "为使本次请求适配模型上下文，较早的消息已被省略（估算）。",
+    "omittedMessagesLabel": "已省略消息",
     "stopUnavailable": "停止不可用：没有正在运行的操作可取消。",
     "waitingForModel": "正在等待模型…",
     "thinking": "模型正在思考…",

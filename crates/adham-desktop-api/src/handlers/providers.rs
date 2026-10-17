@@ -682,9 +682,13 @@ where
     .await
     .map_err(|e| e.to_string())?;
 
-    let start = CompletionStartDto {
+    // The stored receipt is the replay record; the assembly summary is filled
+    // in after the submitted row is durable (below), so a replayed receipt
+    // carries none.
+    let mut start = CompletionStartDto {
         op_id: op_id.to_string(),
         message_id: message_id.to_string(),
+        context: None,
     };
     let persisted = serde_json::to_vec(&start).unwrap_or_default();
     let request_fp = adham_event_log::request_fingerprint("complete_once_streaming", 1, &trimmed);
@@ -719,6 +723,29 @@ where
     let token = CancellationToken::new();
     ctx.completion_runs.insert(&start.op_id, token.clone());
 
+    // Budgeted assembly runs inside this branch's reap protection, after the
+    // submitted row above is durable (it must reach the model). History comes
+    // from protected content server-side, never from the renderer.
+    let (input_budget, max_output_tokens) = budget_with_reserve(&pinned.descriptor);
+    let history_rows = adham_projections::ConversationProjection::get_session_messages(
+        &ctx.pool,
+        ctx.content_key.as_ref(),
+        &ctx.installation_id,
+        &ids.sess_id,
+    )
+    .await
+    .unwrap_or_default();
+    let assembled = assemble_context(
+        history_rows.into_iter(),
+        env.payload.mode.as_deref().and_then(mode_instruction),
+        input_budget,
+    );
+    start.context = Some(ContextAssemblyDto {
+        estimated_input_tokens: assembled.estimated_input_tokens,
+        input_budget_tokens: assembled.input_budget_tokens,
+        dropped_messages: assembled.dropped_messages,
+    });
+
     info!("provider completion dispatching op {}", start.op_id);
     let outcome = run_stream(
         ctx,
@@ -729,7 +756,8 @@ where
         &request_id.to_string(),
         &ids,
         &token,
-        env.payload.mode.as_deref(),
+        assembled.messages,
+        max_output_tokens,
         sink,
     )
     .await;
@@ -763,39 +791,104 @@ async fn resolve_pinned(
         .ok_or_else(|| format!("VALIDATION_FAILED: unknown model '{model_id}' — discover first"))
 }
 
-/// Bounded server-side history: newest-last message list, capped; interrupted
-/// and failed rows never enter next-dispatch context.
-fn bounded_history(
+/// Chars-per-token estimate for budgeting. No tokenizer is embedded, so every
+/// figure derived from this is labeled estimated in the UI.
+const ESTIMATE_CHARS_PER_TOKEN: usize = 4;
+/// Output/generation reserve inside the effective context: Ollama's num_ctx
+/// covers prompt + generated tokens (thinking included), so num_predict is
+/// pinned to the reserve below. At most half the budget, never more than 4096.
+const OUTPUT_RESERVE_TOKENS: u32 = 4096;
+
+struct AssembledContext {
+    messages: Vec<ChatMessage>,
+    estimated_input_tokens: u32,
+    input_budget_tokens: Option<u32>,
+    dropped_messages: u32,
+}
+
+fn estimate_tokens(chars: usize) -> u32 {
+    (chars as u64).div_ceil(ESTIMATE_CHARS_PER_TOKEN as u64) as u32
+}
+
+/// Evidenced input budget and output reserve: effective context (model max ∩
+/// configured num_ctx) minus the reserve. Unknown evidence stays unknown —
+/// nothing is guessed. Returns (input_budget, max_output_tokens).
+fn budget_with_reserve(descriptor: &ModelDescriptor) -> (Option<u32>, Option<u32>) {
+    let Some(effective) = effective_context_budget(descriptor) else {
+        return (None, None);
+    };
+    let reserve = OUTPUT_RESERVE_TOKENS.min(effective / 2);
+    (Some(effective - reserve), (reserve > 0).then_some(reserve))
+}
+
+/// Context assembly: mode instruction + branch history under the caps and the
+/// evidenced input budget. Oldest messages drop first and every drop is
+/// counted; the newest message always survives (a single oversized message is
+/// sent as-is with the estimate visible rather than refusing the send).
+fn assemble_context(
     rows: impl Iterator<Item = adham_projections::ConversationMessageView>,
-) -> Vec<ChatMessage> {
-    let mut kept: Vec<(usize, String, String)> = Vec::new(); // (index, role, content)
-    for row in rows.enumerate() {
+    instruction: Option<&str>,
+    input_budget: Option<u32>,
+) -> AssembledContext {
+    let instruction_chars = instruction.map(str::len).unwrap_or(0);
+    let mut kept: Vec<ChatMessage> = Vec::new();
+    for row in rows {
         if matches!(
-            row.1.completion,
+            row.completion,
             Some(MessageCompletionV1::Interrupted) | Some(MessageCompletionV1::Failed)
         ) {
             continue;
         }
-        kept.push((row.0, row.1.role, row.1.content));
-    }
-    // trim from the oldest end; the newest messages win
-    while kept.len() > MAX_HISTORY_MESSAGES {
-        kept.remove(0);
-    }
-    let mut bytes: usize = kept.iter().map(|(_, _, c)| c.len()).sum();
-    while bytes > MAX_HISTORY_BYTES && kept.len() > 1 {
-        bytes -= kept.remove(0).2.len();
-    }
-    kept.into_iter()
-        .map(|(_, role, content)| ChatMessage {
-            role: if role == "assistant" {
+        kept.push(ChatMessage {
+            role: if row.role == "assistant" {
                 MessageRole::Assistant
             } else {
                 MessageRole::User
             },
-            content,
-        })
-        .collect()
+            content: row.content,
+        });
+    }
+    // trim from the oldest end; the newest messages win
+    let mut dropped_messages: u32 = 0;
+    loop {
+        if kept.len() <= 1 {
+            break;
+        }
+        let bytes: usize = kept.iter().map(|m| m.content.len()).sum();
+        let estimated = estimate_tokens(bytes + instruction_chars);
+        let over_caps = kept.len() > MAX_HISTORY_MESSAGES || bytes > MAX_HISTORY_BYTES;
+        let over_budget = input_budget.map(|b| estimated > b).unwrap_or(false);
+        if !over_caps && !over_budget {
+            break;
+        }
+        kept.remove(0);
+        dropped_messages += 1;
+    }
+    // non-empty content guard: model gets a user prompt (the submitted row is in history)
+    if kept.last().map(|m| m.role) != Some(MessageRole::User) {
+        kept.push(ChatMessage {
+            role: MessageRole::User,
+            content: "(empty prompt)".to_string(),
+        });
+    }
+    // Turn-mode instruction: part of this request only. The stored user text
+    // stays exactly what the user wrote; the mode is frozen at dispatch.
+    if let Some(instruction) = instruction {
+        kept.insert(
+            0,
+            ChatMessage {
+                role: MessageRole::System,
+                content: instruction.to_string(),
+            },
+        );
+    }
+    let bytes: usize = kept.iter().map(|m| m.content.len()).sum();
+    AssembledContext {
+        estimated_input_tokens: estimate_tokens(bytes),
+        input_budget_tokens: input_budget,
+        dropped_messages,
+        messages: kept,
+    }
 }
 
 /// System instruction for a declared turn mode. Request-only: mode semantics
@@ -855,7 +948,9 @@ async fn run_stream<S>(
     request_id: &str,
     ids: &StreamIds,
     token: &CancellationToken,
-    mode: Option<&str>,
+    // Assembled + budgeted by the caller after the submitted row was durable.
+    messages: Vec<ChatMessage>,
+    max_output_tokens: Option<u32>,
     sink: &S,
 ) -> &'static str
 where
@@ -871,35 +966,6 @@ where
     ))
     .ok_or_log(op_id);
 
-    // bounded history from protected content (server-side, never the renderer's)
-    let history_rows = adham_projections::ConversationProjection::get_session_messages(
-        &ctx.pool,
-        ctx.content_key.as_ref(),
-        &ctx.installation_id,
-        &ids.sess_id,
-    )
-    .await
-    .unwrap_or_default();
-    let mut messages = bounded_history(history_rows.into_iter());
-    // non-empty content guard: model gets a user prompt (the submitted row is in history)
-    if messages.last().map(|m| m.role) != Some(MessageRole::User) {
-        messages.push(ChatMessage {
-            role: MessageRole::User,
-            content: "(empty prompt)".to_string(),
-        });
-    }
-    // Turn-mode instruction: part of this request only. The stored user text
-    // stays exactly what the user wrote; the mode is frozen at dispatch.
-    if let Some(instruction) = mode.and_then(mode_instruction) {
-        messages.insert(
-            0,
-            ChatMessage {
-                role: MessageRole::System,
-                content: instruction.to_string(),
-            },
-        );
-    }
-
     let request = ProviderRequestV1 {
         operation_id: op_id.to_string(),
         model_selection: ModelSelectionSnapshot {
@@ -909,7 +975,7 @@ where
             privacy_class: pinned.descriptor.privacy_class,
         },
         messages,
-        max_output_tokens: None,
+        max_output_tokens,
         temperature: None,
     };
 

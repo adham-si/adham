@@ -5,6 +5,8 @@
     "uncertainHint": "If this message may not have saved, reload history before resending.",
     "reloadHistory": "Reload history",
     "executionUnavailable": "Execution is unavailable in this build. Messages are saved as text only.",
+    "contextTruncated": "Older messages were omitted so this request fits the model context (estimated).",
+    "omittedMessagesLabel": "Omitted messages",
     "stopUnavailable": "Stop is unavailable: there is no running operation to cancel.",
     "waitingForModel": "Waiting for the model…",
     "thinking": "Thinking…",

@@ -76,6 +76,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   const [context, setContext] = React.useState<ConversationContext | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [storageWarning, setStorageWarning] = React.useState<string | null>(null);
+  // Older messages dropped from the last dispatch's assembled context
+  // (reported by the server-side assembler; 0 when nothing was dropped).
+  const [omittedMessages, setOmittedMessages] = React.useState(0);
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
@@ -662,6 +665,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       stopRequestedRef.current = false;
       const startedAt = Date.now();
       setStreaming({ opId: '', text: '', phase: 'waiting', startedAt });
+      // The previous turn's truncation notice belongs to that dispatch only.
+      setOmittedMessages(0);
 
       let opId: string | null = null;
       let terminalSeen = false;
@@ -725,6 +730,11 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         if (opId === null) opId = start.opId;
         const pending = streamingRef.current;
         if (pending && pending.opId === '') setStreaming({ ...pending, opId: start.opId });
+        // Assembly summary of this dispatch: history dropped to fit the model
+        // context is surfaced, never silent.
+        if (mountedRef.current && generationRef.current === generation) {
+          setOmittedMessages(start.context?.droppedMessages ?? 0);
+        }
         await terminalPromise;
         // Handoff ordering is atomic in the render sense: the live bubble is
         // dropped BEFORE the authoritative rows land, and on a failed history
@@ -810,6 +820,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     activeWorkspaceId,
     error,
     storageWarning,
+    omittedMessages,
     pendingSend,
     submit,
     streamOnce,

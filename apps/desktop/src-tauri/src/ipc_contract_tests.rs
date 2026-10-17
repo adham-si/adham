@@ -1278,6 +1278,115 @@ fn completion_history_is_bounded_and_tamper_proofed() {
             .expect("final user row");
         assert_eq!(result.data.message_id, submitted.message_id);
     });
+
+    // Assembly summary: drops are reported, nothing is silently lost, and
+    // without context evidence neither the budget nor the output reserve is
+    // claimed.
+    let assembly = result.data.context.expect("assembly summary");
+    assert_eq!(assembly.input_budget_tokens, None, "no context evidence");
+    assert!(assembly.estimated_input_tokens > 0, "estimate present");
+    assert_eq!(
+        assembly.dropped_messages, 6,
+        "25 eligible rows + submitted → 20 kept"
+    );
+}
+
+/// T4c. Budgets honor evidenced limits: the assembler trims to the input
+/// budget (effective context ∩ output reserve) and the reserve is pinned at
+/// the provider via num_predict, so generation cannot silently evict the
+/// prompt. Every drop is counted in the response.
+#[test]
+fn context_assembly_trims_to_the_evidenced_budget_and_reserves_output() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let base_url = spawn_stub_ollama(
+        &runtime,
+        None,
+        captures.clone(),
+        ChatProgram::once(vec![ndjson_delta("ok"), ndjson_done(1, 1)]),
+    );
+    // Evidenced limits: min(1024, 1024) → budget 1024, reserve 512.
+    let account_id = runtime.block_on(async {
+        let account = local_account_for(&base_url);
+        ctx.registry
+            .upsert_account(&account)
+            .await
+            .expect("seed account");
+        let mut descriptor = model_descriptor("m:latest");
+        descriptor.context_limit = Some(1024);
+        descriptor.configured_context = Some(1024);
+        ctx.registry
+            .replace_models(
+                &account.account_id,
+                &[(
+                    ModelId("m:latest".to_string()),
+                    "sha256:seeded".to_string(),
+                    descriptor,
+                )],
+            )
+            .await
+            .expect("seed models");
+        account.account_id.0.clone()
+    });
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    // Three ~609-byte rows ≈ 153 estimated tokens each; with the submitted
+    // row (~152) the estimate lands above the 512 input budget.
+    for index in 0..3 {
+        seed_history_row(
+            &runtime,
+            &ctx,
+            &ws,
+            &proj,
+            &sess,
+            true,
+            None,
+            &format!("marker-{index} {}", "x".repeat(600)),
+        );
+    }
+
+    let env = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id,
+            model_id: "m:latest".to_string(),
+            text: format!("newest {}", "y".repeat(600)),
+            mode: None,
+        },
+    );
+    let sink = CollectSink(collector());
+    let result = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, env, &sink).await
+        })
+        .expect("completion ok");
+
+    let bodies = captures.request_bodies();
+    assert_eq!(bodies.len(), 1, "one chat request");
+    let body: Value = serde_json::from_str(&bodies[0]).expect("chat body json");
+    let messages = body["messages"].as_array().expect("messages");
+    assert!(messages.len() < 4, "trimmed: {}", messages.len());
+    let rendered = bodies[0].clone();
+    assert!(!rendered.contains("marker-0"), "oldest dropped first");
+    assert!(rendered.contains("newest"), "newest survives");
+    assert_eq!(
+        body["options"]["num_predict"],
+        json!(512),
+        "output reserve pinned at the provider"
+    );
+
+    let assembly = result.data.context.expect("assembly summary");
+    assert_eq!(assembly.input_budget_tokens, Some(512));
+    assert!(assembly.dropped_messages >= 1, "drops reported");
+    assert!(
+        assembly.estimated_input_tokens <= 512,
+        "estimate fits: {}",
+        assembly.estimated_input_tokens
+    );
 }
 
 /// T4b. Modes are declarations with real semantics: the instruction reaches

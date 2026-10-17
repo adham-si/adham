@@ -522,6 +522,25 @@ pub struct CompleteOncePayload {
 pub struct CompletionStartDto {
     pub op_id: String,
     pub message_id: String,
+    /// Assembly summary for this dispatch (#[serde] None only when a legacy
+    /// receipt is replayed: fresh dispatches always carry it).
+    #[serde(default)]
+    pub context: Option<ContextAssemblyDto>,
+}
+
+/// What was actually assembled for one dispatch. Token figures are estimates
+/// (no tokenizer is embedded) and are labeled as such in the UI.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ContextAssemblyDto {
+    pub estimated_input_tokens: u32,
+    /// Evidenced input budget (model max ∩ configured num_ctx, minus the
+    /// output reserve). None when either bound is unevidenced.
+    pub input_budget_tokens: Option<u32>,
+    /// Older messages dropped to fit caps/budget. Reported so history loss is
+    /// never silent.
+    pub dropped_messages: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

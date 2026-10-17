@@ -418,7 +418,7 @@ describe('IPC contract fixture (cross-language)', () => {
       // backend fans events into the registered channel sink
       channelSinks[0]?.({ opId: 'op-1', sequence: 1, event: { type: 'started' } });
       channelSinks[0]?.({ opId: 'op-1', sequence: 2, event: { type: 'delta', text: 'hello' } });
-      return { data: { opId: 'op-1', messageId: 'm-1' } };
+      return { data: { opId: 'op-1', messageId: 'm-1', context: null } };
     });
 
     const client = new AdhamApiClient();
