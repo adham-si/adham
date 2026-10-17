@@ -21,45 +21,6 @@ export interface ModelOption {
   supportsReasoning?: boolean | undefined;
 }
 
-export const DEFAULT_MODELS: ModelOption[] = [
-  {
-    id: 'local:qwen2.5-coder:32b',
-    name: 'Qwen 2.5 Coder 32B',
-    provider: 'Ollama',
-    boundary: 'local',
-    descKey: 'compose.modelDescQwen32',
-    description: 'Offline, private, high code intelligence',
-    supportsReasoning: false,
-  },
-  {
-    id: 'local:deepseek-r1:14b',
-    name: 'DeepSeek R1 14B',
-    provider: 'Ollama',
-    boundary: 'local',
-    descKey: 'compose.modelDescDeepseek14',
-    description: 'Offline reasoning model running on local GPU',
-    supportsReasoning: true,
-  },
-  {
-    id: 'cloud:claude-3-7-sonnet',
-    name: 'Claude 3.7 Sonnet',
-    provider: 'Anthropic',
-    boundary: 'cloud',
-    descKey: 'compose.modelDescClaude',
-    description: 'High capacity hybrid thinking model (requires API transfer)',
-    supportsReasoning: true,
-  },
-  {
-    id: 'cloud:gpt-4o',
-    name: 'GPT-4o',
-    provider: 'OpenAI',
-    boundary: 'cloud',
-    descKey: 'compose.modelDescGpt4o',
-    description: 'Fast cloud multimodal model',
-    supportsReasoning: false,
-  },
-];
-
 export interface ComposeModelPickerProps {
   selectedModelId: string;
   onSelectModel: (modelId: string) => void;
@@ -75,7 +36,7 @@ export function ComposeModelPicker({
   onSelectModel,
   reasoningEffort = 'medium',
   onChangeReasoningEffort,
-  models = DEFAULT_MODELS,
+  models = [],
   disabled = false,
   className = '',
 }: ComposeModelPickerProps) {

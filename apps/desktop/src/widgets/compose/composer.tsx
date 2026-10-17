@@ -10,7 +10,6 @@ import { ComposeApprovalBar } from './compose-approval-bar';
 import type { ComposeMode } from './compose-mode-selector';
 import type { ComposeStatus } from './use-compose-state';
 import type { ModelOption } from './compose-model-picker';
-import { DEFAULT_MODELS } from './compose-model-picker';
 
 export interface ComposerProps {
   inputText: string;
@@ -29,12 +28,10 @@ export interface ComposerProps {
   onAddAttachments?: ((attachments: ComposeAttachment[]) => void) | undefined;
   onRemoveAttachment?: ((id: string) => void) | undefined;
   approvalRequest?: Omit<ComposeApprovalBarProps, 'className'> | null | undefined;
-  scopeFolder?: string | null | undefined;
-  scopePolicy?: ('standing-approval' | 'always-ask') | null | undefined;
-  usedTokens?: number | null | undefined;
-  maxTokens?: number | null | undefined;
-  sessionSpend?: string | null | undefined;
-  spendCap?: string | null | undefined;
+  /** Model maximum context in tokens, when the provider evidenced one. */
+  contextLimit?: number | null | undefined;
+  /** Effective request budget (model max ∩ configured), when evidenced. */
+  effectiveContextBudget?: number | null | undefined;
   onRecallPrevious?: (() => void) | undefined;
   onRecallNext?: (() => void) | undefined;
   placeholder?: string | undefined;
@@ -52,21 +49,17 @@ export function Composer({
   status = 'idle',
   mode = 'plan',
   onChangeMode = () => {},
-  selectedModelId = DEFAULT_MODELS[0]!.id,
+  selectedModelId = '',
   onSelectModel = () => {},
   reasoningEffort = 'medium',
   onChangeReasoningEffort,
-  models = DEFAULT_MODELS,
+  models = [],
   attachments = [],
   onAddAttachments = () => {},
   onRemoveAttachment = () => {},
   approvalRequest = null,
-  scopeFolder = null,
-  scopePolicy = null,
-  usedTokens = null,
-  maxTokens = null,
-  sessionSpend = null,
-  spendCap = null,
+  contextLimit = null,
+  effectiveContextBudget = null,
   onRecallPrevious,
   onRecallNext,
   placeholder,
@@ -138,14 +131,10 @@ export function Composer({
           isDragOver ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20' : ''
         }`}
       >
-        {/* Top: Scope & Budget Status Strip */}
+        {/* Top: evidenced context status (renders nothing without evidence) */}
         <ComposeStatusStrip
-          scopeFolder={scopeFolder}
-          scopePolicy={scopePolicy}
-          usedTokens={usedTokens}
-          maxTokens={maxTokens}
-          sessionSpend={sessionSpend}
-          spendCap={spendCap}
+          contextLimit={contextLimit}
+          effectiveContextBudget={effectiveContextBudget}
           className="border-b border-border-subtle/60"
         />
 

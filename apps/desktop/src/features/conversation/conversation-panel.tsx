@@ -157,7 +157,11 @@ export function ConversationPanel({
     name: m.humanLabel,
     provider: 'Ollama',
     boundary: 'local' as const,
+    // Effort controls appear only for evidenced thinking support; unknown or
+    // unsupported must not present a control the model may not honor.
+    supportsReasoning: m.capabilities.thinking === 'supported',
   }));
+  const selectedDescriptor = ollama.models.find((m) => m.modelId === selectedModelId) ?? null;
   const streamReady =
     ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);
 
@@ -497,6 +501,8 @@ export function ConversationPanel({
           models={pickerModels}
           reasoningEffort={reasoningEffort}
           onChangeReasoningEffort={setReasoningEffort}
+          contextLimit={selectedDescriptor?.contextLimit ?? null}
+          effectiveContextBudget={selectedDescriptor?.effectiveContextBudget ?? null}
           attachments={attachments}
           onAddAttachments={(next) => setAttachments((prev) => [...prev, ...next])}
           onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}

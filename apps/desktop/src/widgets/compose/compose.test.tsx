@@ -13,10 +13,30 @@ import {
   useComposeState,
   useDrafts,
 } from './index';
+import type { ModelOption } from './compose-model-picker';
 
 afterEach(() => {
   cleanup();
 });
+
+/// Explicit picker fixture: production ships no static model catalog; models
+/// come only from provider discovery.
+const TEST_MODELS: ModelOption[] = [
+  {
+    id: 'local:qwen2.5-coder:32b',
+    name: 'Qwen 2.5 Coder 32B',
+    provider: 'Ollama',
+    boundary: 'local',
+    supportsReasoning: false,
+  },
+  {
+    id: 'cloud:claude-3-7-sonnet',
+    name: 'Claude 3.7 Sonnet',
+    provider: 'Anthropic',
+    boundary: 'cloud',
+    supportsReasoning: true,
+  },
+];
 
 describe('useComposeState', () => {
   it('handles state transitions cleanly', () => {
@@ -302,7 +322,11 @@ describe('ComposeModelPicker with Data Boundary Badge', () => {
   it('displays local boundary badge and switches models', () => {
     const handleSelect = vi.fn();
     render(
-      <ComposeModelPicker selectedModelId="local:qwen2.5-coder:32b" onSelectModel={handleSelect} />,
+      <ComposeModelPicker
+        selectedModelId="local:qwen2.5-coder:32b"
+        onSelectModel={handleSelect}
+        models={TEST_MODELS}
+      />,
     );
 
     // Check boundary badge
@@ -322,29 +346,27 @@ describe('ComposeModelPicker with Data Boundary Badge', () => {
 });
 
 describe('ComposeStatusStrip', () => {
-  it('displays folder scope, policy and context token budget', () => {
-    render(
-      <ComposeStatusStrip
-        scopeFolder="my-project"
-        scopePolicy="standing-approval"
-        usedTokens={16000}
-        maxTokens={128000}
-        sessionSpend="$0.12"
-        spendCap="$5.00"
-      />,
-    );
+  it('shows the evidenced request budget and the model maximum', () => {
+    render(<ComposeStatusStrip contextLimit={131072} effectiveContextBudget={8192} />);
 
-    expect(screen.getByText('my-project')).toBeDefined();
-    expect(screen.getByText(/Standing Approval/i)).toBeDefined();
-    expect(screen.getByText(/16.0k \/ 128k/i)).toBeDefined();
-    expect(screen.getByText('$0.12')).toBeDefined();
+    expect(screen.getByText(/Context budget: 8k/)).toBeDefined();
+    // no invented usage split: only evidenced numbers render
+    expect(screen.queryByText(/16\.0k/)).toBeNull();
+    expect(screen.queryByText(/\$/)).toBeNull();
   });
 
-  it('renders unknown instead of invented telemetry when nothing is reported', () => {
+  it('shows only the model maximum when no request budget is reported', () => {
+    render(<ComposeStatusStrip contextLimit={131072} />);
+
+    expect(screen.getByText(/Model context: 131k/)).toBeDefined();
+    expect(screen.queryByText(/Context budget/i)).toBeNull();
+  });
+
+  it('renders nothing instead of invented telemetry when nothing is evidenced', () => {
     const { container } = render(<ComposeStatusStrip />);
 
-    expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
-    expect(container.textContent).not.toMatch(/12\.4k \/ 128k/);
+    expect(container.textContent).toBe('');
+    expect(screen.queryByText(/unknown/i)).toBeNull();
     expect(container.textContent).not.toMatch(/\$0\.00/);
     expect(container.textContent).not.toMatch(/adham\.si/);
   });

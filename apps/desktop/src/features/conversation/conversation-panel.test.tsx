@@ -130,12 +130,13 @@ describe('ConversationPanel', () => {
     expect(screen.queryByText(/Verified sandbox execution/i)).toBeNull();
   });
 
-  it('renders telemetry as unknown and discloses the model gap in production', async () => {
+  it('renders no unknown-telemetry dashboard and discloses the model gap in production', async () => {
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
     await screen.findByRole('textbox', { name: /composer input/i });
 
-    expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
+    // no evidence → no context strip at all, and no invented numbers
+    expect(screen.queryByText(/unknown/i)).toBeNull();
     expect(screen.getByText(/model selection is not applied/i)).toBeDefined();
     expect(screen.queryByText(/12\.4k \/ 128k/)).toBeNull();
     expect(screen.queryByText(/adham\.si/)).toBeNull();

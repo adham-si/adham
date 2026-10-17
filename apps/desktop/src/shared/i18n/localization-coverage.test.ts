@@ -87,7 +87,7 @@ describe('desktop localization coverage (all selectable languages)', () => {
     for (const key of [
       'compose.newSession',
       'sessions',
-      'compose.telemetryUnknown',
+      'compose.contextBudget',
       'settings.nav.preferences',
       'titlebar.closeWindow',
     ]) {
