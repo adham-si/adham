@@ -170,3 +170,104 @@ row, op `resolved`. Probe deleted after the run; recorded here only.
 | `cargo fmt --all` | clean |
 | Vitest affected suites (pending-recovery, use-conversation, panel) | 6 files, **65/65** |
 | `pnpm check` (full, repo root) | exit 0 |
+
+---
+
+# Delivery A closure: provider/model honest-settings pass (2026-10-17)
+
+## Scope
+
+The user directed Delivery A closure only; conversation expansion moved to
+teammate ticket #32. No backend, no additional providers, no OpenAI work.
+
+## What changed (head at closure commit, branch feat/settings-completion)
+
+1. **Preview banners removed** from the two working surfaces — Providers and
+   Models pages (`PreviewNote` component retained for still-unshipped settings
+   pages).
+2. **Descriptions rewritten to shipped functionality** (en/ar/ru/zh-CN):
+   providers page no longer advertises cloud providers; models page no longer
+   advertises default runtimes or fallback chains; the local-first note now
+   states exactly what is implemented — dispatch restricted to accounts
+   classified `local_only` to addresses the user configures — and names the
+   residual limitation (cloud providers not implemented in this delivery).
+3. **Distinct provider card states**, all backend-derived (`list_provider_accounts`,
+   `list_provider_models`) or explicitly session-local:
+   - *Configured*: saved alias + endpoint URL.
+   - *Recorded inventory*: restored on reopen from the registry read
+     (`{{count}} models recorded from {{url}}` / `none`), labeled by endpoint.
+   - *Last connection check*: in-session, timestamped ("Last check
+     HH:MM:SS: reachable — N models advertised" / "no response"). After a
+     reopen nothing reachable/unreachable is printed — the card says no check
+     result exists yet, so registry-restored state is never presented as a
+     fresh health check.
+   - *Discovery result*: timestamped "Discovered N models at HH:MM:SS (saved
+     to the registry)".
+   - *Error*: distinct lines for unreachable (no response) vs probe failure
+     (request threw), both `role=alert`, both "Nothing was saved".
+4. **Endpoint edit invalidation** (regression-pinned): results made against
+   endpoint A disappear the moment the input stops matching; the recorded
+   inventory stays explicitly attributed to endpoint A; Discover is locked
+   until the edited endpoint is re-tested and saved onto the account; test on
+   the edited endpoint probes transiently (empty accountId — nothing saves on
+   failure) and updates the existing account before discovery, so discovery
+   and inventory always attribute to the endpoint actually used.
+5. **Model rows**: display name; raw id only when different (`humanLabel !==
+   modelId`, e.g. the real `qwen3.5:0.8b`); per-row account association
+   (alias); verified identity metadata = recorded digest prefix; capability
+   chips render only recorded `supported` values — `unknown` stays unknown and
+   nothing is inferred from model names (pinned with a reasoning-family-id
+   fixture whose recorded thinking is `unknown`).
+6. **Local-inference wording**: `compose.localBoundaryNote` tooltip replaced
+   ("zero data leaves this machine" → "dispatch restricted to the local-only
+   provider endpoint you configured").
+
+## #32 handoff (never lost, never touched)
+
+The owner's two abandoned operations in the live database —
+`provider-completion`, status `pending`, created 2026-10-17 14:40:25Z and
+14:53:00Z in the banner's scope — remain **untouched** (no dismiss, no
+deletion, no replay). The message-recovery banner no longer claims them
+(filtered at the consumer since `5d74097`), so they are invisible-but-recorded
+until conversation-expansion work (#32) decides their resolution UX:
+options include surfacing as interrupted provider runs or a dedicated
+resolve/dismiss path. Do not auto-complete them (the A7 acceptance pin
+`unresolved_pending_operation_surfaces_and_never_autocompletes` still holds).
+
+`5d74097` (thinking-frame adapter fix) and its tests are preserved verbatim:
+`crates/adham-provider` files untouched in this range (verified by diff scoping).
+
+## Gates (final tree)
+
+| Gate | Result |
+| --- | --- |
+| `pnpm check` (full) | exit 0 |
+| `cargo test --workspace --locked` | **339 passed**, 0 failed (Rust unchanged) |
+| `cargo clippy --workspace --all-targets --locked` | 0 warnings |
+| `cargo fmt --all` | clean |
+| Settings suites (providers-page 7, models-page 6, settings-page) | all passed |
+
+New frontend tests this range: 4 provider-state/invalidation regressions +
+2 model-row regressions + updated page-copy assertions. Dependency changes: **none**.
+
+## Live-proof evidence (unchanged, recorded 2026-10-17 earlier today)
+
+Real-daemon bounded probe (disposable context, `qwen3.5:0.8b`,
+`http://127.0.0.1:11434`): one synthetic message → exactly one `completed`
+terminal → one persisted assistant answer, reload-stable second read, op
+`resolved` (13.9s). Discovery provenance: registry digest `d9c89605…88f1c`
+byte-matched the live daemon's `/api/tags`.
+
+## Remaining limitations
+
+1. Provider check/discovery results are session-local; a persistent
+   last-check record would need a new backend table (deliberately out of
+   scope here).
+2. Still-unshipped settings pages (routing, governance, usage…) keep their
+   Preview notes; their copy is unchanged.
+3. The compose widget's dormant `DEFAULT_MODELS` catalog constant was left
+   untouched (cleanup ban); both production callers always pass registry
+   models explicitly.
+4. `privacy_class`/`verified_revision` richer metadata (e.g. parameter sizes)
+   is not exposed by the backend DTO; rows show exactly what the registry
+   records.
