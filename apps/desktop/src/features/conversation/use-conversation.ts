@@ -461,26 +461,32 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       const trimmed = text.trim();
       if (!trimmed)
         return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
+      // Pre-dispatch refusals surface through the same error state as
+      // failures: a blocked send must never look like a dead button.
+      const refuse = (message: string, uncertain = false): SubmitOutcome => {
+        setError(message);
+        return { ok: false, error: message, uncertain };
+      };
       const blocked = sendBlockedReason(scopeStaleRef.current);
-      if (blocked) return { ok: false, error: blocked, uncertain: false };
+      if (blocked) return refuse(blocked);
       // Controller-boundary guard: overlapping submits are rejected before
       // any dispatch, not merely hidden by a later busy render. The guard
       // is acquired BEFORE the bootstrap await below, so two submits that
       // both arrive before the context exists cannot both proceed.
       if (submitInFlightRef.current) {
-        return { ok: false, error: i18n.t('conversation.alreadySaving'), uncertain: false };
+        return refuse(i18n.t('conversation.alreadySaving'));
       }
       const preSwitch = switchUnresolved(requestedRef.current, context?.sessionId);
-      if (preSwitch) return preSwitch;
+      if (preSwitch) return refuse(preSwitch.error, preSwitch.uncertain);
       submitInFlightRef.current = true;
       try {
         let ctx = context;
         if (!ctx) {
           setStatus('bootstrapping');
           ctx = await bootstrap();
-          if (!ctx) return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+          if (!ctx) return refuse(i18n.t('conversation.notReady'));
           const postSwitch = switchUnresolved(requestedRef.current, ctx.sessionId);
-          if (postSwitch) return postSwitch;
+          if (postSwitch) return refuse(postSwitch.error, postSwitch.uncertain);
         }
 
         const pendingFirstBlocked = pendingFirstSendBlockedReason(
@@ -489,7 +495,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           trimmed,
         );
         if (pendingFirstBlocked) {
-          return { ok: false, error: pendingFirstBlocked, uncertain: true };
+          return refuse(pendingFirstBlocked, true);
         }
 
         const pendingFirst = readPendingFirstSend();

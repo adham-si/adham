@@ -341,7 +341,7 @@ export const toUiMessage = (dto: {
 export const switchUnresolved = (
   req: ConversationContext | null,
   curId: string | null | undefined,
-): SubmitOutcome | null =>
+): Extract<SubmitOutcome, { ok: false }> | null =>
   req && req.sessionId !== curId
     ? {
         ok: false,

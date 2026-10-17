@@ -254,7 +254,8 @@ export function ConversationPanel({
       ? await conv.streamOnce(sent, ollama.account!.accountId, selectedModelId)
       : await conv.submit(sent);
     // A rejected streaming dispatch (e.g. a send racing the in-flight turn)
-    // must be visible, never a silent no-op.
+    // must be visible, never a silent no-op. Text-only refusals and failures
+    // go through the hook's error state, which the panel renders below.
     if (streamReady && !outcome.ok) setSubmitError(outcome.error);
     // Retain the draft on failure; never erase edits typed meanwhile.
     if (outcome.ok && draftRef.current === sent) {

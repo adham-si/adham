@@ -183,6 +183,42 @@ describe('ConversationPanel', () => {
     expect(screen.getByRole('button', { name: /reload history/i })).toBeDefined();
   });
 
+  it('surfaces a pre-dispatch refusal instead of a silent no-op', async () => {
+    const user = userEvent.setup();
+    // A leftover first-send record for this scope makes submit return a
+    // refusal BEFORE any dispatch or conv.error write.
+    sessionStorage.setItem(
+      'adham:compose:pending-first-send',
+      JSON.stringify({
+        createRequestId: 'req-create-1',
+        messageRequestId: 'req-message-1',
+        text: 'an earlier first message',
+        workspaceId: 'ws-1',
+        projectId: 'proj-1',
+        sessionId: null,
+      }),
+    );
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    render(<ConversationPanel backend={backend} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+
+    await user.type(box, 'new text while a first send is unresolved');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() =>
+      expect(screen.getByText(/previous first-message save is pending/i)).toBeDefined(),
+    );
+    expect(box.value).toBe('new text while a first send is unresolved');
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+  });
+
   it('marks execution unavailable in execute mode without any approval flow', async () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
