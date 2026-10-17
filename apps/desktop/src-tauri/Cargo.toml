@@ -12,6 +12,9 @@ tauri-build = { version = "2.0.0", features = [] }
 # runtime fail to load on Windows (tauri-apps/tauri#11028, #13419).
 [target.'cfg(not(windows))'.dev-dependencies]
 tauri = { version = "2.0.0", features = ["test"] }
+uuid = { workspace = true }
+adham-provider = { path = "../../../crates/adham-provider" }
+sqlx = { workspace = true }
 
 [dependencies]
 adham-core-types = { path = "../../../crates/adham-core-types" }

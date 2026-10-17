@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+adham-provider = { path = "../adham-provider" }
+tokio-util = { workspace = true }
 adham-core-types = { path = "../adham-core-types" }
 adham-event-log = { path = "../adham-event-log" }
 adham-platform = { path = "../adham-platform" }

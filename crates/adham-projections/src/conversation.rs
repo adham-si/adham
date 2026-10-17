@@ -146,6 +146,73 @@ impl ConversationProjection {
         Ok(())
     }
 
+    /// Live-path assistant terminal insert: the op-keyed guarded upsert means
+    /// a second terminal write for the same operation is a no-op, so exactly
+    /// one terminal outcome wins even when Stop races completion. Mirrors
+    /// `insert_message_tx` plus the completion columns.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_assistant_completion_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        message_id: &str,
+        workspace_id: &str,
+        project_id: &str,
+        session_id: &str,
+        op_id: &str,
+        content_id: &str,
+        completion_json: &str,
+        usage_json: Option<&str>,
+        source_event_id: &str,
+        source_global_position: i64,
+        created_at_us: i64,
+    ) -> Result<bool, DomainError> {
+        let result = sqlx::query(
+            r#"
+            INSERT INTO conversation_messages (
+                message_id, workspace_id, project_id, session_id, role,
+                content_id, source_event_id, source_global_position, created_at_us,
+                op_id, completion_json, usage_json
+            ) VALUES (?, ?, ?, ?, 'assistant', ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(message_id)
+        .bind(workspace_id)
+        .bind(project_id)
+        .bind(session_id)
+        .bind(content_id)
+        .bind(source_event_id)
+        .bind(source_global_position)
+        .bind(created_at_us)
+        .bind(op_id)
+        .bind(completion_json)
+        .bind(usage_json)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+
+        let inserted = result.rows_affected() > 0;
+
+        sqlx::query(
+            r#"
+            INSERT INTO projection_checkpoints (
+                projection_name, projection_version, last_global_position, status, error_code, updated_at_us
+            ) VALUES ('conversation_messages', 1, ?, 'active', NULL, ?)
+            ON CONFLICT(projection_name) DO UPDATE SET
+                last_global_position = excluded.last_global_position,
+                status = excluded.status,
+                error_code = excluded.error_code,
+                updated_at_us = excluded.updated_at_us
+            "#,
+        )
+        .bind(source_global_position)
+        .bind(created_at_us)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+
+        Ok(inserted)
+    }
+
     pub async fn get_checkpoint(pool: &Pool<Sqlite>) -> Result<Option<i64>, DomainError> {
         let row = sqlx::query(
             "SELECT last_global_position FROM projection_checkpoints WHERE projection_name = 'conversation_messages'",

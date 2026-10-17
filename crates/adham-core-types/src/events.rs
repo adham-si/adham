@@ -180,10 +180,14 @@ pub enum MessageCompletionV1 {
 /// Token usage as reported by the provider. Missing values stay unknown —
 /// missing usage is never rewritten to zero.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MessageUsageV1 {
+    #[ts(as = "Option<u32>")]
     pub prompt_tokens: Option<u64>,
+    #[ts(as = "Option<u32>")]
     pub completion_tokens: Option<u64>,
+    #[ts(as = "Option<u32>")]
     pub total_tokens: Option<u64>,
 }
 

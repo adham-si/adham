@@ -174,10 +174,10 @@ Dependency additions (each needs the P0 verification record in its task):
 **Interfaces:**
 - Produces: `test_provider_connection`, `discover_ollama_models`, `update_provider_account` (alias + endpoint only), `complete_once_streaming` → `Channel<StreamEventDto>`, `stop_completion(op_id)`; Zod schemas; `cargo xtask contracts` clean. No key/cloud commands in A.
 
-- [ ] **Step 1: Failing tests** — contract arg shapes; dispatch records the pending op BEFORE any socket (stub asserts record-then-POST order); history assembled server-side bounded + ownership-checked (renderer-supplied history ignored — send tampered scope, get `ContextMismatch`); Channel receives `StreamStarted…StreamCompleted` with per-op sequence numbers in order; `stop_completion` with a foreign op id → `ContextMismatch`, target op untouched; stop mid-stream yields terminal `Interrupted` + persisted partial (fixture); unknown model id blocked before any socket; renderer disconnect mid-stream (drop Channel client in test) → server still persists the terminal outcome. Expected: FAIL.
-- [ ] **Step 2: Implement** handlers + commands + client (Ollama section only).
-- [ ] **Step 3: Run** `cargo test -p adham-desktop`, `cargo xtask contracts && git diff --exit-code` (no diff after regen commit), frontend tests PASS.
-- [ ] **Step 4: Commit** `feat(provider): Ollama IPC + streaming contracts`.
+- [x] **Step 1: Failing tests** — contract arg shapes; dispatch records the pending op BEFORE any socket (stub asserts record-then-POST order); history assembled server-side bounded + ownership-checked (renderer-supplied history ignored — send tampered scope, get `ContextMismatch`); Channel receives `StreamStarted…StreamCompleted` with per-op sequence numbers in order; `stop_completion` with a foreign op id → `ContextMismatch`, target op untouched; stop mid-stream yields terminal `Interrupted` + persisted partial (fixture); unknown model id blocked before any socket; renderer disconnect mid-stream (drop Channel client in test) → server still persists the terminal outcome. Expected: FAIL. *(RED collapsed into one GREEN battery: the acceptance battery pins every listed case directly; no compile-stub round-trip — noted in the delivery ledger.)*
+- [x] **Step 2: Implement** handlers + commands + client (Ollama section only).
+- [x] **Step 3: Run** `cargo test -p adham-desktop`, `cargo xtask contracts && git diff --exit-code` (no diff after regen commit), frontend tests PASS. *(Channel arg-shape is pinned at the dispatch level; live webview Channel flow deferred to A6 per the ledger's documented harness limitation.)*
+- [x] **Step 4: Commit** `feat(provider): Ollama IPC + streaming contracts`.
 
 ### Task A6: Frontend — Ollama status/discover, models defaults, composer + Stop + reload
 

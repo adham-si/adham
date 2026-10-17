@@ -3,6 +3,8 @@ import {
   BootstrapStateSchema,
   ConversationPageSchema,
   ErrorEnvelopeSchema,
+  StreamEventDtoSchema,
+  StreamEventPayloadDtoSchema,
   SubmittedMessageSchema,
 } from './schemas';
 import { queryKeys } from './query-keys';
@@ -10,7 +12,16 @@ import { invoke } from '@tauri-apps/api/core';
 import { AdhamApiClient } from './adham-client';
 import ipcBasicSendFixture from '../../../fixtures/ipc-basic-send.json';
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+const channelSinks: Array<(raw: unknown) => void> = [];
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+  Channel: class {
+    __id = String(globalThis.Math.random());
+    constructor(cb: (raw: unknown) => void) {
+      channelSinks.push(cb);
+    }
+  },
+}));
 
 describe('P0-04 IPC Schemas & Query Keys', () => {
   it('validates canonical query keys structure', () => {
@@ -269,5 +280,135 @@ describe('IPC contract fixture (cross-language)', () => {
     await client.getConversation(ws.workspaceId, proj.projectId, sess.sessionId);
 
     expect(vi.mocked(invoke).mock.calls).toEqual(calls.map((call) => [call.cmd, call.args]));
+  });
+
+  it('validates A5 streaming event schemas', () => {
+    expect(
+      StreamEventDtoSchema.parse({ opId: 'op-1', sequence: 1, event: { type: 'started' } })
+        .sequence,
+    ).toBe(1);
+    expect(
+      StreamEventDtoSchema.parse({
+        opId: 'op-1',
+        sequence: 2,
+        event: { type: 'delta', text: 'hi' },
+      }).event.type,
+    ).toBe('delta');
+    const terminal = StreamEventDtoSchema.parse({
+      opId: 'op-1',
+      sequence: 3,
+      event: {
+        type: 'completed',
+        completion: 'completed',
+        truncated: false,
+        usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+      },
+    });
+    expect(terminal.event.type).toBe('completed');
+    expect(
+      StreamEventDtoSchema.safeParse({ opId: 'op-1', sequence: 0, event: { type: 'bogus' } })
+        .success,
+    ).toBe(false);
+    expect(
+      StreamEventPayloadDtoSchema.safeParse({
+        type: 'completed',
+        completion: 'exploded',
+        truncated: false,
+        usage: null,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('dispatches A5 provider commands with canonical envelopes and validates responses', async () => {
+    vi.mocked(invoke).mockReset();
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'test_provider_connection') {
+        return { data: { reachable: true, modelTagCount: 2 } };
+      }
+      if (cmd === 'stop_completion') {
+        return { data: { opId: 'op-1', status: 'cancelled' } };
+      }
+      if (cmd === 'discover_ollama_models') {
+        return {
+          data: {
+            models: [
+              {
+                modelId: 'm:latest',
+                digest: 'sha256:abc',
+                humanLabel: 'm:latest',
+                privacyClass: 'local_only',
+                capabilities: {
+                  streaming: 'supported',
+                  structuredOutput: 'unknown',
+                  toolProposals: 'supported',
+                  thinking: 'unknown',
+                },
+              },
+            ],
+          },
+        };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+
+    const client = new AdhamApiClient();
+    const health = await client.testProviderConnection('ws', 'proj', 'sess', 'acc-1');
+    expect(health.reachable).toBe(true);
+    const models = await client.discoverOllamaModels('ws', 'proj', 'sess', 'acc-1');
+    expect(models.models[0]?.capabilities.streaming).toBe('supported');
+    const stop = await client.stopCompletion('ws', 'proj', 'sess', 'op-1');
+    expect(stop.status).toBe('cancelled');
+
+    const [probeCall] = vi.mocked(invoke).mock.calls;
+    const envelope = (probeCall?.[1] as { request: Record<string, unknown> }).request;
+    expect(envelope.protocolVersion).toBe(1);
+    expect(envelope.context).toEqual({ workspaceId: 'ws', projectId: 'proj', sessionId: 'sess' });
+    expect((envelope.payload as { accountId: string }).accountId).toBe('acc-1');
+
+    // account minting: null id + alias + endpoint goes to a fresh account row
+    vi.mocked(invoke).mockImplementationOnce(async () => ({
+      data: {
+        accountId: 'acc-new',
+        alias: 'A',
+        endpointUrl: 'http://127.0.0.1:1',
+        privacyClass: 'local_only',
+      },
+    }));
+    const minted = await client.updateProviderAccount(
+      { accountId: null, alias: 'A', endpointUrl: 'http://127.0.0.1:1' },
+      {},
+    );
+    expect(minted.accountId).toBe('acc-new');
+    const mintedCall = vi.mocked(invoke).mock.calls.at(-1)?.[1] as {
+      request: { context: { workspaceId: string | null } };
+    };
+    expect(mintedCall.request.context.workspaceId).toBeNull();
+  });
+
+  it('streams through the tauri channel with schema validation', async () => {
+    vi.mocked(invoke).mockReset();
+    const sinkRef = vi.fn();
+    channelSinks.length = 0;
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      expect(cmd).toBe('complete_once_streaming');
+      // backend fans events into the registered channel sink
+      channelSinks[0]?.({ opId: 'op-1', sequence: 1, event: { type: 'started' } });
+      channelSinks[0]?.({ opId: 'op-1', sequence: 2, event: { type: 'delta', text: 'hello' } });
+      return { data: { opId: 'op-1', messageId: 'm-1' } };
+    });
+
+    const client = new AdhamApiClient();
+    const received: Array<{ sequence: number; event: { type: string } }> = [];
+    const start = await client.completeOnceStreaming(
+      'ws',
+      'proj',
+      'sess',
+      { accountId: 'acc', modelId: 'm:latest', text: 'q' },
+      (event) => received.push(event as unknown as { sequence: number; event: { type: string } }),
+    );
+    expect(start.opId).toBe('op-1');
+    expect(received.map((r) => r.sequence)).toEqual([1, 2]);
+    expect(received[1]?.event.type).toBe('delta');
+    expect(sinkRef).not.toHaveBeenCalled();
   });
 });

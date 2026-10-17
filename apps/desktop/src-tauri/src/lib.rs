@@ -1,11 +1,14 @@
 use adham_desktop_api::{
     ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
-    CommandResult, ConversationPage, CreateProjectPayload, CreateSessionPayload,
-    CreateWorkspacePayload, ErrorEnvelope, GetPreferencesResponse, PendingOperationDto,
-    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, RebuildProjectionsResponse,
-    RecordPendingOperationPayload, ResetPreferencesResponse, SelectProjectPayload, SessionList,
-    SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, WorkspaceList, WorkspaceSummary,
+    CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
+    CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
+    GetPreferencesResponse, PendingOperationDto, PendingOperationList, PlatformInfo, ProjectList,
+    ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
+    RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
+    SelectProjectPayload, SessionList, SessionSummary, StopCompletionPayload,
+    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
+    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
+    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -127,6 +130,70 @@ async fn get_conversation(
     context: CommandContext,
 ) -> Result<ConversationPage, ErrorEnvelope> {
     adham_desktop_api::handle_get_conversation(&state, context)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+// ===== Delivery A: local provider commands =====
+
+struct TauriEventSink {
+    channel: tauri::ipc::Channel<StreamEventDto>,
+}
+
+impl adham_desktop_api::EventSink for TauriEventSink {
+    fn send(&self, event: StreamEventDto) -> Result<(), String> {
+        self.channel.send(event).map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+async fn test_provider_connection(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<TestProviderConnectionPayload>,
+) -> Result<CommandResult<ProviderHealthResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_test_provider_connection(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn discover_ollama_models(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<DiscoverOllamaModelsPayload>,
+) -> Result<CommandResult<ProviderModelsList>, ErrorEnvelope> {
+    adham_desktop_api::handle_discover_ollama_models(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn update_provider_account(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<UpdateProviderAccountPayload>,
+) -> Result<CommandResult<ProviderAccountDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_update_provider_account(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn complete_once_streaming(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<CompleteOncePayload>,
+    on_event: tauri::ipc::Channel<StreamEventDto>,
+) -> Result<CommandResult<CompletionStartDto>, ErrorEnvelope> {
+    let sink = TauriEventSink { channel: on_event };
+    adham_desktop_api::handle_complete_once_streaming(&state, request, &sink)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn stop_completion(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<StopCompletionPayload>,
+) -> Result<CommandResult<StopCompletionResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_stop_completion(&state, request)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -276,6 +343,11 @@ pub fn run() {
             record_pending_operation,
             list_pending_operations,
             clear_pending_operation,
+            test_provider_connection,
+            discover_ollama_models,
+            update_provider_account,
+            complete_once_streaming,
+            stop_completion,
         ]);
 
     let app = builder

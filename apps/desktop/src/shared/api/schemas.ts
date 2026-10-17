@@ -144,3 +144,77 @@ export const PendingOperationListSchema = z.object({
   operations: z.array(PendingOperationDtoSchema),
   truncated: z.boolean(),
 });
+
+// ===== Delivery A: provider commands + streaming completions =====
+
+export const MessageUsageV1Schema = z.object({
+  promptTokens: z.number().int().nonnegative().nullable(),
+  completionTokens: z.number().int().nonnegative().nullable(),
+  totalTokens: z.number().int().nonnegative().nullable(),
+});
+
+export const MessageCompletionV1Schema = z.union([
+  z.object({ Completed: z.object({ truncated: z.boolean() }) }),
+  z.literal('Interrupted'),
+  z.literal('Failed'),
+]);
+
+export const ProviderCapabilitiesDtoSchema = z.object({
+  streaming: z.enum(['supported', 'unsupported', 'unknown']),
+  structuredOutput: z.enum(['supported', 'unsupported', 'unknown']),
+  toolProposals: z.enum(['supported', 'unsupported', 'unknown']),
+  thinking: z.enum(['supported', 'unsupported', 'unknown']),
+});
+
+export const ProviderModelDtoSchema = z.object({
+  modelId: z.string(),
+  digest: z.string(),
+  humanLabel: z.string(),
+  privacyClass: z.string(),
+  capabilities: ProviderCapabilitiesDtoSchema,
+});
+
+export const ProviderModelsListSchema = z.object({
+  models: z.array(ProviderModelDtoSchema),
+});
+
+export const ProviderAccountDtoSchema = z.object({
+  accountId: z.string(),
+  alias: z.string(),
+  endpointUrl: z.string(),
+  privacyClass: z.string(),
+});
+
+export const ProviderHealthResponseSchema = z.object({
+  reachable: z.boolean(),
+  modelTagCount: z.number().int().nonnegative(),
+});
+
+export const CompletionStartDtoSchema = z.object({
+  opId: z.string(),
+  messageId: z.string(),
+});
+
+export const StopCompletionResponseSchema = z.object({
+  opId: z.string(),
+  status: z.string(),
+});
+
+export const StreamEventPayloadDtoSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('started') }),
+  z.object({ type: z.literal('delta'), text: z.string() }),
+  z.object({
+    type: z.literal('completed'),
+    completion: z.enum(['completed', 'interrupted', 'failed']),
+    truncated: z.boolean(),
+    usage: MessageUsageV1Schema.nullable(),
+  }),
+]);
+
+export const StreamEventDtoSchema = z.object({
+  opId: z.string(),
+  sequence: z.number().int().nonnegative(),
+  event: StreamEventPayloadDtoSchema,
+});
+
+export type ValidatedStreamEvent = z.infer<typeof StreamEventDtoSchema>;

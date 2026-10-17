@@ -95,6 +95,21 @@ impl OllamaHttpAdapter {
         Ok(out)
     }
 
+    /// Metadata-only connection probe: `GET /api/tags` carries no prompt and
+    /// runs no billable generation; returns the tag count for the UI.
+    pub async fn connection_test(&self) -> Result<usize, ProviderError> {
+        let tags = self
+            .transport
+            .get_json(&format!("{}/api/tags", self.base_url))
+            .await
+            .map_err(transport_err)?;
+        Ok(tags
+            .get("models")
+            .and_then(Value::as_array)
+            .map(|a| a.len())
+            .unwrap_or(0))
+    }
+
     /// Start a streaming chat. Local-only requests require digest-pinned
     /// evidence; anything else is refused before the socket.
     pub async fn stream_chat(

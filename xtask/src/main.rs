@@ -1,12 +1,16 @@
-use adham_core_types::{ActorKind, EventActor, EventScope};
+use adham_core_types::{ActorKind, EventActor, EventScope, MessageCompletionV1, MessageUsageV1};
 use adham_desktop_api::{
     AppPreferences, BootstrapState, ClearPendingOperationPayload, CommandContext,
-    ConversationMessageDto, ConversationPage, CreateProjectPayload, CreateSessionPayload,
-    CreateWorkspacePayload, GetPreferencesResponse, PendingOperationDto, PendingOperationList,
-    PlatformInfo, ProjectList, ProjectSummary, RebuildProjectionsResponse,
+    CompleteOncePayload, CompletionStartDto, ConversationMessageDto, ConversationPage,
+    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
+    DiscoverOllamaModelsPayload, GetPreferencesResponse, PendingOperationDto, PendingOperationList,
+    PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto, ProviderCapabilitiesDto,
+    ProviderHealthResponse, ProviderModelDto, ProviderModelsList, RebuildProjectionsResponse,
     RecordPendingOperationPayload, ResetPreferencesResponse, SelectProjectPayload, SessionList,
-    SessionSummary, StorageStatus, SubmitMessagePayload, SubmittedMessage,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, WorkspaceList, WorkspaceSummary,
+    SessionSummary, StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
+    StreamEventPayloadDto, SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
+    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
+    WorkspaceList, WorkspaceSummary,
 };
 use std::fs;
 use std::path::Path;
@@ -79,6 +83,24 @@ fn generate_contracts() -> Result<(), Box<dyn std::error::Error>> {
         PendingOperationDto::decl(),
         PendingOperationList::decl(),
         ClearPendingOperationPayload::decl(),
+        // Delivery A: provider accounts, discovery, streaming completions
+        TestProviderConnectionPayload::decl(),
+        ProviderHealthResponse::decl(),
+        DiscoverOllamaModelsPayload::decl(),
+        UpdateProviderAccountPayload::decl(),
+        ProviderAccountDto::decl(),
+        ProviderModelDto::decl(),
+        ProviderCapabilitiesDto::decl(),
+        ProviderModelsList::decl(),
+        CompleteOncePayload::decl(),
+        CompletionStartDto::decl(),
+        StopCompletionPayload::decl(),
+        StopCompletionResponse::decl(),
+        StreamEventDto::decl(),
+        StreamEventPayloadDto::decl(),
+        // persisted assistant terminals/usage (shared with projections)
+        MessageCompletionV1::decl(),
+        MessageUsageV1::decl(),
     ];
 
     let id_types = [
@@ -92,6 +114,7 @@ fn generate_contracts() -> Result<(), Box<dyn std::error::Error>> {
         "export type ContentId = string;",
         "export type EventId = string;",
         "export type ActorId = string;",
+        "export type OperationId = string;",
     ];
 
     for id_decl in id_types {

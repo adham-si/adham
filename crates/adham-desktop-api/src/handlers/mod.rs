@@ -1,6 +1,7 @@
 pub mod conversation;
 pub mod message;
 pub mod pending;
+pub mod providers;
 pub mod selection;
 pub mod session;
 pub mod system;
@@ -9,6 +10,7 @@ pub mod workspace;
 pub use conversation::*;
 pub use message::*;
 pub use pending::*;
+pub use providers::*;
 pub use selection::*;
 pub use session::*;
 pub use system::*;
@@ -25,6 +27,25 @@ pub struct ApiContext {
     pub installation_id: InstallationId,
     pub actor_id: ActorId,
     pub content_key: Arc<dyn ContentKeyProvider>,
+    /// Provider registry cache (digest-pinned models, revision-keyed).
+    pub registry: adham_provider::registry::ProviderRegistry,
+    /// Per-op cancellation handles for streaming completions (shared across
+    /// context clones so a spawned handler and `stop_completion` agree).
+    pub completion_runs: std::sync::Arc<crate::handlers::providers::CompletionRuns>,
+}
+
+impl Clone for ApiContext {
+    fn clone(&self) -> Self {
+        Self {
+            store: SqliteEventStore::new(self.pool.clone()),
+            registry: adham_provider::registry::ProviderRegistry::new(self.pool.clone()),
+            completion_runs: std::sync::Arc::clone(&self.completion_runs),
+            pool: self.pool.clone(),
+            installation_id: self.installation_id,
+            actor_id: self.actor_id,
+            content_key: std::sync::Arc::clone(&self.content_key),
+        }
+    }
 }
 
 impl ApiContext {
@@ -36,6 +57,10 @@ impl ApiContext {
     ) -> Self {
         Self {
             store: SqliteEventStore::new(pool.clone()),
+            registry: adham_provider::registry::ProviderRegistry::new(pool.clone()),
+            completion_runs: std::sync::Arc::new(
+                crate::handlers::providers::CompletionRuns::default(),
+            ),
             pool,
             installation_id,
             actor_id,

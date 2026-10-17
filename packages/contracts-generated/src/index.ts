@@ -24,6 +24,7 @@ export type CorrelationId = string;
 export type ContentId = string;
 export type EventId = string;
 export type ActorId = string;
+export type OperationId = string;
 
 export type ActorKind = "LocalHuman" | "System" | "Migration";
 
@@ -123,4 +124,40 @@ export type PendingOperationDto = { operationId: string, kind: string, workspace
 export type PendingOperationList = { operations: Array<PendingOperationDto>, truncated: boolean, };
 
 export type ClearPendingOperationPayload = { operationId: string, expectedMessageRequestId: string, reason: string, };
+
+export type TestProviderConnectionPayload = { accountId: string, };
+
+export type ProviderHealthResponse = { reachable: boolean, modelTagCount: number, };
+
+export type DiscoverOllamaModelsPayload = { accountId: string, };
+
+export type UpdateProviderAccountPayload = { accountId: string | null, alias: string | null, endpointUrl: string | null, };
+
+export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl: string, privacyClass: string, };
+
+export type ProviderModelDto = { modelId: string, digest: string, humanLabel: string, privacyClass: string, capabilities: ProviderCapabilitiesDto, };
+
+export type ProviderCapabilitiesDto = { streaming: string, structuredOutput: string, toolProposals: string, thinking: string, };
+
+export type ProviderModelsList = { models: Array<ProviderModelDto>, };
+
+export type CompleteOncePayload = { accountId: string, modelId: string, text: string, };
+
+export type CompletionStartDto = { opId: string, messageId: string, };
+
+export type StopCompletionPayload = { opId: string, };
+
+export type StopCompletionResponse = { opId: string, status: string, };
+
+export type StreamEventDto = { opId: string, sequence: number, event: StreamEventPayloadDto, };
+
+export type StreamEventPayloadDto = { "type": "started" } | { "type": "delta", text: string, } | { "type": "completed", 
+/**
+ * "completed" | "interrupted" | "failed"
+ */
+completion: string, truncated: boolean, usage: MessageUsageV1 | null, };
+
+export type MessageCompletionV1 = { "Completed": { truncated: boolean, } } | "Interrupted" | "Failed";
+
+export type MessageUsageV1 = { promptTokens: number | null, completionTokens: number | null, totalTokens: number | null, };
 

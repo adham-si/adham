@@ -395,4 +395,25 @@ impl SqliteEventStore {
         }
         Ok(())
     }
+
+    /// Mark a provider-completion operation resolved (terminal event written).
+    /// The row stays for audit + reload reconstruction; idempotent.
+    pub async fn resolve_pending_operation_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        operation_id: &str,
+        expected_message_request_id: &str,
+    ) -> Result<(), DomainError> {
+        let now_us = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
+        sqlx::query(
+            "UPDATE pending_operations SET status = 'resolved', updated_at_us = ? \
+             WHERE operation_id = ? AND message_request_id = ?",
+        )
+        .bind(now_us)
+        .bind(operation_id)
+        .bind(expected_message_request_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(())
+    }
 }

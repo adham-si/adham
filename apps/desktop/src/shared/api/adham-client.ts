@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 import type {
   AppPreferences,
   BootstrapState,
@@ -6,6 +6,7 @@ import type {
   ClearPendingOperationPayload,
   CommandEnvelope,
   CommandResult,
+  CompletionStartDto,
   ConversationMessageDto,
   ConversationPage,
   GetPreferencesResponse,
@@ -13,6 +14,10 @@ import type {
   PendingOperationList,
   ProjectList,
   PlatformInfo,
+  ProviderAccountDto,
+  ProviderHealthResponse,
+  ProviderModelDto,
+  ProviderModelsList,
   ProjectSummary,
   RebuildProjectionsResponse,
   RecordPendingOperationPayload,
@@ -20,7 +25,9 @@ import type {
   SelectProjectPayload,
   SessionList,
   SessionSummary,
+  StopCompletionResponse,
   StorageStatus,
+  StreamEventDto,
   SubmittedMessage,
   UpdatePreferencesResponse,
   WorkspaceList,
@@ -44,6 +51,12 @@ import {
   UpdatePreferencesResponseSchema,
   WorkspaceListSchema,
   WorkspaceSummarySchema,
+  CompletionStartDtoSchema,
+  ProviderAccountDtoSchema,
+  ProviderHealthResponseSchema,
+  ProviderModelsListSchema,
+  StopCompletionResponseSchema,
+  StreamEventDtoSchema,
 } from './schemas';
 
 export type {
@@ -52,10 +65,15 @@ export type {
   CommandContext,
   CommandEnvelope,
   CommandResult,
+  CompletionStartDto,
   ConversationMessageDto,
   ConversationPage,
   GetPreferencesResponse,
   PlatformInfo,
+  ProviderAccountDto,
+  ProviderHealthResponse,
+  ProviderModelDto,
+  ProviderModelsList,
   ProjectSummary,
   RebuildProjectionsResponse,
   ResetPreferencesResponse,
@@ -65,7 +83,9 @@ export type {
   PendingOperationList,
   RecordPendingOperationPayload,
   SessionSummary,
+  StopCompletionResponse,
   StorageStatus,
+  StreamEventDto,
   SubmittedMessage,
   UpdatePreferencesResponse,
   WorkspaceSummary,
@@ -384,6 +404,113 @@ export class AdhamApiClient implements AdhamClient {
     await invoke('clear_pending_operation', {
       request: this.wrapCommand(payload, undefined, options?.requestId),
     });
+  }
+
+  // ===== Delivery A: provider commands =====
+
+  private sessionContext(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+  ): CommandContext {
+    return { workspaceId, projectId, sessionId };
+  }
+
+  async testProviderConnection(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    accountId: string,
+    options?: { requestId?: string },
+  ): Promise<ProviderHealthResponse> {
+    const envelope = this.wrapCommand(
+      { accountId },
+      this.sessionContext(workspaceId, projectId, sessionId),
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<ProviderHealthResponse>>('test_provider_connection', {
+      request: envelope,
+    });
+    return ProviderHealthResponseSchema.parse(result.data);
+  }
+
+  async discoverOllamaModels(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    accountId: string,
+    options?: { requestId?: string },
+  ): Promise<ProviderModelsList> {
+    const envelope = this.wrapCommand(
+      { accountId },
+      this.sessionContext(workspaceId, projectId, sessionId),
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<ProviderModelsList>>('discover_ollama_models', {
+      request: envelope,
+    });
+    return ProviderModelsListSchema.parse(result.data);
+  }
+
+  async updateProviderAccount(
+    payload: { accountId: string | null; alias: string | null; endpointUrl: string | null },
+    context: { workspaceId?: string; projectId?: string | null; sessionId?: string | null },
+    options?: { requestId?: string },
+  ): Promise<ProviderAccountDto> {
+    const envelope = this.wrapCommand(
+      payload,
+      {
+        workspaceId: context.workspaceId ?? null,
+        projectId: context.projectId ?? null,
+        sessionId: context.sessionId ?? null,
+      },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<ProviderAccountDto>>('update_provider_account', {
+      request: envelope,
+    });
+    return ProviderAccountDtoSchema.parse(result.data);
+  }
+
+  async completeOnceStreaming(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { accountId: string; modelId: string; text: string },
+    onEvent: (event: StreamEventDto) => void,
+    options?: { requestId?: string },
+  ): Promise<CompletionStartDto> {
+    const channel = new Channel<unknown>((raw) => {
+      onEvent(StreamEventDtoSchema.parse(raw));
+    });
+    const envelope = this.wrapCommand(
+      payload,
+      this.sessionContext(workspaceId, projectId, sessionId),
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<CompletionStartDto>>('complete_once_streaming', {
+      request: envelope,
+      onEvent: channel,
+    });
+    return CompletionStartDtoSchema.parse(result.data);
+  }
+
+  async stopCompletion(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    opId: string,
+    options?: { requestId?: string },
+  ): Promise<StopCompletionResponse> {
+    const envelope = this.wrapCommand(
+      { opId },
+      this.sessionContext(workspaceId, projectId, sessionId),
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<StopCompletionResponse>>('stop_completion', {
+      request: envelope,
+    });
+    return StopCompletionResponseSchema.parse(result.data);
   }
 }
 
