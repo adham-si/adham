@@ -4,4 +4,13 @@ export type ProviderCapabilitiesDto = { streaming: string, structuredOutput: str
 /**
  * Image input (vision); unknown never renders as unsupported.
  */
-imageInput: string, };
+imageInput: string, 
+/**
+ * Documented `think` values from `/api/show` (`thinking.values`):
+ * "true"/"false" and/or named levels. None = no documented metadata.
+ */
+thinkingValues: Array<string> | null, 
+/**
+ * The value Ollama uses when `think` is absent, when documented.
+ */
+thinkingDefault: string | null, };

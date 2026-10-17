@@ -95,6 +95,8 @@ describe('ModelsPage (preserved preview implementation)', () => {
                     toolProposals: 'unknown',
                     thinking: 'unknown',
                     imageInput: 'unknown',
+                    thinkingValues: null,
+                    thinkingDefault: null,
                   },
                   contextLimit: null,
                   configuredContext: null,

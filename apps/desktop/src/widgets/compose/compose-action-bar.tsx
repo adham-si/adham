@@ -16,8 +16,9 @@ export interface ComposeActionBarProps {
   onChangeMode: (mode: ComposeMode) => void;
   selectedModelId: string;
   onSelectModel: (modelId: string) => void;
-  reasoningEffort?: ('low' | 'medium' | 'high') | undefined;
-  onChangeReasoningEffort?: ((effort: 'low' | 'medium' | 'high') => void) | undefined;
+  /** Thinking on/off for evidenced thinking models (documented parameter). */
+  think?: boolean | string | null | undefined;
+  onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
   onAddAttachments: (attachments: ComposeAttachment[]) => void;
   status: ComposeStatus;
@@ -32,8 +33,8 @@ export function ComposeActionBar({
   onChangeMode,
   selectedModelId,
   onSelectModel,
-  reasoningEffort,
-  onChangeReasoningEffort,
+  think = null,
+  onChangeThink,
   models,
   onAddAttachments,
   status,
@@ -63,8 +64,8 @@ export function ComposeActionBar({
         <ComposeModelPicker
           selectedModelId={selectedModelId}
           onSelectModel={onSelectModel}
-          reasoningEffort={reasoningEffort}
-          onChangeReasoningEffort={onChangeReasoningEffort}
+          think={think}
+          onChangeThink={onChangeThink}
           models={models}
           disabled={isRunning}
         />

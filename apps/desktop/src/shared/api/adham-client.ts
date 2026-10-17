@@ -499,6 +499,8 @@ export class AdhamApiClient implements AdhamClient {
       modelId: string;
       text: string;
       mode: 'ask' | 'plan' | 'code' | 'execute';
+      /** Documented thinking parameter value; omitted = model default. */
+      think?: boolean | string;
     },
     onEvent: (event: StreamEventDto) => void,
     options?: { requestId?: string },

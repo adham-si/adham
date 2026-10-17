@@ -3,7 +3,6 @@ import { formatNumber } from '@/shared/i18n/format';
 
 export interface SubmissionExtras {
   attachmentCount: number;
-  hasCustomSettings: boolean;
   /** True when the dispatch streams through the selected provider model. */
   modelApplied?: boolean;
 }
@@ -24,13 +23,6 @@ export function submissionNotice(extras: SubmissionExtras): string {
         formatted: formatNumber(extras.attachmentCount),
       }),
     );
-  }
-  if (extras.modelApplied) {
-    if (extras.hasCustomSettings) {
-      withheld.push(i18n.t('compose.withheldReasoning'));
-    }
-  } else if (extras.hasCustomSettings) {
-    withheld.push(i18n.t('compose.withheldCustom'));
   }
   if (withheld.length === 0) return '';
   if (extras.modelApplied) {

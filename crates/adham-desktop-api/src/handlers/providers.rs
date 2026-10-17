@@ -17,7 +17,7 @@ use adham_provider::adapters::ollama_http::OllamaHttpAdapter;
 use adham_provider::domain::account::{PrivacyClass, ProviderAccountId};
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId, ModelSelectionSnapshot};
-use adham_provider::domain::request::{ChatMessage, MessageRole, ProviderRequestV1};
+use adham_provider::domain::request::{ChatMessage, MessageRole, ProviderRequestV1, ThinkValue};
 use adham_provider::domain::stream::{NormalizedStreamEvent, StreamCompletionOutcome, StreamUsage};
 use adham_provider::registry::{LocalAccount, PinnedModel};
 use adham_provider::transport::HttpTransport;
@@ -205,6 +205,16 @@ fn provider_model_dto(descriptor: &ModelDescriptor, digest: &str) -> ProviderMod
             tool_proposals: cap_str(descriptor.capabilities.tool_proposals).to_string(),
             thinking: cap_str(descriptor.capabilities.thinking).to_string(),
             image_input: cap_str(descriptor.capabilities.image_input).to_string(),
+            thinking_values: descriptor
+                .capabilities
+                .thinking_control
+                .as_ref()
+                .map(|control| control.values.clone()),
+            thinking_default: descriptor
+                .capabilities
+                .thinking_control
+                .as_ref()
+                .and_then(|control| control.default_value.clone()),
         },
         context_limit: descriptor.context_limit,
         configured_context: descriptor.configured_context,
@@ -565,6 +575,31 @@ where
     }
     let pinned = resolve_pinned(ctx, &account.account_id, &env.payload.model_id).await?;
 
+    // `think` values are documented per model by `/api/show`
+    // (`thinking.values`). Only an exact documented value may be sent: Ollama
+    // silently falls back to the model default for anything else, which would
+    // turn the UI's applied-state into a lie. No documented values = refused.
+    if let Some(think) = &env.payload.think {
+        let documented: &[String] = pinned
+            .descriptor
+            .capabilities
+            .thinking_control
+            .as_ref()
+            .map(|control| control.values.as_slice())
+            .unwrap_or_default();
+        if documented.is_empty() {
+            return Err(
+                "THINKING_UNSUPPORTED: model has no documented thinking values".to_string(),
+            );
+        }
+        let requested = think.as_documented();
+        if !documented.contains(&requested) {
+            return Err(format!(
+                "THINKING_VALUE_UNSUPPORTED: '{requested}' is not a documented thinking value"
+            ));
+        }
+    }
+
     let adapter = ollama_adapter(&account)?;
     let op_id = OperationId::new_v7();
     let message_id = MessageId::new_v7();
@@ -758,6 +793,7 @@ where
         &token,
         assembled.messages,
         max_output_tokens,
+        env.payload.think,
         sink,
     )
     .await;
@@ -951,6 +987,8 @@ async fn run_stream<S>(
     // Assembled + budgeted by the caller after the submitted row was durable.
     messages: Vec<ChatMessage>,
     max_output_tokens: Option<u32>,
+    // Documented `think` parameter; validated against model evidence already.
+    think: Option<ThinkValue>,
     sink: &S,
 ) -> &'static str
 where
@@ -976,6 +1014,7 @@ where
         },
         messages,
         max_output_tokens,
+        think,
         temperature: None,
     };
 

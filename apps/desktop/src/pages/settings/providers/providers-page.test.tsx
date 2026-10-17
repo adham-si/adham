@@ -39,6 +39,8 @@ const modelDto = () => ({
     toolProposals: 'unknown' as const,
     thinking: 'unknown' as const,
     imageInput: 'unknown' as const,
+    thinkingValues: null,
+    thinkingDefault: null,
   },
   contextLimit: null,
   configuredContext: null,

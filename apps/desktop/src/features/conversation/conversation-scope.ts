@@ -68,6 +68,8 @@ export interface ConversationBackend {
       text: string;
       /** Turn mode; dispatched as a request-only system instruction. */
       mode: 'ask' | 'plan' | 'code' | 'execute';
+      /** Documented thinking parameter value; omitted = model default. */
+      think?: boolean | string;
     },
     onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
     options?: { requestId?: string },

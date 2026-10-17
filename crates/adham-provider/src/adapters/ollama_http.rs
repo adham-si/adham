@@ -13,9 +13,9 @@ use crate::domain::account::PrivacyClass;
 use crate::domain::endpoint::EndpointDescriptor;
 use crate::domain::error::ProviderError;
 use crate::domain::model::{
-    CapabilityStatus, ModelCapabilities, ModelDescriptor, ModelEvidence, ModelId,
+    CapabilityStatus, ModelCapabilities, ModelDescriptor, ModelEvidence, ModelId, ThinkingControl,
 };
-use crate::domain::request::{MessageRole, ProviderRequestV1};
+use crate::domain::request::{MessageRole, ProviderRequestV1, ThinkValue};
 use crate::domain::stream::NormalizedStreamEvent;
 use crate::registry::PinnedModel;
 use crate::transport::{HttpTransport, TransportError, MAX_FRAME_BYTES};
@@ -217,6 +217,19 @@ fn map_show(show: &Value) -> WireEvidence {
             CapabilityStatus::Unsupported
         }
     };
+    let thinking_control = documented_thinking(show);
+    let thinking = match &thinking_control {
+        // A documented value list is the strongest evidence; `[false]` alone
+        // means the model does not support thinking (docs), while any other
+        // documented values mean it does.
+        Some(control) if control.values == ["false"] => CapabilityStatus::Unsupported,
+        Some(_) => CapabilityStatus::Supported,
+        // `thinking` absent stays unknown even with the array present:
+        // the field is newer than some valid thinking models, so absence
+        // is not proof of unsupported (unknown blocks feature use).
+        None if has("thinking") => CapabilityStatus::Supported,
+        None => CapabilityStatus::Unknown,
+    };
     WireEvidence {
         capabilities: ModelCapabilities {
             // /api/chat is Ollama's only transport and streams for every
@@ -225,19 +238,36 @@ fn map_show(show: &Value) -> WireEvidence {
             // no wire evidence in /api/show for structured output — stays unknown
             structured_output: CapabilityStatus::Unknown,
             tool_proposals: evidenced(has("tools")),
-            // `thinking` absent stays unknown even with the array present:
-            // the field is newer than some valid thinking models, so absence
-            // is not proof of unsupported (unknown blocks feature use).
-            thinking: if has("thinking") {
-                CapabilityStatus::Supported
-            } else {
-                CapabilityStatus::Unknown
-            },
+            thinking,
             image_input: evidenced(has("vision")),
+            thinking_control,
         },
         context_limit: context_length(show),
         configured_context: configured_context(show),
     }
+}
+
+/// `/api/show` `thinking` object → documented `think` values + default. Values
+/// are JSON booleans (on/off) or named levels; anything else is not a
+/// documented value and is dropped rather than guessed.
+fn documented_thinking(show: &Value) -> Option<ThinkingControl> {
+    let thinking = show.get("thinking")?;
+    let values = thinking.get("values")?.as_array()?;
+    Some(ThinkingControl {
+        values: values
+            .iter()
+            .filter_map(|value| match value {
+                Value::Bool(flag) => Some(flag.to_string()),
+                Value::String(level) => Some(level.clone()),
+                _ => None,
+            })
+            .collect(),
+        default_value: match thinking.get("default") {
+            Some(Value::Bool(flag)) => Some(flag.to_string()),
+            Some(Value::String(level)) => Some(level.clone()),
+            _ => None,
+        },
+    })
 }
 
 /// Model maximum context from `/api/show` `model_info`; the architecture
@@ -302,6 +332,14 @@ fn chat_request_body(pinned: &PinnedModel, request: &ProviderRequestV1) -> Value
     });
     if !options.is_empty() {
         body["options"] = Value::Object(options);
+    }
+    if let Some(think) = &request.think {
+        // Documented Ollama parameter: on/off or an evidenced level, validated
+        // by the caller against the model's `/api/show` values.
+        body["think"] = match think {
+            ThinkValue::Bool(flag) => json!(flag),
+            ThinkValue::Level(level) => json!(level),
+        };
     }
     body
 }

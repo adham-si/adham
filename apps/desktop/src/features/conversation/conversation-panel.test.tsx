@@ -85,7 +85,10 @@ function fakeBackend(): ConversationFakeBackend {
 type PanelProvider = NonNullable<Parameters<typeof ConversationPanel>[0]['provider']>;
 
 /** Provider registry double with one pinned local model, mirroring Delivery A. */
-function registryProvider(): PanelProvider {
+function registryProvider(
+  thinking = 'unknown',
+  thinkingValues: string[] | null = null,
+): PanelProvider {
   return {
     listAccounts: vi.fn(async () => ({
       accounts: [
@@ -108,7 +111,9 @@ function registryProvider(): PanelProvider {
             streaming: 'supported',
             structuredOutput: 'unknown',
             toolProposals: 'unknown',
-            thinking: 'unknown',
+            thinking,
+            thinkingValues,
+            thinkingDefault: null,
           },
         },
       ],
@@ -275,6 +280,78 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(payloads).toHaveLength(1));
     expect(payloads[0]!.mode).toBe('ask');
     expect(window.localStorage.getItem('adham:compose:mode')).toBe('ask');
+  });
+
+  it('sends only model-documented thinking values, never for undocumented models', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      projectionPosition: '0',
+    });
+    const payloads: Array<Record<string, unknown>> = [];
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as Record<string, unknown>);
+      const opId = `op-t${payloads.length}`;
+      onEvent({ opId, sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId,
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return { opId, messageId: `m-${opId}`, context: null };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-t1', status: 'cancelled' }));
+
+    // Documented values: an off choice is dispatched as the boolean.
+    const values = ['true', 'false', 'medium'];
+    const first = render(
+      <ConversationPanel backend={backend} provider={registryProvider('supported', values)} />,
+    );
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+    await user.click(screen.getByRole('button', { name: /Select model/i }));
+    await user.click(screen.getByLabelText(/Disable thinking/i));
+    await user.keyboard('{Escape}');
+    await user.type(box, 'think later');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(payloads[0]!.think).toBe(false);
+    first.unmount();
+
+    // A documented level travels verbatim.
+    const second = render(
+      <ConversationPanel backend={backend} provider={registryProvider('supported', values)} />,
+    );
+    const levelBox = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+    await user.click(screen.getByRole('button', { name: /Select model/i }));
+    await user.click(screen.getByRole('button', { name: 'medium' }));
+    await user.keyboard('{Escape}');
+    await user.type(levelBox, 'think less');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(payloads).toHaveLength(2));
+    expect(payloads[1]!.think).toBe('medium');
+    second.unmount();
+
+    // No documented values: no control, and no parameter on the wire.
+    render(<ConversationPanel backend={backend} provider={registryProvider('unknown')} />);
+    const plainBox = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+    await user.click(screen.getByRole('button', { name: /Select model/i }));
+    expect(screen.queryByLabelText(/Disable thinking/i)).toBeNull();
+    await user.keyboard('{Escape}');
+    await user.type(plainBox, 'plain');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(payloads).toHaveLength(3));
+    expect('think' in payloads[2]!).toBe(false);
   });
 
   it('restores the last used mode and never restores execute', async () => {

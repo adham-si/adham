@@ -244,7 +244,8 @@ use adham_desktop_api::{EventSink, StreamEventDto, StreamEventPayloadDto};
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderKind};
 use adham_provider::domain::endpoint::EndpointId;
-use adham_provider::domain::model::{ModelDescriptor, ModelId};
+use adham_provider::domain::model::{CapabilityStatus, ModelDescriptor, ModelId, ThinkingControl};
+use adham_provider::domain::request::ThinkValue;
 use adham_provider::registry::LocalAccount;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -1017,6 +1018,7 @@ fn complete_once_streams_in_order_and_persists_terminal() {
             model_id: "m:latest".to_string(),
             text: "Tell me about rust generics".to_string(),
             mode: None,
+            think: None,
         },
     );
 
@@ -1209,6 +1211,7 @@ fn completion_history_is_bounded_and_tamper_proofed() {
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1228,6 +1231,7 @@ fn completion_history_is_bounded_and_tamper_proofed() {
             model_id: "m:latest".to_string(),
             text: "the latest question".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1356,6 +1360,7 @@ fn context_assembly_trims_to_the_evidenced_budget_and_reserves_output() {
             model_id: "m:latest".to_string(),
             text: format!("newest {}", "y".repeat(600)),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1389,6 +1394,142 @@ fn context_assembly_trims_to_the_evidenced_budget_and_reserves_output() {
     );
 }
 
+/// T4d. Thinking controls are documented-value-gated: `/api/show`
+/// `thinking.values` is the only authority for what may be sent, so an
+/// undocumented value (or a model with no documented values) is refused
+/// before any socket, and a documented value reaches the provider request.
+#[test]
+fn thinking_control_requires_documented_values_and_reaches_the_provider_request() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let base_url = spawn_stub_ollama(
+        &runtime,
+        None,
+        captures.clone(),
+        ChatProgram::once(vec![ndjson_delta("ok"), ndjson_done(1, 1)]),
+    );
+    let account_id = runtime.block_on(async {
+        let account = local_account_for(&base_url);
+        ctx.registry
+            .upsert_account(&account)
+            .await
+            .expect("seed account");
+        let mut thinking = model_descriptor("t:latest");
+        thinking.capabilities.thinking = CapabilityStatus::Supported;
+        // /api/show documents the values a model accepts; Ollama silently
+        // falls back to the default for anything else.
+        thinking.capabilities.thinking_control = Some(ThinkingControl {
+            values: vec!["true".to_string(), "false".to_string(), "high".to_string()],
+            default_value: Some("true".to_string()),
+        });
+        ctx.registry
+            .replace_models(
+                &account.account_id,
+                &[
+                    (
+                        ModelId("t:latest".to_string()),
+                        "sha256:t".to_string(),
+                        thinking,
+                    ),
+                    (
+                        ModelId("m:latest".to_string()),
+                        "sha256:m".to_string(),
+                        model_descriptor("m:latest"),
+                    ),
+                ],
+            )
+            .await
+            .expect("seed models");
+        account.account_id.0.clone()
+    });
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    // No documented values: refused before the socket.
+    let refused = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "m:latest".to_string(),
+            text: "hello".to_string(),
+            mode: None,
+            think: Some(ThinkValue::Bool(false)),
+        },
+    );
+    let sink = CollectSink(collector());
+    let err = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, refused, &sink).await
+        })
+        .expect_err("thinking refused without documented values");
+    assert!(err.contains("THINKING_UNSUPPORTED"), "{err}");
+    assert!(
+        captures.request_bodies().is_empty(),
+        "no socket before the refusal"
+    );
+
+    // A value outside the documented list is refused too: the server would
+    // silently use its default, so the app must not claim it was applied.
+    let refused = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id: account_id.clone(),
+            model_id: "t:latest".to_string(),
+            text: "hello".to_string(),
+            mode: None,
+            think: Some(ThinkValue::Level("max".to_string())),
+        },
+    );
+    let sink = CollectSink(collector());
+    let err = runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, refused, &sink).await
+        })
+        .expect_err("undocumented level refused");
+    assert!(err.contains("THINKING_VALUE_UNSUPPORTED"), "{err}");
+    assert!(
+        captures.request_bodies().is_empty(),
+        "no socket before the refusal"
+    );
+
+    // Evidenced support: documented values are forwarded exactly as
+    // documented — a boolean and a named level.
+    for value in [
+        ThinkValue::Bool(false),
+        ThinkValue::Level("high".to_string()),
+    ] {
+        let env = typed_envelope(
+            (&ws, &proj, &sess),
+            CompleteOncePayload {
+                account_id: account_id.clone(),
+                model_id: "t:latest".to_string(),
+                text: "hello".to_string(),
+                mode: None,
+                think: Some(value),
+            },
+        );
+        let sink = CollectSink(collector());
+        runtime
+            .block_on(async {
+                adham_desktop_api::handle_complete_once_streaming(&ctx, env, &sink).await
+            })
+            .expect("completion ok");
+    }
+    let bodies = captures.request_bodies();
+    assert_eq!(bodies.len(), 2, "two chat requests");
+    let off: Value = serde_json::from_str(&bodies[0]).expect("chat body json");
+    assert_eq!(off["think"], json!(false), "boolean documented value");
+    let level: Value = serde_json::from_str(&bodies[1]).expect("chat body json");
+    assert_eq!(
+        level["think"],
+        json!("high"),
+        "named level documented value"
+    );
+}
+
 /// T4b. Modes are declarations with real semantics: the instruction reaches
 /// the provider request only (the persisted user text stays exactly what the
 /// user wrote) and "execute" is refused before any socket because no policy or
@@ -1418,6 +1559,7 @@ fn mode_instruction_is_request_only_and_execute_is_refused() {
             model_id: "m:latest".to_string(),
             text: "write the handler".to_string(),
             mode: Some("code".to_string()),
+            think: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1475,6 +1617,7 @@ fn mode_instruction_is_request_only_and_execute_is_refused() {
             model_id: "m:latest".to_string(),
             text: "run the tests".to_string(),
             mode: Some("execute".to_string()),
+            think: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1493,6 +1636,7 @@ fn mode_instruction_is_request_only_and_execute_is_refused() {
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),
             mode: Some("yolo".to_string()),
+            think: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1536,6 +1680,7 @@ fn unknown_model_blocked_before_socket() {
             model_id: "nosuchmodel:latest".to_string(),
             text: "hi".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(collector());
@@ -1558,6 +1703,7 @@ fn unknown_model_blocked_before_socket() {
                         model_id: "m:latest".to_string(),
                         text: "hi".to_string(),
                         mode: None,
+                        think: None,
                     },
                 ),
                 &sink,
@@ -1694,6 +1840,7 @@ fn stop_mid_stream_persists_interrupted_partial() {
             model_id: "m:latest".to_string(),
             text: "say something".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -1850,6 +1997,7 @@ fn renderer_disconnect_still_persists_terminal() {
             model_id: "m:latest".to_string(),
             text: "disconnect test".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = FailingSink;
@@ -2022,6 +2170,7 @@ fn thinking_model_stream_persists_answer_and_resolves() {
             model_id: "m:latest".to_string(),
             text: "hello".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2136,6 +2285,7 @@ fn stop_during_connect_persists_interrupted_and_resolves() {
             model_id: "m:latest".to_string(),
             text: "slow one".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2269,6 +2419,7 @@ fn stop_after_thinking_activity_stays_interrupted() {
             model_id: "m:latest".to_string(),
             text: "think then answer".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2390,6 +2541,7 @@ fn empty_stop_persists_failed_terminal_and_resolves() {
             model_id: "m:latest".to_string(),
             text: "say nothing".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2480,6 +2632,7 @@ fn tool_only_stop_persists_failed_not_completed() {
             model_id: "m:latest".to_string(),
             text: "use a tool".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(events.clone());
@@ -2559,6 +2712,7 @@ fn two_dispatches_carry_prior_turn_and_persist_both() {
                 model_id: "m:latest".to_string(),
                 text: text.to_string(),
                 mode: None,
+                think: None,
             },
         );
         let sink = CollectSink(collector());
@@ -2701,6 +2855,7 @@ fn provider_management_runs_app_level_without_a_session() {
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),
             mode: None,
+            think: None,
         },
     };
     let message = runtime
@@ -2773,6 +2928,7 @@ fn premature_eof_persists_failed_terminal_once() {
             model_id: "m:latest".to_string(),
             text: "stream until you die".to_string(),
             mode: None,
+            think: None,
         },
     );
     let sink = CollectSink(events.clone());

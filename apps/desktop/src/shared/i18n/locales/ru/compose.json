@@ -91,6 +91,10 @@
     "charsCompact_zero": "{{formatted}}k символов",
     "streamNotice": "Стриминг выбранной модели. Не применено: {{items}}.",
     "withheldReasoning": "своё усилие рассуждения не применено",
+    "disableThinking": "Отключить рассуждения",
+    "thinkingOffTag": "Без рассуждений",
+    "thinkingHeading": "Рассуждения",
+    "thinkingDefault": "По умолчанию у модели",
     "selectModel": "Выберите модель"
   }
 }

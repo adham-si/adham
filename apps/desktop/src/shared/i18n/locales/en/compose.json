@@ -83,6 +83,10 @@
     "charsCompact_zero": "{{formatted}}k characters",
     "streamNotice": "Streaming with the selected model. Withheld: {{items}}.",
     "withheldReasoning": "custom reasoning effort is not applied",
+    "disableThinking": "Disable thinking",
+    "thinkingOffTag": "No thinking",
+    "thinkingHeading": "Thinking",
+    "thinkingDefault": "Model default",
     "selectModel": "Select a model"
   }
 }

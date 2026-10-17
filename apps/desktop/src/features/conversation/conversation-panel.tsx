@@ -138,7 +138,8 @@ export function ConversationPanel({
   // Model choice is explicit: '' until the user picks from the registry, and
   // discovery order never becomes a silent default.
   const [selectedModelId, setSelectedModelId] = React.useState('');
-  const [reasoningEffort, setReasoningEffort] = React.useState<'low' | 'medium' | 'high'>('medium');
+  /** Documented `think` value for the next turn; null = model default. */
+  const [think, setThink] = React.useState<boolean | string | null>(null);
   const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
   const [stopNotice, setStopNotice] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -164,9 +165,12 @@ export function ConversationPanel({
     name: m.humanLabel,
     provider: 'Ollama',
     boundary: 'local' as const,
-    // Effort controls appear only for evidenced thinking support; unknown or
+    // Thinking controls appear only for evidenced support; unknown or
     // unsupported must not present a control the model may not honor.
     supportsReasoning: m.capabilities.thinking === 'supported',
+    // The control itself comes from the model's documented values.
+    thinkingValues: m.capabilities.thinkingValues ?? undefined,
+    thinkingDefault: m.capabilities.thinkingDefault,
   }));
   const selectedDescriptor = ollama.models.find((m) => m.modelId === selectedModelId) ?? null;
   const streamReady =
@@ -262,7 +266,14 @@ export function ConversationPanel({
     // Streaming dispatch when a registry model is wired; otherwise the
     // honest text-only fallback persists just the message.
     const outcome = streamReady
-      ? await conv.streamOnce(sent, ollama.account!.accountId, selectedModelId, mode)
+      ? await conv.streamOnce(
+          sent,
+          ollama.account!.accountId,
+          selectedModelId,
+          mode,
+          // The documented `think` value; null = model default (omitted).
+          think ?? undefined,
+        )
       : await conv.submit(sent);
     // A rejected streaming dispatch (e.g. a send racing the in-flight turn)
     // must be visible, never a silent no-op. Text-only refusals and failures
@@ -272,7 +283,15 @@ export function ConversationPanel({
     if (outcome.ok && draftRef.current === sent) {
       commitPrompt(sent);
     }
-  }, [busy, commitPrompt, conv, streamReady, ollama.account, selectedModelId]);
+  }, [busy, commitPrompt, conv, streamReady, ollama.account, selectedModelId, mode, think]);
+
+  /// A new model invalidates the thinking choice: a level documented for the
+  /// previous model may be undocumented for the next one (the backend refuses
+  /// undocumented values, so carrying it over would refuse an honest send).
+  const handleSelectModel = React.useCallback((modelId: string) => {
+    setSelectedModelId(modelId);
+    setThink(null);
+  }, []);
 
   const handleStop = React.useCallback(() => {
     if (conv.streaming) {
@@ -285,12 +304,10 @@ export function ConversationPanel({
   const notice = streamReady
     ? submissionNotice({
         attachmentCount: attachments.length,
-        hasCustomSettings: reasoningEffort !== 'medium',
         modelApplied: true,
       })
     : submissionNotice({
         attachmentCount: attachments.length,
-        hasCustomSettings: reasoningEffort !== 'medium',
       });
   const composeStatus = conv.streaming
     ? ('streaming' as const)
@@ -518,10 +535,10 @@ export function ConversationPanel({
           mode={mode}
           onChangeMode={handleChangeMode}
           selectedModelId={selectedModelId}
-          onSelectModel={setSelectedModelId}
+          onSelectModel={handleSelectModel}
           models={pickerModels}
-          reasoningEffort={reasoningEffort}
-          onChangeReasoningEffort={setReasoningEffort}
+          think={think}
+          onChangeThink={setThink}
           contextLimit={selectedDescriptor?.contextLimit ?? null}
           effectiveContextBudget={selectedDescriptor?.effectiveContextBudget ?? null}
           attachments={attachments}

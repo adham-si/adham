@@ -6,4 +6,12 @@ export type CompleteOncePayload = { accountId: string, modelId: string, text: st
  * for this request only, never persisted to history. Absent = no
  * instruction. "execute" is refused: no policy/tool runtime exists.
  */
-mode: string | null, };
+mode: string | null, 
+/**
+ * Documented Ollama `think` value for this request only: false disables
+ * reasoning, true requests it, a string selects a documented level.
+ * Absent = model default. Refused (THINKING_UNSUPPORTED / value not in
+ * `thinking_values`) unless the model documents that exact value —
+ * capability and parameter values are never assumed from a request.
+ */
+think: boolean | string | null, };

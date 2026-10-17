@@ -79,6 +79,10 @@
     "charsCompact_zero": "{{formatted}}k 个字符",
     "streamNotice": "正在向所选模型流式发送。未应用：{{items}}。",
     "withheldReasoning": "自定义推理力度未应用",
+    "disableThinking": "禁用思考",
+    "thinkingOffTag": "无思考",
+    "thinkingHeading": "思考",
+    "thinkingDefault": "模型默认",
     "selectModel": "选择模型"
   }
 }

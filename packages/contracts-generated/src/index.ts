@@ -172,7 +172,16 @@ export type ProviderCapabilitiesDto = { streaming: string, structuredOutput: str
 /**
  * Image input (vision); unknown never renders as unsupported.
  */
-imageInput: string, };
+imageInput: string, 
+/**
+ * Documented `think` values from `/api/show` (`thinking.values`):
+ * "true"/"false" and/or named levels. None = no documented metadata.
+ */
+thinkingValues: Array<string> | null, 
+/**
+ * The value Ollama uses when `think` is absent, when documented.
+ */
+thinkingDefault: string | null, };
 
 export type ProviderModelEvidenceDto = { source: string, serverVersion: string | null, 
 /**
@@ -189,7 +198,15 @@ export type CompleteOncePayload = { accountId: string, modelId: string, text: st
  * for this request only, never persisted to history. Absent = no
  * instruction. "execute" is refused: no policy/tool runtime exists.
  */
-mode: string | null, };
+mode: string | null, 
+/**
+ * Documented Ollama `think` value for this request only: false disables
+ * reasoning, true requests it, a string selects a documented level.
+ * Absent = model default. Refused (THINKING_UNSUPPORTED / value not in
+ * `thinking_values`) unless the model documents that exact value —
+ * capability and parameter values are never assumed from a request.
+ */
+think: boolean | string | null, };
 
 export type ContextAssemblyDto = { estimatedInputTokens: number, 
 /**

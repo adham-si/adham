@@ -624,6 +624,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       accountId: string,
       modelId: string,
       mode: 'ask' | 'plan' | 'code' | 'execute',
+      /** Documented thinking parameter value; undefined = model default.
+       *  Only values the model documents in /api/show are accepted (the
+       *  backend refuses anything else before dispatch). */
+      think?: boolean | string,
     ): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed)
@@ -680,7 +684,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           ctx.workspaceId,
           ctx.projectId,
           ctx.sessionId,
-          { accountId, modelId, text: trimmed, mode },
+          { accountId, modelId, text: trimmed, mode, ...(think === undefined ? {} : { think }) },
           (event) => {
             if (!mountedRef.current || generationRef.current !== generation) return;
             if (opId === null) {

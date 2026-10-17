@@ -36,6 +36,17 @@ const TEST_MODELS: ModelOption[] = [
     provider: 'Anthropic',
     boundary: 'cloud',
     supportsReasoning: true,
+    thinkingValues: ['true', 'false', 'low', 'medium', 'high'],
+    thinkingDefault: 'medium',
+  },
+  {
+    // Legacy daemon: the capability array says thinking, but /api/show
+    // documents no values — no control may be offered.
+    id: 'local:legacy-thinker:7b',
+    name: 'Legacy Thinker 7B',
+    provider: 'Ollama',
+    boundary: 'local',
+    supportsReasoning: true,
   },
 ];
 
@@ -366,6 +377,42 @@ describe('ComposeModelPicker with Data Boundary Badge', () => {
     fireEvent.click(claudeOption);
 
     expect(handleSelect).toHaveBeenCalledWith('cloud:claude-3-7-sonnet');
+  });
+
+  it('offers only the model-documented thinking values, verbatim', () => {
+    const onChangeThink = vi.fn();
+    // Documented on/off + levels: both controls exist and dispatch the exact
+    // documented values (the backend refuses anything else).
+    const { unmount } = render(
+      <ComposeModelPicker
+        selectedModelId="cloud:claude-3-7-sonnet"
+        onSelectModel={() => {}}
+        models={TEST_MODELS}
+        onChangeThink={onChangeThink}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Select model/i }));
+    fireEvent.click(screen.getByLabelText(/Disable thinking/i));
+    expect(onChangeThink).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByRole('button', { name: 'high' }));
+    expect(onChangeThink).toHaveBeenCalledWith('high');
+    fireEvent.click(screen.getByRole('button', { name: /Model default \(medium\)/i }));
+    expect(onChangeThink).toHaveBeenCalledWith(null);
+    unmount();
+
+    // No documented values: no control at all — nothing may be sent.
+    render(
+      <ComposeModelPicker
+        selectedModelId="local:legacy-thinker:7b"
+        onSelectModel={() => {}}
+        models={TEST_MODELS}
+        onChangeThink={onChangeThink}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Select model/i }));
+    expect(screen.queryByLabelText(/Disable thinking/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Model default/i })).toBeNull();
+    expect(screen.queryByText(/^Thinking$/)).toBeNull();
   });
 });
 

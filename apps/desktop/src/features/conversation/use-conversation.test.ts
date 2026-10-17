@@ -177,37 +177,15 @@ describe('conversation capabilities', () => {
 
 describe('submissionNotice', () => {
   it('discloses that the model selection is not applied when no model is wired', () => {
-    expect(submissionNotice({ attachmentCount: 0, hasCustomSettings: false })).toMatch(
-      /model selection is not applied/i,
-    );
+    expect(submissionNotice({ attachmentCount: 0 })).toMatch(/model selection is not applied/i);
   });
 
   it('stays silent when the selected model is applied through streaming', () => {
-    expect(
-      submissionNotice({ attachmentCount: 0, hasCustomSettings: false, modelApplied: true }),
-    ).toBe('');
+    expect(submissionNotice({ attachmentCount: 0, modelApplied: true })).toBe('');
   });
 
   it('warns that attachments are not transmitted', () => {
-    expect(submissionNotice({ attachmentCount: 2, hasCustomSettings: false })).toMatch(
-      /attachment/i,
-    );
-  });
-
-  it('discloses only the reasoning gap when the model is applied with custom effort', () => {
-    const notice = submissionNotice({
-      attachmentCount: 0,
-      hasCustomSettings: true,
-      modelApplied: true,
-    });
-    expect(notice).toMatch(/reasoning effort/i);
-    expect(notice).not.toMatch(/model selection is not applied/i);
-  });
-
-  it('warns that model and scope settings are not applied in the fallback', () => {
-    expect(submissionNotice({ attachmentCount: 0, hasCustomSettings: true })).toMatch(
-      /not applied|not sent/i,
-    );
+    expect(submissionNotice({ attachmentCount: 2 })).toMatch(/attachment/i);
   });
 });
 

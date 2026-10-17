@@ -21,8 +21,9 @@ export interface ComposerProps {
   onChangeMode?: ((mode: ComposeMode) => void) | undefined;
   selectedModelId?: string | undefined;
   onSelectModel?: ((modelId: string) => void) | undefined;
-  reasoningEffort?: ('low' | 'medium' | 'high') | undefined;
-  onChangeReasoningEffort?: ((effort: 'low' | 'medium' | 'high') => void) | undefined;
+  /** Thinking on/off for evidenced thinking models (documented parameter). */
+  think?: boolean | string | null | undefined;
+  onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
   attachments?: ComposeAttachment[] | undefined;
   onAddAttachments?: ((attachments: ComposeAttachment[]) => void) | undefined;
@@ -51,8 +52,8 @@ export function Composer({
   onChangeMode = () => {},
   selectedModelId = '',
   onSelectModel = () => {},
-  reasoningEffort = 'medium',
-  onChangeReasoningEffort,
+  think = null,
+  onChangeThink,
   models = [],
   attachments = [],
   onAddAttachments = () => {},
@@ -173,8 +174,8 @@ export function Composer({
           onChangeMode={onChangeMode}
           selectedModelId={selectedModelId}
           onSelectModel={onSelectModel}
-          reasoningEffort={reasoningEffort}
-          onChangeReasoningEffort={onChangeReasoningEffort}
+          think={think}
+          onChangeThink={onChangeThink}
           models={models}
           onAddAttachments={onAddAttachments}
           status={status}

@@ -136,6 +136,7 @@ fn request(model: &str) -> ProviderRequestV1 {
         }],
         max_output_tokens: Some(64),
         temperature: Some(0.7),
+        think: None,
     }
 }
 
@@ -217,6 +218,54 @@ async fn discover_maps_show_evidence_limits_and_modalities() {
     assert!(
         descriptor.evidence.observed_at_us > 0,
         "observation time must be recorded"
+    );
+}
+
+#[tokio::test]
+async fn discover_maps_documented_thinking_values() {
+    // `/api/show` `thinking` is the only authority for which `think` values a
+    // model accepts (booleans and/or named levels) and its default.
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "gpt-oss:20b", "digest": "sha256:g", "size": 100}]
+        }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.13.0"}))),
+        "/api/show" => Some(http_200_json(&json!({
+            "capabilities": ["completion", "thinking"],
+            "thinking": {"values": ["low", "medium", "high"], "default": "medium"}
+        }))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    let capabilities = &models[0].descriptor.capabilities;
+    assert_eq!(capabilities.thinking, CapabilityStatus::Supported);
+    let control = capabilities
+        .thinking_control
+        .as_ref()
+        .expect("documented values");
+    assert_eq!(control.values, ["low", "medium", "high"]);
+    assert_eq!(control.default_value.as_deref(), Some("medium"));
+
+    // `values: [false]` is the server stating the model does not think.
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "plain:1b", "digest": "sha256:p", "size": 100}]
+        }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.13.0"}))),
+        "/api/show" => Some(http_200_json(&json!({
+            "capabilities": ["completion"],
+            "thinking": {"values": [false]}
+        }))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    assert_eq!(
+        models[0].descriptor.capabilities.thinking,
+        CapabilityStatus::Unsupported
     );
 }
 

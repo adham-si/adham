@@ -40,6 +40,22 @@ pub struct ModelCapabilities {
     /// guesses and adapter field support do not prove it.
     #[serde(default)]
     pub image_input: CapabilityStatus,
+    /// Documented `think` values from `/api/show` (`thinking.values` and
+    /// `thinking.default`): booleans for on/off models, strings for named
+    /// levels. None = no documented metadata, so no value may be sent.
+    #[serde(default)]
+    pub thinking_control: Option<ThinkingControl>,
+}
+
+/// `/api/show` `thinking` object: the values a model documents for `think`
+/// and the value used when `think` is absent. Values are kept exactly as the
+/// server states them (`"true"`/`"false"` from JSON booleans, or level names).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ThinkingControl {
+    #[serde(default)]
+    pub values: Vec<String>,
+    #[serde(default)]
+    pub default_value: Option<String>,
 }
 
 impl Default for ModelCapabilities {
@@ -52,6 +68,7 @@ impl Default for ModelCapabilities {
             tool_proposals: CapabilityStatus::Unknown,
             thinking: CapabilityStatus::Unknown,
             image_input: CapabilityStatus::Unknown,
+            thinking_control: None,
         }
     }
 }

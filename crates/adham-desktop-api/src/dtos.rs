@@ -1,4 +1,5 @@
 use adham_core_types::{MessageCompletionV1, MessageUsageV1};
+use adham_provider::domain::request::ThinkValue;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -415,6 +416,11 @@ pub struct ProviderCapabilitiesDto {
     pub thinking: String,
     /// Image input (vision); unknown never renders as unsupported.
     pub image_input: String,
+    /// Documented `think` values from `/api/show` (`thinking.values`):
+    /// "true"/"false" and/or named levels. None = no documented metadata.
+    pub thinking_values: Option<Vec<String>>,
+    /// The value Ollama uses when `think` is absent, when documented.
+    pub thinking_default: Option<String>,
 }
 
 /// Where a model descriptor's claims came from; empty source = legacy row.
@@ -514,6 +520,13 @@ pub struct CompleteOncePayload {
     /// for this request only, never persisted to history. Absent = no
     /// instruction. "execute" is refused: no policy/tool runtime exists.
     pub mode: Option<String>,
+    /// Documented Ollama `think` value for this request only: false disables
+    /// reasoning, true requests it, a string selects a documented level.
+    /// Absent = model default. Refused (THINKING_UNSUPPORTED / value not in
+    /// `thinking_values`) unless the model documents that exact value —
+    /// capability and parameter values are never assumed from a request.
+    #[ts(type = "boolean | string | null")]
+    pub think: Option<ThinkValue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

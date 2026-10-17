@@ -95,6 +95,10 @@
     "charsCompact_zero": "{{formatted}}k حرف",
     "streamNotice": "بثٌّ إلى النموذج المحدد. المُستثنى: {{items}}.",
     "withheldReasoning": "مستوى التفكير المخصص غير مطبَّق",
+    "disableThinking": "إيقاف التفكير",
+    "thinkingOffTag": "دون تفكير",
+    "thinkingHeading": "التفكير",
+    "thinkingDefault": "افتراضي النموذج",
     "selectModel": "اختر نموذجًا"
   }
 }

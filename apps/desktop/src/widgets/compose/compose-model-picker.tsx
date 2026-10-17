@@ -19,13 +19,22 @@ export interface ModelOption {
   /** Resource key for the translated description; falls back to description. */
   descKey?: string | undefined;
   supportsReasoning?: boolean | undefined;
+  /** `/api/show` `thinking.values`: the only values this model documents for
+   *  `think` ("true"/"false" and/or named levels). Absent = no metadata, so
+   *  no control may be offered. */
+  thinkingValues?: string[] | undefined;
+  /** The value Ollama uses when `think` is absent, when documented. */
+  thinkingDefault?: string | null | undefined;
 }
 
 export interface ComposeModelPickerProps {
   selectedModelId: string;
   onSelectModel: (modelId: string) => void;
-  reasoningEffort?: ('low' | 'medium' | 'high') | undefined;
-  onChangeReasoningEffort?: ((effort: 'low' | 'medium' | 'high') => void) | undefined;
+  /** Documented `think` value for the next turn: false, a named level, or
+   *  null for the model default. Only values in the model's documented list
+   *  are offered here (and re-validated by the backend). */
+  think?: boolean | string | null | undefined;
+  onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
   disabled?: boolean | undefined;
   className?: string | undefined;
@@ -34,23 +43,13 @@ export interface ComposeModelPickerProps {
 export function ComposeModelPicker({
   selectedModelId,
   onSelectModel,
-  reasoningEffort = 'medium',
-  onChangeReasoningEffort,
+  think = null,
+  onChangeThink,
   models = [],
   disabled = false,
   className = '',
 }: ComposeModelPickerProps) {
   const { t } = useTranslation();
-  const effortLabels = {
-    low: t('settings.models.effortLow', 'low effort'),
-    medium: t('settings.models.effortMedium', 'medium effort'),
-    high: t('settings.models.effortHigh', 'high effort'),
-  } as const;
-  const tierLabels = {
-    low: t('settings.models.tierLow', 'Low'),
-    medium: t('settings.models.tierMedium', 'Medium'),
-    high: t('settings.models.tierHigh', 'High'),
-  } as const;
   const [isOpen, setIsOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -60,6 +59,24 @@ export function ComposeModelPicker({
     ? (models.find((m) => m.id === selectedModelId) ?? null)
     : null;
   const selectedLabel = selectedModel?.name ?? t('compose.selectModel', 'Select a model');
+
+  // Thinking controls come only from the model's documented `think` values:
+  // on/off when "false"/"true" are documented, named levels verbatim. A model
+  // without documented values gets no control (nothing may be sent for it).
+  const documentedThinking = selectedModel?.thinkingValues ?? [];
+  const permitsOff = documentedThinking.includes('false');
+  const permitsOn = documentedThinking.includes('true');
+  const thinkingLevels = documentedThinking.filter(
+    (value) => value !== 'true' && value !== 'false',
+  );
+  const hasThinkingControl =
+    Boolean(selectedModel?.supportsReasoning) && (permitsOff || thinkingLevels.length > 0);
+  const thinkingSelectionClass = (selected: boolean) =>
+    `min-h-control-xs rounded px-1.5 text-xs capitalize transition-colors ${
+      selected
+        ? 'bg-selection font-medium text-action border border-focus'
+        : 'bg-surface-subtle text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
+    }`;
 
   // Close popup when clicking outside or pressing Escape
   React.useEffect(() => {
@@ -125,10 +142,10 @@ export function ComposeModelPicker({
           </span>
         )}
 
-        {/* Reasoning tag if active */}
-        {selectedModel?.supportsReasoning && (
+        {/* Thinking state tag: a documented non-default choice only. */}
+        {hasThinkingControl && think !== null && think !== true && (
           <span className="hidden sm:inline-block rounded bg-surface px-1 py-0.2 text-[10px] text-foreground-muted border border-border-subtle">
-            {effortLabels[reasoningEffort]}
+            {think === false ? t('compose.thinkingOffTag', 'No thinking') : think}
           </span>
         )}
 
@@ -209,28 +226,49 @@ export function ComposeModelPicker({
             })}
           </div>
 
-          {/* Reasoning Effort Section if current model supports reasoning */}
-          {selectedModel?.supportsReasoning && onChangeReasoningEffort && (
+          {/* Documented `think` controls: on/off only when the model lists
+              those booleans, levels verbatim, plus the documented default. */}
+          {hasThinkingControl && onChangeThink && (
             <div className="mt-2 border-t border-border-subtle pt-2 px-1">
               <div className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-1">
-                {t('settings.models.effortHeading', 'Reasoning Effort')}
+                {t('compose.thinkingHeading', 'Thinking')}
               </div>
-              <div className="grid grid-cols-3 gap-1">
-                {(['low', 'medium', 'high'] as const).map((tier) => (
+              {permitsOff && (
+                <label className="flex items-center gap-2 text-xs text-foreground-secondary">
+                  <input
+                    type="checkbox"
+                    checked={think === false}
+                    onChange={(e) =>
+                      onChangeThink(e.target.checked ? false : permitsOn ? true : null)
+                    }
+                    className="size-3.5 accent-action"
+                  />
+                  <span>{t('compose.disableThinking', 'Disable thinking')}</span>
+                </label>
+              )}
+              {thinkingLevels.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
                   <button
-                    key={tier}
                     type="button"
-                    onClick={() => onChangeReasoningEffort(tier)}
-                    className={`rounded py-1 text-center text-xs capitalize transition-colors ${
-                      reasoningEffort === tier
-                        ? 'bg-selection font-medium text-action border border-focus'
-                        : 'bg-surface-subtle text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
-                    }`}
+                    onClick={() => onChangeThink(null)}
+                    className={thinkingSelectionClass(think === null)}
                   >
-                    {tierLabels[tier]}
+                    {selectedModel?.thinkingDefault
+                      ? `${t('compose.thinkingDefault', 'Model default')} (${selectedModel.thinkingDefault})`
+                      : t('compose.thinkingDefault', 'Model default')}
                   </button>
-                ))}
-              </div>
+                  {thinkingLevels.map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => onChangeThink(level)}
+                      className={thinkingSelectionClass(think === level)}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

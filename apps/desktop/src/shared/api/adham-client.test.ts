@@ -296,6 +296,14 @@ describe('IPC contract fixture (cross-language)', () => {
         event: { type: 'delta', text: 'hi' },
       }).event.type,
     ).toBe('delta');
+    // Reasoning activity marker from thinking-capable models: payload-free.
+    expect(
+      StreamEventDtoSchema.parse({
+        opId: 'op-1',
+        sequence: 3,
+        event: { type: 'thinking' },
+      }).event.type,
+    ).toBe('thinking');
     const terminal = StreamEventDtoSchema.parse({
       opId: 'op-1',
       sequence: 3,
@@ -343,8 +351,10 @@ describe('IPC contract fixture (cross-language)', () => {
                   streaming: 'supported',
                   structuredOutput: 'unknown',
                   toolProposals: 'supported',
-                  thinking: 'unknown',
+                  thinking: 'supported',
                   imageInput: 'supported',
+                  thinkingValues: ['true', 'false', 'high'],
+                  thinkingDefault: 'true',
                 },
                 contextLimit: 131072,
                 configuredContext: 8192,
@@ -375,6 +385,8 @@ describe('IPC contract fixture (cross-language)', () => {
       sessionId: 'sess',
     });
     expect(models.models[0]?.capabilities.streaming).toBe('supported');
+    expect(models.models[0]?.capabilities.thinkingValues).toEqual(['true', 'false', 'high']);
+    expect(models.models[0]?.capabilities.thinkingDefault).toBe('true');
     expect(models.models[0]?.effectiveContextBudget).toBe(8192);
     expect(models.models[0]?.evidence.serverVersion).toBe('0.12.3');
     const stop = await client.stopCompletion('ws', 'proj', 'sess', 'op-1');

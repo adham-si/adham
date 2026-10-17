@@ -170,6 +170,9 @@ export const ProviderCapabilitiesDtoSchema = z.object({
   toolProposals: z.enum(['supported', 'unsupported', 'unknown']),
   thinking: z.enum(['supported', 'unsupported', 'unknown']),
   imageInput: z.enum(['supported', 'unsupported', 'unknown']),
+  // Documented `think` values from /api/show; null = no metadata.
+  thinkingValues: z.array(z.string()).nullable(),
+  thinkingDefault: z.string().nullable(),
 });
 
 export const ProviderModelEvidenceDtoSchema = z.object({
@@ -225,6 +228,9 @@ export const StopCompletionResponseSchema = z.object({
 
 export const StreamEventPayloadDtoSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('started') }),
+  // Reasoning activity marker: payload-free by design (reasoning text never
+  // crosses the IPC boundary).
+  z.object({ type: z.literal('thinking') }),
   z.object({ type: z.literal('delta'), text: z.string() }),
   z.object({
     type: z.literal('completed'),
