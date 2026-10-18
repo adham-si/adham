@@ -177,7 +177,11 @@ export function DialogContent({ size, label, className, children, ...props }: Di
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // An open dialog owns Escape entirely: without stopping propagation a
+        // host page's keydown listener (e.g. settings) waits behind this one
+        // and would close itself the same press.
         event.preventDefault();
+        event.stopPropagation();
         setOpen(false);
         (triggerRef.current ?? previouslyFocusedRef.current)?.focus();
         return;

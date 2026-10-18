@@ -1,6 +1,6 @@
-import * as React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DialogClose,
@@ -93,6 +93,24 @@ describe('Dialog', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it('owns Escape: an open dialog never lets host-page Escape handlers run (no double close)', async () => {
+    let hostClosed = false;
+    const windowListener = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostClosed = true;
+    };
+    window.addEventListener('keydown', windowListener);
+    try {
+      const user = userEvent.setup();
+      render(<BasicDialog />);
+      await user.click(screen.getByRole('button', { name: 'Delete project' }));
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(hostClosed).toBe(false);
+    } finally {
+      window.removeEventListener('keydown', windowListener);
+    }
   });
 
   it('reports the open state change', async () => {
