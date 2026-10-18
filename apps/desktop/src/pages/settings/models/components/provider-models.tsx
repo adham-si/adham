@@ -10,7 +10,7 @@ import {
   StarIcon,
   ToolsIcon,
 } from '@hugeicons/core-free-icons';
-import { Button, Input } from '@adham/ui';
+import { Button, Input, Switch } from '@adham/ui';
 import type { ProviderAccountDto, ProviderModelDto } from '@adham/contracts-generated';
 import { adhamClient } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
@@ -361,18 +361,11 @@ function ModelRow({
           ))}
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => onToggle(!enabled)}
-        aria-pressed={enabled}
-        aria-label={t('settings.models.enabledInChatLabel')}
-        title={t('settings.models.enabledInChatLabel')}
-        className={`flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
-          enabled ? 'text-warning-foreground' : 'text-foreground-muted'
-        }`}
-      >
-        <HugeiconsIcon icon={StarIcon} className="size-icon-sm" />
-      </button>
+      <Switch
+        checked={enabled}
+        onCheckedChange={onToggle}
+        ariaLabel={t('settings.models.enabledInChatLabel')}
+      />
     </li>
   );
 }

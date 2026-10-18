@@ -341,10 +341,10 @@ describe('ModelsPage (search, chips, curation)', () => {
     const ollamaSection = (await screen.findByText('Qwen 2.5 (latest)')).closest(
       'section',
     ) as HTMLElement;
-    const star = within(ollamaSection).getByRole('button', { name: /enabled in chat/i });
-    expect(star.getAttribute('aria-pressed')).toBe('true');
-    await user.click(star);
-    await waitFor(() => expect(star.getAttribute('aria-pressed')).toBe('false'));
+    const enableSwitch = within(ollamaSection).getByRole('switch', { name: /enabled in chat/i });
+    expect(enableSwitch.getAttribute('aria-checked')).toBe('true');
+    await user.click(enableSwitch);
+    await waitFor(() => expect(enableSwitch.getAttribute('aria-checked')).toBe('false'));
     const prefs = JSON.parse(window.localStorage.getItem('adham.modelPrefs.v1') ?? '{}');
     expect(prefs['acc-ollama']['qwen2.5:latest']).toBe(false);
 
@@ -362,12 +362,12 @@ describe('ModelsPage (search, chips, curation)', () => {
     const ollamaSectionAgain = (await screen.findByText('Qwen 2.5 (latest)')).closest(
       'section',
     ) as HTMLElement;
-    const starAgain = within(ollamaSectionAgain).getByRole('button', {
+    const enableSwitchAgain = within(ollamaSectionAgain).getByRole('switch', {
       name: /enabled in chat/i,
     });
-    expect(starAgain.getAttribute('aria-pressed')).toBe('false');
+    expect(enableSwitchAgain.getAttribute('aria-checked')).toBe('false');
     // explicit opt-in clears the stored opt-out (absence = enabled)
-    await user.click(starAgain);
+    await user.click(enableSwitchAgain);
     await waitFor(() =>
       expect(window.localStorage.getItem('adham.modelPrefs.v1')).not.toContain('qwen'),
     );
@@ -382,13 +382,13 @@ describe('ModelsPage (search, chips, curation)', () => {
       .getByRole('heading', { name: 'Google Gemini' })
       .closest('section') as HTMLElement;
     const googleSectionScoped = within(googleSection);
-    await googleSectionScoped.findByRole('button', { name: /enabled in chat/i });
+    await googleSectionScoped.findByRole('switch', { name: /enabled in chat/i });
     await user.click(within(googleSection).getByRole('button', { name: /disable all/i }));
     await waitFor(() =>
       expect(
         within(googleSection)
-          .getByRole('button', { name: /enabled in chat/i })
-          .getAttribute('aria-pressed'),
+          .getByRole('switch', { name: /enabled in chat/i })
+          .getAttribute('aria-checked'),
       ).toBe('false'),
     );
     // undo path: Enable all turned active the moment disabling completed
@@ -401,8 +401,8 @@ describe('ModelsPage (search, chips, curation)', () => {
     await waitFor(() =>
       expect(
         within(googleSection)
-          .getByRole('button', { name: /enabled in chat/i })
-          .getAttribute('aria-pressed'),
+          .getByRole('switch', { name: /enabled in chat/i })
+          .getAttribute('aria-checked'),
       ).toBe('true'),
     );
   });

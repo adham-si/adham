@@ -7,4 +7,5 @@ export * from './menu';
 export * from './message-card';
 export * from './select';
 export * from './sidebar-item';
+export * from './switch';
 export * from './textarea';
