@@ -1,5 +1,6 @@
 use super::common::*;
 use super::*;
+use tauri::Manager;
 
 /// T1. All five provider commands resolve through the real dispatch, parse
 /// their envelope shapes, and fail closed on unknown scope/accounts.

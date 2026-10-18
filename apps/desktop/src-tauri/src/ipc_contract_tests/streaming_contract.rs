@@ -3,6 +3,7 @@ use super::*;
 use adham_core_types::*;
 use adham_desktop_api::StreamEventPayloadDto;
 use std::sync::Arc;
+use tauri::Manager;
 /// sequence numbers, the assistant turn persists with usage, and the op is
 /// resolved.
 #[test]

@@ -4,6 +4,7 @@ use adham_core_types::*;
 use adham_desktop_api::StreamEventPayloadDto;
 use adham_event_log::SqliteEventStore;
 use std::sync::Arc;
+use tauri::Manager;
 /// outside its session; a matching session with no live run reports
 /// already-resolved.
 #[test]

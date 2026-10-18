@@ -1,5 +1,6 @@
 use super::common::*;
 use super::*;
+use tauri::Manager;
 /// (AEAD ciphertext); no event, projection, or pending-op row may hold it.
 /// G2: Google account configuration — consent gate, sealed credential,
 /// rotation, disconnect. The API key may reach only `provider_credentials`

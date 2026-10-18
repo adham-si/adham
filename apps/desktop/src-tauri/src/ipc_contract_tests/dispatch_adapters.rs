@@ -6,6 +6,7 @@ use adham_provider::domain::model::{ModelDescriptor, ModelId};
 use adham_provider::registry::LocalAccount;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use tauri::Manager;
 // ===== G4: dispatch generalization — adapter independence + proofs ============
 
 /// Seed a Google account row at an arbitrary loopback base point. The
