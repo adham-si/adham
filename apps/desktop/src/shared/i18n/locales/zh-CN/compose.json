@@ -93,6 +93,7 @@
     "selectModel": "选择模型",
     "markdown": {
       "copyCode": "复制代码",
+      "copyMessage": "复制消息",
       "copied": "已复制",
       "copyFailed": "复制失败",
       "imageNotShown": "未显示图片",

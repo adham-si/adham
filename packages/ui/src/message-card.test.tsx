@@ -1,9 +1,17 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { contentFromText } from './message-content';
 import { MessageCard } from './message-card';
 
 const DIRECTION_LOCKED = /(^|\s)(left-|right-|ml-|mr-|pl-|pr-)/;
+
+function stubClipboard(writeText: (text: string) => Promise<void>) {
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+}
+
+afterEach(() => {
+  Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+});
 
 describe('MessageCard', () => {
   it('renders an article', () => {
@@ -203,5 +211,57 @@ describe('MessageCard', () => {
       />,
     );
     expect(screen.getByText('Inhalt nicht unterstützt')).toBeDefined();
+  });
+
+  it('copies the message source and reports success', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    stubClipboard(writeText);
+    render(
+      <MessageCard
+        role="assistant"
+        content={contentFromText('## Plan\n\n- step one')}
+        timestamp="10:04"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy message' }));
+
+    expect(await screen.findByText('Copied')).toBeDefined();
+    expect(writeText).toHaveBeenCalledWith('## Plan\n\n- step one');
+  });
+
+  it('reports a rejected clipboard write instead of pretending the copy worked', async () => {
+    stubClipboard(vi.fn().mockRejectedValue(new Error('denied')));
+    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy message' }));
+
+    expect(await screen.findByText('Copy failed')).toBeDefined();
+  });
+
+  it('reports a missing clipboard API instead of failing silently', async () => {
+    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy message' }));
+
+    expect(await screen.findByText('Copy failed')).toBeDefined();
+  });
+
+  it('offers no copy action when there is no text to copy', () => {
+    const content = { schema: 1, parts: [{ type: 'unknown' as const, raw: '{"kind":"chart"}' }] };
+    render(<MessageCard role="assistant" content={content} timestamp="10:04" />);
+    expect(screen.queryByRole('button', { name: 'Copy message' })).toBeNull();
+  });
+
+  it('takes the copy label from the caller locale', () => {
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        labels={{ copyMessage: 'Nachricht kopieren' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Nachricht kopieren' })).toBeDefined();
   });
 });

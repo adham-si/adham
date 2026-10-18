@@ -2,7 +2,8 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from './cn';
 import { Markdown, resolveMarkdownLabels, type MarkdownLabels } from './markdown-view';
-import type { MessageContent } from './message-content';
+import { contentToText, type MessageContent } from './message-content';
+import { useClipboardCopy } from './use-clipboard-copy';
 
 const messageCardVariants = cva(
   'rounded-lg border bg-surface p-4 text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
@@ -61,6 +62,9 @@ export interface MessageCardProps
  *
  * Assistant text renders as safe Markdown; user and system text stays literal,
  * because that is what the author typed.
+ *
+ * Every card offers Copy: the awaited clipboard outcome is stated next to the
+ * button, so a copy that failed never looks like one that worked.
  */
 export function MessageCard({
   role,
@@ -75,6 +79,9 @@ export function MessageCard({
   ...props
 }: MessageCardProps) {
   const label = ROLE_LABEL[role];
+  const resolved = resolveMarkdownLabels(labels);
+  const copyText = React.useMemo(() => contentToText(content), [content]);
+  const { state: copyState, copy } = useClipboardCopy();
 
   return (
     <article
@@ -85,11 +92,31 @@ export function MessageCard({
     >
       <div className="mb-1 flex items-center justify-between gap-2 text-xs">
         <span className="font-semibold tracking-wide uppercase">{label}</span>
-        <time className="text-foreground-muted" dateTime={dateTime ?? timestamp}>
-          {timestamp}
-        </time>
+        <span className="flex items-center gap-2">
+          {copyText.length > 0 && (
+            <button
+              type="button"
+              className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              onClick={() => {
+                void copy(copyText);
+              }}
+            >
+              {resolved.copyMessage}
+            </button>
+          )}
+          <span role="status" className="text-foreground-muted">
+            {copyState === 'copied'
+              ? resolved.copied
+              : copyState === 'failed'
+                ? resolved.copyFailed
+                : ''}
+          </span>
+          <time className="text-foreground-muted" dateTime={dateTime ?? timestamp}>
+            {timestamp}
+          </time>
+        </span>
       </div>
-      <MessageBody role={role} content={content} labels={labels} />
+      <MessageBody role={role} content={content} resolved={resolved} />
     </article>
   );
 }
@@ -97,14 +124,12 @@ export function MessageCard({
 function MessageBody({
   role,
   content,
-  labels,
+  resolved,
 }: {
   role: MessageRole;
   content: MessageContent;
-  labels?: Partial<MarkdownLabels> | undefined;
+  resolved: MarkdownLabels;
 }) {
-  const resolved = resolveMarkdownLabels(labels);
-
   return (
     <div className="flex flex-col gap-2 text-sm text-foreground">
       {content.parts.map((part, index) => {

@@ -105,6 +105,7 @@
     "selectModel": "Выберите модель",
     "markdown": {
       "copyCode": "Копировать код",
+      "copyMessage": "Копировать сообщение",
       "copied": "Скопировано",
       "copyFailed": "Не удалось скопировать",
       "imageNotShown": "Изображение не показано",

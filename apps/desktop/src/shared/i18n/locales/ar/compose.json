@@ -109,6 +109,7 @@
     "selectModel": "اختر نموذجًا",
     "markdown": {
       "copyCode": "نسخ الشيفرة",
+      "copyMessage": "نسخ الرسالة",
       "copied": "تم النسخ",
       "copyFailed": "فشل النسخ",
       "imageNotShown": "الصورة غير معروضة",

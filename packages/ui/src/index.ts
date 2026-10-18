@@ -11,3 +11,4 @@ export * from './message-content';
 export * from './select';
 export * from './sidebar-item';
 export * from './textarea';
+export * from './use-clipboard-copy';

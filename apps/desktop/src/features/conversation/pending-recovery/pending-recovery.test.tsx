@@ -173,6 +173,28 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
     expect(screen.getByText(/Dismiss/i)).toBeDefined();
   });
 
+  it('states a failed clipboard copy instead of swallowing it', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('clipboard denied')) },
+      configurable: true,
+    });
+
+    render(
+      <PendingRecoveryReviewDialog
+        open={true}
+        operation={sampleSingleOp}
+        onClose={vi.fn()}
+        onResend={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Copy Text/i));
+
+    expect(await screen.findByText(/Copy failed/i)).toBeDefined();
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+  });
+
   it('shows dismiss confirmation warning and executes dismissal upon confirmation', async () => {
     const onClose = vi.fn();
     const onResend = vi.fn();

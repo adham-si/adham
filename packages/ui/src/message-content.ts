@@ -23,3 +23,15 @@ export interface MessageContent {
 export function contentFromText(text: string): MessageContent {
   return { schema: MESSAGE_CONTENT_SCHEMA, parts: [{ type: 'text', text }] };
 }
+
+/**
+ * The message's text source, exactly as received: text parts joined in order.
+ * Unrenderable parts contribute nothing — their raw form is not message text
+ * and must not be pasted as if it were.
+ */
+export function contentToText(content: MessageContent): string {
+  return content.parts
+    .filter((part): part is Extract<MessageContentPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n\n');
+}

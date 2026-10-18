@@ -97,6 +97,7 @@
     "selectModel": "Select a model",
     "markdown": {
       "copyCode": "Copy code",
+      "copyMessage": "Copy message",
       "copied": "Copied",
       "copyFailed": "Copy failed",
       "imageNotShown": "Image not shown",

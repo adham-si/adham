@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { cn } from './cn';
 import { parseMarkdown, type InlineToken, type ListItem, type MarkdownBlock } from './markdown';
+import { useClipboardCopy } from './use-clipboard-copy';
 
 /** User-facing strings the renderer needs; the app passes localized copies. */
 export interface MarkdownLabels {
   copyCode: string;
+  copyMessage: string;
   copied: string;
   copyFailed: string;
   imageNotShown: string;
@@ -13,6 +15,7 @@ export interface MarkdownLabels {
 
 export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   copyCode: 'Copy code',
+  copyMessage: 'Copy message',
   copied: 'Copied',
   copyFailed: 'Copy failed',
   imageNotShown: 'Image not shown',
@@ -284,16 +287,7 @@ function CodeBlock({
   language: string;
   labels: MarkdownLabels;
 }) {
-  const [copyState, setCopyState] = React.useState<'idle' | 'copied' | 'failed'>('idle');
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(source);
-      setCopyState('copied');
-    } catch {
-      setCopyState('failed');
-    }
-  };
+  const { state: copyState, copy } = useClipboardCopy();
 
   return (
     <figure className="overflow-hidden rounded-md border border-border-subtle bg-surface-subtle">
@@ -306,7 +300,7 @@ function CodeBlock({
             type="button"
             className="rounded-sm px-1 text-xs text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             onClick={() => {
-              void copy();
+              void copy(source);
             }}
           >
             {labels.copyCode}

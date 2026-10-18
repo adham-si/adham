@@ -96,6 +96,7 @@ export function ConversationPanel({
   const markdownLabels = React.useMemo<Partial<MarkdownLabels>>(
     () => ({
       copyCode: t('compose.markdown.copyCode'),
+      copyMessage: t('compose.markdown.copyMessage'),
       copied: t('compose.markdown.copied'),
       copyFailed: t('compose.markdown.copyFailed'),
       imageNotShown: t('compose.markdown.imageNotShown'),

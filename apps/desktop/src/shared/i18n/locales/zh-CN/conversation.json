@@ -59,6 +59,7 @@
       "confirmResend": "重新发送至原始目标",
       "copyText": "复制文本",
       "textCopied": "已复制到剪贴板",
+      "copyFailed": "复制失败",
       "dismissWarningTitle": "忽略未定消息？",
       "dismissWarning": "忽略将移除此恢复提醒。如果服务器已保存此消息，它将保留在历史记录中；否则，此草稿将不会被发送。",
       "confirmDismiss": "忽略提醒",

@@ -59,6 +59,7 @@
       "confirmResend": "Resend to Original Target",
       "copyText": "Copy Text",
       "textCopied": "Copied to clipboard",
+      "copyFailed": "Copy failed",
       "dismissWarningTitle": "Dismiss unresolved message?",
       "dismissWarning": "Dismissing will remove this recovery reminder. If the server already committed this message, it will remain in history; if not, this draft will not be sent.",
       "confirmDismiss": "Dismiss Reminder",
