@@ -1482,4 +1482,54 @@ describe('ConversationPanel', () => {
     expect(backend.submitMessage).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByText(/Unfinished generation/i)).toBeNull());
   });
+
+  it('renders assistant history as Markdown instead of literal markers', async () => {
+    const backend = fakeBackend();
+    backend.getConversation = vi.fn().mockResolvedValue({
+      items: [
+        {
+          messageId: 'msg-1',
+          role: 'assistant',
+          text: '## Heading\n\n**bold** answer',
+          createdAt: '2026-10-09T00:00:02Z',
+          sourceEventId: 'evt-1',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '2',
+    });
+
+    render(<ConversationPanel backend={backend} />);
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 })).toBeDefined());
+    expect(screen.getByText('bold').tagName).toBe('STRONG');
+    expect(screen.queryByText(/^\*\*bold\*\*/)).toBeNull();
+  });
+
+  it('renders streamed Markdown live, including an incomplete fence', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, _payload, onEvent) => {
+      onEvent({
+        opId: 'op-9',
+        sequence: 1,
+        event: { type: 'delta', text: '## Running\n\n```ts\nconst x' },
+      });
+      return { opId: 'op-9', messageId: 'm-9', context: null };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
+
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+    await user.type(box, 'hi');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 })).toBeDefined());
+    expect(screen.getByText('Running')).toBeDefined();
+    expect(screen.getByText('const x')).toBeDefined();
+    expect(screen.queryByText(/```/)).toBeNull();
+  });
 });

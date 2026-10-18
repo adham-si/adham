@@ -90,6 +90,13 @@
     "queue": "排队发送",
     "queuedHeading": "排队中",
     "removeQueued": "移除排队消息",
-    "selectModel": "选择模型"
+    "selectModel": "选择模型",
+    "markdown": {
+      "copyCode": "复制代码",
+      "copied": "已复制",
+      "copyFailed": "复制失败",
+      "imageNotShown": "未显示图片",
+      "unsupportedContent": "不支持的内容"
+    }
   }
 }

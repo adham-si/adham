@@ -94,6 +94,13 @@
     "queue": "Queue instruction",
     "queuedHeading": "Queued",
     "removeQueued": "Remove queued instruction",
-    "selectModel": "Select a model"
+    "selectModel": "Select a model",
+    "markdown": {
+      "copyCode": "Copy code",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "imageNotShown": "Image not shown",
+      "unsupportedContent": "Unsupported content"
+    }
   }
 }

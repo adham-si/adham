@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { MessageCard } from '@adham/ui';
+import { contentFromText, MessageCard, type MarkdownLabels } from '@adham/ui';
 import {
   Composer,
   EmptyWelcome,
@@ -92,6 +92,17 @@ export function ConversationPanel({
   enterToSend = true,
 }: ConversationPanelProps) {
   const { t } = useTranslation();
+  /** Localized strings for the message renderer (code copy, placeholders). */
+  const markdownLabels = React.useMemo<Partial<MarkdownLabels>>(
+    () => ({
+      copyCode: t('compose.markdown.copyCode'),
+      copied: t('compose.markdown.copied'),
+      copyFailed: t('compose.markdown.copyFailed'),
+      imageNotShown: t('compose.markdown.imageNotShown'),
+      unsupportedContent: t('compose.markdown.unsupportedContent'),
+    }),
+    [t],
+  );
   const conv = useConversation({ backend });
   const prov = useProvisioning({ backend: provisioning });
   const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
@@ -483,7 +494,8 @@ export function ConversationPanel({
               <React.Fragment key={m.id}>
                 <MessageCard
                   role={m.role === 'assistant' || m.role === 'agent' ? 'assistant' : 'user'}
-                  text={m.text}
+                  content={contentFromText(m.text)}
+                  labels={markdownLabels}
                   timestamp={formatTimestamp(m.createdAt)}
                 />
                 {note && (
@@ -503,7 +515,8 @@ export function ConversationPanel({
             <MessageCard
               key={conv.streaming.opId || 'streaming'}
               role="assistant"
-              text={conv.streaming.text}
+              content={contentFromText(conv.streaming.text)}
+              labels={markdownLabels}
               timestamp={formatTime(new Date())}
             />
           )}
@@ -516,7 +529,8 @@ export function ConversationPanel({
             <MessageCard
               key={conv.recoverySnapshot.id}
               role="assistant"
-              text={conv.recoverySnapshot.text}
+              content={contentFromText(conv.recoverySnapshot.text)}
+              labels={markdownLabels}
               timestamp={formatTimestamp(conv.recoverySnapshot.createdAt)}
             />
           )}

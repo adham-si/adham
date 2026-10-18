@@ -102,6 +102,13 @@
     "queue": "Поставить в очередь",
     "queuedHeading": "В очереди",
     "removeQueued": "Убрать сообщение из очереди",
-    "selectModel": "Выберите модель"
+    "selectModel": "Выберите модель",
+    "markdown": {
+      "copyCode": "Копировать код",
+      "copied": "Скопировано",
+      "copyFailed": "Не удалось скопировать",
+      "imageNotShown": "Изображение не показано",
+      "unsupportedContent": "Неподдерживаемое содержимое"
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { MessageCard } from '@adham/ui';
+import { contentFromText, MessageCard } from '@adham/ui';
 import { GallerySection } from './gallery-section';
 
 const DEMO_TIMESTAMP = '10:00 AM';
@@ -12,32 +12,32 @@ export function MessageCardSection() {
     <GallerySection title={t('gallery.messages.title')}>
       <MessageCard
         role="user"
-        text={t('gallery.messages.user')}
+        content={contentFromText(t('gallery.messages.user'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
       />
       <MessageCard
         role="assistant"
-        text={t('gallery.messages.assistant')}
+        content={contentFromText(t('gallery.messages.assistant'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
       />
       <MessageCard
         role="system"
-        text={t('gallery.messages.system')}
+        content={contentFromText(t('gallery.messages.system'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
       />
       <MessageCard
         role="user"
-        text={t('gallery.messages.selected')}
+        content={contentFromText(t('gallery.messages.selected'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
         selected
       />
       <MessageCard
         role="assistant"
-        text={t('gallery.messages.editable')}
+        content={contentFromText(t('gallery.messages.editable'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
         editable

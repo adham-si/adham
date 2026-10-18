@@ -106,6 +106,13 @@
     "queue": "إرسال بعد انتهاء الرد",
     "queuedHeading": "في الانتظار",
     "removeQueued": "إزالة الرسالة المنتظرة",
-    "selectModel": "اختر نموذجًا"
+    "selectModel": "اختر نموذجًا",
+    "markdown": {
+      "copyCode": "نسخ الشيفرة",
+      "copied": "تم النسخ",
+      "copyFailed": "فشل النسخ",
+      "imageNotShown": "الصورة غير معروضة",
+      "unsupportedContent": "محتوى غير مدعوم"
+    }
   }
 }
