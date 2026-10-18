@@ -192,6 +192,10 @@ export const GoogleAccountDisconnectedSchema = z.object({
   accountId: z.string(),
 });
 
+export const OllamaAccountDisconnectedSchema = z.object({
+  accountId: z.string(),
+});
+
 export const ProviderHealthResponseSchema = z.object({
   reachable: z.boolean(),
   modelTagCount: z.number().int().nonnegative(),

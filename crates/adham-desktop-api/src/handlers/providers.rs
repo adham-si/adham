@@ -12,8 +12,8 @@ use super::ApiContext;
 use crate::dtos::*;
 use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
-use adham_provider::adapters::ollama_http::OllamaHttpAdapter;
 use adham_provider::adapters::AnyAdapter;
+use adham_provider::adapters::ollama_http::OllamaHttpAdapter;
 use adham_provider::domain::account::{PrivacyClass, ProviderAccountId};
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId, ModelSelectionSnapshot};
@@ -459,6 +459,31 @@ pub async fn handle_disconnect_google_account(
     Ok(ok_result(
         env.request_id,
         GoogleAccountDisconnected {
+            account_id: account.account_id.0.clone(),
+        },
+    ))
+}
+
+/// Disconnect a Local Ollama account. The store cascades the pinned models
+/// and any sealed credential with the account row.
+pub async fn handle_disconnect_ollama_account(
+    ctx: &ApiContext,
+    env: CommandEnvelope<DisconnectOllamaAccountPayload>,
+) -> Result<CommandResult<OllamaAccountDisconnected>, String> {
+    let account = local_account(ctx, &env.payload.account_id).await?;
+    if account.kind != adham_provider::domain::account::ProviderKind::OllamaLocal {
+        return Err(format!(
+            "VALIDATION_FAILED: account '{}' is not a Local Ollama account",
+            env.payload.account_id
+        ));
+    }
+    ctx.registry
+        .delete_account(&account.account_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(ok_result(
+        env.request_id,
+        OllamaAccountDisconnected {
             account_id: account.account_id.0.clone(),
         },
     ))

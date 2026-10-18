@@ -138,6 +138,10 @@ export type DiscoverOllamaModelsPayload = { accountId: string, };
 
 export type UpdateProviderAccountPayload = { accountId: string | null, alias: string | null, endpointUrl: string | null, };
 
+export type DisconnectOllamaAccountPayload = { accountId: string, };
+
+export type OllamaAccountDisconnected = { accountId: string, };
+
 export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl: string, privacyClass: string, 
 /**
  * Additive (Delivery G1): adapter family of the account — the frontend

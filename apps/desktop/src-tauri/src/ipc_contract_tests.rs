@@ -20,9 +20,9 @@
 //! every platform.
 
 use super::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody};
-use tauri::test::{get_ipc_response, mock_builder, MockRuntime, INVOKE_KEY};
+use tauri::test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder};
 
 /// Disposable context: temp-dir SQLite database, in-memory content key,
 /// never the OS credential store. The runtime is returned so pool tasks
@@ -246,9 +246,9 @@ use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderK
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId};
 use adham_provider::registry::LocalAccount;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 struct StubCaptures {
     accepts: AtomicU64,
@@ -463,6 +463,7 @@ fn provider_mock_app(ctx: ApiContext) -> tauri::App<MockRuntime> {
             update_provider_account,
             configure_google_account,
             disconnect_google_account,
+            disconnect_ollama_account,
             complete_once_streaming,
             stop_completion
         ])
@@ -845,7 +846,7 @@ fn account_lifecycle_and_discovery_pins_models() {
     let captures = Arc::new(StubCaptures::new());
     let base_url = spawn_stub_ollama(&runtime, None, captures.clone(), ChatProgram::once(vec![]));
 
-    let app = provider_mock_app(ctx);
+    let app = provider_mock_app(ctx.clone());
     let webview = mock_webview(&app);
     let (ws, proj, sess) = provision_scope(&webview);
     let scope_ctx = context_for(&ws, &proj, &sess);
@@ -942,6 +943,48 @@ fn account_lifecycle_and_discovery_pins_models() {
         2,
         "rediscovery re-pins against the new endpoint"
     );
+
+    // disconnect requires the Ollama kind guard on non-local accounts first
+    let refused = invoke(
+        &webview,
+        "disconnect_ollama_account",
+        args_for(scope_ctx.clone(), json!({"accountId": "acc-google-style"})),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+        refused.contains("error.validationFailed"),
+        "unknown account refused: {refused}"
+    );
+
+    // disconnect cascades the account row and its pinned models
+    let response = invoke(
+        &webview,
+        "disconnect_ollama_account",
+        args_for(scope_ctx.clone(), json!({"accountId": account_id})),
+    )
+    .expect("disconnect");
+    assert_eq!(
+        response["data"]["accountId"],
+        json!(account_id),
+        "{response}"
+    );
+    runtime.block_on(async {
+        let account_rows: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM provider_accounts WHERE account_id = ?")
+                .bind(&account_id)
+                .fetch_one(&ctx.pool)
+                .await
+                .expect("accounts after disconnect");
+        assert_eq!(account_rows, 0, "the account row is gone");
+        let model_rows: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM provider_models WHERE account_id = ?")
+                .bind(&account_id)
+                .fetch_one(&ctx.pool)
+                .await
+                .expect("models after disconnect");
+        assert_eq!(model_rows, 0, "pinned models cascade with the account");
+    });
 }
 
 /// T3. Happy-path streaming: the pending op is durable when the stub sees the

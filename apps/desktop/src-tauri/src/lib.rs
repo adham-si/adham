@@ -2,11 +2,11 @@ use adham_desktop_api::{
     ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
     CommandResult, CompleteOncePayload, CompletionStartDto, ConfigureGoogleAccountPayload,
     ConversationPage, CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
-    DisconnectGoogleAccountPayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
-    GetPreferencesResponse, GoogleAccountDisconnected, ListProviderAccountsResponse,
-    ListProviderModelsPayload, ListProviderModelsResponse, PendingOperationDto,
-    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
-    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
+    DisconnectGoogleAccountPayload, DisconnectOllamaAccountPayload, DiscoverOllamaModelsPayload,
+    ErrorEnvelope, GetPreferencesResponse, GoogleAccountDisconnected, ListProviderAccountsResponse,
+    ListProviderModelsPayload, ListProviderModelsResponse, OllamaAccountDisconnected,
+    PendingOperationDto, PendingOperationList, PlatformInfo, ProjectList, ProjectSummary,
+    ProviderAccountDto, ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
     RecordPendingOperationPayload, ResetPreferencesResponse, SelectProjectPayload, SessionList,
     SessionSummary, StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
     SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
@@ -219,6 +219,16 @@ async fn disconnect_google_account(
 }
 
 #[tauri::command]
+async fn disconnect_ollama_account(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<DisconnectOllamaAccountPayload>,
+) -> Result<CommandResult<OllamaAccountDisconnected>, ErrorEnvelope> {
+    adham_desktop_api::handle_disconnect_ollama_account(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn complete_once_streaming(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<CompleteOncePayload>,
@@ -392,6 +402,7 @@ pub fn run() {
             update_provider_account,
             configure_google_account,
             disconnect_google_account,
+            disconnect_ollama_account,
             complete_once_streaming,
             stop_completion,
         ]);

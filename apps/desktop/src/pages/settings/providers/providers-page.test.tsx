@@ -135,6 +135,11 @@ beforeEach(async () => {
         accounts = accounts.filter((a) => a.accountId !== payload.accountId);
         return { data: { accountId: payload.accountId } };
       }
+      case 'disconnect_ollama_account': {
+        const payload = (args as { request: { payload: { accountId: string } } }).request.payload;
+        accounts = accounts.filter((a) => a.accountId !== payload.accountId);
+        return { data: { accountId: payload.accountId } };
+      }
       default:
         throw new Error(`unexpected command ${cmd}`);
     }
@@ -400,6 +405,33 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
         }),
       }),
     );
+  });
+
+  it('disconnects a saved Ollama account only after the two-step confirmation', async () => {
+    const user = userEvent.setup();
+    accounts = [mintedAccount()];
+    renderPage();
+    const dlg = await openProvider('Ollama', user);
+    await user.click(within(dlg).getByRole('button', { name: /disconnect/i }));
+    // confirming is still a no-op: the saved endpoint and its models must stay
+    expect(
+      invokeMock.mock.calls.filter(([cmd]) => cmd === 'disconnect_ollama_account'),
+    ).toHaveLength(0);
+
+    await user.click(within(dlg).getByRole('button', { name: /yes, disconnect/i }));
+    await waitFor(() =>
+      expect(
+        invokeMock.mock.calls.filter(([cmd]) => cmd === 'disconnect_ollama_account'),
+      ).toHaveLength(1),
+    );
+    expect(invokeMock).toHaveBeenCalledWith(
+      'disconnect_ollama_account',
+      expect.objectContaining({
+        request: expect.objectContaining({ payload: { accountId: 'acc-minted' } }),
+      }),
+    );
+    // the account list refreshes so the card drops back to "Not connected"
+    await waitFor(() => expect(within(card('Ollama')).getByText(/not connected/i)).toBeDefined());
   });
 });
 

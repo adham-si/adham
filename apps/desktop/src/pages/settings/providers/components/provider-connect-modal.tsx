@@ -399,6 +399,7 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
   const [busy, setBusy] = React.useState(false);
   const [check, setCheck] = React.useState<CheckResult | null>(initialCheck);
   const [probeError, setProbeError] = React.useState<string | null>(null);
+  const [confirmingDisconnect, setConfirmingDisconnect] = React.useState(false);
 
   const value = editedEndpoint ?? saved?.endpointUrl ?? '';
   const current = value.trim();
@@ -455,6 +456,26 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     try {
       await adhamClient.discoverOllamaModels(saved.accountId);
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(saved.accountId) });
+    } catch (error) {
+      setProbeError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Disconnect cascades the saved endpoint row and its pinned models
+   * (store-side cascade), behind the same two-step confirm as Google. */
+  const handleDisconnect = async () => {
+    if (busy || saved === null) return;
+    setBusy(true);
+    setProbeError(null);
+    try {
+      await adhamClient.disconnectOllamaAccount(saved.accountId);
+      setConfirmingDisconnect(false);
+      setEditedEndpoint(null);
+      setCheck(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(saved.accountId) });
+      await refreshAccounts?.();
     } catch (error) {
       setProbeError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -523,15 +544,46 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
         )}
       </div>
 
+      {saved !== null && confirmingDisconnect && (
+        <p className="text-xs text-foreground-secondary">
+          {t('settings.providers.ollamaConfirmDisconnect')}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-2">
-        <Button
-          variant="primary"
-          onClick={() => void saveAndReconnect()}
-          disabled={busy || current.length === 0}
-          className="col-span-2"
-        >
-          {busy ? t('settings.providers.testing') : t('settings.providers.saveReconnect')}
-        </Button>
+        {saved !== null && confirmingDisconnect ? (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingDisconnect(false)}
+              disabled={busy}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button variant="danger" onClick={() => void handleDisconnect()} disabled={busy}>
+              {t('settings.providers.ollamaDisconnectConfirmLabel')}
+            </Button>
+          </>
+        ) : (
+          <>
+            {saved !== null && (
+              <Button
+                variant="danger"
+                onClick={() => setConfirmingDisconnect(true)}
+                disabled={busy}
+              >
+                {t('settings.providers.disconnect')}
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              onClick={() => void saveAndReconnect()}
+              disabled={busy || current.length === 0}
+              className={saved !== null ? undefined : 'col-span-2'}
+            >
+              {busy ? t('settings.providers.testing') : t('settings.providers.saveReconnect')}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
