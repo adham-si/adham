@@ -7,10 +7,11 @@ use adham_desktop_api::{
     MarkCompletionInterruptedResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
     ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
     RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
-    SelectProjectPayload, SessionList, SessionSummary, StopCompletionPayload,
-    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
-    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
-    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
+    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionSummary,
+    StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
+    SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
+    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
+    WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -210,6 +211,18 @@ async fn complete_once_streaming(
 }
 
 #[tauri::command]
+async fn retry_completion_streaming(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<RetryCompletionPayload>,
+    on_event: tauri::ipc::Channel<StreamEventDto>,
+) -> Result<CommandResult<CompletionStartDto>, ErrorEnvelope> {
+    let sink = TauriEventSink { channel: on_event };
+    adham_desktop_api::handle_retry_completion_streaming(&state, request, &sink)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn stop_completion(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<StopCompletionPayload>,
@@ -380,6 +393,7 @@ pub fn run() {
             list_provider_models,
             update_provider_account,
             complete_once_streaming,
+            retry_completion_streaming,
             stop_completion,
             mark_completion_interrupted,
         ]);

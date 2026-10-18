@@ -1532,4 +1532,110 @@ describe('ConversationPanel', () => {
     expect(screen.getByText('const x')).toBeDefined();
     expect(screen.queryByText(/```/)).toBeNull();
   });
+
+  it('retries the failed turn as a new attempt without resending the user message', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    const rows: unknown[] = [
+      {
+        messageId: 'msg-user-1',
+        role: 'user',
+        text: 'retry me please',
+        createdAt: '2026-10-09T00:00:00Z',
+        sourceEventId: 'evt-u1',
+      },
+      {
+        messageId: 'msg-failed-1',
+        role: 'assistant',
+        text: 'no answer was produced',
+        createdAt: '2026-10-09T00:00:01Z',
+        sourceEventId: 'evt-f1',
+        completion: 'Failed',
+      },
+    ];
+    backend.getConversation = vi.fn(async () => ({
+      items: [...rows],
+      nextCursor: null,
+      projectionPosition: `${rows.length}`,
+    }));
+    const payloads: Array<Record<string, unknown>> = [];
+    backend.retryCompletionStreaming = vi.fn(async (_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as unknown as Record<string, unknown>);
+      // The attempt the backend persists is visible on the reload after the
+      // terminal, exactly like the real projection.
+      rows.push({
+        messageId: 'msg-asst-1',
+        role: 'assistant',
+        text: 'second attempt',
+        createdAt: '2026-10-09T00:00:02Z',
+        sourceEventId: 'evt-a1',
+        completion: { Completed: { truncated: false } },
+      });
+      onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
+      onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'second attempt' } });
+      onEvent({
+        opId: 'op-9',
+        sequence: 2,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return { opId: 'op-9', messageId: 'msg-user-1', context: null };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    await pickRegistryModel(user);
+    await screen.findByText('no answer was produced');
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(payloads[0]).toEqual({
+      accountId: 'acc-1',
+      modelId: 'qwen2.5:latest',
+      replyToMessageId: 'msg-user-1',
+      mode: 'plan',
+    });
+    // The user turn is answered again, never re-sent as a new message.
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+    expect(backend.completeOnceStreaming).toBeUndefined();
+    // The original attempt stays visible with its failure note; the newest
+    // attempt is now the completed one, so the offered action is Regenerate.
+    await screen.findByText('second attempt');
+    expect(screen.getByText('no answer was produced')).toBeDefined();
+    expect(screen.getByText(/Generation failed/i)).toBeDefined();
+    await screen.findByRole('button', { name: 'Regenerate' });
+  });
+
+  it('states why a retry cannot run without a resolved model instead of a silent no-op', async () => {
+    const backend = fakeBackend();
+    backend.getConversation = vi.fn(async () => ({
+      items: [
+        {
+          messageId: 'msg-user-1',
+          role: 'user',
+          text: 'retry me please',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-u1',
+        },
+        {
+          messageId: 'msg-failed-1',
+          role: 'assistant',
+          text: 'no answer was produced',
+          createdAt: '2026-10-09T00:00:01Z',
+          sourceEventId: 'evt-f1',
+          completion: 'Failed',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '2',
+    }));
+    backend.retryCompletionStreaming = vi.fn();
+    backend.stopCompletion = vi.fn();
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    await screen.findByText('no answer was produced');
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText(/Select a model to retry this turn/i)).toBeDefined();
+    expect(backend.retryCompletionStreaming).not.toHaveBeenCalled();
+  });
 });

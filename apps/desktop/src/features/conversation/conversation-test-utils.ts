@@ -4,6 +4,7 @@ import type { ConversationBackend } from './use-conversation';
 // Streaming dispatch signatures straight from the real backend contract, so
 // test double assignments typecheck exactly like production wiring.
 export type CompletionStreamFn = NonNullable<ConversationBackend['completeOnceStreaming']>;
+export type RetryCompletionFn = NonNullable<ConversationBackend['retryCompletionStreaming']>;
 export type StopCompletionFn = NonNullable<ConversationBackend['stopCompletion']>;
 export type MarkCompletionInterruptedFn = NonNullable<
   ConversationBackend['markCompletionInterrupted']
@@ -45,6 +46,7 @@ export interface ConversationFakeBackend {
   // Optional: absent means the capability gate stays closed, matching the
   // contract represented by `ConversationBackend` itself.
   completeOnceStreaming?: Mock<CompletionStreamFn>;
+  retryCompletionStreaming?: Mock<RetryCompletionFn>;
   stopCompletion?: Mock<StopCompletionFn>;
   markCompletionInterrupted?: Mock<MarkCompletionInterruptedFn>;
 }

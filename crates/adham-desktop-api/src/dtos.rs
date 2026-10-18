@@ -529,6 +529,24 @@ pub struct CompleteOncePayload {
     pub think: Option<ThinkValue>,
 }
 
+/// Retry / regenerate: one NEW assistant attempt for an existing user turn.
+/// `reply_to_message_id` is the user message whose turn is answered again —
+/// the user row is never duplicated and previous attempts stay persisted.
+/// Only the session's latest user turn may be retried, so an answer can never
+/// be appended out of order. The original history is preserved; `mode` and
+/// `think` follow the same rules as `CompleteOncePayload`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RetryCompletionPayload {
+    pub account_id: String,
+    pub model_id: String,
+    pub reply_to_message_id: String,
+    pub mode: Option<String>,
+    #[ts(type = "boolean | string | null")]
+    pub think: Option<ThinkValue>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]

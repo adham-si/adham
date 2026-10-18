@@ -1,4 +1,5 @@
 import * as React from 'react';
+import type { CompletionStartDto, StreamEventDto } from '@adham/contracts-generated';
 import i18n from '@/shared/i18n';
 import { removeStorage } from '@/shared/lib/session-storage';
 import {
@@ -620,6 +621,143 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     setStreamingState(next);
   }, []);
 
+  /**
+   * One streaming dispatch onto the single live snapshot: the waiting state
+   * exists before the socket does (Stop is reachable during connect and
+   * thinking), deltas stream in order, the terminal is awaited, and the
+   * authoritative history reload hands off with the recovery-snapshot
+   * fallback. Shared by a fresh send and by a retry/regenerate attempt, so
+   * both obey the same sequencing rules.
+   */
+  const runStreamDispatch = React.useCallback(
+    async (opts: {
+      ctx: ConversationContext;
+      sessionId: string;
+      generation: number;
+      /** Starts the op and resolves with the durable start handle. May do
+       *  post-write bookkeeping (first-send identity) before returning. */
+      dispatch: (onEvent: (event: StreamEventDto) => void) => Promise<CompletionStartDto>;
+      /** Runs when the dispatch threw before any terminal: the send path
+       *  removes its optimistic bubble and dismisses its tracked identity. */
+      onDispatchFailure: () => Promise<void> | void;
+    }): Promise<SubmitOutcome> => {
+      const { ctx, sessionId, generation } = opts;
+      const stopCompletion = backend.stopCompletion;
+      // Waiting begins at dispatch: the live snapshot exists before the
+      // socket does, so Stop is reachable during connect and thinking.
+      stopRequestedRef.current = false;
+      const startedAt = Date.now();
+      setStreaming({ opId: '', text: '', phase: 'waiting', startedAt });
+      // The previous turn's truncation notice belongs to that dispatch only.
+      setOmittedMessages(0);
+
+      let opId: string | null = null;
+      let terminalSeen = false;
+      let resolveTerminal!: (completion: 'completed' | 'interrupted' | 'failed') => void;
+      const terminalPromise = new Promise<'completed' | 'interrupted' | 'failed'>((resolve) => {
+        resolveTerminal = resolve;
+      });
+
+      try {
+        const start = await opts.dispatch((event: StreamEventDto) => {
+          if (!mountedRef.current || generationRef.current !== generation) return;
+          if (opId === null) {
+            opId = event.opId;
+            const state = streamingRef.current;
+            if (state) setStreaming({ ...state, opId: event.opId });
+            // A Stop clicked before the op handle arrived is effectuated
+            // here: cancellation never waits for an answer delta.
+            if (stopRequestedRef.current && stopCompletion) {
+              void stopCompletion(ctx.workspaceId, ctx.projectId, sessionId, event.opId).catch(
+                () => undefined,
+              );
+            }
+          }
+          if (event.opId !== opId) return;
+          if (event.event.type === 'delta') {
+            const previous =
+              streamingRef.current?.opId === event.opId ? streamingRef.current.text : '';
+            setStreaming({
+              opId: event.opId,
+              text: previous + event.event.text,
+              phase: 'streaming',
+              startedAt: streamingRef.current?.startedAt ?? startedAt,
+            });
+          } else if (event.event.type === 'thinking') {
+            // Thinking is surfaced only on real reasoning activity; elapsed
+            // time never fabricates this status.
+            const state = streamingRef.current;
+            if (state && state.phase === 'waiting') {
+              setStreaming({ ...state, phase: 'thinking' });
+            }
+          } else if (event.event.type === 'completed' && !terminalSeen) {
+            terminalSeen = true;
+            // Only the documented values pass through; anything else is a
+            // contract violation and resolves failed, never completed.
+            const completion = event.event.completion;
+            resolveTerminal(
+              completion === 'completed' || completion === 'interrupted' ? completion : 'failed',
+            );
+          }
+        });
+        if (!mountedRef.current || generationRef.current !== generation) {
+          return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
+        }
+        // First stream event may arrive before the start handle resolves.
+        if (opId === null) opId = start.opId;
+        const pending = streamingRef.current;
+        if (pending && pending.opId === '') setStreaming({ ...pending, opId: start.opId });
+        // Assembly summary of this dispatch: history dropped to fit the model
+        // context is surfaced, never silent.
+        if (mountedRef.current && generationRef.current === generation) {
+          setOmittedMessages(start.context?.droppedMessages ?? 0);
+        }
+        await terminalPromise;
+        // Handoff ordering is atomic in the render sense: the live bubble is
+        // dropped BEFORE the authoritative rows land, and on a failed history
+        // reload the streamed answer stays visible as a non-authoritative
+        // recovery snapshot — the generation itself is never repeated.
+        const answerText = streamingRef.current?.text ?? '';
+        setStreaming(null);
+        try {
+          if (mountedRef.current && generationRef.current === generation) {
+            loadSeqRef.current += 1;
+            const reloadSeq = loadSeqRef.current;
+            const items = await loadHistory(ctx, generation, reloadSeq, mutationSeqRef.current);
+            if (
+              items === null &&
+              answerText !== '' &&
+              mountedRef.current &&
+              generationRef.current === generation &&
+              !isStale(generation, reloadSeq, mutationSeqRef.current, sessionId)
+            ) {
+              setRecoverySnapshot({
+                id: `recovery-${opId ?? 'terminal'}`,
+                role: 'assistant',
+                text: answerText,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
+        } finally {
+          streamingRef.current = null;
+        }
+        return { ok: true };
+      } catch (err) {
+        setStreaming(null);
+        await opts.onDispatchFailure();
+        const code = err instanceof Error ? err.message : String(err);
+        setError(code);
+        setStatus('error');
+        return { ok: false, error: code, uncertain: true };
+      } finally {
+        stopRequestedRef.current = false;
+        submitInFlightRef.current = false;
+      }
+    },
+    [backend, loadHistory, isStale, setStreaming],
+  );
+
   const streamOnce = React.useCallback(
     async (
       text: string,
@@ -634,7 +772,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
       const trimmed = text.trim();
       if (!trimmed)
         return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
-      if (!backend.completeOnceStreaming || !backend.stopCompletion) {
+      const completeOnceStreaming = backend.completeOnceStreaming;
+      if (!completeOnceStreaming || !backend.stopCompletion) {
         return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
       }
       let ctx = context;
@@ -708,156 +847,125 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         },
       ]);
 
-      // Waiting begins at dispatch: the live snapshot exists before the
-      // socket does, so Stop is reachable during connect and thinking.
-      stopRequestedRef.current = false;
-      const startedAt = Date.now();
-      setStreaming({ opId: '', text: '', phase: 'waiting', startedAt });
-      // The previous turn's truncation notice belongs to that dispatch only.
-      setOmittedMessages(0);
-
-      let opId: string | null = null;
-      let terminalSeen = false;
-      let resolveTerminal!: (completion: 'completed' | 'interrupted' | 'failed') => void;
-      const terminalPromise = new Promise<'completed' | 'interrupted' | 'failed'>((resolve) => {
-        resolveTerminal = resolve;
+      return runStreamDispatch({
+        ctx,
+        sessionId,
+        generation,
+        dispatch: async (onEvent) => {
+          const start = await completeOnceStreaming(
+            ctx.workspaceId,
+            ctx.projectId,
+            sessionId,
+            {
+              accountId,
+              modelId,
+              text: trimmed,
+              mode,
+              ...(think === undefined ? {} : { think }),
+            },
+            onEvent,
+          );
+          if (firstSend) {
+            // The dispatch is confirmed persisted, so the tracked first-send
+            // identity has done its job: resolve it now. A recovery surface must
+            // never offer to resend a message that already landed; an unresolved
+            // turn is the backend's provider operation, not this record.
+            const cleared = await clearDurablePendingOperation(backend, {
+              operationId: firstSend.messageRequestId,
+              expectedMessageRequestId: firstSend.messageRequestId,
+              reason: 'resolved',
+            });
+            if (!cleared.ok) {
+              setStorageWarning(cleared.error ?? i18n.t('conversation.recovery.cleanupFailed'));
+            }
+            const instId = ctx.installationId ?? installationIdRef.current;
+            if (!persistAndAnnounceActiveSession({ ...ctx, title: firstSend.title }, instId)) {
+              setStorageWarning(i18n.t('conversation.storageUnavailable'));
+            }
+          }
+          return start;
+        },
+        onDispatchFailure: async () => {
+          // Dispatch failed before/at the socket: the user turn was never
+          // persisted, so the optimistic bubble is removed.
+          setMessages((prev) => prev.filter((m) => m.id !== 'streaming-user-bubble'));
+          if (firstSend) {
+            // The session now exists, so the first-send identity is superseded:
+            // if the turn did persist, the backend's provider operation is its
+            // durable record; if it did not, the text is back in the composer.
+            // Leaving the record pending would offer a duplicate resend.
+            await clearDurablePendingOperation(backend, {
+              operationId: firstSend.messageRequestId,
+              expectedMessageRequestId: firstSend.messageRequestId,
+              reason: 'dismissed',
+            });
+          }
+        },
       });
-
-      try {
-        const start = await backend.completeOnceStreaming(
-          ctx.workspaceId,
-          ctx.projectId,
-          sessionId,
-          { accountId, modelId, text: trimmed, mode, ...(think === undefined ? {} : { think }) },
-          (event) => {
-            if (!mountedRef.current || generationRef.current !== generation) return;
-            if (opId === null) {
-              opId = event.opId;
-              const state = streamingRef.current;
-              if (state) setStreaming({ ...state, opId: event.opId });
-              // A Stop clicked before the op handle arrived is effectuated
-              // here: cancellation never waits for an answer delta.
-              if (stopRequestedRef.current && backend.stopCompletion) {
-                void backend
-                  .stopCompletion(ctx.workspaceId, ctx.projectId, sessionId, event.opId)
-                  .catch(() => undefined);
-              }
-            }
-            if (event.opId !== opId) return;
-            if (event.event.type === 'delta') {
-              const previous =
-                streamingRef.current?.opId === event.opId ? streamingRef.current.text : '';
-              setStreaming({
-                opId: event.opId,
-                text: previous + event.event.text,
-                phase: 'streaming',
-                startedAt: streamingRef.current?.startedAt ?? startedAt,
-              });
-            } else if (event.event.type === 'thinking') {
-              // Thinking is surfaced only on real reasoning activity; elapsed
-              // time never fabricates this status.
-              const state = streamingRef.current;
-              if (state && state.phase === 'waiting') {
-                setStreaming({ ...state, phase: 'thinking' });
-              }
-            } else if (event.event.type === 'completed' && !terminalSeen) {
-              terminalSeen = true;
-              // Only the documented values pass through; anything else is a
-              // contract violation and resolves failed, never completed.
-              const completion = event.event.completion;
-              resolveTerminal(
-                completion === 'completed' || completion === 'interrupted' ? completion : 'failed',
-              );
-            }
-          },
-        );
-        if (firstSend) {
-          // The dispatch is confirmed persisted, so the tracked first-send
-          // identity has done its job: resolve it now. A recovery surface must
-          // never offer to resend a message that already landed; an unresolved
-          // turn is the backend's provider operation, not this record.
-          const cleared = await clearDurablePendingOperation(backend, {
-            operationId: firstSend.messageRequestId,
-            expectedMessageRequestId: firstSend.messageRequestId,
-            reason: 'resolved',
-          });
-          if (!cleared.ok) {
-            setStorageWarning(cleared.error ?? i18n.t('conversation.recovery.cleanupFailed'));
-          }
-          const instId = ctx.installationId ?? installationIdRef.current;
-          if (!persistAndAnnounceActiveSession({ ...ctx, title: firstSend.title }, instId)) {
-            setStorageWarning(i18n.t('conversation.storageUnavailable'));
-          }
-        }
-        if (!mountedRef.current || generationRef.current !== generation) {
-          return { ok: false, error: i18n.t('conversation.sessionChanged'), uncertain: false };
-        }
-        // First stream event may arrive before the start handle resolves.
-        if (opId === null) opId = start.opId;
-        const pending = streamingRef.current;
-        if (pending && pending.opId === '') setStreaming({ ...pending, opId: start.opId });
-        // Assembly summary of this dispatch: history dropped to fit the model
-        // context is surfaced, never silent.
-        if (mountedRef.current && generationRef.current === generation) {
-          setOmittedMessages(start.context?.droppedMessages ?? 0);
-        }
-        await terminalPromise;
-        // Handoff ordering is atomic in the render sense: the live bubble is
-        // dropped BEFORE the authoritative rows land, and on a failed history
-        // reload the streamed answer stays visible as a non-authoritative
-        // recovery snapshot — the generation itself is never repeated.
-        const answerText = streamingRef.current?.text ?? '';
-        setStreaming(null);
-        try {
-          if (mountedRef.current && generationRef.current === generation) {
-            loadSeqRef.current += 1;
-            const reloadSeq = loadSeqRef.current;
-            const items = await loadHistory(ctx, generation, reloadSeq, mutationSeqRef.current);
-            if (
-              items === null &&
-              answerText !== '' &&
-              mountedRef.current &&
-              generationRef.current === generation &&
-              !isStale(generation, reloadSeq, mutationSeqRef.current, sessionId)
-            ) {
-              setRecoverySnapshot({
-                id: `recovery-${opId ?? 'terminal'}`,
-                role: 'assistant',
-                text: answerText,
-                createdAt: new Date().toISOString(),
-              });
-            }
-          }
-        } finally {
-          streamingRef.current = null;
-        }
-        return { ok: true };
-      } catch (err) {
-        setStreaming(null);
-        // Dispatch failed before/at the socket: the user turn was never
-        // persisted, so the optimistic bubble is removed.
-        setMessages((prev) => prev.filter((m) => m.id !== 'streaming-user-bubble'));
-        if (firstSend) {
-          // The session now exists, so the first-send identity is superseded:
-          // if the turn did persist, the backend's provider operation is its
-          // durable record; if it did not, the text is back in the composer.
-          // Leaving the record pending would offer a duplicate resend.
-          await clearDurablePendingOperation(backend, {
-            operationId: firstSend.messageRequestId,
-            expectedMessageRequestId: firstSend.messageRequestId,
-            reason: 'dismissed',
-          });
-        }
-        const code = err instanceof Error ? err.message : String(err);
-        setError(code);
-        setStatus('error');
-        return { ok: false, error: code, uncertain: true };
-      } finally {
-        stopRequestedRef.current = false;
-        submitInFlightRef.current = false;
-      }
     },
-    [backend, context, loadHistory, isStale, setStreaming],
+    [backend, context, runStreamDispatch],
+  );
+
+  /**
+   * Retry a failed turn / regenerate an answer: ONE new attempt against the
+   * same user turn. No user row is written and no previous attempt is
+   * replaced — the original history stays, and the attempt is an explicit
+   * dispatch with its own op handle (Stop applies to it like any run).
+   */
+  const retryTurn = React.useCallback(
+    async (
+      replyToMessageId: string,
+      accountId: string,
+      modelId: string,
+      mode: 'ask' | 'plan' | 'code' | 'execute',
+      /** Documented thinking parameter value; undefined = model default. */
+      think?: boolean | string,
+    ): Promise<SubmitOutcome> => {
+      const retryCompletionStreaming = backend.retryCompletionStreaming;
+      if (!retryCompletionStreaming || !backend.stopCompletion) {
+        return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+      }
+      const ctx = context;
+      const sessionId = ctx?.sessionId;
+      if (!ctx || !sessionId) {
+        return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+      }
+      const blocked = sendBlockedReason(scopeStaleRef.current);
+      if (blocked) return { ok: false, error: blocked, uncertain: false };
+      // Same controller-boundary guard as a send: one live dispatch at a time.
+      if (submitInFlightRef.current) {
+        return { ok: false, error: i18n.t('conversation.alreadySaving'), uncertain: false };
+      }
+      const preSwitch = switchUnresolved(requestedRef.current, sessionId);
+      if (preSwitch) return preSwitch;
+
+      const generation = generationRef.current;
+      submitInFlightRef.current = true;
+      setError(null);
+      return runStreamDispatch({
+        ctx,
+        sessionId,
+        generation,
+        dispatch: (onEvent) =>
+          retryCompletionStreaming(
+            ctx.workspaceId,
+            ctx.projectId,
+            sessionId,
+            {
+              accountId,
+              modelId,
+              replyToMessageId,
+              mode,
+              ...(think === undefined ? {} : { think }),
+            },
+            onEvent,
+          ),
+        // There is no optimistic bubble and no tracked identity here: a
+        // dispatch failure leaves history exactly as it was.
+        onDispatchFailure: () => undefined,
+      });
+    },
+    [backend, context, runStreamDispatch],
   );
 
   const stop = React.useCallback(async (): Promise<SubmitOutcome> => {
@@ -901,6 +1009,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     pendingSend,
     submit,
     streamOnce,
+    retryTurn,
     stop,
     streaming,
     recoverySnapshot,

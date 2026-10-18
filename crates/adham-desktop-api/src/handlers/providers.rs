@@ -114,6 +114,68 @@ fn ollama_adapter(account: &LocalAccount) -> Result<OllamaHttpAdapter, String> {
     OllamaHttpAdapter::new(HttpTransport::default(), &account.base_url).map_err(|e| e.to_string())
 }
 
+/// Modes are declarations with real semantics. "execute" has no runtime to
+/// execute under, so it is refused rather than silently downgraded; unknown
+/// modes never reach a socket. Shared by send and retry.
+fn validate_mode(mode: Option<&str>) -> Result<(), String> {
+    if let Some(mode) = mode {
+        if mode == "execute" {
+            return Err(
+                "EXECUTE_UNAVAILABLE: execution requires the policy and tool runtime, which is not built"
+                    .to_string(),
+            );
+        }
+        if mode_instruction(mode).is_none() {
+            return Err(format!("VALIDATION_FAILED: unknown mode '{mode}'"));
+        }
+    }
+    Ok(())
+}
+
+/// Model evidence before ANY socket: unknown ids dispatch nothing, and only a
+/// local Ollama account may be used (no keys, no cloud).
+async fn resolve_dispatch_target(
+    ctx: &ApiContext,
+    account_id: &str,
+    model_id: &str,
+) -> Result<(LocalAccount, PinnedModel), String> {
+    let account = local_account(ctx, account_id).await?;
+    if !matches!(
+        account.kind,
+        adham_provider::domain::account::ProviderKind::OllamaLocal
+    ) {
+        return Err(format!(
+            "VALIDATION_FAILED: account '{account_id}' is not a local Ollama account"
+        ));
+    }
+    let pinned = resolve_pinned(ctx, &account.account_id, model_id).await?;
+    Ok((account, pinned))
+}
+
+/// `think` values are documented per model by `/api/show` (`thinking.values`).
+/// Only an exact documented value may be sent: Ollama silently falls back to
+/// the model default for anything else, which would turn the UI's
+/// applied-state into a lie. No documented values = refused.
+fn validate_think(pinned: &PinnedModel, think: &ThinkValue) -> Result<(), String> {
+    let documented: &[String] = pinned
+        .descriptor
+        .capabilities
+        .thinking_control
+        .as_ref()
+        .map(|control| control.values.as_slice())
+        .unwrap_or_default();
+    if documented.is_empty() {
+        return Err("THINKING_UNSUPPORTED: model has no documented thinking values".to_string());
+    }
+    let requested = think.as_documented();
+    if !documented.contains(&requested) {
+        return Err(format!(
+            "THINKING_VALUE_UNSUPPORTED: '{requested}' is not a documented thinking value"
+        ));
+    }
+    Ok(())
+}
+
 fn ok_result<T: Serialize + TS>(request_id: String, data: T) -> CommandResult<T> {
     CommandResult {
         protocol_version: 1,
@@ -543,61 +605,17 @@ where
     if trimmed.len() > 65536 {
         return Err("VALIDATION_FAILED: text exceeds 65536 bytes".to_string());
     }
-    // Modes are declarations with real semantics. "execute" has no runtime to
-    // execute under, so it is refused rather than silently downgraded; unknown
-    // modes never reach a socket.
-    if let Some(mode) = env.payload.mode.as_deref() {
-        if mode == "execute" {
-            return Err(
-                "EXECUTE_UNAVAILABLE: execution requires the policy and tool runtime, which is not built"
-                    .to_string(),
-            );
-        }
-        if mode_instruction(mode).is_none() {
-            return Err(format!("VALIDATION_FAILED: unknown mode '{mode}'"));
-        }
-    }
+    validate_mode(env.payload.mode.as_deref())?;
     let ids = expect_full_scope(&env.context)?;
     validate_session_scope(ctx, &ids).await?;
     let request_id = RequestId::from_client_str(&env.request_id)
         .map_err(|_| "VALIDATION_FAILED: request_id must be UUID".to_string())?;
 
     // Model evidence before ANY socket: unknown ids dispatch nothing.
-    let account = local_account(ctx, &env.payload.account_id).await?;
-    if !matches!(
-        account.kind,
-        adham_provider::domain::account::ProviderKind::OllamaLocal
-    ) {
-        return Err(format!(
-            "VALIDATION_FAILED: account '{}' is not a local Ollama account",
-            env.payload.account_id
-        ));
-    }
-    let pinned = resolve_pinned(ctx, &account.account_id, &env.payload.model_id).await?;
-
-    // `think` values are documented per model by `/api/show`
-    // (`thinking.values`). Only an exact documented value may be sent: Ollama
-    // silently falls back to the model default for anything else, which would
-    // turn the UI's applied-state into a lie. No documented values = refused.
+    let (account, pinned) =
+        resolve_dispatch_target(ctx, &env.payload.account_id, &env.payload.model_id).await?;
     if let Some(think) = &env.payload.think {
-        let documented: &[String] = pinned
-            .descriptor
-            .capabilities
-            .thinking_control
-            .as_ref()
-            .map(|control| control.values.as_slice())
-            .unwrap_or_default();
-        if documented.is_empty() {
-            return Err(
-                "THINKING_UNSUPPORTED: model has no documented thinking values".to_string(),
-            );
-        }
-        let requested = think.as_documented();
-        if !documented.contains(&requested) {
-            return Err(format!(
-                "THINKING_VALUE_UNSUPPORTED: '{requested}' is not a documented thinking value"
-            ));
-        }
+        validate_think(&pinned, think)?;
     }
 
     let adapter = ollama_adapter(&account)?;
@@ -720,7 +738,7 @@ where
     // The stored receipt is the replay record; the assembly summary is filled
     // in after the submitted row is durable (below), so a replayed receipt
     // carries none.
-    let mut start = CompletionStartDto {
+    let start = CompletionStartDto {
         op_id: op_id.to_string(),
         message_id: message_id.to_string(),
         context: None,
@@ -774,7 +792,225 @@ where
         history_rows.into_iter(),
         env.payload.mode.as_deref().and_then(mode_instruction),
         input_budget,
+        // A fresh send keeps the whole session history.
+        None,
     );
+
+    Ok(run_and_settle(
+        ctx,
+        env.request_id,
+        correlation_id,
+        &ids,
+        &adapter,
+        &account,
+        &pinned,
+        &token,
+        start,
+        assembled,
+        max_output_tokens,
+        env.payload.think,
+        sink,
+    )
+    .await)
+}
+
+/// Retry / regenerate: one NEW assistant attempt for an existing user turn.
+///
+/// The user row is never duplicated and previous attempts stay persisted, so
+/// history is preserved and each retry is an explicit, visible dispatch with
+/// its own durable op handle — never a silent re-run and never a resend of the
+/// user's message as a new turn. Only the session's latest user turn can be
+/// retried: history is append-only, so an older turn cannot be answered now
+/// without answering it out of order (refused before any socket).
+pub async fn handle_retry_completion_streaming<S>(
+    ctx: &ApiContext,
+    env: CommandEnvelope<RetryCompletionPayload>,
+    sink: &S,
+) -> Result<CommandResult<CompletionStartDto>, String>
+where
+    S: EventSink,
+{
+    validate_mode(env.payload.mode.as_deref())?;
+    let ids = expect_full_scope(&env.context)?;
+    validate_session_scope(ctx, &ids).await?;
+    let request_id = RequestId::from_client_str(&env.request_id)
+        .map_err(|_| "VALIDATION_FAILED: request_id must be UUID".to_string())?;
+    let (account, pinned) =
+        resolve_dispatch_target(ctx, &env.payload.account_id, &env.payload.model_id).await?;
+    if let Some(think) = &env.payload.think {
+        validate_think(&pinned, think)?;
+    }
+    let adapter = ollama_adapter(&account)?;
+
+    // The retried turn must be a persisted user row of this session, and the
+    // session's latest user turn. History comes from protected content
+    // server-side; the renderer only names the turn.
+    let reply_to = env.payload.reply_to_message_id.clone();
+    let history_rows = adham_projections::ConversationProjection::get_session_messages(
+        &ctx.pool,
+        ctx.content_key.as_ref(),
+        &ctx.installation_id,
+        &ids.sess_id,
+    )
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    let target = history_rows
+        .iter()
+        .find(|r| r.message_id == reply_to)
+        .ok_or_else(|| "VALIDATION_FAILED: reply target is not in this session".to_string())?;
+    if target.role != "user" {
+        return Err("VALIDATION_FAILED: only a user turn can be retried".to_string());
+    }
+    let latest_user = history_rows.iter().rev().find(|r| r.role == "user");
+    if latest_user.map(|r| r.message_id.as_str()) != Some(reply_to.as_str()) {
+        return Err("RETRY_NOT_LATEST_TURN: only the latest user turn can be retried".to_string());
+    }
+
+    let op_id = OperationId::new_v7();
+    let scope = EventScope {
+        installation_id: ctx.installation_id,
+        workspace_id: Some(ids.ws_id),
+        project_id: Some(ids.proj_id),
+        session_id: Some(ids.sess_id),
+    };
+    let mut tx = ctx
+        .pool
+        .begin()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+
+    // idempotent IPC retry: same request → same op handle, never a second
+    // attempt. A deliberate second retry is a new request id, and then it IS
+    // a second visible attempt.
+    if let Some(receipt) = SqliteEventStore::check_receipt_tx(&mut tx, &request_id)
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?
+    {
+        let persisted: CompletionStartDto = serde_json::from_slice(&receipt.response_json)
+            .map_err(|_| "STORAGE_REPAIR_REQUIRED: receipt response unparseable".to_string())?;
+        tx.rollback()
+            .await
+            .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+        return Ok(CommandResult {
+            protocol_version: 1,
+            request_id: env.request_id,
+            correlation_id: receipt.correlation_id,
+            data: persisted,
+        });
+    }
+
+    // Durable op handle BEFORE any socket (fail-closed record-then-POST). The
+    // response names the retried user turn: there is no new user message.
+    SqliteEventStore::record_pending_operation_tx(
+        &mut tx,
+        ctx.content_key.as_ref(),
+        &op_id.to_string(),
+        "provider-completion",
+        &scope,
+        None,
+        &request_id.to_string(),
+        "",
+        None,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let correlation_id = CorrelationId::new_v7();
+    let start = CompletionStartDto {
+        op_id: op_id.to_string(),
+        message_id: reply_to.clone(),
+        context: None,
+    };
+    let persisted = serde_json::to_vec(&start).unwrap_or_default();
+    let request_input = format!("{reply_to}|{}", env.payload.model_id);
+    let request_fp = adham_event_log::request_fingerprint("retry_completion", 1, &request_input);
+    let scope_fp = adham_event_log::scope_fingerprint(
+        "retry_completion",
+        1,
+        &ctx.actor_id,
+        &ctx.installation_id,
+        Some(&ids.ws_id),
+        Some(&ids.proj_id),
+        Some(&ids.sess_id),
+    );
+    // A retry appends no event at dispatch (the user row already exists), so
+    // this receipt has no global position to point at; 0 marks that. Receipt
+    // replay reads the stored response only, never these positions.
+    SqliteEventStore::record_receipt_tx(
+        &mut tx,
+        &request_id,
+        "retry_completion",
+        1,
+        &scope_fp,
+        &request_fp,
+        &ctx.actor_id,
+        &correlation_id,
+        "completed",
+        &persisted,
+        0,
+    )
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    tx.commit()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+
+    let token = CancellationToken::new();
+    ctx.completion_runs.insert(&start.op_id, token.clone());
+
+    // The retried turn's own context: history stops at the user row being
+    // answered, so the previous attempts of this turn are not sent back to the
+    // model (they stay persisted and visible) and later turns cannot exist —
+    // the latest-turn rule above guarantees it.
+    let (input_budget, max_output_tokens) = budget_with_reserve(&pinned.descriptor);
+    let assembled = assemble_context(
+        history_rows.into_iter(),
+        env.payload.mode.as_deref().and_then(mode_instruction),
+        input_budget,
+        Some(&reply_to),
+    );
+
+    Ok(run_and_settle(
+        ctx,
+        env.request_id,
+        correlation_id,
+        &ids,
+        &adapter,
+        &account,
+        &pinned,
+        &token,
+        start,
+        assembled,
+        max_output_tokens,
+        env.payload.think,
+        sink,
+    )
+    .await)
+}
+
+/// Assembly summary + dispatch + settle for one completion op. Shared by a
+/// fresh send and a retry/regenerate attempt: both write exactly one assistant
+/// terminal for one durable op handle, and the op leaves `completion_runs`
+/// before this returns.
+#[allow(clippy::too_many_arguments)]
+async fn run_and_settle<S>(
+    ctx: &ApiContext,
+    request_id: String,
+    correlation_id: CorrelationId,
+    ids: &StreamIds,
+    adapter: &OllamaHttpAdapter,
+    account: &LocalAccount,
+    pinned: &PinnedModel,
+    token: &CancellationToken,
+    mut start: CompletionStartDto,
+    assembled: AssembledContext,
+    max_output_tokens: Option<u32>,
+    think: Option<ThinkValue>,
+    sink: &S,
+) -> CommandResult<CompletionStartDto>
+where
+    S: EventSink,
+{
     start.context = Some(ContextAssemblyDto {
         estimated_input_tokens: assembled.estimated_input_tokens,
         input_budget_tokens: assembled.input_budget_tokens,
@@ -784,16 +1020,16 @@ where
     info!("provider completion dispatching op {}", start.op_id);
     let outcome = run_stream(
         ctx,
-        &adapter,
-        &pinned,
-        &account,
+        adapter,
+        pinned,
+        account,
         &start.op_id,
-        &request_id.to_string(),
-        &ids,
-        &token,
+        &request_id,
+        ids,
+        token,
         assembled.messages,
         max_output_tokens,
-        env.payload.think,
+        think,
         sink,
     )
     .await;
@@ -803,12 +1039,12 @@ where
         start.op_id, outcome
     );
 
-    Ok(CommandResult {
+    CommandResult {
         protocol_version: 1,
-        request_id: env.request_id,
+        request_id,
         correlation_id: correlation_id.to_string(),
         data: start,
-    })
+    }
 }
 
 async fn resolve_pinned(
@@ -861,10 +1097,14 @@ fn budget_with_reserve(descriptor: &ModelDescriptor) -> (Option<u32>, Option<u32
 /// evidenced input budget. Oldest messages drop first and every drop is
 /// counted; the newest message always survives (a single oversized message is
 /// sent as-is with the estimate visible rather than refusing the send).
+/// `stop_after` (retry/regenerate) ends history at that message inclusive: the
+/// turn is answered again against the context it originally had, and previous
+/// attempts of the same turn are not fed back to the model.
 fn assemble_context(
     rows: impl Iterator<Item = adham_projections::ConversationMessageView>,
     instruction: Option<&str>,
     input_budget: Option<u32>,
+    stop_after: Option<&str>,
 ) -> AssembledContext {
     let instruction_chars = instruction.map(str::len).unwrap_or(0);
     let mut kept: Vec<ChatMessage> = Vec::new();
@@ -875,6 +1115,7 @@ fn assemble_context(
         ) {
             continue;
         }
+        let is_last = stop_after == Some(row.message_id.as_str());
         kept.push(ChatMessage {
             role: if row.role == "assistant" {
                 MessageRole::Assistant
@@ -883,6 +1124,9 @@ fn assemble_context(
             },
             content: row.content,
         });
+        if is_last {
+            break;
+        }
     }
     // trim from the oldest end; the newest messages win
     let mut dropped_messages: u32 = 0;

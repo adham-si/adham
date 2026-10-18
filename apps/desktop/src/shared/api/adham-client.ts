@@ -520,6 +520,41 @@ export class AdhamApiClient implements AdhamClient {
     return CompletionStartDtoSchema.parse(result.data);
   }
 
+  /**
+   * Retry/regenerate: a NEW assistant attempt for an existing user turn. The
+   * backend keeps the user row and every previous attempt; `replyToMessageId`
+   * only names the turn being answered again.
+   */
+  async retryCompletionStreaming(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: {
+      accountId: string;
+      modelId: string;
+      replyToMessageId: string;
+      mode: 'ask' | 'plan' | 'code' | 'execute';
+      /** Documented thinking parameter value; omitted = model default. */
+      think?: boolean | string;
+    },
+    onEvent: (event: StreamEventDto) => void,
+    options?: { requestId?: string },
+  ): Promise<CompletionStartDto> {
+    const channel = new Channel<unknown>((raw) => {
+      onEvent(StreamEventDtoSchema.parse(raw));
+    });
+    const envelope = this.wrapCommand(
+      payload,
+      this.sessionContext(workspaceId, projectId, sessionId),
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<CompletionStartDto>>('retry_completion_streaming', {
+      request: envelope,
+      onEvent: channel,
+    });
+    return CompletionStartDtoSchema.parse(result.data);
+  }
+
   async stopCompletion(
     workspaceId: string,
     projectId: string,

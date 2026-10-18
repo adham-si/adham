@@ -367,6 +367,55 @@ export function ConversationPanel({
     [dispatchTurn, setQueuedBoth],
   );
 
+  /// The newest attempt of the newest turn carries Retry (a failed or
+  /// interrupted attempt) or Regenerate (a completed one): earlier attempts
+  /// are superseded, and an older turn cannot be answered out of order. The
+  /// backend enforces the same rule; this only keeps the offered action true.
+  const turnAction = React.useMemo(() => {
+    const messages = conv.messages;
+    const last = messages[messages.length - 1];
+    if (!last || (last.role !== 'assistant' && last.role !== 'agent')) return null;
+    let userId: string | null = null;
+    for (let i = messages.length - 2; i >= 0; i -= 1) {
+      const m = messages[i]!;
+      if (m.role !== 'assistant' && m.role !== 'agent') {
+        userId = m.id;
+        break;
+      }
+    }
+    if (!userId) return null;
+    const state = last.completion?.state;
+    if (state !== 'failed' && state !== 'interrupted' && state !== 'completed') return null;
+    return {
+      attemptId: last.id,
+      userId,
+      verb: state === 'completed' ? ('regenerate' as const) : ('retry' as const),
+    };
+  }, [conv.messages]);
+
+  /// One new attempt against the same user turn. Nothing is replaced and no
+  /// user row is written; the refusal reason (no model, rejected dispatch) is
+  /// stated, never swallowed.
+  const handleTurnAction = React.useCallback(() => {
+    if (!turnAction || busy) return;
+    setSubmitError(null);
+    if (!streamReady) {
+      setSubmitError(t('conversation.retryNeedsModel', 'Select a model to retry this turn.'));
+      return;
+    }
+    void conv
+      .retryTurn(
+        turnAction.userId,
+        ollama.account!.accountId,
+        selectedModelId,
+        mode,
+        think ?? undefined,
+      )
+      .then((outcome) => {
+        if (!outcome.ok) setSubmitError(outcome.error);
+      });
+  }, [turnAction, busy, streamReady, t, conv, ollama.account, selectedModelId, mode, think]);
+
   // Queued instructions belong to the session they were typed in: a session
   // switch drops them rather than dispatching them into another thread.
   React.useEffect(() => {
@@ -508,6 +557,20 @@ export function ConversationPanel({
                   >
                     {note.text}
                   </p>
+                )}
+                {turnAction && m.id === turnAction.attemptId && (
+                  <div className="flex gap-2 px-1">
+                    <button
+                      type="button"
+                      className="text-xs text-foreground-secondary underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
+                      disabled={busy}
+                      onClick={handleTurnAction}
+                    >
+                      {turnAction.verb === 'retry'
+                        ? t('conversation.retryTurn', 'Retry')
+                        : t('conversation.regenerateAnswer', 'Regenerate')}
+                    </button>
+                  </div>
                 )}
               </React.Fragment>
             );

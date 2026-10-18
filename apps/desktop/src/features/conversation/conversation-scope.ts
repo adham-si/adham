@@ -74,6 +74,26 @@ export interface ConversationBackend {
     onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
     options?: { requestId?: string },
   ): Promise<import('@adham/contracts-generated').CompletionStartDto>;
+  /**
+   * One NEW attempt for an existing user turn (retry / regenerate): the user
+   * row is not duplicated and previous attempts stay persisted.
+   */
+  retryCompletionStreaming?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: {
+      accountId: string;
+      modelId: string;
+      replyToMessageId: string;
+      /** Turn mode; dispatched as a request-only system instruction. */
+      mode: 'ask' | 'plan' | 'code' | 'execute';
+      /** Documented thinking parameter value; omitted = model default. */
+      think?: boolean | string;
+    },
+    onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
+    options?: { requestId?: string },
+  ): Promise<import('@adham/contracts-generated').CompletionStartDto>;
   stopCompletion?(
     workspaceId: string,
     projectId: string,

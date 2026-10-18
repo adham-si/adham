@@ -208,6 +208,8 @@ mode: string | null,
  */
 think: boolean | string | null, };
 
+export type RetryCompletionPayload = { accountId: string, modelId: string, replyToMessageId: string, mode: string | null, think: boolean | string | null, };
+
 export type ContextAssemblyDto = { estimatedInputTokens: number, 
 /**
  * Evidenced input budget (model max ∩ configured num_ctx, minus the
