@@ -1,6 +1,6 @@
 use crate::domain::identity::{CanonicalSkillId, SkillSourceKind};
 use crate::domain::skill::{
-    InertResourceRef, SkillMetadata, SkillSnapshot, SkillValidationError, MAX_SKILL_BODY_BYTES,
+    InertResourceRef, MAX_SKILL_BODY_BYTES, SkillMetadata, SkillSnapshot, SkillValidationError,
 };
 use thiserror::Error;
 

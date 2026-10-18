@@ -8,8 +8,8 @@ use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 /// Persisted receipt: structural references only, never cleartext.
 /// The authorized IPC response (`SubmittedMessage`) still carries `text`,

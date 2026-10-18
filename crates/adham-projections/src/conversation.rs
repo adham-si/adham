@@ -1,8 +1,8 @@
 //! Conversation projection. ID newtypes are `Copy`; `.clone()` follows codebase style.
 #![allow(clippy::clone_on_copy)]
 use adham_core_types::{
-    DomainError, MessageCompletedV1, MessageCompletionV1, MessageSubmittedV1, MessageSubmittedV2,
-    MessageUsageV1, OperationId, SessionId, EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED,
+    DomainError, EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED, MessageCompletedV1, MessageCompletionV1,
+    MessageSubmittedV1, MessageSubmittedV2, MessageUsageV1, OperationId, SessionId,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Row, Sqlite};

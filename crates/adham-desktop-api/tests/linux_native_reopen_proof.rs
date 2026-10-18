@@ -12,7 +12,7 @@ use common::*;
 
 use adham_core_types::*;
 use adham_desktop_api::*;
-use adham_event_log::{create_sqlite_pool, ContentKeyProvider, OsKeyringProvider};
+use adham_event_log::{ContentKeyProvider, OsKeyringProvider, create_sqlite_pool};
 use adham_platform::PlatformStoragePolicy;
 use std::sync::Arc;
 

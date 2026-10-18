@@ -1,5 +1,5 @@
 use crate::domain::package::{
-    PackageDigest, PackageManifest, PluginVersion, AGENT_PLUGINS_SCHEMA_V1,
+    AGENT_PLUGINS_SCHEMA_V1, PackageDigest, PackageManifest, PluginVersion,
 };
 use std::collections::HashMap;
 use thiserror::Error;

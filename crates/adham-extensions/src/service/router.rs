@@ -1,6 +1,6 @@
 use crate::domain::activation::{ActivationError, ActivationManifest, MAX_HELPER_SKILLS};
 use crate::domain::identity::{CanonicalSkillId, SkillSourceKind};
-use crate::domain::skill::{SkillMetadata, SkillSnapshot, MAX_METADATA_SHORTLIST};
+use crate::domain::skill::{MAX_METADATA_SHORTLIST, SkillMetadata, SkillSnapshot};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]

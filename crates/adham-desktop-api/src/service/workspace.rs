@@ -4,9 +4,9 @@ use super::common::conflict_msg;
 use crate::dtos::*;
 use crate::handlers::ApiContext;
 use adham_core_types::*;
-use adham_event_log::{set_active_scope_tx, AppendEventRequest, SqliteEventStore};
-use time::format_description::well_known::Rfc3339;
+use adham_event_log::{AppendEventRequest, SqliteEventStore, set_active_scope_tx};
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 fn replay(
     request_id: String,

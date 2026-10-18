@@ -1,5 +1,5 @@
 use crate::domain::edge::EdgeDefinition;
-use crate::domain::node::{has_text, NodeId, NodeLifecycle, NodeState};
+use crate::domain::node::{NodeId, NodeLifecycle, NodeState, has_text};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
@@ -378,7 +378,7 @@ impl TaskGraph {
 
         let mut queue: VecDeque<&str> = in_degree
             .iter()
-            .filter(|(_, &deg)| deg == 0)
+            .filter(|(_, deg)| **deg == 0)
             .map(|(&id, _)| id)
             .collect();
 
@@ -401,7 +401,7 @@ impl TaskGraph {
         if visited_count != nodes.len() {
             let cycle_node = in_degree
                 .iter()
-                .find(|(_, &deg)| deg > 0)
+                .find(|(_, deg)| **deg > 0)
                 .map(|(&id, _)| id)
                 .unwrap_or("unknown");
             return Err(GraphError::CycleDetected(cycle_node.to_string()));

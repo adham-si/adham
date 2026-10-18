@@ -1,4 +1,4 @@
-use crate::sandbox::profile::{sanitize_environment, SandboxProfile};
+use crate::sandbox::profile::{SandboxProfile, sanitize_environment};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Stdio;

@@ -8,8 +8,8 @@ use adham_verify::domain::finding::Finding;
 use adham_verify::domain::verdict::VerificationVerdict;
 use adham_verify::engine::evaluator::evaluate_verdict;
 use common::{
-    all_pass_inputs, failed_execution, fresh_evidence, mismatched_evidence, stale_evidence,
-    test_deliverable, NOW_MS,
+    NOW_MS, all_pass_inputs, failed_execution, fresh_evidence, mismatched_evidence, stale_evidence,
+    test_deliverable,
 };
 
 #[test]

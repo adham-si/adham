@@ -3,7 +3,7 @@ use adham_extensions::domain::activation::{
 };
 use adham_extensions::domain::identity::{CanonicalSkillId, SkillSourceKind};
 use adham_extensions::domain::skill::{
-    InertResourceRef, SkillMetadata, SkillSnapshot, MAX_METADATA_SHORTLIST,
+    InertResourceRef, MAX_METADATA_SHORTLIST, SkillMetadata, SkillSnapshot,
 };
 use adham_extensions::service::router::{CapabilityRouter, RouterError};
 
@@ -107,18 +107,26 @@ fn test_resource_count_and_byte_budget_enforcement() {
     .unwrap();
 
     // 5 resources of 250 KiB = 1250 KiB > 1024 KiB
-    assert!(fresh_manifest
-        .attach_resource(InertResourceRef::new("r1.txt", 250 * 1024, "h1").unwrap())
-        .is_ok());
-    assert!(fresh_manifest
-        .attach_resource(InertResourceRef::new("r2.txt", 250 * 1024, "h2").unwrap())
-        .is_ok());
-    assert!(fresh_manifest
-        .attach_resource(InertResourceRef::new("r3.txt", 250 * 1024, "h3").unwrap())
-        .is_ok());
-    assert!(fresh_manifest
-        .attach_resource(InertResourceRef::new("r4.txt", 250 * 1024, "h4").unwrap())
-        .is_ok());
+    assert!(
+        fresh_manifest
+            .attach_resource(InertResourceRef::new("r1.txt", 250 * 1024, "h1").unwrap())
+            .is_ok()
+    );
+    assert!(
+        fresh_manifest
+            .attach_resource(InertResourceRef::new("r2.txt", 250 * 1024, "h2").unwrap())
+            .is_ok()
+    );
+    assert!(
+        fresh_manifest
+            .attach_resource(InertResourceRef::new("r3.txt", 250 * 1024, "h3").unwrap())
+            .is_ok()
+    );
+    assert!(
+        fresh_manifest
+            .attach_resource(InertResourceRef::new("r4.txt", 250 * 1024, "h4").unwrap())
+            .is_ok()
+    );
 
     // 5th pushes over 1024 KiB
     let over =

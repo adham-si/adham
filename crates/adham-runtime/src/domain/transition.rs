@@ -97,7 +97,7 @@ pub fn reduce_run(state: &RunState, trigger: RunTrigger) -> Result<RunState, Tra
                 return Err(TransitionError::IllegalTransition(
                     state.lifecycle,
                     "RequestPause",
-                ))
+                ));
             }
         },
 
@@ -149,7 +149,7 @@ pub fn reduce_run(state: &RunState, trigger: RunTrigger) -> Result<RunState, Tra
                 return Err(TransitionError::IllegalTransition(
                     state.lifecycle,
                     "RequestCancel",
-                ))
+                ));
             }
         },
 

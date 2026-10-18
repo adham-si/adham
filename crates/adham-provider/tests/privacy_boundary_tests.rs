@@ -9,19 +9,23 @@ use adham_provider::gateway::ProviderGateway;
 #[test]
 fn test_endpoint_loopback_validation() {
     // Valid loopback HTTP endpoints
-    assert!(EndpointDescriptor::new(
-        EndpointId::new("local-1"),
-        "http://localhost:11434",
-        ServiceKind::OllamaLocal,
-    )
-    .is_ok());
+    assert!(
+        EndpointDescriptor::new(
+            EndpointId::new("local-1"),
+            "http://localhost:11434",
+            ServiceKind::OllamaLocal,
+        )
+        .is_ok()
+    );
 
-    assert!(EndpointDescriptor::new(
-        EndpointId::new("local-2"),
-        "http://127.0.0.1:11434",
-        ServiceKind::OllamaLocal,
-    )
-    .is_ok());
+    assert!(
+        EndpointDescriptor::new(
+            EndpointId::new("local-2"),
+            "http://127.0.0.1:11434",
+            ServiceKind::OllamaLocal,
+        )
+        .is_ok()
+    );
 
     // Invalid non-loopback HTTP endpoint
     let res = EndpointDescriptor::new(
@@ -38,12 +42,14 @@ fn test_endpoint_loopback_validation() {
     }
 
     // Valid HTTPS cloud endpoint
-    assert!(EndpointDescriptor::new(
-        EndpointId::new("cloud-secure"),
-        "https://api.openai.com/v1",
-        ServiceKind::OfficialCloudApi,
-    )
-    .is_ok());
+    assert!(
+        EndpointDescriptor::new(
+            EndpointId::new("cloud-secure"),
+            "https://api.openai.com/v1",
+            ServiceKind::OfficialCloudApi,
+        )
+        .is_ok()
+    );
 }
 
 #[test]

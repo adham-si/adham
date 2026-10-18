@@ -1,4 +1,4 @@
-use adham_extensions::domain::package::{PackageDigest, AGENT_PLUGINS_SCHEMA_V1};
+use adham_extensions::domain::package::{AGENT_PLUGINS_SCHEMA_V1, PackageDigest};
 use adham_extensions::domain::publisher::PublisherIdentity;
 use adham_extensions::domain::receipt::PluginInstallationState;
 use adham_extensions::service::installer::PluginInstaller;

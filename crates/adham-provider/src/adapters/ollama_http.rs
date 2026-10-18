@@ -18,8 +18,8 @@ use crate::domain::model::{
 use crate::domain::request::{MessageRole, ProviderRequestV1, ThinkValue};
 use crate::domain::stream::NormalizedStreamEvent;
 use crate::registry::PinnedModel;
-use crate::transport::{HttpTransport, TransportError, MAX_FRAME_BYTES};
-use serde_json::{json, Map, Value};
+use crate::transport::{HttpTransport, MAX_FRAME_BYTES, TransportError};
+use serde_json::{Map, Value, json};
 use std::collections::VecDeque;
 
 pub struct OllamaHttpAdapter {

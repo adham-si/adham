@@ -1,7 +1,7 @@
 // ID newtypes are `Copy`; `.clone()` follows codebase style.
 #![allow(clippy::clone_on_copy)]
 use adham_core_types::*;
-use adham_event_log::{create_sqlite_pool, AppendEventRequest, SqliteEventStore};
+use adham_event_log::{AppendEventRequest, SqliteEventStore, create_sqlite_pool};
 use adham_projections::{ConversationMessageView, ConversationProjection};
 use std::path::PathBuf;
 

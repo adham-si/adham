@@ -1,4 +1,4 @@
-use crate::domain::proposal::{validate_memory_content, MemoryError, MemoryWriteProposal};
+use crate::domain::proposal::{MemoryError, MemoryWriteProposal, validate_memory_content};
 use crate::domain::record::{MemoryRecord, Provenance};
 use crate::domain::scope::{MemoryId, MemoryScope};
 use crate::domain::tombstone::TombstoneRecord;
