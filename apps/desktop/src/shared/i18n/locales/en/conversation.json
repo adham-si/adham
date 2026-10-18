@@ -18,6 +18,7 @@
     "retryTurn": "Retry",
     "regenerateAnswer": "Regenerate",
     "retryNeedsModel": "Select a model to retry this turn.",
+    "replyNeedsModel": "Select a model to send the reply.",
     "switchPending": "Session switch has not completed. Retry the switch before sending.",
     "storageUnavailable": "Durable session storage is unavailable. Session selection will not persist across restarts.",
     "historyLoadFailed": "Conversation history failed to load.",

@@ -94,6 +94,10 @@
     "queue": "Queue instruction",
     "queuedHeading": "Queued",
     "removeQueued": "Remove queued instruction",
+    "replyTo": "Replying to",
+    "queuedReply": "Reply",
+    "cancelReply": "Cancel reply",
+    "replyUnavailable": "Quoted message is not loaded.",
     "selectModel": "Select a model",
     "markdown": {
       "copyCode": "Copy code",
@@ -101,7 +105,10 @@
       "copied": "Copied",
       "copyFailed": "Copy failed",
       "imageNotShown": "Image not shown",
-      "unsupportedContent": "Unsupported content"
+      "unsupportedContent": "Unsupported content",
+      "replyAction": "Reply",
+      "quoteLabel": "Replying to",
+      "quoteUnavailable": "Quoted message is not in the loaded history."
     }
   }
 }

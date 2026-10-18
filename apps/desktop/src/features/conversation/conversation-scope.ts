@@ -70,6 +70,8 @@ export interface ConversationBackend {
       mode: 'ask' | 'plan' | 'code' | 'execute';
       /** Documented thinking parameter value; omitted = model default. */
       think?: boolean | string;
+      /** Durable reply/edit anchor; validated against persisted history. */
+      reference?: { refersToMessageId: string; relation: 'replied' | 'edited-from' };
     },
     onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
     options?: { requestId?: string },
@@ -352,18 +354,21 @@ export const toUiMessage = (dto: {
   text: string;
   createdAt: string;
   completion?: { Completed: { truncated: boolean } } | 'Interrupted' | 'Failed' | null;
+  reference?: { refersToMessageId: string; relation: string } | null;
 }): {
   id: string;
   role: string;
   text: string;
   createdAt: string;
   completion: UiCompletion | null;
+  reference: { refersToMessageId: string; relation: string } | null;
 } => ({
   id: dto.messageId,
   role: dto.role ?? 'user',
   text: dto.text,
   createdAt: dto.createdAt,
   completion: normalizeCompletion(dto.completion),
+  reference: dto.reference ?? null,
 });
 
 export const switchUnresolved = (

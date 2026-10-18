@@ -90,6 +90,10 @@
     "queue": "排队发送",
     "queuedHeading": "排队中",
     "removeQueued": "移除排队消息",
+    "replyTo": "回复",
+    "queuedReply": "回复",
+    "cancelReply": "取消回复",
+    "replyUnavailable": "引用的消息未加载。",
     "selectModel": "选择模型",
     "markdown": {
       "copyCode": "复制代码",
@@ -97,7 +101,10 @@
       "copied": "已复制",
       "copyFailed": "复制失败",
       "imageNotShown": "未显示图片",
-      "unsupportedContent": "不支持的内容"
+      "unsupportedContent": "不支持的内容",
+      "replyAction": "回复",
+      "quoteLabel": "回复",
+      "quoteUnavailable": "引用的消息不在已加载的历史记录中。"
     }
   }
 }

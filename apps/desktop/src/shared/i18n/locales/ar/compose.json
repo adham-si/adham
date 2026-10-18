@@ -106,6 +106,10 @@
     "queue": "إرسال بعد انتهاء الرد",
     "queuedHeading": "في الانتظار",
     "removeQueued": "إزالة الرسالة المنتظرة",
+    "replyTo": "الرد على",
+    "queuedReply": "رد",
+    "cancelReply": "إلغاء الرد",
+    "replyUnavailable": "الرسالة المقتبَسة غير محمّلة.",
     "selectModel": "اختر نموذجًا",
     "markdown": {
       "copyCode": "نسخ الشيفرة",
@@ -113,7 +117,10 @@
       "copied": "تم النسخ",
       "copyFailed": "فشل النسخ",
       "imageNotShown": "الصورة غير معروضة",
-      "unsupportedContent": "محتوى غير مدعوم"
+      "unsupportedContent": "محتوى غير مدعوم",
+      "replyAction": "رد",
+      "quoteLabel": "الرد على",
+      "quoteUnavailable": "الرسالة المقتبَسة غير موجودة في السجل المحمّل."
     }
   }
 }

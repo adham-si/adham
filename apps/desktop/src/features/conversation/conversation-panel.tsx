@@ -13,7 +13,12 @@ import {
 } from '@/widgets/compose';
 import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
-import { useConversation, type ConversationBackend, type UiMessage } from './use-conversation';
+import {
+  useConversation,
+  type ConversationBackend,
+  type UiMessage,
+  type UiMessageReference,
+} from './use-conversation';
 import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
 import { TurnStatus } from './turn-status';
 import {
@@ -101,6 +106,9 @@ export function ConversationPanel({
       copyFailed: t('compose.markdown.copyFailed'),
       imageNotShown: t('compose.markdown.imageNotShown'),
       unsupportedContent: t('compose.markdown.unsupportedContent'),
+      replyAction: t('compose.markdown.replyAction'),
+      quoteLabel: t('compose.markdown.quoteLabel'),
+      quoteUnavailable: t('compose.markdown.quoteUnavailable'),
     }),
     [t],
   );
@@ -173,6 +181,19 @@ export function ConversationPanel({
     queuedRef.current = next;
     setQueued(next);
   }, []);
+  /** Message the next send quotes (reply anchor); cleared on acknowledgment
+   *  or session switch, never dropped silently. */
+  const [replyTarget, setReplyTarget] = React.useState<{
+    id: string;
+    excerpt: string | null;
+  } | null>(null);
+  /** Quoted text for a reference: null when the target is not in the loaded
+   *  history, which the card then states instead of inventing an excerpt. */
+  const quotedExcerptOf = React.useCallback(
+    (messageId: string): string | null =>
+      conv.messages.find((m) => m.id === messageId)?.text ?? null,
+    [conv.messages],
+  );
 
   // A session switch hydrates that session's remembered model choice, carrying
   // a pre-session pick into the session a first send materialized (never
@@ -322,33 +343,43 @@ export function ConversationPanel({
   const formWorking = prov.working || sel.working || provisionTransition !== null;
 
   /// Runs one turn with the parameters current at dispatch; a queued
-  /// instruction drains through exactly the same path as a direct send.
+  /// instruction drains through exactly the same path as a direct send. A
+  /// reply anchor rides only the streaming path (the text-only path records
+  /// no reference), so a reply without a resolved model is refused visibly
+  /// rather than sent as an unreferenced message.
   const dispatchTurn = React.useCallback(
-    async (sent: string) => {
+    async (sent: string, reference?: UiMessageReference) => {
       setSubmitError(null);
-      // Streaming dispatch when a registry model is wired; otherwise the
-      // honest text-only fallback persists just the message.
-      const outcome = streamReady
-        ? await conv.streamOnce(
-            sent,
-            ollama.account!.accountId,
-            selectedModelId,
-            mode,
-            // The documented `think` value; null = model default (omitted).
-            think ?? undefined,
-          )
-        : await conv.submit(sent);
-      // A rejected dispatch (e.g. an undocumented think value) must be
-      // visible, never a silent no-op. Text-only failures go through the
+      const refusedReply = reference !== undefined && !streamReady;
+      const outcome = refusedReply
+        ? {
+            ok: false as const,
+            error: t('conversation.replyNeedsModel'),
+            uncertain: false as const,
+          }
+        : streamReady
+          ? await conv.streamOnce(
+              sent,
+              ollama.account!.accountId,
+              selectedModelId,
+              mode,
+              // The documented `think` value; null = model default (omitted).
+              think ?? undefined,
+              reference,
+            )
+          : await conv.submit(sent);
+      // A rejected dispatch (a refused reply, an undocumented think value) must
+      // be visible, never a silent no-op. Text-only failures go through the
       // hook's error state, which the panel renders below.
-      if (streamReady && !outcome.ok) setSubmitError(outcome.error);
+      if (!outcome.ok && (streamReady || refusedReply)) setSubmitError(outcome.error);
       // Nothing was persisted (the hook drops its optimistic bubble), so the
       // instruction returns to the composer — never clobbering edits typed
-      // meanwhile.
-      if (!outcome.ok && !draftRef.current) setDraft(sent);
+      // meanwhile. The ref still reads `sent` when a refusal lands before the
+      // just-cleared draft has re-rendered, so that case restores too.
+      if (!outcome.ok && (!draftRef.current || draftRef.current === sent)) setDraft(sent);
       return outcome;
     },
-    [conv, streamReady, ollama.account, selectedModelId, mode, think, setDraft],
+    [conv, streamReady, ollama.account, selectedModelId, mode, think, setDraft, t],
   );
 
   /// Dispatches one turn, then drains the visible queue. The hook accepts one
@@ -356,12 +387,25 @@ export function ConversationPanel({
   /// previous dispatch has fully settled (terminal + authoritative reload);
   /// a refusal stops the drain, since its reason applies to what follows too.
   const dispatchAndDrain = React.useCallback(
-    async (sent: string) => {
-      let outcome = await dispatchTurn(sent);
+    async (sent: string, reference?: UiMessageReference) => {
+      let outcome = await dispatchTurn(sent, reference);
+      // The anchor is acknowledged only when its dispatch was accepted; a
+      // refused reply keeps the pending quote so it can be retried as one.
+      if (outcome.ok && reference) {
+        setReplyTarget((prev) => (prev && prev.id === reference.refersToMessageId ? null : prev));
+      }
       while (outcome.ok && queuedRef.current.length > 0) {
         const next = queuedRef.current[0]!;
         setQueuedBoth(queuedRef.current.slice(1));
-        outcome = await dispatchTurn(next.text);
+        outcome = await dispatchTurn(next.text, next.reference);
+        // A refused queued reply returns to the composer with its anchor
+        // intact, never silently downgraded to a plain message.
+        if (!outcome.ok && next.reference) {
+          setReplyTarget({
+            id: next.reference.refersToMessageId,
+            excerpt: next.replyExcerpt ?? null,
+          });
+        }
       }
     },
     [dispatchTurn, setQueuedBoth],
@@ -416,21 +460,35 @@ export function ConversationPanel({
       });
   }, [turnAction, busy, streamReady, t, conv, ollama.account, selectedModelId, mode, think]);
 
-  // Queued instructions belong to the session they were typed in: a session
-  // switch drops them rather than dispatching them into another thread.
+  // Queued instructions and the pending reply anchor belong to the session
+  // they were typed in: a session switch drops them rather than dispatching
+  // them into another thread.
   React.useEffect(() => {
     setQueuedBoth([]);
+    setReplyTarget(null);
   }, [conv.sessionId, setQueuedBoth]);
 
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
     if (!text) return;
+    const reference: UiMessageReference | undefined = replyTarget
+      ? { refersToMessageId: replyTarget.id, relation: 'replied' }
+      : undefined;
     // Sending while a turn runs queues the instruction visibly: it is never
     // injected into the active call and never a silent no-op. It dispatches
     // (with the parameters current then) once the turn settles.
     if (busy) {
       queuedIdRef.current += 1;
-      setQueuedBoth([...queuedRef.current, { id: `queued-${queuedIdRef.current}`, text }]);
+      setQueuedBoth([
+        ...queuedRef.current,
+        {
+          id: `queued-${queuedIdRef.current}`,
+          text,
+          ...(reference ? { reference, replyExcerpt: replyTarget?.excerpt ?? null } : {}),
+        },
+      ]);
+      // The queued instruction carries the anchor now; the chip is done.
+      if (reference) setReplyTarget(null);
       if (draftRef.current === text) commitPrompt(text);
       return;
     }
@@ -438,8 +496,8 @@ export function ConversationPanel({
     // user bubble appears and the turn persists), and a follow-up typed while
     // the answer streams must not append to an already-sent instruction.
     if (draftRef.current === text) commitPrompt(text);
-    await dispatchAndDrain(text);
-  }, [busy, commitPrompt, dispatchAndDrain, setQueuedBoth]);
+    await dispatchAndDrain(text, reference);
+  }, [busy, commitPrompt, dispatchAndDrain, setQueuedBoth, replyTarget]);
 
   /// A new model invalidates the thinking choice: a level documented for the
   /// previous model may be undocumented for the next one (the backend refuses
@@ -547,6 +605,14 @@ export function ConversationPanel({
                   content={contentFromText(m.text)}
                   labels={markdownLabels}
                   timestamp={formatTimestamp(m.createdAt)}
+                  quotedExcerpt={
+                    m.reference ? quotedExcerptOf(m.reference.refersToMessageId) : undefined
+                  }
+                  // Only persisted rows can anchor a reply: the provisional
+                  // bubble carries no durable id the backend could validate.
+                  onReply={
+                    m.provisional ? undefined : () => setReplyTarget({ id: m.id, excerpt: m.text })
+                  }
                 />
                 {note && (
                   <p
@@ -707,6 +773,8 @@ export function ConversationPanel({
           onStop={handleStop}
           queued={queued}
           onRemoveQueued={(id) => setQueuedBoth(queuedRef.current.filter((item) => item.id !== id))}
+          replyTo={replyTarget ? { excerpt: replyTarget.excerpt } : null}
+          onCancelReply={() => setReplyTarget(null)}
           status={composeStatus}
           enterToSend={enterToSend}
           mode={mode}

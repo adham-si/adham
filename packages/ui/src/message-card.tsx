@@ -52,6 +52,12 @@ export interface MessageCardProps
   selected?: boolean;
   /** When false the body is not editable and the card reads as read-only. */
   editable?: boolean;
+  /** When set, the card offers a Reply action anchored to this message. */
+  onReply?: (() => void) | undefined;
+  /** Excerpt of the message this card quotes. undefined = no recorded quote
+   *  (nothing renders); null = the quote target is not in the loaded history,
+   *  which is stated instead of an invented excerpt. */
+  quotedExcerpt?: string | null | undefined;
   ref?: React.Ref<HTMLElement>;
 }
 
@@ -74,6 +80,8 @@ export function MessageCard({
   labels,
   selected = false,
   editable = false,
+  onReply,
+  quotedExcerpt,
   className,
   ref,
   ...props
@@ -93,6 +101,15 @@ export function MessageCard({
       <div className="mb-1 flex items-center justify-between gap-2 text-xs">
         <span className="font-semibold tracking-wide uppercase">{label}</span>
         <span className="flex items-center gap-2">
+          {onReply && (
+            <button
+              type="button"
+              className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              onClick={onReply}
+            >
+              {resolved.replyAction}
+            </button>
+          )}
           {copyText.length > 0 && (
             <button
               type="button"
@@ -116,6 +133,16 @@ export function MessageCard({
           </time>
         </span>
       </div>
+      {quotedExcerpt !== undefined && (
+        <div className="mb-2 border-s-2 border-border-strong ps-2">
+          <p className="text-xs font-semibold tracking-wide text-foreground-muted uppercase">
+            {resolved.quoteLabel}
+          </p>
+          <p className="line-clamp-3 whitespace-pre-wrap text-xs text-foreground-secondary">
+            {quotedExcerpt === null ? resolved.quoteUnavailable : quotedExcerpt}
+          </p>
+        </div>
+      )}
       <MessageBody role={role} content={content} resolved={resolved} />
     </article>
   );

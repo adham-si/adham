@@ -18,6 +18,7 @@
     "retryTurn": "重试",
     "regenerateAnswer": "重新生成",
     "retryNeedsModel": "请选择一个模型来重试此轮。",
+    "replyNeedsModel": "请选择一个模型来发送回复。",
     "switchPending": "会话切换尚未完成，请重试切换后再发送。",
     "storageUnavailable": "持久会话存储不可用，重启后不会保留会话选择。",
     "historyLoadFailed": "对话历史加载失败。",

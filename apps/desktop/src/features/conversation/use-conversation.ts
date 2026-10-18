@@ -51,6 +51,19 @@ export type UiMessage = {
   createdAt: string;
   /** Assistant terminal lifecycle; absent on optimistic/streaming bubbles. */
   completion?: UiCompletion | null;
+  /** Durable reply/edit anchor recorded with this message, when it has one.
+   *  Read-side shape: relation arrives as stored text, displayed as-is. */
+  reference?: { refersToMessageId: string; relation: string } | null;
+  /** True only for a local bubble not yet confirmed persisted: it carries no
+   *  durable id and cannot be the anchor of anything. */
+  provisional?: boolean;
+};
+
+/** A durable anchor for a NEW submission: the only relations the backend
+ *  accepts, and what the composer can actually produce. */
+export type UiMessageReference = {
+  refersToMessageId: string;
+  relation: 'replied' | 'edited-from';
 };
 
 /** Live streaming state for the timeline (phase drives the visible status). */
@@ -768,6 +781,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
        *  Only values the model documents in /api/show are accepted (the
        *  backend refuses anything else before dispatch). */
       think?: boolean | string,
+      /** Durable reply anchor recorded with the turn; omitted = no quote. */
+      reference?: UiMessageReference,
     ): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed)
@@ -844,6 +859,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
           role: 'user',
           text: trimmed,
           createdAt: new Date().toISOString(),
+          reference: reference ?? null,
+          provisional: true,
         },
       ]);
 
@@ -862,6 +879,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
               text: trimmed,
               mode,
               ...(think === undefined ? {} : { think }),
+              ...(reference === undefined ? {} : { reference }),
             },
             onEvent,
           );

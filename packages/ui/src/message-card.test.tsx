@@ -264,4 +264,53 @@ describe('MessageCard', () => {
     );
     expect(screen.getByRole('button', { name: 'Nachricht kopieren' })).toBeDefined();
   });
+
+  it('offers Reply only when the caller can anchor one, and fires it', () => {
+    const onReply = vi.fn();
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        onReply={onReply}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    expect(onReply).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders no reply action without a handler', () => {
+    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
+  });
+
+  it('renders no quote block when no quote is recorded', () => {
+    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
+    expect(screen.queryByText('Replying to')).toBeNull();
+  });
+
+  it('states the quoted excerpt a reply is anchored to', () => {
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        quotedExcerpt="the original question"
+      />,
+    );
+    expect(screen.getByText('Replying to')).toBeDefined();
+    expect(screen.getByText('the original question')).toBeDefined();
+  });
+
+  it('states an unavailable quote instead of inventing an excerpt', () => {
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        quotedExcerpt={null}
+      />,
+    );
+    expect(screen.getByText('Quoted message is not in the loaded history.')).toBeDefined();
+  });
 });

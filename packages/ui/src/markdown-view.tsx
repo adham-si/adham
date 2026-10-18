@@ -11,6 +11,12 @@ export interface MarkdownLabels {
   copyFailed: string;
   imageNotShown: string;
   unsupportedContent: string;
+  /** Action that anchors a reply to a message. */
+  replyAction: string;
+  /** Heading of the quote block a reply shows. */
+  quoteLabel: string;
+  /** Shown when the quoted message is outside the loaded history. */
+  quoteUnavailable: string;
 }
 
 export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
@@ -20,6 +26,9 @@ export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   copyFailed: 'Copy failed',
   imageNotShown: 'Image not shown',
   unsupportedContent: 'Unsupported content',
+  replyAction: 'Reply',
+  quoteLabel: 'Replying to',
+  quoteUnavailable: 'Quoted message is not in the loaded history.',
 };
 
 export function resolveMarkdownLabels(labels?: Partial<MarkdownLabels>): MarkdownLabels {

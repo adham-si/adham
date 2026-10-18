@@ -501,6 +501,9 @@ export class AdhamApiClient implements AdhamClient {
       mode: 'ask' | 'plan' | 'code' | 'execute';
       /** Documented thinking parameter value; omitted = model default. */
       think?: boolean | string;
+      /** Durable reply/edit anchor recorded with this submission; the backend
+       *  validates it against persisted history before any write. */
+      reference?: { refersToMessageId: string; relation: 'replied' | 'edited-from' };
     },
     onEvent: (event: StreamEventDto) => void,
     options?: { requestId?: string },

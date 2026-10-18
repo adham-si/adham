@@ -102,6 +102,10 @@
     "queue": "Поставить в очередь",
     "queuedHeading": "В очереди",
     "removeQueued": "Убрать сообщение из очереди",
+    "replyTo": "Ответ на",
+    "queuedReply": "Ответ",
+    "cancelReply": "Отменить ответ",
+    "replyUnavailable": "Цитируемое сообщение не загружено.",
     "selectModel": "Выберите модель",
     "markdown": {
       "copyCode": "Копировать код",
@@ -109,7 +113,10 @@
       "copied": "Скопировано",
       "copyFailed": "Не удалось скопировать",
       "imageNotShown": "Изображение не показано",
-      "unsupportedContent": "Неподдерживаемое содержимое"
+      "unsupportedContent": "Неподдерживаемое содержимое",
+      "replyAction": "Ответить",
+      "quoteLabel": "В ответ на",
+      "quoteUnavailable": "Цитируемое сообщение отсутствует в загруженной истории."
     }
   }
 }

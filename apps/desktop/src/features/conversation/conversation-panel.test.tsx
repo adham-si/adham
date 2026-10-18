@@ -1638,4 +1638,168 @@ describe('ConversationPanel', () => {
     expect(await screen.findByText(/Select a model to retry this turn/i)).toBeDefined();
     expect(backend.retryCompletionStreaming).not.toHaveBeenCalled();
   });
+
+  it('sends a reply anchored to the persisted message id and shows the quote', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    const rows: unknown[] = [
+      {
+        messageId: 'msg-0',
+        role: 'user',
+        text: 'earlier truth',
+        createdAt: '2026-10-09T00:00:00Z',
+        sourceEventId: 'evt-0',
+      },
+      {
+        messageId: 'msg-orphan',
+        role: 'user',
+        text: 'orphan quote',
+        createdAt: '2026-10-09T00:00:01Z',
+        sourceEventId: 'evt-o',
+        reference: { refersToMessageId: 'msg-gone', relation: 'replied' },
+      },
+    ];
+    backend.getConversation = vi.fn(async () => ({
+      items: [...rows],
+      nextCursor: null,
+      projectionPosition: `${rows.length}`,
+    }));
+    const payloads: Array<Record<string, unknown>> = [];
+    backend.completeOnceStreaming = vi.fn(async (_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as Record<string, unknown>);
+      // The persisted reply becomes visible on the terminal reload, exactly
+      // like the real projection.
+      rows.push({
+        messageId: 'msg-reply',
+        role: 'user',
+        text: 'quoted answer',
+        createdAt: '2026-10-09T00:00:02Z',
+        sourceEventId: 'evt-r',
+        reference: { refersToMessageId: 'msg-0', relation: 'replied' },
+      });
+      onEvent({ opId: 'op-1', sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId: 'op-1',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return { opId: 'op-1', messageId: 'msg-reply', context: null };
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-1', status: 'cancelled' }));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    await pickRegistryModel(user);
+    await screen.findByText('earlier truth');
+    // A reference whose target is not in the loaded history is stated,
+    // never replaced by an invented excerpt.
+    expect(screen.getByText('Quoted message is not in the loaded history.')).toBeDefined();
+
+    await user.click(screen.getAllByRole('button', { name: 'Reply' })[0]!);
+    expect(screen.getByRole('button', { name: 'Cancel reply' })).toBeDefined();
+
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await user.type(box, 'quoted answer');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(payloads[0]).toEqual({
+      accountId: 'acc-1',
+      modelId: 'qwen2.5:latest',
+      text: 'quoted answer',
+      mode: 'plan',
+      reference: { refersToMessageId: 'msg-0', relation: 'replied' },
+    });
+    // Acknowledged: the pending quote chip is consumed, and the persisted
+    // reply renders the quote from loaded history.
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Cancel reply' })).toBeNull());
+    await screen.findByText('quoted answer');
+    expect(screen.getAllByText('earlier truth').length).toBe(2);
+  });
+
+  it('refuses a reply without a resolved model instead of dropping the anchor', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.completeOnceStreaming = vi.fn();
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    await screen.findByText('earlier truth');
+    await user.click(screen.getByRole('button', { name: 'Reply' }));
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await user.type(box, 'quoted answer');
+    await user.keyboard('{Enter}');
+
+    // The refusal is stated; nothing was sent (not even text-only), and both
+    // the text and the anchor stay for a retry as a reply.
+    expect(await screen.findByText('Select a model to send the reply.')).toBeDefined();
+    expect(backend.completeOnceStreaming).not.toHaveBeenCalled();
+    expect(backend.submitMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Cancel reply' })).toBeDefined();
+    expect(box.value).toBe('quoted answer');
+  });
+
+  it('dispatches a queued reply with its anchor when the running turn settles', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    const payloads: Array<Record<string, unknown>> = [];
+    let emit: StreamEventParam | null = null;
+    let resolveDispatch!: (start: CompletionStartDto) => void;
+    backend.completeOnceStreaming = vi.fn((_ws, _p, _s, payload, onEvent) => {
+      payloads.push(payload as Record<string, unknown>);
+      if (payloads.length === 1) {
+        emit = onEvent;
+        return new Promise((resolve) => {
+          resolveDispatch = resolve;
+        });
+      }
+      onEvent({ opId: 'op-2', sequence: 0, event: { type: 'started' } });
+      onEvent({
+        opId: 'op-2',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      return Promise.resolve({ opId: 'op-2', messageId: 'm-2', context: null });
+    });
+    backend.stopCompletion = vi.fn(async () => ({ opId: 'op-1', status: 'cancelled' }));
+
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
+    await pickRegistryModel(user);
+    await screen.findByText('earlier truth');
+
+    await user.type(box, 'first');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(payloads).toHaveLength(1));
+
+    // A reply clicked during the run is queued as a reply: the queued row says
+    // so, and the anchor travels with the instruction.
+    await user.click(screen.getByRole('button', { name: 'Reply' }));
+    await user.type(box, 'queued reply');
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText(/^queued$/i)).toBeDefined();
+    expect(screen.getByText('Reply', { selector: 'span' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Cancel reply' })).toBeNull();
+
+    await act(async () => {
+      emit!({
+        opId: 'op-1',
+        sequence: 1,
+        event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+      });
+      resolveDispatch({ opId: 'op-1', messageId: 'm-1', context: null });
+    });
+    await waitFor(() => expect(payloads).toHaveLength(2));
+    expect(payloads[1]).toEqual({
+      accountId: 'acc-1',
+      modelId: 'qwen2.5:latest',
+      text: 'queued reply',
+      mode: 'plan',
+      reference: { refersToMessageId: 'msg-0', relation: 'replied' },
+    });
+  });
 });
