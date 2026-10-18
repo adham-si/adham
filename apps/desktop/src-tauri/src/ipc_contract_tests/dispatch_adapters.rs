@@ -1,15 +1,11 @@
 use super::common::*;
 use super::*;
-use adham_core_types::*;
-use adham_desktop_api::{EventSink, StreamEventDto, StreamEventPayloadDto};
-use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderKind};
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId};
 use adham_provider::registry::LocalAccount;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::sync::Mutex;
 // ===== G4: dispatch generalization — adapter independence + proofs ============
 
 /// Seed a Google account row at an arbitrary loopback base point. The

@@ -4,15 +4,7 @@ use super::*;
 /// T1. All five provider commands resolve through the real dispatch, parse
 /// their envelope shapes, and fail closed on unknown scope/accounts.
 use adham_core_types::*;
-use adham_desktop_api::{EventSink, StreamEventDto, StreamEventPayloadDto};
-use adham_event_log::{AppendEventRequest, SqliteEventStore};
-use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderKind};
-use adham_provider::domain::endpoint::EndpointId;
-use adham_provider::domain::model::{ModelDescriptor, ModelId};
-use adham_provider::registry::LocalAccount;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::sync::Mutex;
 /// their envelope shapes, and fail closed on unknown scope/accounts.
 #[test]
 fn provider_commands_register_and_reject_malformed_scope() {
@@ -222,7 +214,6 @@ fn account_lifecycle_and_discovery_pins_models() {
 
 /// T3. Happy-path streaming: the pending op is durable when the stub sees the
 /// socket, the sink receives Started → deltas → Completed with per-op ordered
-
 /// A6 support: saved Ollama accounts are listing-reachable (reload survives),
 /// and probing an unsaved URL persists nothing ("failed test saves nothing").
 #[test]

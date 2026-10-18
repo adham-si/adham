@@ -9,7 +9,7 @@ use super::*;
 // a disposable temp database with a local stub Ollama endpoint.
 
 use adham_core_types::*;
-use adham_desktop_api::{EventSink, StreamEventDto, StreamEventPayloadDto};
+use adham_desktop_api::{EventSink, StreamEventDto};
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderKind};
 use adham_provider::domain::endpoint::EndpointId;

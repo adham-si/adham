@@ -1,15 +1,8 @@
 use super::common::*;
 use super::*;
 use adham_core_types::*;
-use adham_desktop_api::{EventSink, StreamEventDto, StreamEventPayloadDto};
-use adham_event_log::{AppendEventRequest, SqliteEventStore};
-use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderKind};
-use adham_provider::domain::endpoint::EndpointId;
-use adham_provider::domain::model::{ModelDescriptor, ModelId};
-use adham_provider::registry::LocalAccount;
-use std::sync::atomic::{AtomicU64, Ordering};
+use adham_desktop_api::StreamEventPayloadDto;
 use std::sync::Arc;
-use std::sync::Mutex;
 /// sequence numbers, the assistant turn persists with usage, and the op is
 /// resolved.
 #[test]
@@ -365,7 +358,6 @@ fn unknown_model_blocked_before_socket() {
 }
 
 /// T6. Stop ownership: a foreign op is rejected and the op id is unknown
-
 /// A7 follow-up. The owner-observed failure: a thinking-capable model
 /// (qwen3.5:0.8b) streams contentless `thinking` frames; the adapter used to
 /// panic on the first one, aborting the streaming task and leaving the op

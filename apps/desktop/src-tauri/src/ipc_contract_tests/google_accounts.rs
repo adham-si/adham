@@ -1,15 +1,5 @@
 use super::common::*;
 use super::*;
-use adham_core_types::*;
-use adham_desktop_api::{EventSink, StreamEventDto, StreamEventPayloadDto};
-use adham_event_log::{AppendEventRequest, SqliteEventStore};
-use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderKind};
-use adham_provider::domain::endpoint::EndpointId;
-use adham_provider::domain::model::{ModelDescriptor, ModelId};
-use adham_provider::registry::LocalAccount;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::sync::Mutex;
 /// (AEAD ciphertext); no event, projection, or pending-op row may hold it.
 /// G2: Google account configuration — consent gate, sealed credential,
 /// rotation, disconnect. The API key may reach only `provider_credentials`
