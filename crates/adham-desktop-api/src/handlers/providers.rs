@@ -851,10 +851,11 @@ where
     .await
     .unwrap_or_default();
     let assembled = assemble_context(
-        history_rows.into_iter(),
+        branch_context_rows(history_rows, env.payload.reference.as_ref()),
         env.payload.mode.as_deref().and_then(mode_instruction),
         input_budget,
-        // A fresh send keeps the whole session history.
+        // A fresh send keeps the whole session history; the branch lives in
+        // the row iterator instead of a stop_after cut.
         None,
     );
 
@@ -1153,6 +1154,33 @@ fn budget_with_reserve(descriptor: &ModelDescriptor) -> (Option<u32>, Option<u32
     };
     let reserve = OUTPUT_RESERVE_TOKENS.min(effective / 2);
     (Some(effective - reserve), (reserve > 0).then_some(reserve))
+}
+
+/// The rows a dispatch is answered against. A fresh send (or a reply, which
+/// only quotes) keeps the whole session history. An "edited-from" branch
+/// answers against the context its original had: everything before the edited
+/// message, plus the just-submitted edited turn. The original prompt, its
+/// answers, and whatever followed stay persisted and visible, but are not fed
+/// back to the model.
+fn branch_context_rows(
+    rows: Vec<adham_projections::ConversationMessageView>,
+    reference: Option<&MessageReferenceDto>,
+) -> impl Iterator<Item = adham_projections::ConversationMessageView> {
+    let newest = rows.len().saturating_sub(1);
+    // The reference was validated before the submit effect: the target is a
+    // persisted user row of this session (position found defensively anyway).
+    let cut = reference
+        .filter(|r| r.relation == "edited-from")
+        .and_then(|r| {
+            rows.iter()
+                .position(|row| row.message_id.as_str() == r.refers_to_message_id)
+        });
+    rows.into_iter()
+        .enumerate()
+        .filter_map(move |(index, row)| match cut {
+            Some(cut) if index >= cut && index != newest => None,
+            _ => Some(row),
+        })
 }
 
 /// Context assembly: mode instruction + branch history under the caps and the

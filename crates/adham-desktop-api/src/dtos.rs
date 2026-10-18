@@ -544,6 +544,10 @@ pub struct CompleteOncePayload {
     /// anchor ("replied") or an edit alternative ("edited-from"). Validated
     /// against persisted history before anything is written — the target must
     /// be a message of this session, and only a user message can be edited.
+    /// An "edited-from" branch is answered against the context its original
+    /// had (everything before the edited message, plus this text): the
+    /// original and whatever followed it stay persisted and visible, but are
+    /// never fed back to the model.
     pub reference: Option<MessageReferenceDto>,
 }
 

@@ -21,9 +21,9 @@
 
 use super::*;
 use adham_desktop_api::MessageReferenceDto;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody};
-use tauri::test::{get_ipc_response, mock_builder, MockRuntime, INVOKE_KEY};
+use tauri::test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder};
 
 /// Disposable context: temp-dir SQLite database, in-memory content key,
 /// never the OS credential store. The runtime is returned so pool tasks
@@ -248,9 +248,9 @@ use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{CapabilityStatus, ModelDescriptor, ModelId, ThinkingControl};
 use adham_provider::domain::request::ThinkValue;
 use adham_provider::registry::LocalAccount;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 struct StubCaptures {
     accepts: AtomicU64,
@@ -3577,6 +3577,157 @@ fn complete_once_records_a_reply_reference_and_reads_it_back() {
             Some(target_id.as_str())
         );
         assert_eq!(reply.refers_to_relation.as_deref(), Some("replied"));
+    });
+}
+
+/// C3: an "edited-from" branch is answered against the context its original
+/// had: everything before the edited message plus the edited text. The
+/// original, its answers, and later turns stay persisted and visible but never
+/// reach the model.
+#[test]
+fn complete_once_answers_an_edited_branch_without_its_original() {
+    let (runtime, ctx) = disposable_context();
+    let captures = Arc::new(StubCaptures::new());
+    let chat = ChatProgram::once(vec![ndjson_delta("branch answer"), ndjson_done(3, 2)]);
+    let base_url = spawn_stub_ollama(&runtime, None, captures.clone(), chat);
+    let account_id = seed_local_account_with_model(&runtime, &ctx, &base_url);
+
+    let app = provider_mock_app(ctx);
+    let webview = mock_webview(&app);
+    let (ws, proj, sess) = provision_scope(&webview);
+    let ctx = app.state::<ApiContext>().inner().clone();
+
+    let completed = Some(MessageCompletionV1::Completed { truncated: false });
+    seed_history_row(
+        &runtime,
+        &ctx,
+        &ws,
+        &proj,
+        &sess,
+        true,
+        None,
+        "preamble question",
+    );
+    seed_history_row(
+        &runtime,
+        &ctx,
+        &ws,
+        &proj,
+        &sess,
+        false,
+        completed,
+        "preamble answer",
+    );
+    seed_history_row(
+        &runtime,
+        &ctx,
+        &ws,
+        &proj,
+        &sess,
+        true,
+        None,
+        "original prompt",
+    );
+    seed_history_row(
+        &runtime,
+        &ctx,
+        &ws,
+        &proj,
+        &sess,
+        false,
+        completed,
+        "original answer",
+    );
+    seed_history_row(
+        &runtime,
+        &ctx,
+        &ws,
+        &proj,
+        &sess,
+        true,
+        None,
+        "later question",
+    );
+
+    let target_id = runtime.block_on(async {
+        let sess_id = SessionId::from_string(&sess).expect("sess");
+        let rows = adham_projections::ConversationProjection::get_session_messages(
+            &ctx.pool,
+            ctx.content_key.as_ref(),
+            &ctx.installation_id,
+            &sess_id,
+        )
+        .await
+        .expect("rows");
+        rows.iter()
+            .find(|r| r.content == "original prompt")
+            .expect("target row")
+            .message_id
+            .clone()
+    });
+
+    let sink = CollectSink(collector());
+    let env = typed_envelope(
+        (&ws, &proj, &sess),
+        CompleteOncePayload {
+            account_id,
+            model_id: "m:latest".to_string(),
+            text: "edited prompt".to_string(),
+            mode: None,
+            think: None,
+            reference: Some(MessageReferenceDto {
+                refers_to_message_id: target_id.clone(),
+                relation: "edited-from".to_string(),
+            }),
+        },
+    );
+    runtime
+        .block_on(async {
+            adham_desktop_api::handle_complete_once_streaming(&ctx, env, &sink).await
+        })
+        .expect("branch completion ok");
+
+    // What the model received: pre-original history + the edited text.
+    let bodies = captures.request_bodies();
+    assert_eq!(bodies.len(), 1, "one chat request");
+    let body: Value = serde_json::from_str(&bodies[0]).expect("chat body json");
+    let contents: Vec<&str> = body["messages"]
+        .as_array()
+        .expect("messages")
+        .iter()
+        .map(|m| m["content"].as_str().expect("content"))
+        .collect();
+    assert_eq!(
+        contents,
+        vec!["preamble question", "preamble answer", "edited prompt"],
+        "branch context: {contents:?}"
+    );
+
+    // Everything stays persisted: the branch row carries its lineage, and the
+    // original and the later turn are untouched.
+    runtime.block_on(async {
+        let sess_id = SessionId::from_string(&sess).expect("sess");
+        let messages = adham_projections::ConversationProjection::get_session_messages(
+            &ctx.pool,
+            ctx.content_key.as_ref(),
+            &ctx.installation_id,
+            &sess_id,
+        )
+        .await
+        .expect("messages");
+        assert_eq!(messages.len(), 7, "messages: {messages:?}");
+        assert_eq!(messages[2].content, "original prompt");
+        assert_eq!(messages[2].refers_to_message_id, None);
+        assert_eq!(messages[4].content, "later question");
+        let branch = messages
+            .iter()
+            .find(|m| m.content == "edited prompt")
+            .expect("branch row");
+        assert_eq!(
+            branch.refers_to_message_id.as_deref(),
+            Some(target_id.as_str())
+        );
+        assert_eq!(branch.refers_to_relation.as_deref(), Some("edited-from"));
     });
 }
 
