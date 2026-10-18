@@ -2,6 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import type {
   AppPreferences,
   BootstrapState,
+  BranchSelectionDto,
   CommandContext,
   ClearPendingOperationPayload,
   CommandEnvelope,
@@ -39,6 +40,7 @@ import type {
 } from '@adham/contracts-generated';
 import {
   BootstrapStateSchema,
+  BranchSelectionListSchema,
   ConversationPageSchema,
   GetPreferencesResponseSchema,
   PendingOperationDtoSchema,
@@ -344,6 +346,30 @@ export class AdhamApiClient implements AdhamClient {
       limit,
     });
     return ConversationPageSchema.parse(raw);
+  }
+
+  /** Record which member of an edited branch the session continues from.
+   *  Returns the session's selections after the write (the server validates
+   *  every id against the session's rows and refuses otherwise). */
+  async setActiveAlternative(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    rootMessageId: string,
+    activeMessageId: string,
+  ): Promise<BranchSelectionDto[]> {
+    const raw = await invoke('set_active_alternative', {
+      context: {
+        workspaceId,
+        projectId,
+        sessionId,
+      },
+      payload: {
+        rootMessageId,
+        activeMessageId,
+      },
+    });
+    return BranchSelectionListSchema.parse(raw);
   }
 
   async getStorageStatus(): Promise<StorageStatus> {

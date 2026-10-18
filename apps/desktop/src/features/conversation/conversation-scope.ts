@@ -19,7 +19,13 @@ export type BootstrapSnapshot = {
 
 export type SessionSnapshot = { sessionId: string };
 export type SubmittedSnapshot = { messageId: string; text: string; createdAt: string };
-export type ConversationSnapshot = { items: ConversationMessageDto[] };
+/** Which member of an edited branch the session continues from. */
+export type BranchSelection = { rootMessageId: string; activeMessageId: string };
+export type ConversationSnapshot = {
+  items: ConversationMessageDto[];
+  /** Present on real pages; a backend that cannot read selections omits it. */
+  branchSelections?: BranchSelection[] | undefined;
+};
 
 export interface ConversationBackend {
   getBootstrapState(): Promise<BootstrapSnapshot>;
@@ -41,6 +47,15 @@ export interface ConversationBackend {
     projectId: string,
     sessionId: string,
   ): Promise<ConversationSnapshot>;
+  /** Record which member of an edited branch the session continues from.
+   *  Returns the session's selections after the write. */
+  setActiveAlternative(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    rootMessageId: string,
+    activeMessageId: string,
+  ): Promise<BranchSelection[]>;
   listSessions?(context: {
     workspaceId?: string;
     projectId: string;

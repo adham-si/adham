@@ -81,7 +81,12 @@ completion: MessageCompletionV1 | null,
  */
 reference: MessageReferenceDto | null, };
 
-export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, };
+export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, 
+/**
+ * Active-alternative selections for this session, so the timeline can
+ * label every edited branch without a second round trip.
+ */
+branchSelections: Array<BranchSelectionDto>, };
 
 export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, 
 /**
@@ -226,6 +231,18 @@ reference: MessageReferenceDto | null, };
 export type RetryCompletionPayload = { accountId: string, modelId: string, replyToMessageId: string, mode: string | null, think: boolean | string | null, };
 
 export type MessageReferenceDto = { refersToMessageId: string, relation: string, };
+
+export type BranchSelectionDto = { 
+/**
+ * The user message the alternatives edited.
+ */
+rootMessageId: string, 
+/**
+ * The branch member currently being continued from (root or one edit).
+ */
+activeMessageId: string, };
+
+export type SetActiveAlternativePayload = { rootMessageId: string, activeMessageId: string, };
 
 export type ContextAssemblyDto = { estimatedInputTokens: number, 
 /**

@@ -63,6 +63,7 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
         .mockResolvedValue({ operations: [providerOp, sampleSingleOp], truncated: false }),
       recordPendingOperation: vi.fn(),
       clearPendingOperation: vi.fn(async () => undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     } as unknown as ConversationBackend;
 
     // composited list layer
@@ -240,6 +241,7 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
       recordPendingOperation: vi.fn().mockRejectedValue(new Error('SQLite write failure')),
       listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
 
     const outcome = await performSingleMessageSend({
@@ -270,6 +272,7 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
       recordPendingOperation: vi.fn().mockRejectedValue(new Error('SQLite write failure')),
       listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
 
     const outcome = await performLazyFirstSend({
@@ -298,6 +301,7 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
       recordPendingOperation: vi.fn(),
       listPendingOperations: vi.fn().mockRejectedValue(new Error('Database unavailable')),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
 
     const { result } = renderHook(() => usePendingRecovery({ backend: mockBackend }));
@@ -333,6 +337,7 @@ describe('APP-WIRING-04: Durable pending recovery UI and hooks', () => {
         .fn()
         .mockResolvedValue({ operations: [sampleSingleOp], truncated: false }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
 
     const { result } = renderHook(() => usePendingRecovery({ backend: mockBackend }));

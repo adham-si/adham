@@ -18,6 +18,7 @@ import {
 import { clearDurablePendingOperation } from './pending-recovery/durable-pending-operations';
 import { performSingleMessageSend } from './single-message-send';
 import {
+  type BranchSelection,
   type ConversationBackend,
   type ConversationContext,
   type UiCompletion,
@@ -95,6 +96,10 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // Older messages dropped from the last dispatch's assembled context
   // (reported by the server-side assembler; 0 when nothing was dropped).
   const [omittedMessages, setOmittedMessages] = React.useState(0);
+  // Active-alternative selections for the loaded session (line 65). Local
+  // state: choosing a branch never rewrites history, only what the next
+  // dispatch is answered against.
+  const [branchSelections, setBranchSelections] = React.useState<BranchSelection[]>([]);
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
@@ -172,6 +177,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         const items = page.items.map(toUiMessage);
         setContext(ctx);
         setMessages(items);
+        setBranchSelections(page.branchSelections ?? []);
         // Same-flush swap: the recovery snapshot (if any) is replaced by the
         // authoritative rows atomically — never two copies of an answer.
         setRecoverySnapshot(null);
@@ -1015,6 +1021,41 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     }
   }, [backend, context]);
 
+  /** Switch which member of an edited branch the session continues from.
+   *  Server-validated; the response is the session's selections after the
+   *  write. A failure is surfaced as an error state, never a silent no-op. */
+  const makeAlternativeActive = React.useCallback(
+    async (rootMessageId: string, activeMessageId: string): Promise<SubmitOutcome> => {
+      const ctx = context;
+      if (!ctx?.sessionId) {
+        return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+      }
+      const generation = generationRef.current;
+      const loadSeq = loadSeqRef.current;
+      const mutationSeq = mutationSeqRef.current;
+      try {
+        const selections = await backend.setActiveAlternative(
+          ctx.workspaceId,
+          ctx.projectId,
+          ctx.sessionId,
+          rootMessageId,
+          activeMessageId,
+        );
+        // A stale response belongs to a session the user already left: it was
+        // applied server-side, but must not overwrite the new session's map.
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return { ok: true };
+        setBranchSelections(selections);
+        return { ok: true };
+      } catch (err) {
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return { ok: true };
+        const message =
+          err instanceof Error ? err.message : i18n.t('conversation.alternativeUpdateFailed');
+        return { ok: false, error: message, uncertain: false };
+      }
+    },
+    [backend, context, isStale],
+  );
+
   return {
     status,
     messages,
@@ -1029,6 +1070,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     streamOnce,
     retryTurn,
     stop,
+    branchSelections,
+    makeAlternativeActive,
     streaming,
     recoverySnapshot,
     retry,

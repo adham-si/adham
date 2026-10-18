@@ -29,6 +29,7 @@ import {
 } from '../provisioning';
 import { useSelection, type SelectionBackend } from '../workspace-selection';
 import { ConversationSetupSlot } from './conversation-setup-slot';
+import { alternativeIndex } from './alternative-groups';
 import { submissionNotice, type ModelGapReason } from './submission-notice';
 import { readComposeModePreference, writeComposeModePreference } from './compose-mode-preference';
 import {
@@ -109,10 +110,21 @@ export function ConversationPanel({
       replyAction: t('compose.markdown.replyAction'),
       quoteLabel: t('compose.markdown.quoteLabel'),
       quoteUnavailable: t('compose.markdown.quoteUnavailable'),
+      branchActiveLabel: t('compose.markdown.branchActive'),
+      branchMakeActiveLabel: t('compose.markdown.branchMakeActive'),
     }),
     [t],
   );
   const conv = useConversation({ backend });
+  /** A refused branch switch states itself; it is not an uncertain send. */
+  const [alternativeNotice, setAlternativeNotice] = React.useState<string | null>(null);
+  // Edited-branch provenance: which messages belong to a branch and which
+  // member the session continues from (default: the newest edit, the same
+  // rule the backend applies).
+  const alternatives = React.useMemo(
+    () => alternativeIndex(conv.messages, conv.branchSelections),
+    [conv.messages, conv.branchSelections],
+  );
   const prov = useProvisioning({ backend: provisioning });
   const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
   const sel = useSelection({ backend: selection, enabled: needsProvisioning });
@@ -614,6 +626,7 @@ export function ConversationPanel({
         <div className="flex w-full flex-1 flex-col gap-4 p-4">
           {conv.messages.map((m) => {
             const note = messageNote(m, t);
+            const alternative = alternatives.get(m.id);
             return (
               <React.Fragment key={m.id}>
                 <MessageCard
@@ -621,6 +634,22 @@ export function ConversationPanel({
                   content={contentFromText(m.text)}
                   labels={markdownLabels}
                   timestamp={formatTimestamp(m.createdAt)}
+                  branch={
+                    alternative
+                      ? {
+                          active: alternative.active,
+                          onMakeActive: alternative.active
+                            ? undefined
+                            : () => {
+                                void conv
+                                  .makeAlternativeActive(alternative.rootId, m.id)
+                                  .then((outcome) =>
+                                    setAlternativeNotice(outcome.ok ? null : outcome.error),
+                                  );
+                              },
+                        }
+                      : undefined
+                  }
                   quotedExcerpt={
                     m.reference ? quotedExcerptOf(m.reference.refersToMessageId) : undefined
                   }
@@ -739,6 +768,14 @@ export function ConversationPanel({
             <button type="button" onClick={() => void conv.reload()}>
               {t('conversation.reloadHistory', 'Reload history')}
             </button>
+          </div>
+        )}
+        {alternativeNotice && (
+          <div
+            role="status"
+            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
+          >
+            <p>{alternativeNotice}</p>
           </div>
         )}
         {executionUnavailable && (

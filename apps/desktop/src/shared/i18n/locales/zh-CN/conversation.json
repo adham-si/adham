@@ -90,7 +90,8 @@
       "failed": "无法将操作标记为已中断。",
       "listFailed": "检查未完成的生成失败。",
       "retryAction": "重试"
-    }
+    },
+    "alternativeUpdateFailed": "无法切换当前备选分支。"
   },
   "provision": {
     "workspaceTitle": "创建工作区",

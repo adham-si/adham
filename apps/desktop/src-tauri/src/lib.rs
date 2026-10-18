@@ -1,13 +1,14 @@
 use adham_desktop_api::{
-    ApiContext, BootstrapState, ClearPendingOperationPayload, CommandContext, CommandEnvelope,
-    CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
-    CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
-    GetPreferencesResponse, ListProviderAccountsResponse, ListProviderModelsPayload,
-    ListProviderModelsResponse, MarkCompletionInterruptedPayload,
-    MarkCompletionInterruptedResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
-    ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
-    RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
-    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionSummary,
+    ApiContext, BootstrapState, BranchSelectionDto, ClearPendingOperationPayload, CommandContext,
+    CommandEnvelope, CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage,
+    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
+    DiscoverOllamaModelsPayload, ErrorEnvelope, GetPreferencesResponse,
+    ListProviderAccountsResponse, ListProviderModelsPayload, ListProviderModelsResponse,
+    MarkCompletionInterruptedPayload, MarkCompletionInterruptedResponse, PendingOperationDto,
+    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
+    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
+    RecordPendingOperationPayload, ResetPreferencesResponse, RetryCompletionPayload,
+    SelectProjectPayload, SessionList, SessionSummary, SetActiveAlternativePayload,
     StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
     SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
     UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
@@ -133,6 +134,17 @@ async fn get_conversation(
     context: CommandContext,
 ) -> Result<ConversationPage, ErrorEnvelope> {
     adham_desktop_api::handle_get_conversation(&state, context)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_active_alternative(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+    payload: SetActiveAlternativePayload,
+) -> Result<Vec<BranchSelectionDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_active_alternative(&state, context, payload)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -383,6 +395,7 @@ pub fn run() {
             list_sessions,
             submit_message,
             get_conversation,
+            set_active_alternative,
             admin_rebuild_projections,
             record_pending_operation,
             list_pending_operations,

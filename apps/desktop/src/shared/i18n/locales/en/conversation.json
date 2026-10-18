@@ -90,7 +90,8 @@
       "failed": "Could not mark the operation interrupted.",
       "listFailed": "Failed to check for unfinished generations.",
       "retryAction": "Retry"
-    }
+    },
+    "alternativeUpdateFailed": "Could not switch the active alternative."
   },
   "provision": {
     "workspaceTitle": "Create your workspace",

@@ -91,6 +91,13 @@ export const MessageReferenceDtoSchema = z.object({
   relation: z.string(),
 });
 
+export const BranchSelectionSchema = z.object({
+  rootMessageId: z.string(),
+  activeMessageId: z.string(),
+});
+
+export const BranchSelectionListSchema = z.array(BranchSelectionSchema);
+
 export const ConversationMessageDtoSchema = z.object({
   messageId: z.string(),
   role: z.string(),
@@ -105,6 +112,7 @@ export const ConversationPageSchema = z.object({
   items: z.array(ConversationMessageDtoSchema),
   nextCursor: z.string().nullable(),
   projectionPosition: z.string(),
+  branchSelections: z.array(BranchSelectionSchema),
 });
 
 export const StorageStatusSchema = z.object({

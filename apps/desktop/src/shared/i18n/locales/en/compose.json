@@ -113,7 +113,9 @@
       "editAction": "Edit",
       "quoteLabel": "Replying to",
       "quoteEditedLabel": "Edited from",
-      "quoteUnavailable": "Quoted message is not in the loaded history."
+      "quoteUnavailable": "Quoted message is not in the loaded history.",
+      "branchActive": "Active",
+      "branchMakeActive": "Make active"
     }
   }
 }

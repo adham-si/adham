@@ -130,6 +130,7 @@ describe('Session-selection navigation fencing during recovery', () => {
         mockPendingOps = mockPendingOps.filter((op) => op.operationId !== payload.operationId);
         return Promise.resolve(undefined);
       }),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
 
     const mockSelectionBackend: SelectionBackend = {

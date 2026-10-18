@@ -121,7 +121,9 @@
       "editAction": "Изменить",
       "quoteLabel": "В ответ на",
       "quoteEditedLabel": "Отредактировано из",
-      "quoteUnavailable": "Цитируемое сообщение отсутствует в загруженной истории."
+      "quoteUnavailable": "Цитируемое сообщение отсутствует в загруженной истории.",
+      "branchActive": "Активный",
+      "branchMakeActive": "Сделать активным"
     }
   }
 }

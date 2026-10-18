@@ -125,7 +125,9 @@
       "editAction": "تعديل",
       "quoteLabel": "الرد على",
       "quoteEditedLabel": "تعديل من",
-      "quoteUnavailable": "الرسالة المقتبَسة غير موجودة في السجل المحمّل."
+      "quoteUnavailable": "الرسالة المقتبَسة غير موجودة في السجل المحمّل.",
+      "branchActive": "نشط",
+      "branchMakeActive": "تعيين كنشط"
     }
   }
 }

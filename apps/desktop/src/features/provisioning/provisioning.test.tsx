@@ -411,6 +411,7 @@ describe('provisioning journey', () => {
       recordPendingOperation: vi.fn(),
       listPendingOperations: vi.fn(async () => ({ operations: [], truncated: false })),
       clearPendingOperation: vi.fn(),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
     // Selection reads go through a separate object with a plain bootstrap
     // reader: conv-side fail/delay flags belong to the authoritative refresh

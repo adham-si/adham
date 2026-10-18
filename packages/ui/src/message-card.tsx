@@ -64,6 +64,9 @@ export interface MessageCardProps
   /** Relation of the recorded quote: 'edited-from' labels the block as an
    *  edit lineage ("Edited from") instead of a reply quote. */
   quotedRelation?: string | undefined;
+  /** Edited-branch provenance: a static marker on the member the session
+   *  continues from, and on other members the action that switches to them. */
+  branch?: { active: boolean; onMakeActive?: (() => void) | undefined } | undefined;
   ref?: React.Ref<HTMLElement>;
 }
 
@@ -90,6 +93,7 @@ export function MessageCard({
   onEdit,
   quotedExcerpt,
   quotedRelation,
+  branch,
   className,
   ref,
   ...props
@@ -107,7 +111,25 @@ export function MessageCard({
       className={cn(messageCardVariants({ role, selected, editable }), className)}
     >
       <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-        <span className="font-semibold tracking-wide uppercase">{label}</span>
+        <span className="flex items-center gap-2">
+          <span className="font-semibold tracking-wide uppercase">{label}</span>
+          {branch &&
+            (branch.active ? (
+              <span className="rounded-sm border border-border-subtle px-1 text-foreground-secondary">
+                {resolved.branchActiveLabel}
+              </span>
+            ) : (
+              branch.onMakeActive && (
+                <button
+                  type="button"
+                  className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  onClick={branch.onMakeActive}
+                >
+                  {resolved.branchMakeActiveLabel}
+                </button>
+              )
+            ))}
+        </span>
         <span className="flex items-center gap-2">
           {onEdit && (
             <button

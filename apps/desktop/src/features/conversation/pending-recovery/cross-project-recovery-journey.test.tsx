@@ -50,6 +50,7 @@ describe('Cross-project recovery and navigation fencing journeys', () => {
         truncated: false,
       }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
 
     const onSessionOpened = vi.fn();
@@ -213,6 +214,7 @@ describe('Cross-project recovery and navigation fencing journeys', () => {
         mockPendingOps = mockPendingOps.filter((op) => op.operationId !== payload.operationId);
         return Promise.resolve(undefined);
       }),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
     };
 
     const mockSelectionBackend: SelectionBackend = {

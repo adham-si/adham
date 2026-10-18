@@ -182,6 +182,27 @@ pub struct MessageReferenceDto {
     pub relation: String,
 }
 
+/// Which member of an edited branch the session continues from. Local state,
+/// not an event: history is never rewritten, only what a later dispatch is
+/// answered against. Absence of a row means the default: the newest edit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BranchSelectionDto {
+    /// The user message the alternatives edited.
+    pub root_message_id: String,
+    /// The branch member currently being continued from (root or one edit).
+    pub active_message_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetActiveAlternativePayload {
+    pub root_message_id: String,
+    pub active_message_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -205,6 +226,9 @@ pub struct ConversationPage {
     pub items: Vec<ConversationMessageDto>,
     pub next_cursor: Option<String>,
     pub projection_position: String,
+    /// Active-alternative selections for this session, so the timeline can
+    /// label every edited branch without a second round trip.
+    pub branch_selections: Vec<BranchSelectionDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

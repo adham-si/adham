@@ -78,6 +78,7 @@ function fakeBackend(): ConversationFakeBackend {
       truncated: false,
     }),
     clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+    setActiveAlternative: vi.fn().mockResolvedValue([]),
     markCompletionInterrupted: vi.fn().mockResolvedValue({ status: 'interrupted' }),
   };
 }
@@ -1933,5 +1934,112 @@ describe('ConversationPanel', () => {
     expect(backend.submitMessage).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Cancel edit' })).toBeDefined();
     expect(box.value).toBe('earlier truth');
+  });
+
+  it('labels an edited branch, marks the newest edit active, and switches on demand', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.getConversation = vi.fn().mockResolvedValue({
+      items: [
+        {
+          messageId: 'msg-0',
+          role: 'user',
+          text: 'original prompt',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-0',
+          completion: null,
+          reference: null,
+        },
+        {
+          messageId: 'msg-branch',
+          role: 'user',
+          text: 'edited prompt',
+          createdAt: '2026-10-09T00:00:02Z',
+          sourceEventId: 'evt-b',
+          completion: null,
+          reference: { refersToMessageId: 'msg-0', relation: 'edited-from' },
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '2',
+      branchSelections: [],
+    });
+    backend.setActiveAlternative = vi
+      .fn()
+      .mockResolvedValue([{ rootMessageId: 'msg-0', activeMessageId: 'msg-0' }]);
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    const userCards = await screen.findAllByRole('article', { name: 'You' });
+    // The quote block in the edited card repeats the original text, so the
+    // cards are located by role and row order, not by text.
+    const originalCard = userCards[0] as HTMLElement;
+    const editedCard = userCards[1] as HTMLElement;
+    // Default rule, the same one the backend applies: the newest edit is the
+    // branch the session continues from.
+    expect(within(editedCard).getByText('Active')).toBeDefined();
+    expect(within(editedCard).queryByRole('button', { name: 'Make active' })).toBeNull();
+    expect(within(originalCard).getByRole('button', { name: 'Make active' })).toBeDefined();
+
+    await user.click(within(originalCard).getByRole('button', { name: 'Make active' }));
+
+    // The switch goes to the server with the branch root; the chips follow the
+    // response, never an optimistic guess.
+    expect(backend.setActiveAlternative).toHaveBeenCalledWith(
+      'ws-1',
+      'proj-1',
+      'sess-1',
+      'msg-0',
+      'msg-0',
+    );
+    await waitFor(() => expect(within(originalCard).getByText('Active')).toBeDefined());
+    expect(within(editedCard).getByRole('button', { name: 'Make active' })).toBeDefined();
+  });
+
+  it('shows the persisted selection on load and surfaces a refused switch', async () => {
+    const user = userEvent.setup();
+    const backend = fakeBackend();
+    backend.getConversation = vi.fn().mockResolvedValue({
+      items: [
+        {
+          messageId: 'msg-0',
+          role: 'user',
+          text: 'original prompt',
+          createdAt: '2026-10-09T00:00:00Z',
+          sourceEventId: 'evt-0',
+          completion: null,
+          reference: null,
+        },
+        {
+          messageId: 'msg-branch',
+          role: 'user',
+          text: 'edited prompt',
+          createdAt: '2026-10-09T00:00:02Z',
+          sourceEventId: 'evt-b',
+          completion: null,
+          reference: { refersToMessageId: 'msg-0', relation: 'edited-from' },
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '2',
+      branchSelections: [{ rootMessageId: 'msg-0', activeMessageId: 'msg-0' }],
+    });
+    backend.setActiveAlternative = vi
+      .fn()
+      .mockRejectedValue(new Error('selection refused by the server'));
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+
+    // The persisted selection, not the default, drives the labels.
+    const userCards = await screen.findAllByRole('article', { name: 'You' });
+    const originalCard = userCards[0] as HTMLElement;
+    const editedCard = userCards[1] as HTMLElement;
+    expect(within(originalCard).getByText('Active')).toBeDefined();
+
+    await user.click(within(editedCard).getByRole('button', { name: 'Make active' }));
+
+    // A refusal is stated and nothing flips: the chips still show the stored
+    // selection.
+    expect(await screen.findByText('selection refused by the server')).toBeDefined();
+    expect(within(originalCard).getByText('Active')).toBeDefined();
+    expect(within(editedCard).getByRole('button', { name: 'Make active' })).toBeDefined();
   });
 });

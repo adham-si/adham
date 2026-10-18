@@ -81,9 +81,24 @@ pub async fn handle_get_conversation(
         max_pos += 1;
     }
 
+    let branch_selections = crate::service::branch::read_branch_selections(&ctx.pool, &session_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
     Ok(ConversationPage {
         items: dtos,
         next_cursor: None,
         projection_position: max_pos.to_string(),
+        branch_selections,
     })
+}
+
+/// Record the active member of an edited branch. Validation lives in the
+/// service: a refused selection never writes (the previous selection stands).
+pub async fn handle_set_active_alternative(
+    ctx: &super::ApiContext,
+    context: CommandContext,
+    payload: SetActiveAlternativePayload,
+) -> Result<Vec<BranchSelectionDto>, String> {
+    crate::service::branch::set_active_alternative(ctx, context, payload).await
 }

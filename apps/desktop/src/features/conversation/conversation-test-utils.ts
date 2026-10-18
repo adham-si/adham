@@ -38,6 +38,15 @@ export interface ConversationFakeBackend {
     ) => any
   >;
   getConversation: Mock<(workspaceId: string, projectId: string, sessionId: string) => any>;
+  setActiveAlternative: Mock<
+    (
+      workspaceId: string,
+      projectId: string,
+      sessionId: string,
+      rootMessageId: string,
+      activeMessageId: string,
+    ) => any
+  >;
   listSessions: Mock<(...args: any[]) => any>;
   getStorageStatus: Mock<(...args: any[]) => any>;
   recordPendingOperation: Mock<(...args: any[]) => any>;
@@ -79,6 +88,7 @@ export function fakeBackend(): ConversationFakeBackend {
       nextCursor: null,
       projectionPosition: '0',
     }),
+    setActiveAlternative: vi.fn().mockResolvedValue([]),
     listSessions: vi.fn().mockResolvedValue({
       sessions: [
         {

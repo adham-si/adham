@@ -851,7 +851,13 @@ where
     .await
     .unwrap_or_default();
     let assembled = assemble_context(
-        branch_context_rows(history_rows, env.payload.reference.as_ref()),
+        branch_aware_rows(
+            history_rows,
+            env.payload.reference.as_ref(),
+            &ids.sess_id,
+            ctx,
+        )
+        .await,
         env.payload.mode.as_deref().and_then(mode_instruction),
         input_budget,
         // A fresh send keeps the whole session history; the branch lives in
@@ -1181,6 +1187,29 @@ fn branch_context_rows(
             Some(cut) if index >= cut && index != newest => None,
             _ => Some(row),
         })
+}
+
+/// The rows a dispatch is answered against, in the order both rules need: an
+/// "edited-from" send is answered against the context its original had (the
+/// cut), and then every edited branch contributes only its active member. The
+/// cut runs first because it is defined against the persisted rows: an edit of
+/// an already-superseded prompt must still see what that prompt saw.
+async fn branch_aware_rows(
+    rows: Vec<adham_projections::ConversationMessageView>,
+    reference: Option<&MessageReferenceDto>,
+    session_id: &SessionId,
+    ctx: &ApiContext,
+) -> std::vec::IntoIter<adham_projections::ConversationMessageView> {
+    // A failed selection read falls back to the default branch (the newest
+    // edit) instead of mixing superseded prompts into the context.
+    let selections = crate::service::branch::read_branch_selections(&ctx.pool, session_id)
+        .await
+        .unwrap_or_default();
+    crate::service::branch::active_branch_rows(
+        branch_context_rows(rows, reference).collect(),
+        &selections,
+    )
+    .into_iter()
 }
 
 /// Context assembly: mode instruction + branch history under the caps and the

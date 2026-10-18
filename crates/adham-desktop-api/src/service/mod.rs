@@ -1,3 +1,4 @@
+pub mod branch;
 pub mod common;
 pub mod message;
 pub mod pending;

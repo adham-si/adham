@@ -15,6 +15,10 @@ export interface MarkdownLabels {
   replyAction: string;
   /** Action that resends a user message as an edited alternative. */
   editAction: string;
+  /** Chip marking the branch member the session continues from. */
+  branchActiveLabel: string;
+  /** Action that makes this branch member the one the session continues from. */
+  branchMakeActiveLabel: string;
   /** Heading of the quote block a reply shows. */
   quoteLabel: string;
   /** Heading of the quote block an edited alternative shows. */
@@ -32,6 +36,8 @@ export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   unsupportedContent: 'Unsupported content',
   replyAction: 'Reply',
   editAction: 'Edit',
+  branchActiveLabel: 'Active',
+  branchMakeActiveLabel: 'Make active',
   quoteLabel: 'Replying to',
   quoteEditedLabel: 'Edited from',
   quoteUnavailable: 'Quoted message is not in the loaded history.',
