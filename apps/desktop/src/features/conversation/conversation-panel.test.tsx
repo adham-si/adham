@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConversationPanel } from './conversation-panel';
 import { ConversationSetupSlot, type ConversationSetupSlotProps } from './conversation-setup-slot';
@@ -301,6 +301,53 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(screen.getAllByText('partial answer')).toHaveLength(1));
     expect(screen.getAllByText('earlier truth')).toHaveLength(1);
     await waitFor(() => expect(screen.getByRole('button', { name: /send/i })).toBeDefined());
+  });
+
+  it('composer offers only the models still enabled in chat (settings curation)', async () => {
+    // absence = enabled: a fresh connection's picker lists its models
+    const provider = {
+      listAccounts: vi.fn(async () => ({
+        accounts: [
+          {
+            accountId: 'acc-1',
+            alias: 'Local Ollama',
+            endpointUrl: 'http://127.0.0.1:11434',
+            privacyClass: 'local_only',
+            kind: 'ollama_local',
+          },
+        ],
+      })),
+      listModels: vi.fn(async () => ({
+        models: [
+          {
+            modelId: 'qwen2.5:latest',
+            digest: 'sha256:abc',
+            humanLabel: 'Qwen 2.5 (latest)',
+            privacyClass: 'local_only',
+            kind: 'ollama_local',
+            capabilities: {
+              streaming: 'supported',
+              structuredOutput: 'unknown',
+              toolProposals: 'unknown',
+              thinking: 'unknown',
+            },
+          },
+        ],
+      })),
+    } as unknown as NonNullable<Parameters<typeof ConversationPanel>[0]['provider']>;
+    render(<ConversationPanel backend={fakeBackend()} provider={provider} />);
+    expect(await screen.findByRole('button', { name: 'Select a model' })).toBeDefined();
+
+    // after disabling it on the models page, the picker has nothing to offer
+    // and is hidden entirely (the composer never falls back to a default).
+    cleanup();
+    localStorage.setItem(
+      'adham.modelPrefs.v1',
+      JSON.stringify({ 'acc-1': { 'qwen2.5:latest': false } }),
+    );
+    render(<ConversationPanel backend={fakeBackend()} provider={provider} />);
+    await screen.findByRole('textbox', { name: /composer input/i });
+    expect(screen.queryByRole('button', { name: 'Select a model' })).toBeNull();
   });
 
   it('keeps the answer as a recovery snapshot on a failed terminal reload; the retry replaces it without rerunning the dispatch', async () => {

@@ -13,6 +13,7 @@ import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
 import { useConversation, type ConversationBackend } from './use-conversation';
 import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
+import { useModelPrefs } from '@/shared/models/model-prefs';
 import {
   announceScopeChanged,
   SCOPE_CHANGED_EVENT,
@@ -110,6 +111,9 @@ export function ConversationPanel({
   const [reasoningEffort, setReasoningEffort] = React.useState<'low' | 'medium' | 'high'>('medium');
   const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
   const [stopNotice, setStopNotice] = React.useState(false);
+  // "Enabled in chat" curation from the models settings page filters what the
+  // composer offers (absence = enabled, so a fresh connection stays complete).
+  const modelPrefs = useModelPrefs();
 
   // Registry-driven picker: when an Ollama account has pinned models, the
   // composer options come from the provider registry (Delivery A). Without
@@ -127,12 +131,14 @@ export function ConversationPanel({
         : null,
     enabled: conv.status === 'ready',
   });
-  const pickerModels: ModelOption[] = ollama.models.map((m) => ({
-    id: m.modelId,
-    name: m.humanLabel,
-    provider: 'Ollama',
-    boundary: 'local' as const,
-  }));
+  const pickerModels: ModelOption[] = ollama.models
+    .filter((m) => modelPrefs.isEnabled(ollama.account?.accountId ?? '', m.modelId))
+    .map((m) => ({
+      id: m.modelId,
+      name: m.humanLabel,
+      provider: 'Ollama',
+      boundary: 'local' as const,
+    }));
   const streamReady =
     ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);
 
