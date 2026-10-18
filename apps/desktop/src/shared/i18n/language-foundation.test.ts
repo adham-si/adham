@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LANGUAGE,
-  SUPPORTED_LANGUAGES,
   getLanguageDirection,
   isRTL,
   isSupportedLanguage,
   normalizeLanguage,
   resolveLanguage,
+  SUPPORTED_LANGUAGES,
 } from './languages';
 
 describe('language registry', () => {

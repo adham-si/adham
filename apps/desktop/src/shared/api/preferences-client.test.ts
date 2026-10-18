@@ -1,13 +1,13 @@
+import { invoke } from '@tauri-apps/api/core';
 import { describe, expect, it, vi } from 'vitest';
+import { AdhamApiClient, DEFAULT_PREFERENCES } from './adham-client';
+import { queryKeys } from './query-keys';
 import {
   AppPreferencesSchema,
   GetPreferencesResponseSchema,
   RebuildProjectionsResponseSchema,
   UpdatePreferencesResponseSchema,
 } from './schemas';
-import { queryKeys } from './query-keys';
-import { invoke } from '@tauri-apps/api/core';
-import { AdhamApiClient, DEFAULT_PREFERENCES } from './adham-client';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 

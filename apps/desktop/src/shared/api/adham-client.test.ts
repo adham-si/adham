@@ -1,4 +1,8 @@
+import { invoke } from '@tauri-apps/api/core';
 import { describe, expect, it, vi } from 'vitest';
+import ipcBasicSendFixture from '../../../fixtures/ipc-basic-send.json';
+import { AdhamApiClient } from './adham-client';
+import { queryKeys } from './query-keys';
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
@@ -7,10 +11,6 @@ import {
   StreamEventPayloadDtoSchema,
   SubmittedMessageSchema,
 } from './schemas';
-import { queryKeys } from './query-keys';
-import { invoke } from '@tauri-apps/api/core';
-import { AdhamApiClient } from './adham-client';
-import ipcBasicSendFixture from '../../../fixtures/ipc-basic-send.json';
 
 const channelSinks: Array<(raw: unknown) => void> = [];
 vi.mock('@tauri-apps/api/core', () => ({

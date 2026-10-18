@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+
+import { cleanup, render, screen } from '@testing-library/react';
 import * as React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
-import i18n from './index';
+import { afterEach, describe, expect, it } from 'vitest';
 import { Composer } from '@/widgets/compose';
+import i18n from './index';
 
 /**
  * Runtime i18n & RTL integration verification:
