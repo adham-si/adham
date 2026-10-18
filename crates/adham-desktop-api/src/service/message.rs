@@ -274,6 +274,10 @@ pub async fn submit_message(
         &append_res.event_id.to_string(),
         append_res.global_position,
         now_us,
+        // The text-only submit path carries no reference (its IPC payload has
+        // no reference field); a reply is refused in the composer without a
+        // resolved model rather than dropping the anchor silently.
+        None,
     )
     .await
     {

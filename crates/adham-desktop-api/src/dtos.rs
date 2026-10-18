@@ -171,6 +171,17 @@ pub struct SubmittedMessage {
     pub projection_position: String,
 }
 
+/// A durable reference from a submitted message to another persisted message:
+/// the quote anchor of a reply, or the "edited-from" lineage of an alternative
+/// (a branch). `relation` is "replied" | "edited-from".
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct MessageReferenceDto {
+    pub refers_to_message_id: String,
+    pub relation: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -183,6 +194,8 @@ pub struct ConversationMessageDto {
     /// Terminal lifecycle of assistant turns (None for user turns). The UI
     /// labels failed/interrupted/truncated turns from this, never from text.
     pub completion: Option<MessageCompletionV1>,
+    /// Quote anchor or edit lineage of this message, when it recorded one.
+    pub reference: Option<MessageReferenceDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -527,6 +540,11 @@ pub struct CompleteOncePayload {
     /// capability and parameter values are never assumed from a request.
     #[ts(type = "boolean | string | null")]
     pub think: Option<ThinkValue>,
+    /// Optional durable reference this submission records: a reply quote
+    /// anchor ("replied") or an edit alternative ("edited-from"). Validated
+    /// against persisted history before anything is written — the target must
+    /// be a message of this session, and only a user message can be edited.
+    pub reference: Option<MessageReferenceDto>,
 }
 
 /// Retry / regenerate: one NEW assistant attempt for an existing user turn.

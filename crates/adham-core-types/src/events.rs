@@ -160,6 +160,59 @@ impl MessageSubmittedV1 {
     }
 }
 
+/// Current written version of `user/message-submitted`. Version 1 rows stay
+/// decodable (decoded as version 2 with `reference: None`; the stored bytes
+/// are never rewritten).
+pub const MESSAGE_SUBMITTED_CURRENT_VERSION: u16 = 2;
+
+/// A durable reference from one submitted message to another persisted
+/// message: the quote anchor of a reply, or the lineage of an edited variant.
+/// `relation` is a stable lowercase kebab-case string validated at append:
+/// "replied" (any earlier message of the session) or "edited-from" (a user
+/// message this one re-sends as an alternative).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageReferenceV1 {
+    pub refers_to_message_id: MessageId,
+    pub relation: String,
+}
+
+impl MessageReferenceV1 {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if !["replied", "edited-from"].contains(&self.relation.as_str()) {
+            return Err("relation must be replied or edited-from");
+        }
+        Ok(())
+    }
+}
+
+/// Version 2 of the submitted-message fact: the version 1 fields plus an
+/// optional reference. `reference: null` is the encoded form of "no
+/// reference"; omission decodes the same way.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageSubmittedV2 {
+    pub message_id: MessageId,
+    pub content_id: ContentId,
+    pub content_kind: String,
+    pub size_bytes: u64,
+    pub reference: Option<MessageReferenceV1>,
+}
+
+impl MessageSubmittedV2 {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        MessageSubmittedV1 {
+            message_id: self.message_id,
+            content_id: self.content_id,
+            content_kind: self.content_kind.clone(),
+            size_bytes: self.size_bytes,
+        }
+        .validate()?;
+        if let Some(reference) = &self.reference {
+            reference.validate()?;
+        }
+        Ok(())
+    }
+}
+
 /// Four terminal lifecycle outcomes for one provider-completion operation:
 /// completed (a length-limit stop maps to completed-with-`truncated:true`,
 /// never a silent full answer), interrupted (a user stop — the persisted

@@ -132,7 +132,7 @@ fn test_schema_registry_consistency() {
 
     assert_eq!(parsed["registryVersion"], 1);
     let events = parsed["events"].as_array().expect("events array");
-    assert_eq!(events.len(), 4);
+    assert_eq!(events.len(), 5);
 
     for event in events {
         let schema_rel = event["schema"].as_str().expect("schema relative path");
@@ -250,4 +250,74 @@ fn test_message_completed_roundtrip_and_rejection() {
         ..failed
     };
     assert!(bad_kind.validate().is_err());
+}
+
+// ===== C3: message references (user/message-submitted v2) =====
+
+#[test]
+fn test_message_submitted_v2_reference_roundtrip_and_validation() {
+    let target = MessageId::new_v7();
+    let replied = MessageReferenceV1 {
+        refers_to_message_id: target,
+        relation: "replied".to_string(),
+    };
+    assert!(replied.validate().is_ok());
+
+    let edited = MessageReferenceV1 {
+        refers_to_message_id: target,
+        relation: "edited-from".to_string(),
+    };
+    assert!(edited.validate().is_ok());
+
+    let unknown_relation = MessageReferenceV1 {
+        refers_to_message_id: target,
+        relation: "quoted".to_string(),
+    };
+    assert!(unknown_relation.validate().is_err());
+
+    let v2 = MessageSubmittedV2 {
+        message_id: MessageId::new_v7(),
+        content_id: ContentId::new_v7(),
+        content_kind: "user_text".to_string(),
+        size_bytes: 42,
+        reference: Some(replied),
+    };
+    assert!(v2.validate().is_ok());
+    let json = serde_json::to_string(&v2).unwrap();
+    assert_eq!(
+        serde_json::from_str::<MessageSubmittedV2>(&json).unwrap(),
+        v2
+    );
+
+    // no reference encodes as an explicit null and round-trips
+    let plain = MessageSubmittedV2 {
+        reference: None,
+        ..v2.clone()
+    };
+    let plain_json = serde_json::to_string(&plain).unwrap();
+    assert!(plain_json.contains("\"reference\":null"));
+    assert_eq!(
+        serde_json::from_str::<MessageSubmittedV2>(&plain_json).unwrap(),
+        plain
+    );
+
+    // a stored version 1 payload decodes as version 2 with no reference
+    let v1_json = serde_json::to_string(&MessageSubmittedV1 {
+        message_id: plain.message_id,
+        content_id: plain.content_id,
+        content_kind: "user_text".to_string(),
+        size_bytes: 42,
+    })
+    .unwrap();
+    let upcast: MessageSubmittedV2 = serde_json::from_str(&v1_json).unwrap();
+    assert_eq!(upcast.reference, None);
+    assert_eq!(upcast.message_id, plain.message_id);
+    assert_eq!(upcast.content_id, plain.content_id);
+
+    // an invalid reference refuses the whole payload
+    let invalid = MessageSubmittedV2 {
+        reference: Some(unknown_relation),
+        ..plain.clone()
+    };
+    assert!(invalid.validate().is_err());
 }

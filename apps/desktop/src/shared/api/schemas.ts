@@ -86,6 +86,11 @@ export const MessageCompletionV1Schema = z.union([
   z.literal('Failed'),
 ]);
 
+export const MessageReferenceDtoSchema = z.object({
+  refersToMessageId: z.string(),
+  relation: z.string(),
+});
+
 export const ConversationMessageDtoSchema = z.object({
   messageId: z.string(),
   role: z.string(),
@@ -93,6 +98,7 @@ export const ConversationMessageDtoSchema = z.object({
   createdAt: z.string(),
   sourceEventId: z.string(),
   completion: MessageCompletionV1Schema.nullable(),
+  reference: MessageReferenceDtoSchema.nullable(),
 });
 
 export const ConversationPageSchema = z.object({

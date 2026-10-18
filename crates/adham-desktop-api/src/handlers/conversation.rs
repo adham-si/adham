@@ -69,6 +69,14 @@ pub async fn handle_get_conversation(
             created_at: dt.format(&Rfc3339).unwrap_or_default(),
             source_event_id: String::new(),
             completion: m.completion,
+            // Both columns are written together or left NULL together; a
+            // half-present pair is not a reference.
+            reference: m.refers_to_message_id.zip(m.refers_to_relation).map(
+                |(refers_to_message_id, relation)| MessageReferenceDto {
+                    refers_to_message_id,
+                    relation,
+                },
+            ),
         });
         max_pos += 1;
     }

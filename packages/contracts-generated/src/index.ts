@@ -75,7 +75,11 @@ export type ConversationMessageDto = { messageId: string, role: string, text: st
  * Terminal lifecycle of assistant turns (None for user turns). The UI
  * labels failed/interrupted/truncated turns from this, never from text.
  */
-completion: MessageCompletionV1 | null, };
+completion: MessageCompletionV1 | null, 
+/**
+ * Quote anchor or edit lineage of this message, when it recorded one.
+ */
+reference: MessageReferenceDto | null, };
 
 export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, };
 
@@ -206,9 +210,18 @@ mode: string | null,
  * `thinking_values`) unless the model documents that exact value —
  * capability and parameter values are never assumed from a request.
  */
-think: boolean | string | null, };
+think: boolean | string | null, 
+/**
+ * Optional durable reference this submission records: a reply quote
+ * anchor ("replied") or an edit alternative ("edited-from"). Validated
+ * against persisted history before anything is written — the target must
+ * be a message of this session, and only a user message can be edited.
+ */
+reference: MessageReferenceDto | null, };
 
 export type RetryCompletionPayload = { accountId: string, modelId: string, replyToMessageId: string, mode: string | null, think: boolean | string | null, };
+
+export type MessageReferenceDto = { refersToMessageId: string, relation: string, };
 
 export type ContextAssemblyDto = { estimatedInputTokens: number, 
 /**

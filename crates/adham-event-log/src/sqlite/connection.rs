@@ -37,6 +37,7 @@ pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Er
     pool.execute(PREFERENCES_SQL).await?;
     pool.execute(PROVIDER_REGISTRY_SQL).await?;
     ensure_assistant_columns(&pool).await?;
+    ensure_message_reference_columns(&pool).await?;
     info!("Database schema initialized successfully.");
 
     Ok(pool)
@@ -109,5 +110,25 @@ async fn ensure_assistant_columns(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error
     )
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+/// Message-reference columns on `conversation_messages` (NULL for messages
+/// that reference nothing). A reference is the quote anchor of a reply or the
+/// "edited-from" lineage of a branch alternative. Both columns are written
+/// together or left NULL together.
+async fn ensure_message_reference_columns(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
+    let cols: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM pragma_table_info('conversation_messages')")
+            .fetch_all(pool)
+            .await?;
+    for column in ["refers_to_message_id", "refers_to_relation"] {
+        if !cols.iter().any(|c| c == column) {
+            pool.execute(
+                format!("ALTER TABLE conversation_messages ADD COLUMN {column} TEXT").as_str(),
+            )
+            .await?;
+        }
+    }
     Ok(())
 }

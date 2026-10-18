@@ -92,6 +92,7 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
         &evt1.event_id.to_string(),
         evt1.global_position,
         1000,
+        None,
     )
     .await
     .expect("insert message 1 projection");
@@ -161,6 +162,7 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
         &evt2.event_id.to_string(),
         evt2.global_position,
         2000,
+        None,
     )
     .await
     .expect("insert message 2 projection");
@@ -250,12 +252,21 @@ impl Harness {
     }
 
     async fn append(&mut self, event_type: &str, payload: &impl serde::Serialize) -> i64 {
+        self.append_versioned(event_type, 1, payload).await
+    }
+
+    async fn append_versioned(
+        &mut self,
+        event_type: &str,
+        event_version: u16,
+        payload: &impl serde::Serialize,
+    ) -> i64 {
         let req = AppendEventRequest {
             stream_id: self.stream_id.clone(),
             stream_kind: "session".to_string(),
             expected_sequence: self.seq,
             event_type: event_type.to_string(),
-            event_version: 1,
+            event_version,
             scope: self.scope.clone(),
             actor: EventActor {
                 actor_id: ActorId::new_v7(),
@@ -391,6 +402,121 @@ async fn test_assistant_completed_replays_in_order_with_roles_and_usage() {
     );
     assert_eq!(view[1].usage.as_ref().unwrap().total_tokens, Some(15));
     assert_eq!(view[1].op_id, Some(op_id));
+}
+
+#[tokio::test]
+async fn test_message_reference_survives_rebuild_and_read_back() {
+    let mut h = Harness::new().await;
+
+    // Original message (v2, no reference), then a reply anchored to it.
+    let original_id = MessageId::new_v7();
+    let original_content = ContentId::new_v7();
+    h.store
+        .put_content(
+            &h.provider,
+            &original_content,
+            "user_text",
+            "text/plain",
+            &h.scope,
+            b"Original",
+        )
+        .await
+        .expect("put original");
+    h.append_versioned(
+        "MessageSubmitted",
+        2,
+        &MessageSubmittedV2 {
+            message_id: original_id,
+            content_id: original_content,
+            content_kind: "user_text".to_string(),
+            size_bytes: 8,
+            reference: None,
+        },
+    )
+    .await;
+
+    let reply_content = ContentId::new_v7();
+    h.store
+        .put_content(
+            &h.provider,
+            &reply_content,
+            "user_text",
+            "text/plain",
+            &h.scope,
+            b"Reply",
+        )
+        .await
+        .expect("put reply");
+    h.append_versioned(
+        "MessageSubmitted",
+        2,
+        &MessageSubmittedV2 {
+            message_id: MessageId::new_v7(),
+            content_id: reply_content,
+            content_kind: "user_text".to_string(),
+            size_bytes: 5,
+            reference: Some(MessageReferenceV1 {
+                refers_to_message_id: original_id,
+                relation: "replied".to_string(),
+            }),
+        },
+    )
+    .await;
+
+    let replayed = ConversationProjection::rebuild(&h.pool)
+        .await
+        .expect("rebuild");
+    assert_eq!(replayed, 2);
+
+    let view = h.messages().await;
+    assert_eq!(view.len(), 2);
+    assert_eq!(view[0].content, "Original");
+    assert_eq!(view[0].refers_to_message_id, None);
+    assert_eq!(view[0].refers_to_relation, None);
+    assert_eq!(view[1].content, "Reply");
+    assert_eq!(
+        view[1].refers_to_message_id.as_deref(),
+        Some(original_id.to_string().as_str())
+    );
+    assert_eq!(view[1].refers_to_relation.as_deref(), Some("replied"));
+}
+
+#[tokio::test]
+async fn test_unknown_message_version_stops_rebuild() {
+    let mut h = Harness::new().await;
+
+    let content_id = ContentId::new_v7();
+    h.store
+        .put_content(
+            &h.provider,
+            &content_id,
+            "user_text",
+            "text/plain",
+            &h.scope,
+            b"Future",
+        )
+        .await
+        .expect("put content");
+    h.append_versioned(
+        "MessageSubmitted",
+        3,
+        &MessageSubmittedV2 {
+            message_id: MessageId::new_v7(),
+            content_id,
+            content_kind: "user_text".to_string(),
+            size_bytes: 6,
+            reference: None,
+        },
+    )
+    .await;
+
+    let err = ConversationProjection::rebuild(&h.pool)
+        .await
+        .expect_err("an unknown version must stop the rebuild, never guess");
+    assert!(
+        format!("{err:?}").contains("UNSUPPORTED_EVENT_VERSION"),
+        "{err:?}"
+    );
 }
 
 #[tokio::test]

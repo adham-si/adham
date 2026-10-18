@@ -587,6 +587,35 @@ pub async fn handle_mark_completion_interrupted(
     ))
 }
 
+/// Validate a submission reference against this session's persisted history:
+/// the target must be a message of the session, and only a user message can be
+/// edited. Nothing is written on refusal.
+fn validate_submit_reference(
+    rows: &[adham_projections::ConversationMessageView],
+    reference: &MessageReferenceDto,
+) -> Result<(), String> {
+    if reference.relation != "replied" && reference.relation != "edited-from" {
+        return Err("VALIDATION_FAILED: relation must be replied or edited-from".to_string());
+    }
+    let target = rows
+        .iter()
+        .find(|r| r.message_id == reference.refers_to_message_id)
+        .ok_or_else(|| "VALIDATION_FAILED: reference target is not in this session".to_string())?;
+    if reference.relation == "edited-from" && target.role != "user" {
+        return Err("VALIDATION_FAILED: only a user message can be edited".to_string());
+    }
+    Ok(())
+}
+
+/// The canonical event payload form of a validated IPC reference.
+fn message_reference_v1(reference: &MessageReferenceDto) -> Result<MessageReferenceV1, String> {
+    Ok(MessageReferenceV1 {
+        refers_to_message_id: MessageId::from_string(&reference.refers_to_message_id)
+            .map_err(|e| format!("VALIDATION_FAILED: {e}"))?,
+        relation: reference.relation.clone(),
+    })
+}
+
 /// Complete exactly once, streaming deltas over the sink. Returns only after
 /// the terminal outcome is persisted. The user message is atomically
 /// submitted first; the op handle is durable BEFORE dispatch.
@@ -610,6 +639,21 @@ where
     validate_session_scope(ctx, &ids).await?;
     let request_id = RequestId::from_client_str(&env.request_id)
         .map_err(|_| "VALIDATION_FAILED: request_id must be UUID".to_string())?;
+
+    // A submission reference is validated against persisted history before
+    // anything else: unknown targets and non-user edits refuse the whole
+    // send, pre-append and pre-socket.
+    if let Some(reference) = &env.payload.reference {
+        let rows = adham_projections::ConversationProjection::get_session_messages(
+            &ctx.pool,
+            ctx.content_key.as_ref(),
+            &ctx.installation_id,
+            &ids.sess_id,
+        )
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+        validate_submit_reference(&rows, reference)?;
+    }
 
     // Model evidence before ANY socket: unknown ids dispatch nothing.
     let (account, pinned) =
@@ -684,7 +728,7 @@ where
         stream_kind: "session".to_string(),
         expected_sequence: current_seq,
         event_type: "MessageSubmitted".to_string(),
-        event_version: 1,
+        event_version: MESSAGE_SUBMITTED_CURRENT_VERSION,
         scope: scope.clone(),
         actor: EventActor {
             actor_id: ctx.actor_id,
@@ -693,11 +737,17 @@ where
         request_id,
         correlation_id,
         causation_id: None,
-        payload_json: serde_json::to_vec(&MessageSubmittedV1 {
+        payload_json: serde_json::to_vec(&MessageSubmittedV2 {
             message_id,
             content_id,
             content_kind: "user_text".to_string(),
             size_bytes: trimmed.len() as u64,
+            reference: env
+                .payload
+                .reference
+                .as_ref()
+                .map(message_reference_v1)
+                .transpose()?,
         })
         .map_err(|e| e.to_string())?,
         metadata_json: b"{}".to_vec(),
@@ -716,6 +766,10 @@ where
         &append_res.event_id.to_string(),
         append_res.global_position,
         now_us,
+        env.payload
+            .reference
+            .as_ref()
+            .map(|r| (r.refers_to_message_id.as_str(), r.relation.as_str())),
     )
     .await
     .map_err(|e| e.to_string())?;
@@ -744,7 +798,15 @@ where
         context: None,
     };
     let persisted = serde_json::to_vec(&start).unwrap_or_default();
-    let request_fp = adham_event_log::request_fingerprint("complete_once_streaming", 1, &trimmed);
+    // The fingerprint covers the semantic input: a reference, when present, is
+    // part of it, so a reused request id with a different reference conflicts.
+    // A reference-free send hashes exactly as before.
+    let request_input = match &env.payload.reference {
+        Some(r) => format!("{trimmed}|{}|{}", r.refers_to_message_id, r.relation),
+        None => trimmed.clone(),
+    };
+    let request_fp =
+        adham_event_log::request_fingerprint("complete_once_streaming", 1, &request_input);
     let scope_fp = adham_event_log::scope_fingerprint(
         "complete_once_streaming",
         1,
