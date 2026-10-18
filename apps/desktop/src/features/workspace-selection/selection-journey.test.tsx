@@ -115,6 +115,7 @@ describe('selection journey', () => {
       listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
       setActiveAlternative: vi.fn().mockResolvedValue([]),
+      setAnswerFeedback: vi.fn().mockResolvedValue([]),
     };
     return { backend, state };
   }

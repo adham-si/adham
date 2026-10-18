@@ -112,12 +112,21 @@ export function ConversationPanel({
       quoteUnavailable: t('compose.markdown.quoteUnavailable'),
       branchActiveLabel: t('compose.markdown.branchActive'),
       branchMakeActiveLabel: t('compose.markdown.branchMakeActive'),
+      likeAction: t('compose.markdown.likeAnswer'),
+      dislikeAction: t('compose.markdown.dislikeAnswer'),
+      feedbackReason: t('compose.markdown.feedbackReason'),
     }),
     [t],
   );
   const conv = useConversation({ backend });
-  /** A refused branch switch states itself; it is not an uncertain send. */
-  const [alternativeNotice, setAlternativeNotice] = React.useState<string | null>(null);
+  /** A refused branch switch or feedback save states itself; neither is an
+   *  uncertain send, so it is not routed through the send-error notice. */
+  const [actionNotice, setActionNotice] = React.useState<string | null>(null);
+  // Feedback by answer row: the stored verdict is the only pressed state.
+  const feedbackByAnswer = React.useMemo(
+    () => new Map(conv.answerFeedback.map((f) => [f.messageId, f])),
+    [conv.answerFeedback],
+  );
   // Edited-branch provenance: which messages belong to a branch and which
   // member the session continues from (default: the newest edit, the same
   // rule the backend applies).
@@ -627,10 +636,11 @@ export function ConversationPanel({
           {conv.messages.map((m) => {
             const note = messageNote(m, t);
             const alternative = alternatives.get(m.id);
+            const isAssistant = m.role === 'assistant' || m.role === 'agent';
             return (
               <React.Fragment key={m.id}>
                 <MessageCard
-                  role={m.role === 'assistant' || m.role === 'agent' ? 'assistant' : 'user'}
+                  role={isAssistant ? 'assistant' : 'user'}
                   content={contentFromText(m.text)}
                   labels={markdownLabels}
                   timestamp={formatTimestamp(m.createdAt)}
@@ -644,11 +654,24 @@ export function ConversationPanel({
                                 void conv
                                   .makeAlternativeActive(alternative.rootId, m.id)
                                   .then((outcome) =>
-                                    setAlternativeNotice(outcome.ok ? null : outcome.error),
+                                    setActionNotice(outcome.ok ? null : outcome.error),
                                   );
                               },
                         }
                       : undefined
+                  }
+                  // Feedback is for a settled, persisted answer attempt: the
+                  // provisional bubble has no durable id to key a verdict to,
+                  // so it is never offered one.
+                  feedback={m.provisional || !isAssistant ? undefined : feedbackByAnswer.get(m.id)}
+                  onFeedback={
+                    m.provisional || !isAssistant
+                      ? undefined
+                      : (verdict, reason) => {
+                          void conv
+                            .setAnswerFeedback(m.id, verdict, reason)
+                            .then((outcome) => setActionNotice(outcome.ok ? null : outcome.error));
+                        }
                   }
                   quotedExcerpt={
                     m.reference ? quotedExcerptOf(m.reference.refersToMessageId) : undefined
@@ -770,12 +793,12 @@ export function ConversationPanel({
             </button>
           </div>
         )}
-        {alternativeNotice && (
+        {actionNotice && (
           <div
             role="status"
             className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
           >
-            <p>{alternativeNotice}</p>
+            <p>{actionNotice}</p>
           </div>
         )}
         {executionUnavailable && (

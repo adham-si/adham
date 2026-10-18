@@ -25,6 +25,12 @@ export interface MarkdownLabels {
   quoteEditedLabel: string;
   /** Shown when the quoted message is outside the loaded history. */
   quoteUnavailable: string;
+  /** Verdict action: this answer was liked. */
+  likeAction: string;
+  /** Verdict action: this answer was disliked. */
+  dislikeAction: string;
+  /** Label and placeholder of the optional feedback reason field. */
+  feedbackReason: string;
 }
 
 export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
@@ -41,6 +47,9 @@ export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   quoteLabel: 'Replying to',
   quoteEditedLabel: 'Edited from',
   quoteUnavailable: 'Quoted message is not in the loaded history.',
+  likeAction: 'Like',
+  dislikeAction: 'Dislike',
+  feedbackReason: 'Reason (optional)',
 };
 
 export function resolveMarkdownLabels(labels?: Partial<MarkdownLabels>): MarkdownLabels {

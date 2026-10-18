@@ -91,7 +91,8 @@
       "listFailed": "تعذّر التحقق من التوليدات غير المكتملة.",
       "retryAction": "إعادة المحاولة"
     },
-    "alternativeUpdateFailed": "تعذر تبديل البديل النشط."
+    "alternativeUpdateFailed": "تعذر تبديل البديل النشط.",
+    "feedbackUpdateFailed": "تعذّر حفظ تقييمك."
   },
   "provision": {
     "refreshFailed": "تم حفظ التغيير. تعذّرت إعادة التحميل.",

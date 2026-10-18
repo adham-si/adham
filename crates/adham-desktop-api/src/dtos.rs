@@ -203,6 +203,44 @@ pub struct SetActiveAlternativePayload {
     pub active_message_id: String,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum AnswerVerdict {
+    Like,
+    Dislike,
+}
+
+impl AnswerVerdict {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AnswerVerdict::Like => "like",
+            AnswerVerdict::Dislike => "dislike",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AnswerFeedbackDto {
+    /// The persisted assistant row (one attempt) this verdict is keyed to.
+    pub message_id: String,
+    pub verdict: AnswerVerdict,
+    /// Optional user note; null when absent.
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetAnswerFeedbackPayload {
+    pub message_id: String,
+    /// null removes the stored feedback.
+    pub verdict: Option<AnswerVerdict>,
+    pub reason: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -229,6 +267,9 @@ pub struct ConversationPage {
     /// Active-alternative selections for this session, so the timeline can
     /// label every edited branch without a second round trip.
     pub branch_selections: Vec<BranchSelectionDto>,
+    /// Local like/dislike verdicts for this session's answers, so a card shows
+    /// its stored verdict without a second round trip.
+    pub feedback: Vec<AnswerFeedbackDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

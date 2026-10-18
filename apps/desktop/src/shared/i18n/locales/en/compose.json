@@ -115,7 +115,10 @@
       "quoteEditedLabel": "Edited from",
       "quoteUnavailable": "Quoted message is not in the loaded history.",
       "branchActive": "Active",
-      "branchMakeActive": "Make active"
+      "branchMakeActive": "Make active",
+      "likeAnswer": "Like this answer",
+      "dislikeAnswer": "Dislike this answer",
+      "feedbackReason": "Reason (optional)"
     }
   }
 }

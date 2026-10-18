@@ -111,7 +111,10 @@
       "quoteEditedLabel": "编辑自",
       "quoteUnavailable": "引用的消息不在已加载的历史记录中。",
       "branchActive": "当前",
-      "branchMakeActive": "设为当前"
+      "branchMakeActive": "设为当前",
+      "likeAnswer": "喜欢此回答",
+      "dislikeAnswer": "不喜欢此回答",
+      "feedbackReason": "原因（可选）"
     }
   }
 }

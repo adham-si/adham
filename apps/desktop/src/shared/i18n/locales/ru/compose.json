@@ -123,7 +123,10 @@
       "quoteEditedLabel": "Отредактировано из",
       "quoteUnavailable": "Цитируемое сообщение отсутствует в загруженной истории.",
       "branchActive": "Активный",
-      "branchMakeActive": "Сделать активным"
+      "branchMakeActive": "Сделать активным",
+      "likeAnswer": "Нравится этот ответ",
+      "dislikeAnswer": "Не нравится этот ответ",
+      "feedbackReason": "Причина (необязательно)"
     }
   }
 }

@@ -98,6 +98,14 @@ export const BranchSelectionSchema = z.object({
 
 export const BranchSelectionListSchema = z.array(BranchSelectionSchema);
 
+export const AnswerFeedbackSchema = z.object({
+  messageId: z.string(),
+  verdict: z.enum(['like', 'dislike']),
+  reason: z.string().nullable(),
+});
+
+export const AnswerFeedbackListSchema = z.array(AnswerFeedbackSchema);
+
 export const ConversationMessageDtoSchema = z.object({
   messageId: z.string(),
   role: z.string(),
@@ -113,6 +121,7 @@ export const ConversationPageSchema = z.object({
   nextCursor: z.string().nullable(),
   projectionPosition: z.string(),
   branchSelections: z.array(BranchSelectionSchema),
+  feedback: z.array(AnswerFeedbackSchema),
 });
 
 export const StorageStatusSchema = z.object({

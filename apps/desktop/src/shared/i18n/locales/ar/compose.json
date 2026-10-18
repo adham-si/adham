@@ -127,7 +127,10 @@
       "quoteEditedLabel": "تعديل من",
       "quoteUnavailable": "الرسالة المقتبَسة غير موجودة في السجل المحمّل.",
       "branchActive": "نشط",
-      "branchMakeActive": "تعيين كنشط"
+      "branchMakeActive": "تعيين كنشط",
+      "likeAnswer": "أعجبني هذا الرد",
+      "dislikeAnswer": "لم يعجبني هذا الرد",
+      "feedbackReason": "السبب (اختياري)"
     }
   }
 }

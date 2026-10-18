@@ -13,7 +13,7 @@ use crate::dtos::{BranchSelectionDto, CommandContext, SetActiveAlternativePayloa
 use crate::handlers::ApiContext;
 use adham_core_types::*;
 use adham_projections::{ConversationMessageView, ConversationProjection};
-use sqlx::{Pool, Row, Sqlite};
+use sqlx::{Pool, Sqlite};
 use std::collections::{HashMap, HashSet};
 use time::OffsetDateTime;
 
@@ -128,40 +128,7 @@ pub async fn set_active_alternative(
     context: CommandContext,
     payload: SetActiveAlternativePayload,
 ) -> Result<Vec<BranchSelectionDto>, String> {
-    let session_id = SessionId::from_string(
-        context
-            .session_id
-            .as_deref()
-            .ok_or("sessionId context required")?,
-    )
-    .map_err(|e| e.to_string())?;
-
-    let sess_stream = format!("session:{session_id}");
-    let sess_row: Option<sqlx::sqlite::SqliteRow> = sqlx::query(
-        "SELECT workspace_id, project_id FROM events WHERE stream_id = ? AND stream_sequence = 1",
-    )
-    .bind(&sess_stream)
-    .fetch_optional(&ctx.pool)
-    .await
-    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
-    let sess_row =
-        sess_row.ok_or("SESSION_NOT_FOUND: session stream does not exist".to_string())?;
-    if let Some(expected) = context.workspace_id.as_deref() {
-        let actual: Option<String> = sess_row.get("workspace_id");
-        if actual.as_deref() != Some(expected) {
-            return Err(
-                "CONTEXT_MISMATCH: session does not belong to specified workspace".to_string(),
-            );
-        }
-    }
-    if let Some(expected) = context.project_id.as_deref() {
-        let actual: Option<String> = sess_row.get("project_id");
-        if actual.as_deref() != Some(expected) {
-            return Err(
-                "CONTEXT_MISMATCH: session does not belong to specified project".to_string(),
-            );
-        }
-    }
+    let session_id = crate::service::common::resolve_scoped_session(ctx, &context).await?;
 
     let rows = ConversationProjection::get_session_messages(
         &ctx.pool,

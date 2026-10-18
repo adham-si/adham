@@ -82,6 +82,7 @@ describe('P0-04 IPC Schemas & Query Keys', () => {
       nextCursor: null,
       projectionPosition: '1',
       branchSelections: [],
+      feedback: [],
     });
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.role).toBe('user');
@@ -246,6 +247,7 @@ describe('IPC contract fixture (cross-language)', () => {
       nextCursor: null,
       projectionPosition: '1',
       branchSelections: [],
+      feedback: [],
     };
 
     vi.mocked(invoke).mockClear();

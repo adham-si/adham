@@ -21,10 +21,18 @@ export type SessionSnapshot = { sessionId: string };
 export type SubmittedSnapshot = { messageId: string; text: string; createdAt: string };
 /** Which member of an edited branch the session continues from. */
 export type BranchSelection = { rootMessageId: string; activeMessageId: string };
+/** A stored like/dislike verdict for one persisted answer row (one attempt). */
+export type AnswerFeedback = {
+  messageId: string;
+  verdict: 'like' | 'dislike';
+  reason: string | null;
+};
 export type ConversationSnapshot = {
   items: ConversationMessageDto[];
   /** Present on real pages; a backend that cannot read selections omits it. */
   branchSelections?: BranchSelection[] | undefined;
+  /** Present on real pages; a backend without stored verdicts omits it. */
+  feedback?: AnswerFeedback[] | undefined;
 };
 
 export interface ConversationBackend {
@@ -56,6 +64,16 @@ export interface ConversationBackend {
     rootMessageId: string,
     activeMessageId: string,
   ): Promise<BranchSelection[]>;
+  /** Record, switch, or remove (verdict null) the local verdict for one
+   *  answer row. Returns the session's feedback after the write. */
+  setAnswerFeedback(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    verdict: 'like' | 'dislike' | null,
+    reason: string | null,
+  ): Promise<AnswerFeedback[]>;
   listSessions?(context: {
     workspaceId?: string;
     projectId: string;

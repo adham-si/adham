@@ -1,5 +1,6 @@
 pub mod branch;
 pub mod common;
+pub mod feedback;
 pub mod message;
 pub mod pending;
 pub mod selection;

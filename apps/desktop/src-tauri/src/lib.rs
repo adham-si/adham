@@ -1,18 +1,18 @@
 use adham_desktop_api::{
-    ApiContext, BootstrapState, BranchSelectionDto, ClearPendingOperationPayload, CommandContext,
-    CommandEnvelope, CommandResult, CompleteOncePayload, CompletionStartDto, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
-    DiscoverOllamaModelsPayload, ErrorEnvelope, GetPreferencesResponse,
-    ListProviderAccountsResponse, ListProviderModelsPayload, ListProviderModelsResponse,
-    MarkCompletionInterruptedPayload, MarkCompletionInterruptedResponse, PendingOperationDto,
-    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
-    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
-    RecordPendingOperationPayload, ResetPreferencesResponse, RetryCompletionPayload,
-    SelectProjectPayload, SessionList, SessionSummary, SetActiveAlternativePayload,
-    StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
-    SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
-    WorkspaceList, WorkspaceSummary,
+    AnswerFeedbackDto, ApiContext, BootstrapState, BranchSelectionDto,
+    ClearPendingOperationPayload, CommandContext, CommandEnvelope, CommandResult,
+    CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
+    CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
+    GetPreferencesResponse, ListProviderAccountsResponse, ListProviderModelsPayload,
+    ListProviderModelsResponse, MarkCompletionInterruptedPayload,
+    MarkCompletionInterruptedResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
+    ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
+    RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
+    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionSummary,
+    SetActiveAlternativePayload, SetAnswerFeedbackPayload, StopCompletionPayload,
+    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
+    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
+    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -145,6 +145,17 @@ async fn set_active_alternative(
     payload: SetActiveAlternativePayload,
 ) -> Result<Vec<BranchSelectionDto>, ErrorEnvelope> {
     adham_desktop_api::handle_set_active_alternative(&state, context, payload)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_answer_feedback(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+    payload: SetAnswerFeedbackPayload,
+) -> Result<Vec<AnswerFeedbackDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_answer_feedback(&state, context, payload)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -396,6 +407,7 @@ pub fn run() {
             submit_message,
             get_conversation,
             set_active_alternative,
+            set_answer_feedback,
             admin_rebuild_projections,
             record_pending_operation,
             list_pending_operations,

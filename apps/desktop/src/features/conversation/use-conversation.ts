@@ -18,6 +18,7 @@ import {
 import { clearDurablePendingOperation } from './pending-recovery/durable-pending-operations';
 import { performSingleMessageSend } from './single-message-send';
 import {
+  type AnswerFeedback,
   type BranchSelection,
   type ConversationBackend,
   type ConversationContext,
@@ -100,6 +101,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // state: choosing a branch never rewrites history, only what the next
   // dispatch is answered against.
   const [branchSelections, setBranchSelections] = React.useState<BranchSelection[]>([]);
+  // Local like/dislike verdicts keyed by answer row: server-authoritative, so
+  // a refusal never flips a chip, and a reload restores the stored verdict.
+  const [answerFeedback, setAnswerFeedbackRows] = React.useState<AnswerFeedback[]>([]);
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
@@ -178,6 +182,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setContext(ctx);
         setMessages(items);
         setBranchSelections(page.branchSelections ?? []);
+        setAnswerFeedbackRows(page.feedback ?? []);
         // Same-flush swap: the recovery snapshot (if any) is replaced by the
         // authoritative rows atomically — never two copies of an answer.
         setRecoverySnapshot(null);
@@ -1056,6 +1061,47 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     [backend, context, isStale],
   );
 
+  /** Record, switch, or remove (verdict null) the local verdict for one
+   *  answer row. Server-validated; the response is the session's feedback
+   *  after the write. A failure is surfaced to the caller, never a silent
+   *  no-op and never a flipped chip. */
+  const setAnswerFeedback = React.useCallback(
+    async (
+      messageId: string,
+      verdict: 'like' | 'dislike' | null,
+      reason: string | null,
+    ): Promise<SubmitOutcome> => {
+      const ctx = context;
+      if (!ctx?.sessionId) {
+        return { ok: false, error: i18n.t('conversation.notReady'), uncertain: false };
+      }
+      const generation = generationRef.current;
+      const loadSeq = loadSeqRef.current;
+      const mutationSeq = mutationSeqRef.current;
+      try {
+        const feedback = await backend.setAnswerFeedback(
+          ctx.workspaceId,
+          ctx.projectId,
+          ctx.sessionId,
+          messageId,
+          verdict,
+          reason,
+        );
+        // A stale response belongs to a session the user already left: it was
+        // applied server-side, but must not overwrite the new session's map.
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return { ok: true };
+        setAnswerFeedbackRows(feedback);
+        return { ok: true };
+      } catch (err) {
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return { ok: true };
+        const message =
+          err instanceof Error ? err.message : i18n.t('conversation.feedbackUpdateFailed');
+        return { ok: false, error: message, uncertain: false };
+      }
+    },
+    [backend, context, isStale],
+  );
+
   return {
     status,
     messages,
@@ -1072,6 +1118,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     stop,
     branchSelections,
     makeAlternativeActive,
+    answerFeedback,
+    setAnswerFeedback,
     streaming,
     recoverySnapshot,
     retry,

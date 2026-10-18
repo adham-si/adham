@@ -86,7 +86,12 @@ export type ConversationPage = { items: Array<ConversationMessageDto>, nextCurso
  * Active-alternative selections for this session, so the timeline can
  * label every edited branch without a second round trip.
  */
-branchSelections: Array<BranchSelectionDto>, };
+branchSelections: Array<BranchSelectionDto>, 
+/**
+ * Local like/dislike verdicts for this session's answers, so a card shows
+ * its stored verdict without a second round trip.
+ */
+feedback: Array<AnswerFeedbackDto>, };
 
 export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, 
 /**
@@ -243,6 +248,24 @@ rootMessageId: string,
 activeMessageId: string, };
 
 export type SetActiveAlternativePayload = { rootMessageId: string, activeMessageId: string, };
+
+export type AnswerVerdict = "like" | "dislike";
+
+export type AnswerFeedbackDto = { 
+/**
+ * The persisted assistant row (one attempt) this verdict is keyed to.
+ */
+messageId: string, verdict: AnswerVerdict, 
+/**
+ * Optional user note; null when absent.
+ */
+reason: string | null, };
+
+export type SetAnswerFeedbackPayload = { messageId: string, 
+/**
+ * null removes the stored feedback.
+ */
+verdict: AnswerVerdict | null, reason: string | null, };
 
 export type ContextAssemblyDto = { estimatedInputTokens: number, 
 /**

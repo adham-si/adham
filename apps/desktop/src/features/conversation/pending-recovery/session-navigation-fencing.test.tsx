@@ -131,6 +131,7 @@ describe('Session-selection navigation fencing during recovery', () => {
         return Promise.resolve(undefined);
       }),
       setActiveAlternative: vi.fn().mockResolvedValue([]),
+      setAnswerFeedback: vi.fn().mockResolvedValue([]),
     };
 
     const mockSelectionBackend: SelectionBackend = {

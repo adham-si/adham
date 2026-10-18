@@ -67,6 +67,12 @@ export interface MessageCardProps
   /** Edited-branch provenance: a static marker on the member the session
    *  continues from, and on other members the action that switches to them. */
   branch?: { active: boolean; onMakeActive?: (() => void) | undefined } | undefined;
+  /** Stored like/dislike verdict for this answer row (one attempt). */
+  feedback?: { verdict: 'like' | 'dislike'; reason: string | null } | undefined;
+  /** When set, the card offers Like/Dislike for this answer. verdict null
+   *  removes the stored feedback. Only settled, persisted assistant rows get
+   *  this: a provisional or streaming bubble offers nothing to rate. */
+  onFeedback?: ((verdict: 'like' | 'dislike' | null, reason: string | null) => void) | undefined;
   ref?: React.Ref<HTMLElement>;
 }
 
@@ -94,6 +100,8 @@ export function MessageCard({
   quotedExcerpt,
   quotedRelation,
   branch,
+  feedback,
+  onFeedback,
   className,
   ref,
   ...props
@@ -183,7 +191,76 @@ export function MessageCard({
         </div>
       )}
       <MessageBody role={role} content={content} resolved={resolved} />
+      {onFeedback && (
+        <FeedbackControls feedback={feedback} onFeedback={onFeedback} resolved={resolved} />
+      )}
     </article>
+  );
+}
+
+/** Like/dislike for one answer attempt. The stored verdict is the only
+ *  pressed state, so a refused save never flips a button. The reason is
+ *  optional: Enter saves it on top of the current verdict, and a pending
+ *  draft survives a failed save. */
+function FeedbackControls({
+  feedback,
+  onFeedback,
+  resolved,
+}: {
+  feedback?: { verdict: 'like' | 'dislike'; reason: string | null } | undefined;
+  onFeedback: (verdict: 'like' | 'dislike' | null, reason: string | null) => void;
+  resolved: MarkdownLabels;
+}) {
+  const [draft, setDraft] = React.useState<string | null>(null);
+
+  const verdictButton = (verdict: 'like' | 'dislike', label: string) => (
+    <button
+      type="button"
+      aria-pressed={feedback?.verdict === verdict}
+      className={cn(
+        'rounded-sm px-1 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+        feedback?.verdict === verdict
+          ? 'bg-surface-hover text-foreground'
+          : 'text-foreground-secondary',
+      )}
+      onClick={() => {
+        if (feedback?.verdict === verdict) {
+          // Toggle off: the verdict and its reason are removed together.
+          setDraft(null);
+          onFeedback(null, null);
+        } else {
+          onFeedback(verdict, feedback?.reason ?? null);
+        }
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      {verdictButton('like', resolved.likeAction)}
+      {verdictButton('dislike', resolved.dislikeAction)}
+      {feedback && (
+        <input
+          type="text"
+          aria-label={resolved.feedbackReason}
+          placeholder={resolved.feedbackReason}
+          value={draft ?? feedback.reason ?? ''}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            // Trimmed now so what is shown is what will be stored; the draft
+            // stays until a response replaces the stored value.
+            const reason = (draft ?? feedback.reason ?? '').trim();
+            setDraft(reason);
+            onFeedback(feedback.verdict, reason);
+          }}
+          className="min-w-0 flex-1 rounded-sm border border-border-subtle bg-surface-muted px-2 py-1 text-xs text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        />
+      )}
+    </div>
   );
 }
 

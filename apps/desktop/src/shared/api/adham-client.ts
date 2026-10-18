@@ -1,5 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 import type {
+  AnswerFeedbackDto,
   AppPreferences,
   BootstrapState,
   BranchSelectionDto,
@@ -39,6 +40,7 @@ import type {
   WorkspaceSummary,
 } from '@adham/contracts-generated';
 import {
+  AnswerFeedbackListSchema,
   BootstrapStateSchema,
   BranchSelectionListSchema,
   ConversationPageSchema,
@@ -370,6 +372,32 @@ export class AdhamApiClient implements AdhamClient {
       },
     });
     return BranchSelectionListSchema.parse(raw);
+  }
+
+  /** Record, switch, or remove (verdict null) the local verdict for one
+   *  answer row. Returns the session's feedback after the write (the server
+   *  validates the row against the session's persisted answers). */
+  async setAnswerFeedback(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    verdict: 'like' | 'dislike' | null,
+    reason: string | null,
+  ): Promise<AnswerFeedbackDto[]> {
+    const raw = await invoke('set_answer_feedback', {
+      context: {
+        workspaceId,
+        projectId,
+        sessionId,
+      },
+      payload: {
+        messageId,
+        verdict,
+        reason,
+      },
+    });
+    return AnswerFeedbackListSchema.parse(raw);
   }
 
   async getStorageStatus(): Promise<StorageStatus> {

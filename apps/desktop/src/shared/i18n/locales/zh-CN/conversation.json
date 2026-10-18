@@ -91,7 +91,8 @@
       "listFailed": "检查未完成的生成失败。",
       "retryAction": "重试"
     },
-    "alternativeUpdateFailed": "无法切换当前备选分支。"
+    "alternativeUpdateFailed": "无法切换当前备选分支。",
+    "feedbackUpdateFailed": "无法保存你的反馈。"
   },
   "provision": {
     "workspaceTitle": "创建工作区",
