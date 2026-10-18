@@ -20,9 +20,9 @@
 //! every platform.
 
 use super::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tauri::ipc::{CallbackFn, InvokeBody};
-use tauri::test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder};
+use tauri::test::{get_ipc_response, mock_builder, MockRuntime, INVOKE_KEY};
 
 /// Disposable context: temp-dir SQLite database, in-memory content key,
 /// never the OS credential store. The runtime is returned so pool tasks
@@ -246,9 +246,9 @@ use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderK
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId};
 use adham_provider::registry::LocalAccount;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 struct StubCaptures {
     accepts: AtomicU64,
