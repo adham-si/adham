@@ -7,7 +7,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@adham/ui';
-import { Cancel01Icon } from '@hugeicons/core-free-icons';
+import { Cancel01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
@@ -22,21 +22,8 @@ interface CheckResult {
   reachable: boolean;
   tags: number | null;
 }
-interface DiscoveryResult {
-  at: number;
-  count: number;
-}
-
-function fmtTime(at: number): string {
-  return new Date(at).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 const inputClass = 'w-full min-w-0 rounded-md border border-border bg-surface px-3 py-2 text-sm';
-const statusPanelClass =
-  'space-y-1 rounded-lg border border-border-subtle bg-surface-subtle/40 p-3 text-xs text-foreground-secondary';
 
 export interface ProviderConnectModalProps {
   entry: ProviderCatalogEntry;
@@ -51,11 +38,12 @@ export interface ProviderConnectModalProps {
 }
 
 /**
- * Connect/manage dialog for one provider. Text discipline: one status panel
- * (state · endpoint · last check · models), one config block, one footer.
- * Flows keep the Delivery A/G rules: a check renders only under the endpoint
- * it ran against, the Google key draft is write-only, disconnect confirms
- * because it cascades the credential and discovered models.
+ * Connect/manage dialog for one provider. The user sees three things only:
+ * status (Connected/Offline with the model count and a Sync affordance), the
+ * credential/endpoint control, and two footer actions. Delivery A/G rules stay
+ * intact: a failed transient test persists nothing, the Google key draft is
+ * write-only, a check only shows while it matches the current endpoint, and
+ * disconnect confirms because it cascades the credential and models.
  */
 export function ProviderConnectModal({
   entry,
@@ -92,6 +80,7 @@ export function ProviderConnectModal({
             initialCheck={initialCheck}
             onProbeOutcome={onProbeOutcome}
             refreshAccounts={refreshAccounts}
+            onClose={onClose}
           />
         ) : (
           <OllamaFlow
@@ -111,58 +100,63 @@ interface FlowProps {
   initialCheck: CheckResult | null;
   onProbeOutcome: (reachable: boolean) => void;
   refreshAccounts?: () => Promise<void>;
+  onClose?: () => void;
 }
 
-function CheckRows({ check, endpoint }: { check: CheckResult | null; endpoint: string }) {
-  const { t } = useTranslation();
-  const current = check !== null && check.endpoint === endpoint;
-  if (check === null || !current) return null;
-  return check.reachable ? (
-    <p>
-      {t('settings.providers.lastCheckReachable', {
-        time: fmtTime(check.at),
-        count: check.tags ?? 0,
-      })}
-    </p>
-  ) : (
-    <p role="alert">
-      {t('settings.providers.unreachable', { time: fmtTime(check.at), url: check.endpoint })}
-    </p>
-  );
-}
-
-function GoogleCheckRows({ check, endpoint }: { check: CheckResult | null; endpoint: string }) {
-  const { t } = useTranslation();
-  const current = check !== null && check.endpoint === endpoint;
-  if (check === null || !current) return null;
-  return check.reachable ? (
-    <p>
-      {t('settings.providers.lastCheckReachable', {
-        time: fmtTime(check.at),
-        count: check.tags ?? 0,
-      })}
-    </p>
-  ) : (
-    <p role="alert">
-      {t('settings.providers.googleUnreachable', { time: fmtTime(check.at), url: check.endpoint })}
-    </p>
-  );
-}
-
-function DiscoveryRows({ discovery }: { discovery: DiscoveryResult | null }) {
-  const { t } = useTranslation();
-  if (discovery === null) return null;
+/** One clean status row: colored dot + verdict text, optional Sync affordance. */
+function StatusLine({
+  ok,
+  children,
+  trailing,
+}: {
+  ok: boolean | null;
+  children: React.ReactNode;
+  trailing?: React.ReactNode;
+}) {
   return (
-    <p>
-      {t('settings.providers.lastDiscovery', {
-        count: discovery.count,
-        time: fmtTime(discovery.at),
-      })}
-    </p>
+    <div className="flex items-center gap-2 text-xs">
+      <span
+        className={`inline-block size-2 shrink-0 rounded-full ${
+          ok === null
+            ? 'bg-foreground-muted'
+            : ok
+              ? 'bg-success-foreground'
+              : 'bg-danger-foreground'
+        }`}
+      />
+      <div className="min-w-0 flex-1">{children}</div>
+      {trailing}
+    </div>
   );
 }
 
-function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: FlowProps) {
+function SyncButton({
+  onSync,
+  disabled,
+  title,
+}: {
+  onSync: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      onClick={onSync}
+      disabled={disabled}
+      title={title}
+      aria-label={t('settings.providers.sync')}
+      className="shrink-0"
+    >
+      <HugeiconsIcon icon={RefreshIcon} className="size-icon-sm" />
+      {t('settings.providers.sync')}
+    </Button>
+  );
+}
+
+function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts, onClose }: FlowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const modelsQuery = useQuery({
@@ -178,27 +172,19 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
   const [busy, setBusy] = React.useState(false);
   const [rotating, setRotating] = React.useState(false);
   const [check, setCheck] = React.useState<CheckResult | null>(initialCheck);
-  const [discovery, setDiscovery] = React.useState<DiscoveryResult | null>(null);
-  const [rotatedAt, setRotatedAt] = React.useState<number | null>(null);
   const [probeError, setProbeError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [confirmingDisconnect, setConfirmingDisconnect] = React.useState(false);
 
   const models = modelsQuery.data?.models ?? [];
 
-  /** After connect/update the key: probe once, then load models automatically. */
+  /** After connect or a key change: verify once, then load models — no manual steps. */
   const autoVerify = async (accountId: string, endpointUrl: string) => {
     const health = await adhamClient.testProviderConnection(accountId);
-    setCheck({
-      endpoint: endpointUrl,
-      at: Date.now(),
-      reachable: health.reachable,
-      tags: health.modelTagCount,
-    });
+    setCheck({ endpoint: endpointUrl, at: Date.now(), reachable: health.reachable, tags: null });
     onProbeOutcome(health.reachable);
     if (health.reachable) {
-      const modelsList = await adhamClient.discoverOllamaModels(accountId);
-      setDiscovery({ at: Date.now(), count: modelsList.models.length });
+      await adhamClient.discoverOllamaModels(accountId);
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(accountId) });
     }
   };
@@ -220,8 +206,6 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
       setKeyDraft('');
       setConsent(false);
       setRotating(false);
-      setRotatedAt(Date.now());
-      setDiscovery(null);
       await refreshAccounts?.();
       await autoVerify(account.accountId, account.endpointUrl);
     } catch (err) {
@@ -231,33 +215,12 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     }
   };
 
-  const handleTest = async () => {
+  const handleSync = async () => {
     if (busy || saved === null) return;
     setBusy(true);
     setProbeError(null);
     try {
-      const health = await adhamClient.testProviderConnection(saved.accountId);
-      setCheck({
-        endpoint: saved.endpointUrl,
-        at: Date.now(),
-        reachable: health.reachable,
-        tags: health.modelTagCount,
-      });
-      onProbeOutcome(health.reachable);
-    } catch (err) {
-      setProbeError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDiscover = async () => {
-    if (busy || saved === null) return;
-    setBusy(true);
-    setProbeError(null);
-    try {
-      const modelsList = await adhamClient.discoverOllamaModels(saved.accountId);
-      setDiscovery({ at: Date.now(), count: modelsList.models.length });
+      await adhamClient.discoverOllamaModels(saved.accountId);
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(saved.accountId) });
     } catch (err) {
       setProbeError(err instanceof Error ? err.message : String(err));
@@ -274,8 +237,6 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
       await adhamClient.disconnectGoogleAccount(saved.accountId);
       setConfirmingDisconnect(false);
       setCheck(null);
-      setDiscovery(null);
-      setRotatedAt(null);
       await refreshAccounts?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -284,22 +245,44 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     }
   };
 
+  // A probe is meaningful only while it ran against this account's endpoint.
+  const currentCheck =
+    saved !== null && check !== null && check.endpoint === saved.endpointUrl ? check : null;
+
   return (
     <div className="space-y-3">
       {saved !== null && (
-        <div className={statusPanelClass}>
-          <p className="truncate">
-            {t('settings.providers.lblEndpoint')} {saved.endpointUrl}
-          </p>
-          <GoogleCheckRows check={check} endpoint={saved.endpointUrl} />
-          {modelsQuery.data && (
-            <p>
-              {models.length > 0
-                ? t('settings.providers.inventoryLine', { count: models.length })
-                : t('settings.providers.inventoryNone')}
+        <div className="space-y-1">
+          {currentCheck !== null && (
+            <StatusLine
+              ok={currentCheck.reachable}
+              trailing={
+                currentCheck.reachable ? (
+                  <SyncButton onSync={() => void handleSync()} disabled={busy} />
+                ) : undefined
+              }
+            >
+              {currentCheck.reachable ? (
+                <span className="text-foreground">
+                  {t('settings.providers.statusAvailable', { count: models.length })}
+                </span>
+              ) : (
+                <span className="text-foreground">
+                  {t('settings.providers.googleUnreachable', { url: saved.endpointUrl })}
+                </span>
+              )}
+            </StatusLine>
+          )}
+          {probeError !== null && (
+            <p role="alert" className="text-xs text-danger-foreground">
+              {t('settings.providers.probeFailed', { error: probeError })}
             </p>
           )}
-          <DiscoveryRows discovery={discovery} />
+          {error !== null && (
+            <p role="alert" className="text-xs text-danger-foreground">
+              {t('settings.providers.googleFailedLine', { error })}
+            </p>
+          )}
         </div>
       )}
 
@@ -326,26 +309,10 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
           />
         </div>
       ) : (
-        <p className="text-xs text-foreground-secondary">
-          {t('settings.providers.googleKeySealedNote')}
-          {rotatedAt !== null && (
-            <> {t('settings.providers.googleRotated', { time: fmtTime(rotatedAt) })}</>
-          )}
-        </p>
-      )}
-
-      {saved !== null && !rotating && !confirmingDisconnect && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
+          <span>🔒 {t('settings.providers.googleKeyNote')}</span>
           <Button size="sm" variant="secondary" onClick={() => setRotating(true)} disabled={busy}>
             {t('settings.providers.updateKey')}
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={() => setConfirmingDisconnect(true)}
-            disabled={busy}
-          >
-            {t('settings.providers.googleDisconnect')}
           </Button>
         </div>
       )}
@@ -356,24 +323,9 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
         </p>
       )}
 
-      {probeError !== null && (
-        <p role="alert" className="text-xs text-danger-foreground">
-          {t('settings.providers.probeFailed', { error: probeError })}
-        </p>
-      )}
-      {error !== null && (
-        <p role="alert" className="text-xs text-danger-foreground">
-          {t('settings.providers.googleFailedLine', { error })}
-        </p>
-      )}
-
-      {/* Footer: the two available actions, 50/50. Confirm replaces both. */}
       <div className="grid grid-cols-2 gap-2">
         {saved !== null && confirmingDisconnect ? (
           <>
-            <Button variant="danger" onClick={() => void handleDisconnect()} disabled={busy}>
-              {t('settings.providers.googleDisconnectConfirmLabel')}
-            </Button>
             <Button
               variant="secondary"
               onClick={() => setConfirmingDisconnect(false)}
@@ -381,17 +333,13 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
             >
               {t('common.cancel')}
             </Button>
+            <Button variant="danger" onClick={() => void handleDisconnect()} disabled={busy}>
+              {t('settings.providers.googleDisconnectConfirmLabel')}
+            </Button>
           </>
         ) : saved === null || rotating ? (
           rotating ? (
             <>
-              <Button
-                variant="primary"
-                onClick={() => void submitKey()}
-                disabled={busy || !consent || keyDraft.trim().length === 0}
-              >
-                {t('settings.providers.updateKey')}
-              </Button>
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -401,6 +349,13 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
                 disabled={busy}
               >
                 {t('common.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => void submitKey()}
+                disabled={busy || !consent || keyDraft.trim().length === 0}
+              >
+                {t('settings.providers.updateKey')}
               </Button>
             </>
           ) : (
@@ -415,21 +370,11 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
           )
         ) : (
           <>
-            <Button
-              variant="primary"
-              onClick={() => void handleTest()}
-              disabled={busy}
-              aria-label={t('settings.providers.googleTestLabel')}
-            >
-              {t('settings.providers.testConnection')}
+            <Button variant="danger" onClick={() => setConfirmingDisconnect(true)} disabled={busy}>
+              {t('settings.providers.googleDisconnect')}
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => void handleDiscover()}
-              disabled={busy}
-              aria-label={t('settings.providers.googleDiscoverLabel')}
-            >
-              {t('settings.providers.discoverModels')}
+            <Button variant="primary" onClick={onClose} disabled={busy}>
+              {t('settings.providers.done')}
             </Button>
           </>
         )}
@@ -453,22 +398,22 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
   const [editedEndpoint, setEditedEndpoint] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [check, setCheck] = React.useState<CheckResult | null>(initialCheck);
-  const [discovery, setDiscovery] = React.useState<DiscoveryResult | null>(null);
   const [probeError, setProbeError] = React.useState<string | null>(null);
 
   const value = editedEndpoint ?? saved?.endpointUrl ?? '';
   const current = value.trim();
   const dirty = saved !== null && editedEndpoint !== null && editedEndpoint !== saved.endpointUrl;
-  const checkCurrent = check !== null && check.endpoint === current;
   const models = modelsQuery.data?.models ?? [];
 
-  const handleTest = async () => {
+  /** One action: probe (transiently for unsaved/edited hosts), save only on
+   * reachability, then load the models — the old Test/Discover pair, merged. */
+  const saveAndReconnect = async () => {
     if (busy || !current) return;
     setBusy(true);
     setProbeError(null);
     try {
-      // Unsaved/changed endpoints probe transiently ("failed test saves
-      // nothing"): the empty accountId makes the backend skip persistence.
+      // Unsaved/changed endpoints probe transiently, so a failed test saves
+      // nothing: the empty accountId makes the backend skip persistence.
       const health =
         !saved || dirty
           ? await adhamClient.testProviderConnection('', undefined, { endpointUrl: value })
@@ -490,13 +435,12 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
         );
         accountId = account.accountId;
       }
-      const modelsList = await adhamClient.discoverOllamaModels(accountId);
+      await adhamClient.discoverOllamaModels(accountId);
       setCheck({ endpoint: current, at: Date.now(), reachable: true, tags: health.modelTagCount });
-      setDiscovery({ at: Date.now(), count: modelsList.models.length });
       onProbeOutcome(true);
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(accountId) });
       // the minted/updated identity must reach the page's account state
-      await refreshAccounts?.();
+      if (!saved || dirty) await refreshAccounts?.();
     } catch (error) {
       setProbeError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -504,13 +448,12 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     }
   };
 
-  const handleDiscover = async () => {
-    if (busy || saved === null || dirty) return;
+  const handleSync = async () => {
+    if (busy || saved === null) return;
     setBusy(true);
     setProbeError(null);
     try {
-      const modelsList = await adhamClient.discoverOllamaModels(saved.accountId);
-      setDiscovery({ at: Date.now(), count: modelsList.models.length });
+      await adhamClient.discoverOllamaModels(saved.accountId);
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(saved.accountId) });
     } catch (error) {
       setProbeError(error instanceof Error ? error.message : String(error));
@@ -519,74 +462,75 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     }
   };
 
+  // A probe is meaningful only while it ran against the endpoint in the input.
+  const currentCheck = check !== null && check.endpoint === current ? check : null;
+
   return (
     <div className="space-y-3">
-      {saved !== null || check !== null ? (
-        <div className={statusPanelClass}>
-          {saved !== null && (
-            <p className="truncate">
-              {t('settings.providers.lblEndpoint')} {saved.endpointUrl}
-            </p>
-          )}
-          {checkCurrent ? (
-            <CheckRows check={check} endpoint={current} />
-          ) : check !== null || saved !== null ? (
-            <p>{t('settings.providers.checkPending', { url: current })}</p>
-          ) : null}
-          {saved !== null && modelsQuery.data && (
-            <p>
-              {models.length > 0
-                ? t('settings.providers.inventoryLine', { count: models.length })
-                : t('settings.providers.inventoryNone')}
-            </p>
-          )}
-          {dirty && models.length > 0 && (
-            <p>
-              {t('settings.providers.unsavedAttribution', { url: saved?.endpointUrl ?? current })}
-            </p>
-          )}
-          {saved !== null && !dirty && <DiscoveryRows discovery={discovery} />}
-        </div>
-      ) : (
-        <p className="text-xs text-foreground-secondary">
-          {t('settings.providers.notConfiguredLine')}
-        </p>
-      )}
+      <div className="space-y-1.5">
+        <label
+          htmlFor="ollama-host"
+          className="block text-xs font-medium text-foreground-secondary"
+        >
+          {t('settings.providers.endpointHostLabel')}
+        </label>
+        <input
+          id="ollama-host"
+          type="text"
+          aria-label={t('settings.providers.endpointHostLabel')}
+          placeholder={t('settings.providers.endpointPlaceholder')}
+          value={value}
+          onChange={(e) => setEditedEndpoint(e.target.value)}
+          className={inputClass}
+        />
+      </div>
 
-      <input
-        type="text"
-        aria-label={t('settings.providers.endpointLabel')}
-        placeholder={t('settings.providers.endpointPlaceholder')}
-        value={value}
-        onChange={(e) => setEditedEndpoint(e.target.value)}
-        className={inputClass}
-      />
-
-      {probeError !== null && (
-        <p role="alert" className="text-xs text-danger-foreground">
-          {t('settings.providers.probeFailed', { error: probeError })}
-        </p>
-      )}
+      <div className="space-y-1">
+        {currentCheck !== null && (
+          <StatusLine
+            ok={currentCheck.reachable}
+            trailing={
+              currentCheck.reachable ? (
+                <SyncButton
+                  onSync={() => void handleSync()}
+                  disabled={busy || dirty}
+                  {...(dirty
+                    ? {
+                        title: t('settings.providers.syncDirty', {
+                          url: saved?.endpointUrl ?? current,
+                        }),
+                      }
+                    : {})}
+                />
+              ) : undefined
+            }
+          >
+            {currentCheck.reachable ? (
+              <span className="text-foreground">
+                {t('settings.providers.statusAvailable', { count: models.length })}
+              </span>
+            ) : (
+              <span className="text-foreground">
+                {t('settings.providers.offlineMessage', { url: currentCheck.endpoint })}
+              </span>
+            )}
+          </StatusLine>
+        )}
+        {probeError !== null && (
+          <p role="alert" className="text-xs text-danger-foreground">
+            {t('settings.providers.probeFailed', { error: probeError })}
+          </p>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <Button
           variant="primary"
-          onClick={() => void handleTest()}
+          onClick={() => void saveAndReconnect()}
           disabled={busy || current.length === 0}
+          className="col-span-2"
         >
-          {busy ? t('settings.providers.testing') : t('settings.providers.testConnection')}
-        </Button>
-        <Button
-          variant="primary"
-          onClick={() => void handleDiscover()}
-          disabled={busy || saved === null || dirty}
-          title={
-            dirty
-              ? t('settings.providers.unsavedAttribution', { url: saved?.endpointUrl ?? current })
-              : undefined
-          }
-        >
-          {t('settings.providers.discoverModels')}
+          {busy ? t('settings.providers.testing') : t('settings.providers.saveReconnect')}
         </Button>
       </div>
     </div>
