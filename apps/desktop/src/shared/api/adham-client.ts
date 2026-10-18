@@ -418,12 +418,18 @@ export class AdhamApiClient implements AdhamClient {
 
   // ===== Delivery A: provider commands =====
 
-  private sessionContext(
-    workspaceId: string,
-    projectId: string,
-    sessionId: string,
-  ): CommandContext {
-    return { workspaceId, projectId, sessionId };
+  /** Shared transport for JSON provider commands: wrap → invoke → zod parse;
+   * context omitted means the app-level null scope (settings surface). */
+  private async sendCommand<T>(
+    command: string,
+    payload: unknown,
+    schema: { parse: (raw: unknown) => T },
+    context?: CommandContext,
+    requestId?: string,
+  ): Promise<T> {
+    const envelope = this.wrapCommand(payload, context, requestId);
+    const result = await invoke<CommandResult<T>>(command, { request: envelope });
+    return schema.parse(result.data);
   }
 
   async listProviderAccounts(): Promise<ListProviderAccountsResponse> {
@@ -436,11 +442,13 @@ export class AdhamApiClient implements AdhamClient {
     context?: CommandContext,
     options?: { requestId?: string },
   ): Promise<ListProviderModelsResponse> {
-    const envelope = this.wrapCommand({ accountId }, context, options?.requestId);
-    const result = await invoke<CommandResult<ListProviderModelsResponse>>('list_provider_models', {
-      request: envelope,
-    });
-    return ListProviderModelsResponseSchema.parse(result.data);
+    return this.sendCommand(
+      'list_provider_models',
+      { accountId },
+      ListProviderModelsResponseSchema,
+      context,
+      options?.requestId,
+    );
   }
 
   async testProviderConnection(
@@ -448,15 +456,13 @@ export class AdhamApiClient implements AdhamClient {
     context?: CommandContext,
     options?: { requestId?: string; endpointUrl?: string },
   ): Promise<ProviderHealthResponse> {
-    const envelope = this.wrapCommand(
+    return this.sendCommand(
+      'test_provider_connection',
       { accountId, endpointUrl: options?.endpointUrl ?? null },
+      ProviderHealthResponseSchema,
       context,
       options?.requestId,
     );
-    const result = await invoke<CommandResult<ProviderHealthResponse>>('test_provider_connection', {
-      request: envelope,
-    });
-    return ProviderHealthResponseSchema.parse(result.data);
   }
 
   async discoverOllamaModels(
@@ -464,11 +470,13 @@ export class AdhamApiClient implements AdhamClient {
     context?: CommandContext,
     options?: { requestId?: string },
   ): Promise<ProviderModelsList> {
-    const envelope = this.wrapCommand({ accountId }, context, options?.requestId);
-    const result = await invoke<CommandResult<ProviderModelsList>>('discover_ollama_models', {
-      request: envelope,
-    });
-    return ProviderModelsListSchema.parse(result.data);
+    return this.sendCommand(
+      'discover_ollama_models',
+      { accountId },
+      ProviderModelsListSchema,
+      context,
+      options?.requestId,
+    );
   }
 
   async updateProviderAccount(
@@ -476,8 +484,10 @@ export class AdhamApiClient implements AdhamClient {
     context: { workspaceId?: string; projectId?: string | null; sessionId?: string | null },
     options?: { requestId?: string },
   ): Promise<ProviderAccountDto> {
-    const envelope = this.wrapCommand(
+    return this.sendCommand(
+      'update_provider_account',
       payload,
+      ProviderAccountDtoSchema,
       {
         workspaceId: context.workspaceId ?? null,
         projectId: context.projectId ?? null,
@@ -485,10 +495,6 @@ export class AdhamApiClient implements AdhamClient {
       },
       options?.requestId,
     );
-    const result = await invoke<CommandResult<ProviderAccountDto>>('update_provider_account', {
-      request: envelope,
-    });
-    return ProviderAccountDtoSchema.parse(result.data);
   }
 
   /** G2: write-only Google configuration — the API key is sealed backend-side
@@ -502,47 +508,35 @@ export class AdhamApiClient implements AdhamClient {
     },
     options?: { requestId?: string },
   ): Promise<ProviderAccountDto> {
-    const envelope = this.wrapCommand(
+    return this.sendCommand(
+      'configure_google_account',
       payload,
-      { workspaceId: null, projectId: null, sessionId: null },
+      ProviderAccountDtoSchema,
+      undefined,
       options?.requestId,
     );
-    const result = await invoke<CommandResult<ProviderAccountDto>>('configure_google_account', {
-      request: envelope,
-    });
-    return ProviderAccountDtoSchema.parse(result.data);
   }
 
   /** G2: disconnect removes the Google account; models and the sealed key
    * cascade away on the backend. */
-  async disconnectGoogleAccount(
-    accountId: string,
-    options?: { requestId?: string },
-  ): Promise<{ accountId: string }> {
-    const envelope = this.wrapCommand(
+  async disconnectGoogleAccount(accountId: string, options?: { requestId?: string }) {
+    return this.sendCommand(
+      'disconnect_google_account',
       { accountId },
-      { workspaceId: null, projectId: null, sessionId: null },
+      GoogleAccountDisconnectedSchema,
+      undefined,
       options?.requestId,
     );
-    const result = await invoke<CommandResult<{ accountId: string }>>('disconnect_google_account', {
-      request: envelope,
-    });
-    return GoogleAccountDisconnectedSchema.parse(result.data);
   }
 
-  async disconnectOllamaAccount(
-    accountId: string,
-    options?: { requestId?: string },
-  ): Promise<{ accountId: string }> {
-    const envelope = this.wrapCommand(
+  async disconnectOllamaAccount(accountId: string, options?: { requestId?: string }) {
+    return this.sendCommand(
+      'disconnect_ollama_account',
       { accountId },
-      { workspaceId: null, projectId: null, sessionId: null },
+      OllamaAccountDisconnectedSchema,
+      undefined,
       options?.requestId,
     );
-    const result = await invoke<CommandResult<{ accountId: string }>>('disconnect_ollama_account', {
-      request: envelope,
-    });
-    return OllamaAccountDisconnectedSchema.parse(result.data);
   }
 
   async completeOnceStreaming(
@@ -558,7 +552,7 @@ export class AdhamApiClient implements AdhamClient {
     });
     const envelope = this.wrapCommand(
       payload,
-      this.sessionContext(workspaceId, projectId, sessionId),
+      { workspaceId, projectId, sessionId },
       options?.requestId,
     );
     const result = await invoke<CommandResult<CompletionStartDto>>('complete_once_streaming', {
@@ -577,7 +571,7 @@ export class AdhamApiClient implements AdhamClient {
   ): Promise<StopCompletionResponse> {
     const envelope = this.wrapCommand(
       { opId },
-      this.sessionContext(workspaceId, projectId, sessionId),
+      { workspaceId, projectId, sessionId },
       options?.requestId,
     );
     const result = await invoke<CommandResult<StopCompletionResponse>>('stop_completion', {
