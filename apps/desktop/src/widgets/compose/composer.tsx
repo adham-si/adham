@@ -18,10 +18,10 @@ import type { ModelOption } from './compose-model-picker';
 export interface QueuedInstruction {
   id: string;
   text: string;
-  /** Reply anchor captured when it was queued; the drain dispatches with it. */
+  /** Reference captured when it was queued; the drain dispatches with it. */
   reference?: { refersToMessageId: string; relation: 'replied' | 'edited-from' } | undefined;
-  /** Quoted text as seen when queued (display only); null = not loaded then. */
-  replyExcerpt?: string | null | undefined;
+  /** Referenced text as seen when queued (display only); null = not loaded then. */
+  referenceExcerpt?: string | null | undefined;
 }
 
 export interface ComposerProps {
@@ -33,9 +33,10 @@ export interface ComposerProps {
    *  input so a queueing send is never a silent no-op. */
   queued?: QueuedInstruction[] | undefined;
   onRemoveQueued?: ((id: string) => void) | undefined;
-  /** Pending reply anchor: the next send quotes this message. Excerpt is null
-   *  when the quoted message is not in the loaded history. */
-  replyTo?: { excerpt: string | null } | null | undefined;
+  /** Pending reference: the next send quotes this message ('replied') or
+   *  resends it as an edited alternative ('edited-from'). Excerpt is null when
+   *  the referenced message is not in the loaded history. */
+  replyTo?: { relation: 'replied' | 'edited-from'; excerpt: string | null } | null | undefined;
   onCancelReply?: (() => void) | undefined;
   status?: ComposeStatus | undefined;
   mode?: ComposeMode | undefined;
@@ -180,12 +181,15 @@ export function Composer({
         {/* Attached Context Chips (Files, Folders, Pasted Text Blobs) */}
         <ComposeContextChips attachments={attachments} onRemove={onRemoveAttachment} />
 
-        {/* Pending reply quote: the next send is anchored to this message
-            until it is acknowledged or cancelled — never silently dropped. */}
+        {/* Pending reference: the next send quotes this message (reply) or
+            resends it as an edited alternative, until acknowledged or
+            cancelled — never silently dropped. */}
         {replyTo && (
           <div className="flex items-center gap-2 px-3 pt-2 text-xs text-foreground-secondary">
             <span className="shrink-0 rounded border border-border-subtle bg-surface px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-              {t('compose.replyTo', 'Replying to')}
+              {replyTo.relation === 'edited-from'
+                ? t('compose.editing', 'Editing')
+                : t('compose.replyTo', 'Replying to')}
             </span>
             <span className="truncate" title={replyTo.excerpt ?? undefined}>
               {replyTo.excerpt ?? t('compose.replyUnavailable', 'Quoted message is not loaded.')}
@@ -193,8 +197,16 @@ export function Composer({
             <button
               type="button"
               onClick={() => onCancelReply?.()}
-              aria-label={t('compose.cancelReply', 'Cancel reply')}
-              title={t('compose.cancelReply', 'Cancel reply')}
+              aria-label={
+                replyTo.relation === 'edited-from'
+                  ? t('compose.cancelEdit', 'Cancel edit')
+                  : t('compose.cancelReply', 'Cancel reply')
+              }
+              title={
+                replyTo.relation === 'edited-from'
+                  ? t('compose.cancelEdit', 'Cancel edit')
+                  : t('compose.cancelReply', 'Cancel reply')
+              }
               className="ms-auto shrink-0 rounded p-0.5 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
             >
               <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
@@ -216,7 +228,9 @@ export function Composer({
                 </span>
                 {item.reference && (
                   <span className="shrink-0 rounded border border-border-subtle bg-surface px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                    {t('compose.queuedReply', 'Reply')}
+                    {item.reference.relation === 'edited-from'
+                      ? t('compose.queuedEdit', 'Edit')
+                      : t('compose.queuedReply', 'Reply')}
                   </span>
                 )}
                 <span className="truncate" title={item.text}>

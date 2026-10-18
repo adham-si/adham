@@ -110,6 +110,9 @@
     "queuedReply": "رد",
     "cancelReply": "إلغاء الرد",
     "replyUnavailable": "الرسالة المقتبَسة غير محمّلة.",
+    "editing": "تعديل",
+    "queuedEdit": "تعديل",
+    "cancelEdit": "إلغاء التعديل",
     "selectModel": "اختر نموذجًا",
     "markdown": {
       "copyCode": "نسخ الشيفرة",
@@ -119,7 +122,9 @@
       "imageNotShown": "الصورة غير معروضة",
       "unsupportedContent": "محتوى غير مدعوم",
       "replyAction": "رد",
+      "editAction": "تعديل",
       "quoteLabel": "الرد على",
+      "quoteEditedLabel": "تعديل من",
       "quoteUnavailable": "الرسالة المقتبَسة غير موجودة في السجل المحمّل."
     }
   }

@@ -98,6 +98,9 @@
     "queuedReply": "Reply",
     "cancelReply": "Cancel reply",
     "replyUnavailable": "Quoted message is not loaded.",
+    "editing": "Editing",
+    "queuedEdit": "Edit",
+    "cancelEdit": "Cancel edit",
     "selectModel": "Select a model",
     "markdown": {
       "copyCode": "Copy code",
@@ -107,7 +110,9 @@
       "imageNotShown": "Image not shown",
       "unsupportedContent": "Unsupported content",
       "replyAction": "Reply",
+      "editAction": "Edit",
       "quoteLabel": "Replying to",
+      "quoteEditedLabel": "Edited from",
       "quoteUnavailable": "Quoted message is not in the loaded history."
     }
   }

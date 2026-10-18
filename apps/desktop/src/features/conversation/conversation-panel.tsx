@@ -181,12 +181,21 @@ export function ConversationPanel({
     queuedRef.current = next;
     setQueued(next);
   }, []);
-  /** Message the next send quotes (reply anchor); cleared on acknowledgment
-   *  or session switch, never dropped silently. */
-  const [replyTarget, setReplyTarget] = React.useState<{
+  /** The message the next send references: a reply quote or an edited
+   *  alternative; cleared on acknowledgment or session switch, never dropped
+   *  silently. Switching Reply/Edit replaces the pending reference (one send
+   *  carries at most one); only Edit touches the draft (prefill/restore). */
+  const [pendingReference, setPendingReference] = React.useState<{
     id: string;
+    relation: UiMessageReference['relation'];
     excerpt: string | null;
+    /** Draft restored when an edit is cancelled; undefined = leave as-is. */
+    priorDraft?: string;
   } | null>(null);
+  const cancelPendingReference = React.useCallback(() => {
+    if (pendingReference?.priorDraft !== undefined) setDraft(pendingReference.priorDraft);
+    setPendingReference(null);
+  }, [pendingReference, setDraft]);
   /** Quoted text for a reference: null when the target is not in the loaded
    *  history, which the card then states instead of inventing an excerpt. */
   const quotedExcerptOf = React.useCallback(
@@ -344,17 +353,21 @@ export function ConversationPanel({
 
   /// Runs one turn with the parameters current at dispatch; a queued
   /// instruction drains through exactly the same path as a direct send. A
-  /// reply anchor rides only the streaming path (the text-only path records
-  /// no reference), so a reply without a resolved model is refused visibly
-  /// rather than sent as an unreferenced message.
+  /// reference rides only the streaming path (the text-only path records no
+  /// reference), so a referenced send without a resolved model is refused
+  /// visibly rather than sent as an unreferenced message.
   const dispatchTurn = React.useCallback(
     async (sent: string, reference?: UiMessageReference) => {
       setSubmitError(null);
-      const refusedReply = reference !== undefined && !streamReady;
-      const outcome = refusedReply
+      const refusedReference = reference !== undefined && !streamReady;
+      const outcome = refusedReference
         ? {
             ok: false as const,
-            error: t('conversation.replyNeedsModel'),
+            error: t(
+              reference?.relation === 'edited-from'
+                ? 'conversation.editNeedsModel'
+                : 'conversation.replyNeedsModel',
+            ),
             uncertain: false as const,
           }
         : streamReady
@@ -371,7 +384,7 @@ export function ConversationPanel({
       // A rejected dispatch (a refused reply, an undocumented think value) must
       // be visible, never a silent no-op. Text-only failures go through the
       // hook's error state, which the panel renders below.
-      if (!outcome.ok && (streamReady || refusedReply)) setSubmitError(outcome.error);
+      if (!outcome.ok && (streamReady || refusedReference)) setSubmitError(outcome.error);
       // Nothing was persisted (the hook drops its optimistic bubble), so the
       // instruction returns to the composer — never clobbering edits typed
       // meanwhile. The ref still reads `sent` when a refusal lands before the
@@ -389,21 +402,24 @@ export function ConversationPanel({
   const dispatchAndDrain = React.useCallback(
     async (sent: string, reference?: UiMessageReference) => {
       let outcome = await dispatchTurn(sent, reference);
-      // The anchor is acknowledged only when its dispatch was accepted; a
-      // refused reply keeps the pending quote so it can be retried as one.
+      // The reference is acknowledged only when its dispatch was accepted; a
+      // refused send keeps the pending reference so it can be retried as one.
       if (outcome.ok && reference) {
-        setReplyTarget((prev) => (prev && prev.id === reference.refersToMessageId ? null : prev));
+        setPendingReference((prev) =>
+          prev && prev.id === reference.refersToMessageId ? null : prev,
+        );
       }
       while (outcome.ok && queuedRef.current.length > 0) {
         const next = queuedRef.current[0]!;
         setQueuedBoth(queuedRef.current.slice(1));
         outcome = await dispatchTurn(next.text, next.reference);
-        // A refused queued reply returns to the composer with its anchor
+        // A refused queued reference returns to the composer with its target
         // intact, never silently downgraded to a plain message.
         if (!outcome.ok && next.reference) {
-          setReplyTarget({
+          setPendingReference({
             id: next.reference.refersToMessageId,
-            excerpt: next.replyExcerpt ?? null,
+            relation: next.reference.relation,
+            excerpt: next.referenceExcerpt ?? null,
           });
         }
       }
@@ -460,19 +476,19 @@ export function ConversationPanel({
       });
   }, [turnAction, busy, streamReady, t, conv, ollama.account, selectedModelId, mode, think]);
 
-  // Queued instructions and the pending reply anchor belong to the session
-  // they were typed in: a session switch drops them rather than dispatching
-  // them into another thread.
+  // Queued instructions and the pending reference belong to the session they
+  // were typed in: a session switch drops them rather than dispatching them
+  // into another thread.
   React.useEffect(() => {
     setQueuedBoth([]);
-    setReplyTarget(null);
+    setPendingReference(null);
   }, [conv.sessionId, setQueuedBoth]);
 
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
     if (!text) return;
-    const reference: UiMessageReference | undefined = replyTarget
-      ? { refersToMessageId: replyTarget.id, relation: 'replied' }
+    const reference: UiMessageReference | undefined = pendingReference
+      ? { refersToMessageId: pendingReference.id, relation: pendingReference.relation }
       : undefined;
     // Sending while a turn runs queues the instruction visibly: it is never
     // injected into the active call and never a silent no-op. It dispatches
@@ -484,11 +500,11 @@ export function ConversationPanel({
         {
           id: `queued-${queuedIdRef.current}`,
           text,
-          ...(reference ? { reference, replyExcerpt: replyTarget?.excerpt ?? null } : {}),
+          ...(reference ? { reference, referenceExcerpt: pendingReference?.excerpt ?? null } : {}),
         },
       ]);
-      // The queued instruction carries the anchor now; the chip is done.
-      if (reference) setReplyTarget(null);
+      // The queued instruction carries the reference now; the chip is done.
+      if (reference) setPendingReference(null);
       if (draftRef.current === text) commitPrompt(text);
       return;
     }
@@ -497,7 +513,7 @@ export function ConversationPanel({
     // the answer streams must not append to an already-sent instruction.
     if (draftRef.current === text) commitPrompt(text);
     await dispatchAndDrain(text, reference);
-  }, [busy, commitPrompt, dispatchAndDrain, setQueuedBoth, replyTarget]);
+  }, [busy, commitPrompt, dispatchAndDrain, setQueuedBoth, pendingReference]);
 
   /// A new model invalidates the thinking choice: a level documented for the
   /// previous model may be undocumented for the next one (the backend refuses
@@ -608,10 +624,29 @@ export function ConversationPanel({
                   quotedExcerpt={
                     m.reference ? quotedExcerptOf(m.reference.refersToMessageId) : undefined
                   }
-                  // Only persisted rows can anchor a reply: the provisional
+                  quotedRelation={m.reference?.relation}
+                  // Only persisted rows can reference a message: the provisional
                   // bubble carries no durable id the backend could validate.
                   onReply={
-                    m.provisional ? undefined : () => setReplyTarget({ id: m.id, excerpt: m.text })
+                    m.provisional
+                      ? undefined
+                      : () =>
+                          setPendingReference({ id: m.id, relation: 'replied', excerpt: m.text })
+                  }
+                  // Edit rewrites the prompt, which the backend accepts only
+                  // for user rows: never offered where it would have to refuse.
+                  onEdit={
+                    m.provisional || m.role !== 'user'
+                      ? undefined
+                      : () => {
+                          setPendingReference({
+                            id: m.id,
+                            relation: 'edited-from',
+                            excerpt: m.text,
+                            priorDraft: draftRef.current,
+                          });
+                          setDraft(m.text);
+                        }
                   }
                 />
                 {note && (
@@ -773,8 +808,12 @@ export function ConversationPanel({
           onStop={handleStop}
           queued={queued}
           onRemoveQueued={(id) => setQueuedBoth(queuedRef.current.filter((item) => item.id !== id))}
-          replyTo={replyTarget ? { excerpt: replyTarget.excerpt } : null}
-          onCancelReply={() => setReplyTarget(null)}
+          replyTo={
+            pendingReference
+              ? { relation: pendingReference.relation, excerpt: pendingReference.excerpt }
+              : null
+          }
+          onCancelReply={cancelPendingReference}
           status={composeStatus}
           enterToSend={enterToSend}
           mode={mode}

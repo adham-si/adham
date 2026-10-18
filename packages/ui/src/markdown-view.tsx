@@ -13,8 +13,12 @@ export interface MarkdownLabels {
   unsupportedContent: string;
   /** Action that anchors a reply to a message. */
   replyAction: string;
+  /** Action that resends a user message as an edited alternative. */
+  editAction: string;
   /** Heading of the quote block a reply shows. */
   quoteLabel: string;
+  /** Heading of the quote block an edited alternative shows. */
+  quoteEditedLabel: string;
   /** Shown when the quoted message is outside the loaded history. */
   quoteUnavailable: string;
 }
@@ -27,7 +31,9 @@ export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   imageNotShown: 'Image not shown',
   unsupportedContent: 'Unsupported content',
   replyAction: 'Reply',
+  editAction: 'Edit',
   quoteLabel: 'Replying to',
+  quoteEditedLabel: 'Edited from',
   quoteUnavailable: 'Quoted message is not in the loaded history.',
 };
 

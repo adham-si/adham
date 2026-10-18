@@ -54,10 +54,16 @@ export interface MessageCardProps
   editable?: boolean;
   /** When set, the card offers a Reply action anchored to this message. */
   onReply?: (() => void) | undefined;
+  /** When set, the card offers an Edit action: the message is resendable as an
+   *  edited alternative. Only user messages can be edited. */
+  onEdit?: (() => void) | undefined;
   /** Excerpt of the message this card quotes. undefined = no recorded quote
    *  (nothing renders); null = the quote target is not in the loaded history,
    *  which is stated instead of an invented excerpt. */
   quotedExcerpt?: string | null | undefined;
+  /** Relation of the recorded quote: 'edited-from' labels the block as an
+   *  edit lineage ("Edited from") instead of a reply quote. */
+  quotedRelation?: string | undefined;
   ref?: React.Ref<HTMLElement>;
 }
 
@@ -81,7 +87,9 @@ export function MessageCard({
   selected = false,
   editable = false,
   onReply,
+  onEdit,
   quotedExcerpt,
+  quotedRelation,
   className,
   ref,
   ...props
@@ -101,6 +109,15 @@ export function MessageCard({
       <div className="mb-1 flex items-center justify-between gap-2 text-xs">
         <span className="font-semibold tracking-wide uppercase">{label}</span>
         <span className="flex items-center gap-2">
+          {onEdit && (
+            <button
+              type="button"
+              className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              onClick={onEdit}
+            >
+              {resolved.editAction}
+            </button>
+          )}
           {onReply && (
             <button
               type="button"
@@ -136,7 +153,7 @@ export function MessageCard({
       {quotedExcerpt !== undefined && (
         <div className="mb-2 border-s-2 border-border-strong ps-2">
           <p className="text-xs font-semibold tracking-wide text-foreground-muted uppercase">
-            {resolved.quoteLabel}
+            {quotedRelation === 'edited-from' ? resolved.quoteEditedLabel : resolved.quoteLabel}
           </p>
           <p className="line-clamp-3 whitespace-pre-wrap text-xs text-foreground-secondary">
             {quotedExcerpt === null ? resolved.quoteUnavailable : quotedExcerpt}

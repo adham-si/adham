@@ -106,6 +106,9 @@
     "queuedReply": "Ответ",
     "cancelReply": "Отменить ответ",
     "replyUnavailable": "Цитируемое сообщение не загружено.",
+    "editing": "Редактирование",
+    "queuedEdit": "Правка",
+    "cancelEdit": "Отменить редактирование",
     "selectModel": "Выберите модель",
     "markdown": {
       "copyCode": "Копировать код",
@@ -115,7 +118,9 @@
       "imageNotShown": "Изображение не показано",
       "unsupportedContent": "Неподдерживаемое содержимое",
       "replyAction": "Ответить",
+      "editAction": "Изменить",
       "quoteLabel": "В ответ на",
+      "quoteEditedLabel": "Отредактировано из",
       "quoteUnavailable": "Цитируемое сообщение отсутствует в загруженной истории."
     }
   }

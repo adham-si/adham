@@ -284,6 +284,39 @@ describe('MessageCard', () => {
     expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
   });
 
+  it('offers Edit only when the caller can branch, and fires it', () => {
+    const onEdit = vi.fn();
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        onEdit={onEdit}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders no edit action without a handler', () => {
+    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+
+  it('labels an edited-from lineage as an edit, not a reply quote', () => {
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        quotedExcerpt="the original prompt"
+        quotedRelation="edited-from"
+      />,
+    );
+    expect(screen.getByText('Edited from')).toBeDefined();
+    expect(screen.queryByText('Replying to')).toBeNull();
+  });
+
   it('renders no quote block when no quote is recorded', () => {
     render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
     expect(screen.queryByText('Replying to')).toBeNull();

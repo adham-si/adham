@@ -94,6 +94,9 @@
     "queuedReply": "回复",
     "cancelReply": "取消回复",
     "replyUnavailable": "引用的消息未加载。",
+    "editing": "正在编辑",
+    "queuedEdit": "编辑",
+    "cancelEdit": "取消编辑",
     "selectModel": "选择模型",
     "markdown": {
       "copyCode": "复制代码",
@@ -103,7 +106,9 @@
       "imageNotShown": "未显示图片",
       "unsupportedContent": "不支持的内容",
       "replyAction": "回复",
+      "editAction": "编辑",
       "quoteLabel": "回复",
+      "quoteEditedLabel": "编辑自",
       "quoteUnavailable": "引用的消息不在已加载的历史记录中。"
     }
   }
