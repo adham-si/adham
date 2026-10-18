@@ -160,7 +160,7 @@ capability evidence must come from the wire. Adopted/flagged changes to this pla
 
 ## Tasks
 
-### G-Task 1: Contract variant + account DTO additive (coordinate note)
+### Task 1: Contract variant + account DTO additive (coordinate note)
 - [ ] Step 1: `domain/account.rs`: `ProviderKind::GoogleGemini` (serde `google_gemini`);
       fix every non-exhaustive match compile error outside the provider crate
       (expected: the `matches!` gate in `handlers/providers.rs` only).
@@ -169,7 +169,7 @@ capability evidence must come from the wire. Adopted/flagged changes to this pla
 - [ ] Step 3: providers.rs `local_account` gate generalized (kind match below).
 - [ ] Gates: cargo + affected frontend suites.
 
-### G-Task 2: Credential vault (backend only)
+### Task 2: Credential vault (backend only)
 - [ ] Step 1: failing tests → `crates/adham-event-log/src/sqlite/provider_credentials.rs`:
       `provider_credentials` table (`account_id` PK, AEAD ciphertext, record meta),
       `put/get/remove` through the existing content-key envelope; unique
@@ -181,7 +181,7 @@ capability evidence must come from the wire. Adopted/flagged changes to this pla
       (re-put), disconnect (remove key + keep account row? choose: remove both row
       and key — account delete parity with Ollama).
 
-### G-Task 3: Gemini adapter module
+### Task 3: Gemini adapter module
 - [ ] Step 1: failing fixture tests (TcpListener stubs from task 0 patterns):
       discovery mapping (generative + embedding rows), health, SSE happy path,
       thought/text mixing, finishReason matrix, quota/auth errors, truncated and
@@ -194,7 +194,7 @@ capability evidence must come from the wire. Adopted/flagged changes to this pla
 - [ ] Step 3: wire `mod.rs`; privacy-boundary tests extended
       (`privacy_boundary_tests.rs`).
 
-### G-Task 4: Dispatch generalization (+ proofs live here)
+### Task 4: Dispatch generalization (+ proofs live here)
 - [ ] Step 1: failing tests in `crates/adham-desktop-api/src/ipc_contract_tests.rs`
       (existing battery):
       1. `google_configure_and_discover_work_while_ollama_unreachable`
@@ -209,7 +209,7 @@ capability evidence must come from the wire. Adopted/flagged changes to this pla
       dispatch and vice versa).
 - [ ] Step 3: same battery green; Ollama 16-test battery untouched.
 
-### G-Task 5: Provider settings surface (backend-driven only)
+### Task 5: Provider settings surface (backend-driven only)
 - [ ] Step 1: failing vitest specs (providers-page test file patterns):
       Google card = consent checkbox + write-only password key input (cleared on
       unmount/submit — old B-plan copy rules) + Test/Discover with the SAME
@@ -222,7 +222,7 @@ capability evidence must come from the wire. Adopted/flagged changes to this pla
 - [ ] Step 3: composer untouched (cloud dispatch proof stays backend/IPC-level until
       #32 wires the cloud-capable composer; the LOCAL composer needs zero changes).
 
-### G-Task 6: Docs, evidence, coordination
+### Task 6: Docs, evidence, coordination
 - [ ] Step 1: full gates; evidence report `docs/reports/provider-delivery-g-YYYY-MM-DD.md`
       (delta list, proofs, limitations).
 - [ ] Step 2: ledger; coordination handoff to #32 (DTO kind field + descriptor

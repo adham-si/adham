@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
-import * as React from 'react';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, cleanup, within } from '@testing-library/react';
+import { Channel, invoke } from '@tauri-apps/api/core';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { invoke, Channel } from '@tauri-apps/api/core';
 import '@/shared/i18n';
+import type { ProviderAccountDto } from '@adham/contracts-generated';
 import i18n from '@/shared/i18n';
 import { ThemeProvider } from '@/theme/theme-provider';
-import type { ProviderAccountDto } from '@adham/contracts-generated';
 import { ProvidersPage } from './providers-page';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -216,7 +217,7 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     await user.type(input, 'http://127.0.0.1:11434');
 
     await user.click(within(dlg).getByRole('button', { name: /test connection/i }));
-    await waitFor(() => expect(within(dlg).getByText(/models recorded from/i)).toBeDefined());
+    await waitFor(() => expect(within(dlg).getByText(/models recorded/i)).toBeDefined());
     expect(invokeMock).toHaveBeenCalledWith(
       'test_provider_connection',
       expect.objectContaining({
@@ -273,8 +274,8 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     renderPage();
     const user = userEvent.setup();
     const dlg = await openProvider('Ollama', user);
-    expect(await within(dlg).findByText(/models recorded from/i)).toBeDefined();
-    expect(within(dlg).getByText(/configured/i)).toBeDefined();
+    expect(await within(dlg).findByText(/models recorded/i)).toBeDefined();
+    expect(within(dlg).getByText(/endpoint http:\/\/127\.0\.0\.1:11434/i)).toBeDefined();
     // The auto status probe really runs (reachability is asserted, never guessed)
     await waitFor(() => expect(within(dlg).getByText(/reachable/i)).toBeDefined());
     const checked = invokeMock.mock.calls.filter(
@@ -298,7 +299,7 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
 
     // make the saved endpoint's check + discovery current, then edit
     await user.click(within(dlg).getByRole('button', { name: /test connection/i }));
-    await waitFor(() => expect(within(dlg).getByText(/models recorded from/i)).toBeDefined());
+    await waitFor(() => expect(within(dlg).getByText(/models recorded/i)).toBeDefined());
     const discoverCallsBefore = invokeMock.mock.calls.filter(
       ([cmd]) => cmd === 'discover_ollama_models',
     ).length;
@@ -307,9 +308,9 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
 
     // old results disappear the moment the endpoint differs
     expect(within(dlg).queryByText(/reachable/i)).toBeNull();
-    expect(within(dlg).getByText(/no check result recorded for/i)).toBeDefined();
+    expect(within(dlg).getByText(/not checked yet/i)).toBeDefined();
     // the recorded inventory is still attributed to the endpoint it came from
-    expect(within(dlg).getByText(/recorded from http:\/\/127\.0\.0\.1:11434/i)).toBeDefined();
+    expect(within(dlg).getByText(/endpoint http:\/\/127\.0\.0\.1:11434/i)).toBeDefined();
     expect(within(dlg).getByText(/belong to http:\/\/127\.0\.0\.1:11434/i)).toBeDefined();
 
     // Discover stays locked until the edited endpoint is saved
@@ -325,7 +326,7 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     // then discovery runs against that updated identity
     await user.click(within(dlg).getByRole('button', { name: /test connection/i }));
     await waitFor(() =>
-      expect(within(dlg).getByText(/recorded from http:\/\/127\.0\.0\.1:11435/i)).toBeDefined(),
+      expect(within(dlg).getByText(/endpoint http:\/\/127\.0\.0\.1:11435/i)).toBeDefined(),
     );
     expect(invokeMock).toHaveBeenCalledWith(
       'test_provider_connection',
@@ -353,7 +354,7 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     await user.clear(input);
     await user.type(input, 'http://127.0.0.1:11440');
     expect(within(dlg).queryByText(/no response from/i)).toBeNull();
-    expect(within(dlg).getByText(/no check result recorded for/i)).toBeDefined();
+    expect(within(dlg).getByText(/not checked yet/i)).toBeDefined();
   });
 
   it('renders a distinct probe-failure error when the request itself errors', async () => {
@@ -385,7 +386,7 @@ describe('ProvidersPage Ollama wiring (Delivery A)', () => {
     await waitFor(() => expect(input.value).toBe('http://127.0.0.1:11434'));
 
     await user.click(within(dlg).getByRole('button', { name: /test connection/i }));
-    await waitFor(() => expect(within(dlg).getByText(/models recorded from/i)).toBeDefined());
+    await waitFor(() => expect(within(dlg).getByText(/models recorded/i)).toBeDefined());
     expect(invokeMock).toHaveBeenCalledWith(
       'test_provider_connection',
       expect.objectContaining({
@@ -440,10 +441,11 @@ describe('ProvidersPage Google wiring (Delivery G)', () => {
     ).toBe(false);
     await user.click(within(dlg).getByRole('button', { name: /^Connect$/i }));
 
-    await waitFor(() =>
-      expect(within(dlg).getByText(/stored sealed in this app's vault/i)).toBeDefined(),
-    );
-    // Write-only: the key never lingers in the draft once submitted.
+    await waitFor(() => expect(within(dlg).getByText(/sealed in the vault/i)).toBeDefined());
+    // Write-only: the connected state holds no key field at all.
+    expect(within(dlg).queryByLabelText(/gemini api key/i)).toBeNull();
+    // Rotating re-reveals an empty field — the sealed key is never shown back.
+    await user.click(within(dlg).getByRole('button', { name: /update key/i }));
     expect((within(dlg).getByLabelText(/gemini api key/i) as HTMLInputElement).value).toBe('');
     expect(invokeMock).toHaveBeenCalledWith(
       'configure_google_account',
@@ -485,13 +487,15 @@ describe('ProvidersPage Google wiring (Delivery G)', () => {
     renderPage();
     const dlg = await openProvider('Google Gemini', user);
     await user.click(await within(dlg).findByRole('button', { name: /disconnect/i }));
-    expect(within(dlg).getByText(/removed together/i)).toBeDefined();
+    expect(within(dlg).getByText(/sealed key and its discovered models/i)).toBeDefined();
     expect(
       invokeMock.mock.calls.filter(([cmd]) => cmd === 'disconnect_google_account'),
     ).toHaveLength(0);
 
     await user.click(within(dlg).getByRole('button', { name: /yes, disconnect/i }));
-    await waitFor(() => expect(within(dlg).queryByText(/removed together/i)).toBeNull());
+    await waitFor(() =>
+      expect(within(dlg).queryByText(/sealed key and its discovered models/i)).toBeNull(),
+    );
     expect(invokeMock).toHaveBeenCalledWith(
       'disconnect_google_account',
       expect.objectContaining({
@@ -506,7 +510,7 @@ describe('ProvidersPage Google wiring (Delivery G)', () => {
     renderPage();
     const dlg = await openProvider('Google Gemini', user);
     await user.click(await within(dlg).findByRole('button', { name: /test google connection/i }));
-    await waitFor(() => expect(within(dlg).getByText(/last check .*reachable/i)).toBeDefined());
+    await waitFor(() => expect(within(dlg).getByText(/reachable/i)).toBeDefined());
     expect(invokeMock).toHaveBeenCalledWith(
       'test_provider_connection',
       expect.objectContaining({
@@ -520,9 +524,7 @@ describe('ProvidersPage Google wiring (Delivery G)', () => {
       ([cmd]) => cmd === 'discover_ollama_models',
     ).length;
     await user.click(within(dlg).getByRole('button', { name: /discover google models/i }));
-    await waitFor(() =>
-      expect(within(dlg).getByText(/discovered [0-9]+ models at/i)).toBeDefined(),
-    );
+    await waitFor(() => expect(within(dlg).getByText(/discovered [0-9]+ models/i)).toBeDefined());
     expect(invokeMock.mock.calls.filter(([cmd]) => cmd === 'discover_ollama_models').length).toBe(
       discoverCallsBefore + 1,
     );

@@ -1,6 +1,4 @@
-import * as React from 'react';
-import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ProviderAccountDto } from '@adham/contracts-generated';
 import {
   Button,
   DialogClose,
@@ -9,10 +7,14 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@adham/ui';
-import type { ProviderAccountDto } from '@adham/contracts-generated';
+import { Cancel01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { adhamClient } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
-import type { ProviderCatalogEntry } from './provider-card';
+import { type ProviderCatalogEntry, type ProviderStatus, StatusBadge } from './provider-card';
 
 interface CheckResult {
   endpoint: string;
@@ -29,32 +31,35 @@ function fmtTime(at: number): string {
   return new Date(at).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   });
 }
 
+const inputClass = 'w-full min-w-0 rounded-md border border-border bg-surface px-3 py-2 text-sm';
+const statusPanelClass =
+  'space-y-1 rounded-lg border border-border-subtle bg-surface-subtle/40 p-3 text-xs text-foreground-secondary';
+
 export interface ProviderConnectModalProps {
   entry: ProviderCatalogEntry;
+  status: ProviderStatus;
   open: boolean;
   onClose: () => void;
   saved: ProviderAccountDto | null;
-  /** Auto status probe result for this provider from the page (seeded as the last check). */
+  /** Auto status probe result from the page (seeded as the last check). */
   initialCheck: CheckResult | null;
-  /** Syncs the card status badge after a modal-run probe. */
   onProbeOutcome: (reachable: boolean) => void;
   refreshAccounts: () => Promise<void>;
 }
 
 /**
- * Connect/manage dialog for one provider (page card opens it in front of the
- * settings surface). Both flows keep their Delivery A/G discipline: a
- * check/discovery renders only under the account it ran against, results carry
- * timestamps, the Google key is write-only (the draft never outlives submit),
- * and Google disconnect stays a two-step confirmation (it cascades the
- * credential and discovered models).
+ * Connect/manage dialog for one provider. Text discipline: one status panel
+ * (state · endpoint · last check · models), one config block, one footer.
+ * Flows keep the Delivery A/G rules: a check renders only under the endpoint
+ * it ran against, the Google key draft is write-only, disconnect confirms
+ * because it cascades the credential and discovered models.
  */
 export function ProviderConnectModal({
   entry,
+  status,
   open,
   onClose,
   saved,
@@ -66,26 +71,21 @@ export function ProviderConnectModal({
 
   return (
     <DialogRoot open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        // Settings closes on any Escape; this dialog must own it while open.
-        data-connect-dialog=""
-        className="space-y-4"
-      >
-        <div className="flex items-center gap-3">
+      <DialogContent data-connect-dialog="" className="space-y-4">
+        <DialogClose
+          aria-label={t('common.close')}
+          className="absolute top-3 end-3 flex size-8 items-center justify-center rounded-md text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} className="size-icon-sm" />
+        </DialogClose>
+        <div className="flex items-center gap-3 pe-10">
           <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-surface-raised p-2">
             <img src={entry.logo} alt="" className="size-6 object-contain" />
           </div>
           <DialogTitle className="mb-0">{entry.name}</DialogTitle>
+          <StatusBadge status={status} />
         </div>
-        <DialogDescription>{t(entry.descKey)}</DialogDescription>
-        {saved !== null && (
-          <p className="text-xs text-foreground-secondary">
-            {t('settings.providers.configuredLine', {
-              alias: saved.alias,
-              url: saved.endpointUrl,
-            })}
-          </p>
-        )}
+        <DialogDescription className="mb-2">{t(entry.descKey)}</DialogDescription>
         {entry.id === 'google' ? (
           <GoogleFlow
             saved={saved}
@@ -101,20 +101,66 @@ export function ProviderConnectModal({
             refreshAccounts={refreshAccounts}
           />
         )}
-        <div className="flex justify-end border-t border-border-subtle pt-3">
-          <DialogClose>{t('common.close')}</DialogClose>
-        </div>
       </DialogContent>
     </DialogRoot>
   );
 }
 
-type FlowProps = Pick<
-  ProviderConnectModalProps,
-  'saved' | 'initialCheck' | 'onProbeOutcome' | 'refreshAccounts'
->;
+interface FlowProps {
+  saved: ProviderAccountDto | null;
+  initialCheck: CheckResult | null;
+  onProbeOutcome: (reachable: boolean) => void;
+  refreshAccounts?: () => Promise<void>;
+}
 
-const inputClass = 'w-full min-w-0 rounded-md border border-border bg-surface px-3 py-2 text-sm';
+function CheckRows({ check, endpoint }: { check: CheckResult | null; endpoint: string }) {
+  const { t } = useTranslation();
+  const current = check !== null && check.endpoint === endpoint;
+  if (check === null || !current) return null;
+  return check.reachable ? (
+    <p>
+      {t('settings.providers.lastCheckReachable', {
+        time: fmtTime(check.at),
+        count: check.tags ?? 0,
+      })}
+    </p>
+  ) : (
+    <p role="alert">
+      {t('settings.providers.unreachable', { time: fmtTime(check.at), url: check.endpoint })}
+    </p>
+  );
+}
+
+function GoogleCheckRows({ check, endpoint }: { check: CheckResult | null; endpoint: string }) {
+  const { t } = useTranslation();
+  const current = check !== null && check.endpoint === endpoint;
+  if (check === null || !current) return null;
+  return check.reachable ? (
+    <p>
+      {t('settings.providers.lastCheckReachable', {
+        time: fmtTime(check.at),
+        count: check.tags ?? 0,
+      })}
+    </p>
+  ) : (
+    <p role="alert">
+      {t('settings.providers.googleUnreachable', { time: fmtTime(check.at), url: check.endpoint })}
+    </p>
+  );
+}
+
+function DiscoveryRows({ discovery }: { discovery: DiscoveryResult | null }) {
+  const { t } = useTranslation();
+  if (discovery === null) return null;
+  return (
+    <p>
+      {t('settings.providers.lastDiscovery', {
+        count: discovery.count,
+        time: fmtTime(discovery.at),
+      })}
+    </p>
+  );
+}
 
 function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: FlowProps) {
   const { t } = useTranslation();
@@ -130,6 +176,7 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
   const [consent, setConsent] = React.useState(false);
   const [keyDraft, setKeyDraft] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const [rotating, setRotating] = React.useState(false);
   const [check, setCheck] = React.useState<CheckResult | null>(initialCheck);
   const [discovery, setDiscovery] = React.useState<DiscoveryResult | null>(null);
   const [rotatedAt, setRotatedAt] = React.useState<number | null>(null);
@@ -137,28 +184,46 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
   const [error, setError] = React.useState<string | null>(null);
   const [confirmingDisconnect, setConfirmingDisconnect] = React.useState(false);
 
-  const current = saved?.endpointUrl ?? '';
   const models = modelsQuery.data?.models ?? [];
 
-  const handleConnect = async () => {
+  /** After connect/update the key: probe once, then load models automatically. */
+  const autoVerify = async (accountId: string, endpointUrl: string) => {
+    const health = await adhamClient.testProviderConnection(accountId);
+    setCheck({
+      endpoint: endpointUrl,
+      at: Date.now(),
+      reachable: health.reachable,
+      tags: health.modelTagCount,
+    });
+    onProbeOutcome(health.reachable);
+    if (health.reachable) {
+      const modelsList = await adhamClient.discoverOllamaModels(accountId);
+      setDiscovery({ at: Date.now(), count: modelsList.models.length });
+      queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(accountId) });
+    }
+  };
+
+  const submitKey = async () => {
     if (busy || !consent) return;
     const apiKey = keyDraft.trim();
     if (!apiKey) return;
     setBusy(true);
     setError(null);
     try {
-      await adhamClient.configureGoogleAccount({
+      const account = await adhamClient.configureGoogleAccount({
         accountId: saved?.accountId ?? null,
         alias: saved?.alias ?? null,
         apiKey,
         acknowledgeCloudTransfer: true,
       });
-      // write-only: the key never outlives the submit (unmount discards the
-      // draft — no stored draft anywhere)
+      // write-only: the key never outlives the submit (unmount discards the draft)
       setKeyDraft('');
+      setConsent(false);
+      setRotating(false);
       setRotatedAt(Date.now());
       setDiscovery(null);
-      await refreshAccounts();
+      await refreshAccounts?.();
+      await autoVerify(account.accountId, account.endpointUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -173,7 +238,7 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     try {
       const health = await adhamClient.testProviderConnection(saved.accountId);
       setCheck({
-        endpoint: current,
+        endpoint: saved.endpointUrl,
         at: Date.now(),
         reachable: health.reachable,
         tags: health.modelTagCount,
@@ -193,9 +258,7 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     try {
       const modelsList = await adhamClient.discoverOllamaModels(saved.accountId);
       setDiscovery({ at: Date.now(), count: modelsList.models.length });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.providerModels(saved.accountId),
-      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(saved.accountId) });
     } catch (err) {
       setProbeError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -213,7 +276,7 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
       setCheck(null);
       setDiscovery(null);
       setRotatedAt(null);
-      await refreshAccounts();
+      await refreshAccounts?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -221,135 +284,81 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     }
   };
 
-  const checkCurrent = check !== null && check.endpoint === current;
-
   return (
     <div className="space-y-3">
-      <label className="flex items-start gap-2 text-xs text-foreground-secondary">
-        <input
-          type="checkbox"
-          aria-label={t('settings.providers.googleConsentLabel')}
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          className="mt-0.5"
-        />
-        <span>{t('settings.providers.googleConsentLabel')}</span>
-      </label>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <input
-          type="password"
-          aria-label={t('settings.providers.googleKeyLabel')}
-          placeholder={t('settings.providers.googleKeyPlaceholder')}
-          value={keyDraft}
-          onChange={(e) => setKeyDraft(e.target.value)}
-          autoComplete="off"
-          className={`min-w-0 flex-1 ${inputClass}`}
-        />
-        <Button
-          variant="primary"
-          onClick={() => void handleConnect()}
-          disabled={busy || !consent || keyDraft.trim().length === 0}
-        >
-          {t('settings.providers.googleConnect')}
-        </Button>
-        <Button
-          onClick={() => void handleTest()}
-          disabled={busy || saved === null}
-          aria-label={t('settings.providers.googleTestLabel')}
-        >
-          {t('settings.providers.testConnection')}
-        </Button>
-        <Button
-          onClick={() => void handleDiscover()}
-          disabled={busy || saved === null}
-          aria-label={t('settings.providers.googleDiscoverLabel')}
-        >
-          {t('settings.providers.discoverModels')}
-        </Button>
-      </div>
-
-      <div aria-live="polite" className="space-y-1 text-xs text-foreground-secondary">
-        {saved === null && (
-          <>
-            <p>{t('settings.providers.googleDisconnectedLine')}</p>
-            {!consent && <p>{t('settings.providers.googleConsentRequired')}</p>}
-          </>
-        )}
-        {saved !== null && (
-          <>
-            <p>{t('settings.providers.googleKeySealedNote')}</p>
-            {modelsQuery.data && (
-              <p>
-                {models.length > 0
-                  ? t('settings.providers.inventoryLine', { count: models.length, url: current })
-                  : t('settings.providers.inventoryNone', { url: current })}
-              </p>
-            )}
-            {rotatedAt !== null && (
-              <p>{t('settings.providers.googleRotated', { time: fmtTime(rotatedAt) })}</p>
-            )}
-            {checkCurrent ? (
-              check.reachable ? (
-                <p>
-                  {t('settings.providers.lastCheckReachable', {
-                    time: fmtTime(check.at),
-                    count: check.tags ?? 0,
-                  })}
-                </p>
-              ) : (
-                <p role="alert">
-                  {t('settings.providers.googleUnreachable', {
-                    time: fmtTime(check.at),
-                    url: check.endpoint,
-                  })}
-                </p>
-              )
-            ) : null}
-            {discovery !== null && (
-              <p>
-                {t('settings.providers.lastDiscovery', {
-                  count: discovery.count,
-                  time: fmtTime(discovery.at),
-                })}
-              </p>
-            )}
-          </>
-        )}
-      </div>
-
       {saved !== null && (
-        <div>
-          {confirmingDisconnect ? (
-            <div className="flex items-center gap-2 text-xs text-foreground-secondary">
-              <span>{t('settings.providers.googleConfirmDisconnect')}</span>
-              <Button
-                size="sm"
-                variant="danger"
-                onClick={() => void handleDisconnect()}
-                disabled={busy}
-              >
-                {t('settings.providers.googleDisconnectConfirmLabel')}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setConfirmingDisconnect(false)}>
-                {t('common.cancel')}
-              </Button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setConfirmingDisconnect(true)}
-              disabled={busy}
-            >
-              {t('settings.providers.googleDisconnect')}
-            </Button>
+        <div className={statusPanelClass}>
+          <p className="truncate">
+            {t('settings.providers.lblEndpoint')} {saved.endpointUrl}
+          </p>
+          <GoogleCheckRows check={check} endpoint={saved.endpointUrl} />
+          {modelsQuery.data && (
+            <p>
+              {models.length > 0
+                ? t('settings.providers.inventoryLine', { count: models.length })
+                : t('settings.providers.inventoryNone')}
+            </p>
           )}
+          <DiscoveryRows discovery={discovery} />
         </div>
       )}
+
+      {saved === null || rotating ? (
+        <div className="space-y-2.5 rounded-lg border border-border-subtle p-3">
+          <label className="flex items-start gap-2 text-xs text-foreground-secondary">
+            <input
+              type="checkbox"
+              aria-label={t('settings.providers.googleConsentLabel')}
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>{t('settings.providers.googleConsentLabel')}</span>
+          </label>
+          <input
+            type="password"
+            aria-label={t('settings.providers.googleKeyLabel')}
+            placeholder={t('settings.providers.googleKeyPlaceholder')}
+            value={keyDraft}
+            onChange={(e) => setKeyDraft(e.target.value)}
+            autoComplete="off"
+            className={inputClass}
+          />
+        </div>
+      ) : (
+        <p className="text-xs text-foreground-secondary">
+          {t('settings.providers.googleKeySealedNote')}
+          {rotatedAt !== null && (
+            <> {t('settings.providers.googleRotated', { time: fmtTime(rotatedAt) })}</>
+          )}
+        </p>
+      )}
+
+      {saved !== null && !rotating && !confirmingDisconnect && (
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setRotating(true)} disabled={busy}>
+            {t('settings.providers.updateKey')}
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => setConfirmingDisconnect(true)}
+            disabled={busy}
+          >
+            {t('settings.providers.googleDisconnect')}
+          </Button>
+        </div>
+      )}
+
+      {saved !== null && confirmingDisconnect && (
+        <p className="text-xs text-foreground-secondary">
+          {t('settings.providers.googleConfirmDisconnect')}
+        </p>
+      )}
+
       {probeError !== null && (
         <p role="alert" className="text-xs text-danger-foreground">
-          {t('settings.providers.probeFailed', { url: current, error: probeError })}
+          {t('settings.providers.probeFailed', { error: probeError })}
         </p>
       )}
       {error !== null && (
@@ -357,6 +366,74 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
           {t('settings.providers.googleFailedLine', { error })}
         </p>
       )}
+
+      {/* Footer: the two available actions, 50/50. Confirm replaces both. */}
+      <div className="grid grid-cols-2 gap-2">
+        {saved !== null && confirmingDisconnect ? (
+          <>
+            <Button variant="danger" onClick={() => void handleDisconnect()} disabled={busy}>
+              {t('settings.providers.googleDisconnectConfirmLabel')}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingDisconnect(false)}
+              disabled={busy}
+            >
+              {t('common.cancel')}
+            </Button>
+          </>
+        ) : saved === null || rotating ? (
+          rotating ? (
+            <>
+              <Button
+                variant="primary"
+                onClick={() => void submitKey()}
+                disabled={busy || !consent || keyDraft.trim().length === 0}
+              >
+                {t('settings.providers.updateKey')}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setRotating(false);
+                  setKeyDraft('');
+                }}
+                disabled={busy}
+              >
+                {t('common.cancel')}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="primary"
+              onClick={() => void submitKey()}
+              disabled={busy || !consent || keyDraft.trim().length === 0}
+              className="col-span-2"
+            >
+              {t('settings.providers.googleConnect')}
+            </Button>
+          )
+        ) : (
+          <>
+            <Button
+              variant="primary"
+              onClick={() => void handleTest()}
+              disabled={busy}
+              aria-label={t('settings.providers.googleTestLabel')}
+            >
+              {t('settings.providers.testConnection')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void handleDiscover()}
+              disabled={busy}
+              aria-label={t('settings.providers.googleDiscoverLabel')}
+            >
+              {t('settings.providers.discoverModels')}
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -419,7 +496,7 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
       onProbeOutcome(true);
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(accountId) });
       // the minted/updated identity must reach the page's account state
-      await refreshAccounts();
+      await refreshAccounts?.();
     } catch (error) {
       setProbeError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -444,19 +521,63 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <input
-          type="text"
-          aria-label={t('settings.providers.endpointLabel')}
-          placeholder={t('settings.providers.endpointPlaceholder')}
-          value={value}
-          onChange={(e) => setEditedEndpoint(e.target.value)}
-          className={`min-w-0 flex-1 ${inputClass}`}
-        />
-        <Button onClick={() => void handleTest()} disabled={busy || current.length === 0}>
+      {saved !== null || check !== null ? (
+        <div className={statusPanelClass}>
+          {saved !== null && (
+            <p className="truncate">
+              {t('settings.providers.lblEndpoint')} {saved.endpointUrl}
+            </p>
+          )}
+          {checkCurrent ? (
+            <CheckRows check={check} endpoint={current} />
+          ) : check !== null || saved !== null ? (
+            <p>{t('settings.providers.checkPending', { url: current })}</p>
+          ) : null}
+          {saved !== null && modelsQuery.data && (
+            <p>
+              {models.length > 0
+                ? t('settings.providers.inventoryLine', { count: models.length })
+                : t('settings.providers.inventoryNone')}
+            </p>
+          )}
+          {dirty && models.length > 0 && (
+            <p>
+              {t('settings.providers.unsavedAttribution', { url: saved?.endpointUrl ?? current })}
+            </p>
+          )}
+          {saved !== null && !dirty && <DiscoveryRows discovery={discovery} />}
+        </div>
+      ) : (
+        <p className="text-xs text-foreground-secondary">
+          {t('settings.providers.notConfiguredLine')}
+        </p>
+      )}
+
+      <input
+        type="text"
+        aria-label={t('settings.providers.endpointLabel')}
+        placeholder={t('settings.providers.endpointPlaceholder')}
+        value={value}
+        onChange={(e) => setEditedEndpoint(e.target.value)}
+        className={inputClass}
+      />
+
+      {probeError !== null && (
+        <p role="alert" className="text-xs text-danger-foreground">
+          {t('settings.providers.probeFailed', { error: probeError })}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          variant="primary"
+          onClick={() => void handleTest()}
+          disabled={busy || current.length === 0}
+        >
           {busy ? t('settings.providers.testing') : t('settings.providers.testConnection')}
         </Button>
         <Button
+          variant="primary"
           onClick={() => void handleDiscover()}
           disabled={busy || saved === null || dirty}
           title={
@@ -467,63 +588,6 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
         >
           {t('settings.providers.discoverModels')}
         </Button>
-      </div>
-
-      <div aria-live="polite" className="space-y-1 text-xs text-foreground-secondary">
-        {saved === null ? (
-          <p>{t('settings.providers.notConfiguredLine')}</p>
-        ) : (
-          <>
-            {modelsQuery.data && (
-              <p>
-                {models.length > 0
-                  ? t('settings.providers.inventoryLine', {
-                      count: models.length,
-                      url: saved.endpointUrl,
-                    })
-                  : t('settings.providers.inventoryNone', { url: saved.endpointUrl })}
-              </p>
-            )}
-            {dirty && models.length > 0 && (
-              <p>{t('settings.providers.unsavedAttribution', { url: saved.endpointUrl })}</p>
-            )}
-          </>
-        )}
-        {checkCurrent ? (
-          check.reachable ? (
-            <p>
-              {t('settings.providers.lastCheckReachable', {
-                time: fmtTime(check.at),
-                count: check.tags ?? 0,
-              })}
-            </p>
-          ) : (
-            <p role="alert">
-              {t('settings.providers.unreachable', {
-                time: fmtTime(check.at),
-                url: check.endpoint,
-              })}
-            </p>
-          )
-        ) : saved !== null || check !== null ? (
-          <p>{t('settings.providers.checkPending', { url: current })}</p>
-        ) : null}
-        {saved !== null && !dirty && discovery !== null && (
-          <p>
-            {t('settings.providers.lastDiscovery', {
-              count: discovery.count,
-              time: fmtTime(discovery.at),
-            })}
-          </p>
-        )}
-        {probeError !== null && (
-          <p role="alert" className="text-xs text-danger-foreground">
-            {t('settings.providers.probeFailed', {
-              url: saved?.endpointUrl ?? current,
-              error: probeError,
-            })}
-          </p>
-        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
-import { useTranslation } from 'react-i18next';
 import { Button } from '@adham/ui';
+import { useTranslation } from 'react-i18next';
 
 export type ProviderId = 'ollama' | 'google';
 
@@ -20,6 +20,25 @@ const BADGE_STYLES: Record<ProviderStatus, string> = {
   connected: 'bg-success-surface text-success-foreground',
   issue: 'bg-danger-surface text-danger-foreground',
 };
+
+export const STATUS_BADGE_CLASS = BADGE_STYLES;
+
+export function StatusBadge({ status }: { status: ProviderStatus }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium leading-none ${BADGE_STYLES[status]}`}
+    >
+      {status === 'connected'
+        ? t('settings.providers.badgeConnected')
+        : status === 'checking'
+          ? t('settings.providers.statusChecking')
+          : status === 'issue'
+            ? t('settings.providers.statusIssue')
+            : t('settings.providers.statusNotConnected')}
+    </span>
+  );
+}
 
 export function ProviderCard({
   provider,

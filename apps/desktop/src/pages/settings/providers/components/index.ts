@@ -3,5 +3,6 @@ export {
   type ProviderCatalogEntry,
   type ProviderId,
   type ProviderStatus,
+  StatusBadge,
 } from './provider-card';
 export { ProviderConnectModal, type ProviderConnectModalProps } from './provider-connect-modal';

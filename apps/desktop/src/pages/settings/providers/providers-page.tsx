@@ -1,13 +1,13 @@
+import type { ProviderAccountDto } from '@adham/contracts-generated';
+import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
 import { adhamClient } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
-import type { ProviderAccountDto } from '@adham/contracts-generated';
 import {
   ProviderCard,
-  ProviderConnectModal,
   type ProviderCatalogEntry,
+  ProviderConnectModal,
   type ProviderId,
   type ProviderStatus,
 } from './components';
@@ -146,6 +146,7 @@ export function ProvidersPage() {
       {openEntry !== null && (
         <ProviderConnectModal
           entry={openEntry}
+          status={statusFor(openEntry.id)}
           open
           onClose={() => setOpenKind(null)}
           saved={savedById[openEntry.id] ?? null}
