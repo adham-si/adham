@@ -92,6 +92,15 @@ describe('Markdown rendering', () => {
     expect(await screen.findByText('Kopiert')).toBeDefined();
   });
 
+  it('uses a caller-provided glyph for the copy control without losing its name', () => {
+    render(
+      <Markdown source={'```ts\nconst x = 1;\n```'} copyIcon={<span data-testid="copy-glyph" />} />,
+    );
+
+    expect(screen.getByTestId('copy-glyph')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Copy code' })).toBeDefined();
+  });
+
   it('never makes an unsafe link openable, even with a handler', () => {
     const onOpenLink = vi.fn();
     const { container } = render(

@@ -59,6 +59,16 @@ export function MessageCardSection() {
         name="qwen2.5:latest"
         avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />}
         icons={DEMO_ICONS}
+        content={contentFromText(t('gallery.messages.rich'))}
+        timestamp={DEMO_TIMESTAMP}
+        dateTime={DEMO_ISO}
+        onReply={() => {}}
+      />
+      <MessageCard
+        role="assistant"
+        name="qwen2.5:latest"
+        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />}
+        icons={DEMO_ICONS}
         streaming
         content={contentFromText(t('gallery.messages.assistant'))}
         timestamp={DEMO_TIMESTAMP}

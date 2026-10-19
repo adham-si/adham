@@ -451,6 +451,19 @@ describe('MessageCard', () => {
     expect(screen.getByRole('button', { name: 'Edit' })).toBeDefined();
   });
 
+  it('lends the action copy glyph to a fenced code block in the body', () => {
+    render(
+      <MessageCard
+        role="assistant"
+        content={contentFromText('```ts\nconst x = 1;\n```')}
+        timestamp="10:04"
+        icons={{ copy: <span data-testid="copy-glyph" /> }}
+      />,
+    );
+    // Once in the action row, once in the code header.
+    expect(screen.getAllByTestId('copy-glyph')).toHaveLength(2);
+  });
+
   it('trails a still-arriving answer with a caret and keeps settled cards clean', () => {
     const { container, rerender } = render(
       <MessageCard

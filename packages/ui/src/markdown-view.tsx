@@ -74,6 +74,9 @@ export interface MarkdownProps {
    * that still shows its target: nothing navigates on its own.
    */
   onOpenLink?: ((url: string) => void) | undefined;
+  /** Glyph for the fenced-block copy control; without it the control shows its
+   *  word instead (the UI package ships no icon set). */
+  copyIcon?: React.ReactNode | undefined;
   className?: string;
 }
 
@@ -82,14 +85,20 @@ export interface MarkdownProps {
  * HTML in model output stays visible text. Parsing happens per render, so a
  * partial (streaming) document renders as far as it is complete.
  */
-export function Markdown({ source, labels, onOpenLink, className }: MarkdownProps) {
+export function Markdown({ source, labels, onOpenLink, copyIcon, className }: MarkdownProps) {
   const blocks = React.useMemo(() => parseMarkdown(source), [source]);
   const resolved = React.useMemo(() => resolveMarkdownLabels(labels), [labels]);
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex flex-col gap-3', className)}>
       {blocks.map((block, index) => (
-        <BlockView key={index} block={block} labels={resolved} onOpenLink={onOpenLink} />
+        <BlockView
+          key={index}
+          block={block}
+          labels={resolved}
+          onOpenLink={onOpenLink}
+          copyIcon={copyIcon}
+        />
       ))}
     </div>
   );
@@ -99,10 +108,12 @@ function BlockView({
   block,
   labels,
   onOpenLink,
+  copyIcon,
 }: {
   block: MarkdownBlock;
   labels: MarkdownLabels;
   onOpenLink?: ((url: string) => void) | undefined;
+  copyIcon?: React.ReactNode | undefined;
 }) {
   switch (block.kind) {
     case 'paragraph':
@@ -116,8 +127,12 @@ function BlockView({
       return (
         <Heading
           className={cn(
-            'font-semibold',
-            block.level <= 2 ? 'text-base' : 'text-sm text-foreground-secondary',
+            'mt-2 font-semibold first:mt-0',
+            block.level === 1 && 'text-2xl',
+            block.level === 2 && 'text-xl',
+            block.level === 3 && 'text-lg',
+            block.level === 4 && 'text-base',
+            block.level >= 5 && 'text-sm text-foreground-secondary',
           )}
         >
           <InlineView tokens={block.tokens} labels={labels} onOpenLink={onOpenLink} />
@@ -125,41 +140,63 @@ function BlockView({
       );
     }
     case 'code':
-      return <CodeBlock source={block.text} language={block.language} labels={labels} />;
+      return (
+        <CodeBlock
+          source={block.text}
+          language={block.language}
+          labels={labels}
+          copyIcon={copyIcon}
+        />
+      );
     case 'list': {
       const List = block.ordered ? 'ol' : 'ul';
       return (
         <List
-          className={cn('flex flex-col gap-1 ps-5', block.ordered ? 'list-decimal' : 'list-disc')}
+          className={cn(
+            'flex flex-col gap-2 ps-6 marker:text-foreground-muted',
+            block.ordered ? 'list-decimal' : 'list-disc',
+          )}
           {...(block.ordered && block.start !== 1 ? { start: block.start } : {})}
         >
           {block.items.map((item, index) => (
-            <ListItemView key={index} item={item} labels={labels} onOpenLink={onOpenLink} />
+            <ListItemView
+              key={index}
+              item={item}
+              labels={labels}
+              onOpenLink={onOpenLink}
+              copyIcon={copyIcon}
+            />
           ))}
         </List>
       );
     }
     case 'quote':
       return (
-        <blockquote className="border-s border-border-strong ps-2 text-foreground-secondary">
-          <div className="flex flex-col gap-2">
+        <blockquote className="border-s-4 border-border ps-4 text-foreground-secondary">
+          <div className="flex flex-col gap-3">
             {block.blocks.map((inner, index) => (
-              <BlockView key={index} block={inner} labels={labels} onOpenLink={onOpenLink} />
+              <BlockView
+                key={index}
+                block={inner}
+                labels={labels}
+                onOpenLink={onOpenLink}
+                copyIcon={copyIcon}
+              />
             ))}
           </div>
         </blockquote>
       );
     case 'table':
       return (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-xs">
+        <div className="overflow-x-auto rounded-lg border border-border-subtle">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
                 {block.header.map((cell, index) => (
                   <th
                     key={index}
                     scope="col"
-                    className="border border-border-subtle px-1 py-0.5 text-start align-top font-semibold"
+                    className="border-b border-border-subtle bg-surface-muted px-3 py-2 text-start align-top font-semibold"
                   >
                     <InlineView tokens={cell} labels={labels} onOpenLink={onOpenLink} />
                   </th>
@@ -172,7 +209,10 @@ function BlockView({
                   {row.map((cell, cellIndex) => (
                     <td
                       key={cellIndex}
-                      className="border border-border-subtle px-1 py-0.5 text-start align-top"
+                      className={cn(
+                        'px-3 py-2 text-start align-top',
+                        rowIndex > 0 && 'border-t border-border-subtle',
+                      )}
                     >
                       <InlineView tokens={cell} labels={labels} onOpenLink={onOpenLink} />
                     </td>
@@ -192,18 +232,26 @@ function ListItemView({
   item,
   labels,
   onOpenLink,
+  copyIcon,
 }: {
   item: ListItem;
   labels: MarkdownLabels;
   onOpenLink?: ((url: string) => void) | undefined;
+  copyIcon?: React.ReactNode | undefined;
 }) {
   return (
     <li className="whitespace-pre-wrap">
       <InlineView tokens={item.tokens} labels={labels} onOpenLink={onOpenLink} />
       {item.blocks.length > 0 && (
-        <div className="flex flex-col gap-2 pt-1">
+        <div className="flex flex-col gap-3 pt-1">
           {item.blocks.map((block, index) => (
-            <BlockView key={index} block={block} labels={labels} onOpenLink={onOpenLink} />
+            <BlockView
+              key={index}
+              block={block}
+              labels={labels}
+              onOpenLink={onOpenLink}
+              copyIcon={copyIcon}
+            />
           ))}
         </div>
       )}
@@ -243,7 +291,7 @@ function InlineTokenView({
       return token.text;
     case 'code':
       return (
-        <code className="rounded-xs bg-surface-muted px-1 font-mono text-xs" dir="ltr">
+        <code className="rounded-sm bg-surface-muted px-1 py-0.5 font-mono text-sm" dir="ltr">
           {token.text}
         </code>
       );
@@ -292,7 +340,7 @@ function LinkView({
       <a
         href={token.url}
         rel="noreferrer noopener"
-        className="text-action underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="text-action underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         onClick={(event) => {
           event.preventDefault();
           onOpenLink(token.url);
@@ -321,28 +369,32 @@ function CodeBlock({
   source,
   language,
   labels,
+  copyIcon,
 }: {
   source: string;
   language: string;
   labels: MarkdownLabels;
+  copyIcon?: React.ReactNode | undefined;
 }) {
   const { state: copyState, copy } = useClipboardCopy();
 
   return (
-    <figure className="overflow-hidden rounded-md border border-border-subtle bg-surface-subtle">
-      <figcaption className="flex items-center justify-between gap-2 border-b border-border-subtle px-2 py-1">
+    <figure className="overflow-hidden rounded-lg border border-border-subtle bg-surface-subtle">
+      <figcaption className="flex items-center justify-between gap-2 border-b border-border-subtle px-3 py-1">
         <span className="font-mono text-xs text-foreground-muted" dir="ltr">
           {language || labels.codeLabel}
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-sm px-1 text-xs text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="flex min-h-control-sm min-w-8 items-center justify-center gap-1 rounded-md px-2 text-xs text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            aria-label={labels.copyCode}
+            title={labels.copyCode}
             onClick={() => {
               void copy(source);
             }}
           >
-            {labels.copyCode}
+            {copyIcon ?? labels.copyCode}
           </button>
           <span role="status" className="text-xs text-foreground-muted">
             {copyState === 'copied'
@@ -353,8 +405,8 @@ function CodeBlock({
           </span>
         </span>
       </figcaption>
-      <pre className="max-h-[60vh] overflow-auto p-2 text-xs" dir="ltr">
-        <code className="font-mono">{source}</code>
+      <pre className="max-h-[60vh] overflow-auto px-3 py-3 font-mono text-xs leading-5" dir="ltr">
+        <code>{source}</code>
       </pre>
     </figure>
   );

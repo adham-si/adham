@@ -185,7 +185,13 @@ export function MessageCard({
             </p>
           </div>
         )}
-        <MessageBody role={role} content={content} resolved={resolved} streaming={streaming} />
+        <MessageBody
+          role={role}
+          content={content}
+          resolved={resolved}
+          streaming={streaming}
+          copyIcon={icons?.copy}
+        />
       </div>
       <MessageActions
         resolved={resolved}
@@ -210,18 +216,20 @@ function MessageBody({
   content,
   resolved,
   streaming,
+  copyIcon,
 }: {
   role: MessageRole;
   content: MessageContent;
   resolved: MarkdownLabels;
   streaming: boolean;
+  copyIcon?: React.ReactNode | undefined;
 }) {
   return (
-    <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto text-sm text-foreground">
+    <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto text-base leading-6 text-foreground">
       {content.parts.map((part, index) => {
         if (part.type === 'text') {
           return role === 'assistant' ? (
-            <Markdown key={index} source={part.text} labels={resolved} />
+            <Markdown key={index} source={part.text} labels={resolved} copyIcon={copyIcon} />
           ) : (
             <p key={index} className="whitespace-pre-wrap">
               {part.text}
@@ -229,7 +237,7 @@ function MessageBody({
           );
         }
         return (
-          <div key={index} className="rounded-md border border-border-subtle bg-surface-muted p-2">
+          <div key={index} className="rounded-lg border border-border-subtle bg-surface-muted p-3">
             <p className="mb-1 text-xs font-semibold tracking-wide text-foreground-muted uppercase">
               {resolved.unsupportedContent}
             </p>
