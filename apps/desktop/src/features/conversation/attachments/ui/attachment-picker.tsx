@@ -19,7 +19,7 @@ export function AttachmentPicker({ onFiles, disabled = false }: AttachmentPicker
   return (
     <>
       <Button
-        size="xs"
+        size="sm"
         variant="ghost"
         iconOnly
         disabled={disabled}

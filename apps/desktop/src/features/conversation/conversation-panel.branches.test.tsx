@@ -9,7 +9,7 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
-/** Edit/Reply/Make active live in the card's ⋮ menu. */
+/** Reply/Make active live in the card's ⋮ menu; Edit sits beside Copy. */
 async function clickMessageMenu(
   user: ReturnType<typeof userEvent.setup>,
   card: HTMLElement,
@@ -72,15 +72,15 @@ describe('ConversationPanel edit branches', () => {
     await pickRegistryModel(user);
     await screen.findByText('original prompt');
 
-    // Edit rewrites a prompt — user-only. The assistant row still offers Reply.
+    // Edit rewrites a prompt — user-only, and visible beside Copy. The
+    // assistant row still offers Reply.
     const userCard = screen.getByRole('article', { name: 'You' });
     const assistantCard = screen.getByRole('article', { name: 'Assistant' });
-    await user.click(within(userCard).getByRole('button', { name: 'More actions' }));
-    expect(within(userCard).getByRole('menuitem', { name: 'Edit' })).toBeDefined();
-    await user.click(within(userCard).getByRole('menuitem', { name: 'Edit' }));
+    expect(within(userCard).getByRole('button', { name: 'Edit' })).toBeDefined();
+    expect(within(assistantCard).queryByRole('button', { name: 'Edit' })).toBeNull();
+    await user.click(within(userCard).getByRole('button', { name: 'Edit' }));
 
     await user.click(within(assistantCard).getByRole('button', { name: 'More actions' }));
-    expect(within(assistantCard).queryByRole('menuitem', { name: 'Edit' })).toBeNull();
     expect(within(assistantCard).getByRole('menuitem', { name: 'Reply' })).toBeDefined();
     // Close the assistant menu before the composer takes the interaction.
     await user.keyboard('{Escape}');
@@ -122,7 +122,8 @@ describe('ConversationPanel edit branches', () => {
     })) as HTMLTextAreaElement;
     await user.type(box, 'draft in progress');
 
-    await clickMessageMenu(user, screen.getByRole('article', { name: 'You' }), 'Edit');
+    const userCard = screen.getByRole('article', { name: 'You' });
+    await user.click(within(userCard).getByRole('button', { name: 'Edit' }));
     expect(box.value).toBe('earlier truth');
 
     await user.click(screen.getByRole('button', { name: 'Cancel edit' }));
@@ -139,7 +140,8 @@ describe('ConversationPanel edit branches', () => {
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
 
     await screen.findByText('earlier truth');
-    await clickMessageMenu(user, screen.getByRole('article', { name: 'You' }), 'Edit');
+    const userCard = screen.getByRole('article', { name: 'You' });
+    await user.click(within(userCard).getByRole('button', { name: 'Edit' }));
     const box = (await screen.findByRole('textbox', {
       name: /composer input/i,
     })) as HTMLTextAreaElement;

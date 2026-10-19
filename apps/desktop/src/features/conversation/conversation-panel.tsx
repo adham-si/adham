@@ -6,6 +6,7 @@ import {
   BotMessageSquareIcon,
   CopyIcon,
   MoreVerticalIcon,
+  PencilLineIcon,
   RefreshCcwIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
@@ -72,9 +73,11 @@ const ASSISTANT_AVATAR = <HugeiconsIcon icon={BotMessageSquareIcon} className="s
 const USER_AVATAR = <HugeiconsIcon icon={UserIcon} className="size-5" />;
 const MESSAGE_ICONS: MessageActionIcons = {
   copy: <HugeiconsIcon icon={CopyIcon} className="size-4" />,
+  edit: <HugeiconsIcon icon={PencilLineIcon} className="size-4" />,
   regenerate: <HugeiconsIcon icon={RefreshCcwIcon} className="size-4" />,
   like: <HugeiconsIcon icon={ThumbsUpIcon} className="size-4" />,
-  dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4" />,
+  // Mirrored so the thumb faces the same way as the like glyph.
+  dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4 -scale-x-100" />,
   more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
 };
 

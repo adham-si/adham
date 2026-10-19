@@ -129,9 +129,7 @@ export function ComposeInput({
         }
         rows={minRows}
         aria-label={t('compose.inputLabel', 'Message composer input')}
-        className={`w-full resize-none border-none bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-0 disabled:opacity-50 ${
-          isRtl ? 'text-right' : 'text-left'
-        }`}
+        className="w-full resize-none border-none bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-0 disabled:opacity-50"
       />
     </div>
   );

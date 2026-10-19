@@ -94,14 +94,14 @@ export function ComposeModeSelector({
           selected.defaultLabel,
         )}`}
         title={t('compose.modeLabel', 'Execution mode')}
-        className="group flex min-h-control-xs items-center gap-1.5 rounded-lg border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
+        className="group flex min-h-control-sm items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-3 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
       >
         <span className="font-medium text-foreground">
           {t(selected.labelKey, selected.defaultLabel)}
         </span>
         <HugeiconsIcon
           icon={ArrowDown01Icon}
-          className="size-3 text-foreground-muted transition-transform group-hover:text-foreground"
+          className="size-4 text-foreground-muted transition-transform group-hover:text-foreground"
         />
       </button>
 
@@ -110,7 +110,7 @@ export function ComposeModeSelector({
         <div
           role="listbox"
           aria-label={t('compose.modeLabel', 'Execution mode')}
-          className="absolute bottom-full mb-1.5 start-0 z-popover w-64 rounded-xl border border-border-subtle bg-surface p-1.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute bottom-full start-0 z-popover mb-2 w-64 rounded-lg border border-border-subtle bg-surface p-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           <div className="space-y-0.5">
             {MODES.map((item) => {
@@ -136,7 +136,7 @@ export function ComposeModeSelector({
                     onChangeMode(item.id);
                     setIsOpen(false);
                   }}
-                  className={`flex w-full items-start gap-2 rounded-lg p-2 text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus ${
+                  className={`flex w-full items-start gap-2 rounded-md p-2 text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus ${
                     isSelected
                       ? 'bg-selection text-action'
                       : isUnavailable
@@ -148,7 +148,7 @@ export function ComposeModeSelector({
                     <span className="block text-xs font-medium">
                       {t(item.labelKey, item.defaultLabel)}
                     </span>
-                    <span className="mt-0.5 block text-[11px] text-foreground-muted">{hint}</span>
+                    <span className="mt-1 block text-xs text-foreground-muted">{hint}</span>
                   </span>
                   {isSelected && (
                     <span className="mt-0.5 text-action">

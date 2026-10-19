@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowUp01Icon } from '@hugeicons/core-free-icons';
+import { SendIcon } from '@hugeicons/core-free-icons';
 import { Button } from '@adham/ui';
 import { AttachmentPicker } from '@/features/conversation/attachments';
 import type { ComposeMode } from './compose-mode-selector';
@@ -52,10 +52,10 @@ export function ComposeActionBar({
     <div
       role="toolbar"
       aria-label={t('compose.actionsToolbar', 'Composer actions and controls')}
-      className={`flex flex-wrap items-center justify-between gap-2 px-3 pb-2 pt-1 border-t border-border-subtle ${className}`}
+      className={`flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle px-4 py-2 ${className}`}
     >
       {/* Leading controls: Attachment trigger + Mode Selector */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex flex-wrap items-center gap-2">
         <AttachmentPicker onFiles={onAddFiles} disabled={isRunning} />
 
         <ComposeModeSelector mode={mode} onChangeMode={onChangeMode} disabled={isRunning} />
@@ -76,21 +76,21 @@ export function ComposeActionBar({
         {/* Morphing Send / Stop Button; while running, a queued send has its
             own visible affordance instead of the send slot. */}
         {isRunning ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {canSubmit && (
               <Button
-                size="xs"
+                size="sm"
                 variant="primary"
                 iconOnly
                 onClick={onSubmit}
                 aria-label={t('compose.queue', 'Queue instruction')}
                 title={t('compose.queue', 'Queue instruction')}
               >
-                <HugeiconsIcon icon={ArrowUp01Icon} className="size-4 stroke-[2.5]" />
+                <HugeiconsIcon icon={SendIcon} className="size-4" />
               </Button>
             )}
             <Button
-              size="xs"
+              size="sm"
               variant="danger"
               iconOnly
               onClick={onStop}
@@ -98,12 +98,12 @@ export function ComposeActionBar({
               title={t('compose.stop', 'Stop generation')}
             >
               {/* Square Stop Glyphs */}
-              <span className="size-2.5 rounded-xs bg-current" />
+              <span className="size-3 rounded-xs bg-current" />
             </Button>
           </div>
         ) : (
           <Button
-            size="xs"
+            size="sm"
             variant="primary"
             iconOnly
             disabled={!canSubmit}
@@ -111,7 +111,7 @@ export function ComposeActionBar({
             aria-label={t('compose.send', 'Send instruction')}
             title={t('compose.send', 'Send instruction')}
           >
-            <HugeiconsIcon icon={ArrowUp01Icon} className="size-4 stroke-[2.5]" />
+            <HugeiconsIcon icon={SendIcon} className="size-4" />
           </Button>
         )}
       </div>

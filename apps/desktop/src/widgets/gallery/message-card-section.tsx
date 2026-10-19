@@ -4,6 +4,7 @@ import {
   BotMessageSquareIcon,
   CopyIcon,
   MoreVerticalIcon,
+  PencilLineIcon,
   RefreshCcwIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
@@ -18,9 +19,10 @@ const DEMO_ISO = '2026-10-07T10:00:00Z';
 /** Demo glyphs: the app supplies these nodes to the icon-set-free card. */
 const DEMO_ICONS: MessageActionIcons = {
   copy: <HugeiconsIcon icon={CopyIcon} className="size-4" />,
+  edit: <HugeiconsIcon icon={PencilLineIcon} className="size-4" />,
   regenerate: <HugeiconsIcon icon={RefreshCcwIcon} className="size-4" />,
   like: <HugeiconsIcon icon={ThumbsUpIcon} className="size-4" />,
-  dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4" />,
+  dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4 -scale-x-100" />,
   more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
 };
 
@@ -37,6 +39,7 @@ export function MessageCardSection() {
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
         onReply={() => {}}
+        onEdit={() => {}}
       />
       <MessageCard
         role="assistant"

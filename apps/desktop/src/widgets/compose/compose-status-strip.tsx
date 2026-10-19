@@ -42,10 +42,10 @@ export function ComposeStatusStrip({
     <div
       role="region"
       aria-label={t('compose.statusRegion', 'Agent governance and budget status')}
-      className={`flex flex-wrap items-center gap-2 px-3 py-1 text-[11px] text-foreground-secondary ${className}`}
+      className={`flex flex-wrap items-center gap-2 px-4 py-2 text-xs text-foreground-secondary ${className}`}
     >
       <div
-        className="flex items-center gap-1.5"
+        className="flex items-center gap-2"
         title={
           budgetKnown
             ? t(
@@ -58,7 +58,7 @@ export function ComposeStatusStrip({
               )
         }
       >
-        <HugeiconsIcon icon={ChartHistogramIcon} className="size-3 text-foreground-muted" />
+        <HugeiconsIcon icon={ChartHistogramIcon} className="size-4 text-foreground-muted" />
         <span>{`${label}: ${formatTokens(tokens)}`}</span>
       </div>
     </div>

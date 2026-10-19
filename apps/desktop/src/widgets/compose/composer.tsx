@@ -132,7 +132,7 @@ export function Composer({
   return (
     <footer
       className={`w-full transition-all duration-500 ease-in-out ${
-        isCentered ? 'bg-transparent p-0' : 'bg-transparent px-4 pb-4 pt-1'
+        isCentered ? 'bg-transparent p-0' : 'bg-transparent px-4 pb-4 pt-2'
       } ${className}`}
     >
       {/* Screen reader announcement for streaming state */}
@@ -150,7 +150,7 @@ export function Composer({
         onDrop={handleDrop}
         className={`w-full transition-all duration-500 ease-in-out ${
           isCentered ? 'max-w-2xl mx-auto border-border' : 'border-border-subtle'
-        } rounded-2xl border bg-surface hover:border-border focus-within:border-focus focus-within:ring-1 focus-within:ring-focus ${
+        } rounded-xl border bg-surface hover:border-border focus-within:border-focus focus-within:ring-1 focus-within:ring-focus ${
           isDragOver || isDragOverExternal
             ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20'
             : ''
@@ -183,8 +183,8 @@ export function Composer({
             resends it as an edited alternative, until acknowledged or
             cancelled — never silently dropped. */}
         {replyTo && (
-          <div className="flex items-center gap-2 px-3 pt-2 text-xs text-foreground-secondary">
-            <span className="shrink-0 rounded border border-border-subtle bg-surface px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+          <div className="flex items-center gap-2 px-4 pt-3 text-xs text-foreground-secondary">
+            <span className="shrink-0 rounded-sm border border-border-subtle bg-surface px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
               {replyTo.relation === 'edited-from'
                 ? t('compose.editing', 'Editing')
                 : t('compose.replyTo', 'Replying to')}
@@ -205,9 +205,9 @@ export function Composer({
                   ? t('compose.cancelEdit', 'Cancel edit')
                   : t('compose.cancelReply', 'Cancel reply')
               }
-              className="ms-auto shrink-0 rounded p-0.5 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+              className="ms-auto shrink-0 rounded-sm p-1 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
             >
-              <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
+              <HugeiconsIcon icon={Cancel01Icon} className="size-4" />
             </button>
           </div>
         )}
@@ -215,17 +215,17 @@ export function Composer({
         {/* Queued instructions: visible while a turn runs; each is dispatched
             when the turn settles unless the user removes it first. */}
         {queued.length > 0 && (
-          <div aria-live="polite" className="space-y-1 px-3 pt-2">
+          <div aria-live="polite" className="space-y-2 px-4 pt-3">
             {queued.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground-secondary"
               >
-                <span className="shrink-0 rounded border border-border-subtle bg-surface px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                <span className="shrink-0 rounded-sm border border-border-subtle bg-surface px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
                   {t('compose.queuedHeading', 'Queued')}
                 </span>
                 {item.reference && (
-                  <span className="shrink-0 rounded border border-border-subtle bg-surface px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                  <span className="shrink-0 rounded-sm border border-border-subtle bg-surface px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
                     {item.reference.relation === 'edited-from'
                       ? t('compose.queuedEdit', 'Edit')
                       : t('compose.queuedReply', 'Reply')}
@@ -239,9 +239,9 @@ export function Composer({
                   onClick={() => onRemoveQueued?.(item.id)}
                   aria-label={t('compose.removeQueued', 'Remove queued instruction')}
                   title={t('compose.removeQueued', 'Remove queued instruction')}
-                  className="ms-auto shrink-0 rounded p-0.5 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+                  className="ms-auto shrink-0 rounded-sm p-1 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
                 >
-                  <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
+                  <HugeiconsIcon icon={Cancel01Icon} className="size-4" />
                 </button>
               </div>
             ))}

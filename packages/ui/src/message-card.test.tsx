@@ -364,7 +364,7 @@ describe('MessageCard', () => {
     expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
-  it('offers Edit in the ⋮ menu only when the caller can branch, and fires it', () => {
+  it('offers Edit beside Copy when the caller can branch, and fires it', () => {
     const onEdit = vi.fn();
     render(
       <MessageCard
@@ -374,9 +374,10 @@ describe('MessageCard', () => {
         onEdit={onEdit}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(onEdit).toHaveBeenCalledTimes(1);
+    // Edit is a visible control, not hidden behind the ⋮ menu.
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
   it('offers Make active in the ⋮ menu for an inactive branch member, and fires it', () => {
@@ -440,11 +441,14 @@ describe('MessageCard', () => {
         role="assistant"
         content={contentFromText('Body')}
         timestamp="10:04"
-        icons={{ copy: <span data-testid="copy-glyph" /> }}
+        icons={{ copy: <span data-testid="copy-glyph" />, edit: <span data-testid="edit-glyph" /> }}
+        onEdit={() => {}}
       />,
     );
     expect(screen.getByTestId('copy-glyph')).toBeDefined();
+    expect(screen.getByTestId('edit-glyph')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Copy message' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDefined();
   });
 
   it('trails a still-arriving answer with a caret and keeps settled cards clean', () => {

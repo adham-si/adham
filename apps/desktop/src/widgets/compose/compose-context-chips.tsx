@@ -47,19 +47,19 @@ export function ComposeContextChips({
     <div
       role="list"
       aria-label={t('compose.attachedContext')}
-      className={`flex flex-wrap items-center gap-1.5 px-3 pt-2 pb-1 ${className}`}
+      className={`flex flex-wrap items-center gap-2 px-4 pt-3 pb-1 ${className}`}
     >
       {attachments.map((item) => (
         <div
           key={item.key}
           role="listitem"
-          className={`group flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${
+          className={`group flex items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
             item.status === 'error'
               ? 'border-danger/40 bg-danger/5 text-foreground'
               : 'border-border-subtle bg-surface-subtle text-foreground hover:border-border'
           }`}
         >
-          <span className="text-foreground-secondary [&_svg]:size-3.5">
+          <span className="text-foreground-secondary [&_svg]:size-4">
             <HugeiconsIcon icon={DocumentCodeIcon} />
           </span>
 
@@ -68,22 +68,19 @@ export function ComposeContextChips({
           </span>
 
           {item.status === 'error' ? (
-            <span role="alert" className="text-[10px] text-danger-foreground">
+            <span role="alert" className="text-xs text-danger-foreground">
               {t(`attachments.errors.${item.errorCode ?? 'unknown'}`)}
             </span>
           ) : item.status === 'reading' ? (
-            <span className="text-[10px] text-foreground-muted">{t('attachments.reading')}</span>
+            <span className="text-xs text-foreground-muted">{t('attachments.reading')}</span>
           ) : item.status === 'pending' ? (
-            <span
-              className="text-[10px] text-foreground-muted"
-              title={t('attachments.pendingTitle')}
-            >
+            <span className="text-xs text-foreground-muted" title={t('attachments.pendingTitle')}>
               {t('attachments.pendingRead')}
             </span>
           ) : (
             <>
               {item.charCount !== undefined ? (
-                <span className="text-[10px] text-foreground-muted">
+                <span className="text-xs text-foreground-muted">
                   {t('compose.charsCompact', {
                     count: item.charCount,
                     formatted: formatNumber(item.charCount / 1000, undefined, {
@@ -93,12 +90,10 @@ export function ComposeContextChips({
                   })}
                 </span>
               ) : item.byteSize ? (
-                <span className="text-[10px] text-foreground-muted">
-                  {formatBytes(item.byteSize)}
-                </span>
+                <span className="text-xs text-foreground-muted">{formatBytes(item.byteSize)}</span>
               ) : null}
               {item.truncated && (
-                <span className="rounded-sm border border-border-subtle px-1 text-[10px] text-foreground-muted">
+                <span className="rounded-sm border border-border-subtle px-1 text-xs text-foreground-muted">
                   {t('attachments.truncated')}
                 </span>
               )}
@@ -110,7 +105,7 @@ export function ComposeContextChips({
             onClick={() => onRemove(item.key)}
             aria-label={t('compose.removeAttachment', { name: item.fileName })}
             title={t('compose.removeAttachment', { name: item.fileName })}
-            className="ms-1 flex size-4 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus [&_svg]:size-3"
+            className="ms-1 flex size-4 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus [&_svg]:size-3"
           >
             <HugeiconsIcon icon={Cancel01Icon} />
           </button>

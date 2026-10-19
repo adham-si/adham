@@ -57,18 +57,18 @@ export function MessageAttachments({
       <ul
         role="list"
         aria-label={t('attachments.sentLabel')}
-        className="flex flex-wrap items-center gap-1.5"
+        className="flex flex-wrap items-center gap-2"
       >
         {attachments.map((item) => (
           <li
             key={item.attachmentId}
-            className="flex items-center gap-1.5 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground-secondary"
+            className="flex items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground-secondary"
           >
-            <HugeiconsIcon icon={DocumentCodeIcon} className="size-3.5 shrink-0" />
+            <HugeiconsIcon icon={DocumentCodeIcon} className="size-4 shrink-0" />
             <span className="max-w-44 truncate font-medium text-foreground" title={item.fileName}>
               {item.fileName}
             </span>
-            <span className="text-[10px] text-foreground-muted">
+            <span className="text-xs text-foreground-muted">
               {t('compose.charsCompact', {
                 count: item.extractedChars,
                 formatted: formatNumber(item.extractedChars / 1000, undefined, {
@@ -78,7 +78,7 @@ export function MessageAttachments({
               })}
             </span>
             {item.truncated && (
-              <span className="rounded-sm border border-border-subtle px-1 text-[10px] text-foreground-muted">
+              <span className="rounded-sm border border-border-subtle px-1 text-xs text-foreground-muted">
                 {t('attachments.truncated')}
               </span>
             )}
@@ -86,7 +86,7 @@ export function MessageAttachments({
               type="button"
               onClick={() => toggle(item.attachmentId)}
               aria-expanded={openId === item.attachmentId}
-              className="ms-1 rounded px-1 text-[10px] text-foreground-muted underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+              className="ms-1 rounded-sm px-1 text-xs text-foreground-muted underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
             >
               {openId === item.attachmentId
                 ? t('attachments.previewHide')
@@ -106,7 +106,7 @@ export function MessageAttachments({
                 {preview.text.slice(0, PREVIEW_DISPLAY_CHARS)}
               </pre>
               {preview.total > PREVIEW_DISPLAY_CHARS && (
-                <p className="mt-1 text-[10px] text-foreground-muted">
+                <p className="mt-1 text-xs text-foreground-muted">
                   {t('attachments.previewBound', {
                     shown: formatNumber(PREVIEW_DISPLAY_CHARS),
                     total: formatNumber(preview.total),

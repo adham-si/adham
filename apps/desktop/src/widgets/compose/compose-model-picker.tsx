@@ -76,7 +76,7 @@ export function ComposeModelPicker({
   const hasThinkingControl =
     Boolean(selectedModel?.supportsReasoning) && (permitsOff || thinkingLevels.length > 0);
   const thinkingSelectionClass = (selected: boolean) =>
-    `min-h-control-xs rounded px-1.5 text-xs capitalize transition-colors ${
+    `min-h-control-sm rounded-md px-3 text-xs capitalize transition-colors ${
       selected
         ? 'bg-selection font-medium text-action border border-focus'
         : 'bg-surface-subtle text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
@@ -123,7 +123,7 @@ export function ComposeModelPicker({
               }`
             : selectedLabel
         }
-        className="group flex min-h-control-xs items-center gap-1.5 rounded-lg border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
+        className="group flex min-h-control-sm items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-3 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
       >
         {/* Model Name */}
         <span className="font-medium text-foreground">{selectedLabel}</span>
@@ -131,7 +131,7 @@ export function ComposeModelPicker({
         {/* Data Boundary Badge */}
         {selectedModel && (
           <span
-            className={`flex items-center gap-1 rounded-sm px-1.5 py-0.2 text-[10px] font-semibold uppercase tracking-wider ${
+            className={`flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${
               isLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
             }`}
             title={
@@ -140,21 +140,21 @@ export function ComposeModelPicker({
                 : t('compose.cloudBoundaryNote', { provider: selectedModel.provider })
             }
           >
-            <HugeiconsIcon icon={isLocal ? CpuIcon : AiCloud01Icon} className="size-3" />
+            <HugeiconsIcon icon={isLocal ? CpuIcon : AiCloud01Icon} className="size-4" />
             <span>{isLocal ? t('compose.localBadge', 'Local') : selectedModel.provider}</span>
           </span>
         )}
 
         {/* Thinking state tag: a documented non-default choice only. */}
         {hasThinkingControl && think !== null && think !== true && (
-          <span className="hidden sm:inline-block rounded bg-surface px-1 py-0.2 text-[10px] text-foreground-muted border border-border-subtle">
+          <span className="hidden rounded-sm border border-border-subtle bg-surface px-2 py-0.5 text-xs text-foreground-muted sm:inline-block">
             {think === false ? t('compose.thinkingOffTag', 'No thinking') : think}
           </span>
         )}
 
         <HugeiconsIcon
           icon={ArrowDown01Icon}
-          className="size-3 text-foreground-muted transition-transform group-hover:text-foreground"
+          className="size-4 text-foreground-muted transition-transform group-hover:text-foreground"
         />
       </button>
 
@@ -163,14 +163,14 @@ export function ComposeModelPicker({
         <div
           role="listbox"
           aria-label={t('compose.modelsAria', 'Available models')}
-          className="absolute bottom-full mb-1.5 end-0 z-popover w-72 rounded-xl border border-border-subtle bg-surface p-1.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute bottom-full end-0 z-popover mb-2 w-72 rounded-lg border border-border-subtle bg-surface p-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
-          <div className="px-2 py-1 text-[11px] font-semibold text-foreground-muted">
+          <div className="px-2 py-2 text-xs font-semibold text-foreground-muted">
             {t('compose.modelsHeading', 'Models & Privacy Boundary')}
           </div>
 
           {models.length === 0 ? (
-            <p className="px-2 py-1.5 text-[11px] text-foreground-muted">
+            <p className="px-2 py-2 text-xs text-foreground-muted">
               {t('compose.modelSetupHint', 'Set up a model in Settings → AI Providers')}
             </p>
           ) : (
@@ -189,7 +189,7 @@ export function ComposeModelPicker({
                       onSelectModel(model.id);
                       setIsOpen(false);
                     }}
-                    className={`flex w-full items-start gap-2 rounded-lg p-2 text-start transition-colors ${
+                    className={`flex w-full items-start gap-2 rounded-md p-2 text-start transition-colors ${
                       isSelected
                         ? 'bg-selection text-action'
                         : 'hover:bg-surface-hover text-foreground'
@@ -203,10 +203,10 @@ export function ComposeModelPicker({
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
                         <span className="truncate text-xs font-medium">{model.name}</span>
                         <span
-                          className={`rounded px-1 py-0.2 text-[9px] font-semibold uppercase ${
+                          className={`rounded-sm px-2 py-0.5 text-xs font-semibold uppercase ${
                             modelLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
                           }`}
                         >
@@ -231,8 +231,8 @@ export function ComposeModelPicker({
           {/* Documented `think` controls: on/off only when the model lists
               those booleans, levels verbatim, plus the documented default. */}
           {hasThinkingControl && onChangeThink && (
-            <div className="mt-2 border-t border-border-subtle pt-2 px-1">
-              <div className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-1">
+            <div className="mt-2 border-t border-border-subtle px-1 pt-2">
+              <div className="mb-2 text-xs font-semibold text-foreground-muted uppercase tracking-wider">
                 {t('compose.thinkingHeading', 'Thinking')}
               </div>
               {permitsOff && (
@@ -243,13 +243,13 @@ export function ComposeModelPicker({
                     onChange={(e) =>
                       onChangeThink(e.target.checked ? false : permitsOn ? true : null)
                     }
-                    className="size-3.5 accent-action"
+                    className="size-4 accent-action"
                   />
                   <span>{t('compose.disableThinking', 'Disable thinking')}</span>
                 </label>
               )}
               {thinkingLevels.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
+                <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => onChangeThink(null)}

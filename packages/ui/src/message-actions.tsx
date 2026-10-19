@@ -11,13 +11,15 @@ import type { CopyState } from './use-clipboard-copy';
  */
 export interface MessageActionIcons {
   copy?: React.ReactNode;
+  edit?: React.ReactNode;
   regenerate?: React.ReactNode;
   like?: React.ReactNode;
   dislike?: React.ReactNode;
   more?: React.ReactNode;
 }
 
-/** Actions that would crowd the row and live behind the ⋮ trigger instead. */
+/** One-time actions: Edit sits in the row beside Copy; Reply and the branch
+ *  switch live behind the ⋮ trigger so the row stays short. */
 export interface MessageActionMenu {
   edit?: (() => void) | undefined;
   reply?: (() => void) | undefined;
@@ -39,10 +41,10 @@ export interface MessageActionsProps {
 }
 
 /**
- * One message's actions, grouped under its content: copy, regenerate, the
- * like/dislike verdicts, and a ⋮ menu for the rest. The awaited clipboard
- * outcome is stated next to the controls, so a copy that failed never looks
- * like one that worked.
+ * One message's actions, grouped under its content: copy, edit (beside copy,
+ * where the caller offers it), regenerate, the like/dislike verdicts, and a ⋮
+ * menu for the rest. The awaited clipboard outcome is stated next to the
+ * controls, so a copy that failed never looks like one that worked.
  */
 export function MessageActions({
   resolved,
@@ -56,11 +58,15 @@ export function MessageActions({
   onFeedback,
   menu,
 }: MessageActionsProps) {
-  const hasMenu =
-    menu !== undefined &&
-    (menu.edit !== undefined || menu.reply !== undefined || menu.makeActive !== undefined);
+  const hasMenu = menu !== undefined && (menu.reply !== undefined || menu.makeActive !== undefined);
 
-  if (copyText.length === 0 && regenerate === undefined && onFeedback === undefined && !hasMenu) {
+  if (
+    copyText.length === 0 &&
+    menu?.edit === undefined &&
+    regenerate === undefined &&
+    onFeedback === undefined &&
+    !hasMenu
+  ) {
     return null;
   }
 
@@ -76,6 +82,9 @@ export function MessageActions({
       <div className="flex flex-wrap items-center justify-end gap-1 text-foreground-secondary">
         {copyText.length > 0 && (
           <ActionControl label={resolved.copyMessage} icon={icons?.copy} onClick={onCopy} />
+        )}
+        {menu?.edit !== undefined && (
+          <ActionControl label={resolved.editAction} icon={icons?.edit} onClick={menu.edit} />
         )}
         {regenerate !== undefined && (
           <ActionControl
@@ -131,12 +140,10 @@ export function MessageActions({
                 label={resolved.moreActions}
                 className="end-0 bottom-full mb-1"
                 onSelect={(value) => {
-                  if (value === 'edit') menu.edit?.();
-                  else if (value === 'reply') menu.reply?.();
+                  if (value === 'reply') menu.reply?.();
                   else if (value === 'make-active') menu.makeActive?.();
                 }}
               >
-                {menu.edit !== undefined && <MenuItem value="edit">{resolved.editAction}</MenuItem>}
                 {menu.reply !== undefined && (
                   <MenuItem value="reply">{resolved.replyAction}</MenuItem>
                 )}
