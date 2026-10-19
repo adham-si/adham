@@ -274,7 +274,7 @@ function MessageBody({
   resolved: MarkdownLabels;
 }) {
   return (
-    <div className="flex flex-col gap-2 text-sm text-foreground">
+    <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto text-sm text-foreground">
       {content.parts.map((part, index) => {
         if (part.type === 'text') {
           return role === 'assistant' ? (

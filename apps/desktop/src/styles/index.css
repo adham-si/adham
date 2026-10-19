@@ -136,3 +136,14 @@ body {
     transform: rotate(2.5deg);
   }
 }
+
+/* The app's motion preference (and the OS preference resolved into it by
+   applyPresentation) disables decorative animation and long transitions. */
+[data-reduced-motion="reduce"] *,
+[data-reduced-motion="reduce"] *::before,
+[data-reduced-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

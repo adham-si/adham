@@ -376,6 +376,7 @@ fn provider_management_runs_app_level_without_a_session() {
             session_id: None,
         },
         payload: CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,

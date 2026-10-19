@@ -31,7 +31,7 @@ describe('ConversationPanel streaming', () => {
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
 
     await pickRegistryModel(user);
-    expect(localStorage.getItem('adham:compose:model:pending')).toBe('qwen2.5:latest');
+    expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:pending')).toBe('qwen2.5:latest');
 
     const box = (await screen.findByRole('textbox', {
       name: /composer input/i,
@@ -56,8 +56,8 @@ describe('ConversationPanel streaming', () => {
         undefined,
       ),
     );
-    expect(localStorage.getItem('adham:compose:model:sess-1')).toBe('qwen2.5:latest');
-    expect(localStorage.getItem('adham:compose:model:pending')).toBeNull();
+    expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:sess-1')).toBe('qwen2.5:latest');
+    expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:pending')).toBeNull();
   });
 
   it('returns the first message to the composer when its first dispatch is refused', async () => {

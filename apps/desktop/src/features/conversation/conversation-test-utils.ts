@@ -68,6 +68,16 @@ export interface ConversationFakeBackend {
   retryCompletionStreaming?: Mock<RetryCompletionFn>;
   stopCompletion?: Mock<StopCompletionFn>;
   markCompletionInterrupted?: Mock<MarkCompletionInterruptedFn>;
+  ingestAttachment?: Mock<
+    (
+      workspaceId: string,
+      projectId: string,
+      sessionId: string,
+      payload: { fileName: string; text: string },
+    ) => any
+  >;
+  ingestAttachmentPath?: Mock<(...args: any[]) => any>;
+  readAttachmentText?: Mock<(...args: any[]) => any>;
 }
 
 export function fakeBackend(): ConversationFakeBackend {
@@ -131,6 +141,21 @@ export function fakeBackend(): ConversationFakeBackend {
       truncated: false,
     }),
     clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+    ingestAttachment: vi.fn().mockImplementation((_ws, _proj, _session, payload) =>
+      Promise.resolve({
+        attachmentId: 'att-1',
+        fileName: payload.fileName,
+        mediaType: 'text/markdown',
+        byteSize: payload.text.length,
+        contentHash: 'hash-1',
+        hashAlgorithm: 'blake3',
+        extractedChars: payload.text.length,
+        truncated: false,
+        retention: 'session',
+        text: payload.text,
+      }),
+    ),
+    readAttachmentText: vi.fn(),
   };
 }
 

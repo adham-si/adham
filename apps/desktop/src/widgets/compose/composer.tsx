@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { ComposeInput } from './compose-input';
-import type { ComposeAttachment } from './compose-context-chips';
+import type { ComposeAttachmentChip } from './compose-context-chips';
 import { ComposeContextChips } from './compose-context-chips';
 import { ComposeActionBar } from './compose-action-bar';
 import { ComposeStatusStrip } from './compose-status-strip';
@@ -47,9 +47,12 @@ export interface ComposerProps {
   think?: boolean | string | null | undefined;
   onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
-  attachments?: ComposeAttachment[] | undefined;
-  onAddAttachments?: ((attachments: ComposeAttachment[]) => void) | undefined;
-  onRemoveAttachment?: ((id: string) => void) | undefined;
+  attachments?: ComposeAttachmentChip[] | undefined;
+  /** Picked/pasted/dropped files; ingestion and refusals live above this. */
+  onAddFiles?: ((files: File[]) => void) | undefined;
+  onRemoveAttachment?: ((key: string) => void) | undefined;
+  /** Native (Tauri) file-drag hover over the window. */
+  isDragOverExternal?: boolean | undefined;
   approvalRequest?: Omit<ComposeApprovalBarProps, 'className'> | null | undefined;
   /** Model maximum context in tokens, when the provider evidenced one. */
   contextLimit?: number | null | undefined;
@@ -82,8 +85,9 @@ export function Composer({
   onChangeThink,
   models = [],
   attachments = [],
-  onAddAttachments = () => {},
+  onAddFiles = () => {},
   onRemoveAttachment = () => {},
+  isDragOverExternal = false,
   approvalRequest = null,
   contextLimit = null,
   effectiveContextBudget = null,
@@ -99,7 +103,8 @@ export function Composer({
 
   const canSubmit = Boolean(inputText.trim() || attachments.length > 0) && status !== 'error';
 
-  // Drag and drop handlers
+  // Browser drag/drop (the app shell reports native drops separately); both
+  // routes hand the files to the same ingestion.
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -117,20 +122,8 @@ export function Composer({
     e.stopPropagation();
     setIsDragOver(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const items: ComposeAttachment[] = Array.from(e.dataTransfer.files).map((f) => ({
-        id: `drop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        type: f.type.startsWith('image/') ? 'image' : 'file',
-        name: f.name,
-        size: f.size,
-        file: f,
-      }));
-      onAddAttachments(items);
-    }
-  };
-
-  const handleAttachPastedBlob = (attachment: ComposeAttachment) => {
-    onAddAttachments([attachment]);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0) onAddFiles(files);
   };
 
   return (
@@ -155,7 +148,9 @@ export function Composer({
         className={`w-full transition-all duration-500 ease-in-out ${
           isCentered ? 'max-w-2xl mx-auto border-border' : 'border-border-subtle'
         } rounded-2xl border bg-surface hover:border-border focus-within:border-focus focus-within:ring-1 focus-within:ring-focus ${
-          isDragOver ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20' : ''
+          isDragOver || isDragOverExternal
+            ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20'
+            : ''
         }`}
       >
         {/* Top: evidenced context status (renders nothing without evidence) */}
@@ -178,7 +173,7 @@ export function Composer({
           </div>
         )}
 
-        {/* Attached Context Chips (Files, Folders, Pasted Text Blobs) */}
+        {/* Attached files: each chip states what is known (read/pending/refused) */}
         <ComposeContextChips attachments={attachments} onRemove={onRemoveAttachment} />
 
         {/* Pending reference: the next send quotes this message (reply) or
@@ -257,7 +252,8 @@ export function Composer({
           onSubmit={onSubmit}
           onRecallPrevious={onRecallPrevious}
           onRecallNext={onRecallNext}
-          onAttachPastedBlob={handleAttachPastedBlob}
+          onPasteFiles={onAddFiles}
+          canSendEmpty={attachments.length > 0}
           placeholder={placeholder}
           enterToSend={enterToSend}
         />
@@ -271,7 +267,7 @@ export function Composer({
           think={think}
           onChangeThink={onChangeThink}
           models={models}
-          onAddAttachments={onAddAttachments}
+          onAddFiles={onAddFiles}
           status={status}
           canSubmit={canSubmit}
           onSubmit={onSubmit}

@@ -13,6 +13,7 @@ pub mod assembly;
 pub mod discovery;
 pub mod google;
 pub mod retry;
+pub(crate) mod scope;
 pub mod stream_io;
 pub mod streaming;
 
@@ -31,7 +32,8 @@ pub use streaming::{
 
 use super::ApiContext;
 use super::assembly::mode_instruction;
-use super::streaming::{expect_full_scope, resolve_pinned};
+use super::scope::expect_full_scope;
+use super::streaming::resolve_pinned;
 use crate::dtos::*;
 use adham_core_types::*;
 use adham_provider::adapters::AnyAdapter;

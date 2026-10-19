@@ -17,6 +17,7 @@
     "turnTruncated": "内容因长度限制被截断。",
     "retryTurn": "重试",
     "regenerateAnswer": "重新生成",
+    "jumpToLatest": "跳转到最新",
     "retryNeedsModel": "请选择一个模型来重试此轮。",
     "replyNeedsModel": "请选择一个模型来发送回复。",
     "editNeedsModel": "请选择一个模型来发送编辑后的提示词。",

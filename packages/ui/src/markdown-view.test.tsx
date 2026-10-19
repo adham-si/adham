@@ -39,6 +39,21 @@ describe('Markdown rendering', () => {
     expect(container.textContent).toContain('ts');
   });
 
+  it('falls back to a neutral label for a fence with no language', () => {
+    const { container } = render(<Markdown source={'```\nplain\n```'} />);
+    expect(container.textContent).toContain('Code');
+    expect(container.querySelector('pre')?.textContent).toBe('plain');
+  });
+
+  it('keeps a long fenced block complete inside a bounded scroller', () => {
+    const lines = Array.from({ length: 1200 }, (_, i) => `line ${i}`);
+    const { container } = render(<Markdown source={`\`\`\`text\n${lines.join('\n')}\n\`\`\``} />);
+    const pre = container.querySelector('pre');
+    expect(pre?.textContent).toBe(lines.join('\n'));
+    expect(pre?.className).toContain('max-h-');
+    expect(pre?.className).toContain('overflow-auto');
+  });
+
   it('copies code through the clipboard and reports success', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     stubClipboard(writeText);

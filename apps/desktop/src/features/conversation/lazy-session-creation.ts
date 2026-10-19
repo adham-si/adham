@@ -122,6 +122,9 @@ export interface LazyFirstSendParams {
   text: string;
   title?: string | null;
   installationId?: string | null;
+  /** An attachment-only first send: the file carries the turn, so empty text
+   *  is valid and the session title falls back to the default. */
+  allowEmptyText?: boolean;
   isStale: () => boolean;
 }
 
@@ -173,7 +176,7 @@ export async function prepareLazyFirstSend(
 ): Promise<LazyFirstSendPrepareOutcome> {
   const { backend, workspaceId, projectId, text, installationId, isStale } = params;
   const trimmed = text.trim();
-  if (!trimmed) {
+  if (!trimmed && !params.allowEmptyText) {
     return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
   }
 

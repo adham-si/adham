@@ -26,4 +26,10 @@ think: boolean | string | null,
  * original and whatever followed it stay persisted and visible, but are
  * never fed back to the model.
  */
-reference: MessageReferenceDto | null, };
+reference: MessageReferenceDto | null, 
+/**
+ * Explicitly selected attachments for this send. Every id is validated
+ * against this session's scope before anything is written; a missing,
+ * foreign, or over-cap selection refuses the whole send.
+ */
+attachmentIds: Array<string>, };

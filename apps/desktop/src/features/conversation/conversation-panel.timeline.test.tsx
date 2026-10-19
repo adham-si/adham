@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConversationPanel } from './conversation-panel';
 import { fakeBackend, registryProvider, pickRegistryModel } from './conversation-panel-test-utils';
@@ -109,5 +109,50 @@ describe('ConversationPanel timeline', () => {
     await screen.findByText('No answer was produced.');
     expect(screen.getByText('Truncated by the length limit.')).toBeDefined();
     expect(screen.getByText('Cancelled')).toBeDefined();
+  });
+
+  it('offers jump-to-latest only after the reader scrolls away from the bottom', async () => {
+    const backend = fakeBackend();
+    backend.getConversation.mockResolvedValue({
+      items: [
+        {
+          messageId: 'm1',
+          role: 'user',
+          text: 'hello',
+          createdAt: '2026-10-16T00:00:00Z',
+          sourceEventId: 'e1',
+        },
+        {
+          messageId: 'm2',
+          role: 'assistant',
+          text: 'world',
+          createdAt: '2026-10-16T00:00:01Z',
+          sourceEventId: 'e2',
+        },
+      ],
+      nextCursor: null,
+      projectionPosition: '2',
+    });
+    const { container } = render(<ConversationPanel backend={backend} />);
+    await screen.findByText('world');
+
+    const timeline = container.querySelector(
+      '[data-testid="conversation-timeline"]',
+    ) as HTMLElement;
+    Object.defineProperty(timeline, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(timeline, 'clientHeight', { value: 300, configurable: true });
+
+    // Reading the newest output: following continues, no affordance.
+    timeline.scrollTop = 900;
+    fireEvent.scroll(timeline);
+    expect(screen.queryByRole('button', { name: 'Jump to latest' })).toBeNull();
+
+    // Scrolled back into history: following stops and the affordance appears.
+    timeline.scrollTop = 0;
+    fireEvent.scroll(timeline);
+    const jump = await screen.findByRole('button', { name: 'Jump to latest' });
+    fireEvent.click(jump);
+    expect(timeline.scrollTop).toBe(1000);
+    expect(screen.queryByRole('button', { name: 'Jump to latest' })).toBeNull();
   });
 });

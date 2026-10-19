@@ -68,6 +68,7 @@ fn context_assembly_trims_to_the_evidenced_budget_and_reserves_output() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id,
             model_id: "m:latest".to_string(),
             text: format!("newest {}", "y".repeat(600)),
@@ -165,6 +166,7 @@ fn thinking_control_requires_documented_values_and_reaches_the_provider_request(
     let refused = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hello".to_string(),
@@ -190,6 +192,7 @@ fn thinking_control_requires_documented_values_and_reaches_the_provider_request(
     let refused = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "t:latest".to_string(),
             text: "hello".to_string(),
@@ -219,6 +222,7 @@ fn thinking_control_requires_documented_values_and_reaches_the_provider_request(
         let env = typed_envelope(
             (&ws, &proj, &sess),
             CompleteOncePayload {
+                attachment_ids: Vec::new(),
                 account_id: account_id.clone(),
                 model_id: "t:latest".to_string(),
                 text: "hello".to_string(),
@@ -271,6 +275,7 @@ fn mode_instruction_is_request_only_and_execute_is_refused() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "write the handler".to_string(),
@@ -330,6 +335,7 @@ fn mode_instruction_is_request_only_and_execute_is_refused() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "run the tests".to_string(),
@@ -350,6 +356,7 @@ fn mode_instruction_is_request_only_and_execute_is_refused() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),
@@ -397,6 +404,7 @@ fn two_dispatches_carry_prior_turn_and_persist_both() {
         let env = typed_envelope(
             (&ws, &proj, &sess),
             CompleteOncePayload {
+                attachment_ids: Vec::new(),
                 account_id: account_id.clone(),
                 model_id: "m:latest".to_string(),
                 text: text.to_string(),

@@ -17,7 +17,7 @@ const journeyFiles = [
   '../../widgets/compose/compose-action-bar.tsx',
   '../../widgets/compose/compose-mode-selector.tsx',
   '../../widgets/compose/compose-model-picker.tsx',
-  '../../widgets/compose/compose-attachment-menu.tsx',
+  '../../features/conversation/attachments/ui/attachment-picker.tsx',
   '../../widgets/compose/compose-approval-bar.tsx',
   '../../widgets/compose/compose-status-strip.tsx',
 ];

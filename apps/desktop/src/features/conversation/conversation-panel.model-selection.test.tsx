@@ -35,7 +35,7 @@ describe('ConversationPanel model selection', () => {
 
     await pickRegistryModel(user);
     await waitFor(() =>
-      expect(localStorage.getItem('adham:compose:model:sess-1')).toBe('qwen2.5:latest'),
+      expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:sess-1')).toBe('qwen2.5:latest'),
     );
 
     // Reopen: the choice is restored from the session bucket, never re-picked
@@ -57,7 +57,7 @@ describe('ConversationPanel model selection', () => {
 
   it('explains a vanished stored model and never silently substitutes another', async () => {
     const user = userEvent.setup();
-    localStorage.setItem('adham:compose:model:sess-1', 'ghost:70b');
+    localStorage.setItem('adham:compose:model:ws-1:proj-1:sess-1', 'ghost:70b');
     const backend = fakeBackend();
     backend.completeOnceStreaming = vi.fn();
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
@@ -110,9 +110,9 @@ describe('ConversationPanel model selection', () => {
     await user.keyboard('{Enter}');
 
     await waitFor(() =>
-      expect(localStorage.getItem('adham:compose:model:sess-1')).toBe('ghost:70b'),
+      expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:sess-1')).toBe('ghost:70b'),
     );
-    expect(localStorage.getItem('adham:compose:model:pending')).toBeNull();
+    expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:pending')).toBeNull();
     // The vanished claim is still the session's remembered choice: explained,
     // never silently substituted. (While the turn persisted, the provider list
     // was briefly unresolved, so the explained block returns only after ready.)

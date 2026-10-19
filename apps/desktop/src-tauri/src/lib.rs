@@ -1,14 +1,15 @@
 use adham_desktop_api::{
-    AnswerFeedbackDto, ApiContext, BootstrapState, BranchSelectionDto,
+    AnswerFeedbackDto, ApiContext, AttachmentDto, BootstrapState, BranchSelectionDto,
     ClearPendingOperationPayload, CommandContext, CommandEnvelope, CommandResult,
     CompleteOncePayload, CompletionStartDto, ConfigureGoogleAccountPayload, ConversationPage,
     CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
     DisconnectGoogleAccountPayload, DisconnectOllamaAccountPayload, DiscoverOllamaModelsPayload,
-    ErrorEnvelope, GetPreferencesResponse, GoogleAccountDisconnected, ListProviderAccountsResponse,
-    ListProviderModelsPayload, ListProviderModelsResponse, MarkCompletionInterruptedPayload,
+    ErrorEnvelope, GetPreferencesResponse, GoogleAccountDisconnected, IngestAttachmentPathPayload,
+    IngestAttachmentPayload, ListProviderAccountsResponse, ListProviderModelsPayload,
+    ListProviderModelsResponse, MarkCompletionInterruptedPayload,
     MarkCompletionInterruptedResponse, OllamaAccountDisconnected, PendingOperationDto,
     PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
-    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
+    ProviderHealthResponse, ProviderModelsList, ReadAttachmentPayload, RebuildProjectionsResponse,
     RecordPendingOperationPayload, ResetPreferencesResponse, RetryCompletionPayload,
     SelectProjectPayload, SessionList, SessionSummary, SetActiveAlternativePayload,
     SetAnswerFeedbackPayload, StopCompletionPayload, StopCompletionResponse, StorageStatus,
@@ -126,6 +127,36 @@ async fn submit_message(
     request: CommandEnvelope<SubmitMessagePayload>,
 ) -> Result<CommandResult<SubmittedMessage>, ErrorEnvelope> {
     adham_desktop_api::handle_submit_message(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn ingest_attachment(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<IngestAttachmentPayload>,
+) -> Result<CommandResult<AttachmentDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_ingest_attachment(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn ingest_attachment_path(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<IngestAttachmentPathPayload>,
+) -> Result<CommandResult<AttachmentDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_ingest_attachment_path(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn read_attachment_text(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<ReadAttachmentPayload>,
+) -> Result<CommandResult<AttachmentDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_read_attachment_text(&state, request)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -437,6 +468,9 @@ pub fn run() {
             create_session,
             list_sessions,
             submit_message,
+            ingest_attachment,
+            ingest_attachment_path,
+            read_attachment_text,
             get_conversation,
             set_active_alternative,
             set_answer_feedback,

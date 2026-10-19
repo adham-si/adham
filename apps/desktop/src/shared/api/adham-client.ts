@@ -1,6 +1,7 @@
 import type {
   AnswerFeedbackDto,
   AppPreferences,
+  AttachmentDto,
   BootstrapState,
   BranchSelectionDto,
   ClearPendingOperationPayload,
@@ -42,6 +43,7 @@ import type {
 import { Channel, invoke } from '@tauri-apps/api/core';
 import {
   AnswerFeedbackListSchema,
+  AttachmentDtoSchema,
   BootstrapStateSchema,
   BranchSelectionListSchema,
   CompletionStartDtoSchema,
@@ -317,7 +319,7 @@ export class AdhamApiClient implements AdhamClient {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-    payload: { text: string },
+    payload: { text: string; attachmentIds?: string[] },
     options?: { requestId?: string },
   ): Promise<SubmittedMessage> {
     const envelope = this.wrapCommand(
@@ -333,6 +335,49 @@ export class AdhamApiClient implements AdhamClient {
       request: envelope,
     });
     return SubmittedMessageSchema.parse(result.data);
+  }
+
+  /** Bounded extraction of a picked/pasted text or code file into the
+   *  session's protected attachment index. */
+  async ingestAttachment(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { fileName: string; text: string },
+  ): Promise<AttachmentDto> {
+    const envelope = this.wrapCommand(payload, { workspaceId, projectId, sessionId });
+    const result = await invoke<CommandResult<AttachmentDto>>('ingest_attachment', {
+      request: envelope,
+    });
+    return AttachmentDtoSchema.parse(result.data);
+  }
+
+  /** Bounded Rust-side read for a dropped filesystem path (no dialog plugin). */
+  async ingestAttachmentPath(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { filePath: string },
+  ): Promise<AttachmentDto> {
+    const envelope = this.wrapCommand(payload, { workspaceId, projectId, sessionId });
+    const result = await invoke<CommandResult<AttachmentDto>>('ingest_attachment_path', {
+      request: envelope,
+    });
+    return AttachmentDtoSchema.parse(result.data);
+  }
+
+  /** Rehydrate the exact extracted text a sent attachment carried. */
+  async readAttachmentText(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    attachmentId: string,
+  ): Promise<AttachmentDto> {
+    const envelope = this.wrapCommand({ attachmentId }, { workspaceId, projectId, sessionId });
+    const result = await invoke<CommandResult<AttachmentDto>>('read_attachment_text', {
+      request: envelope,
+    });
+    return AttachmentDtoSchema.parse(result.data);
   }
 
   async getConversation(
@@ -610,6 +655,8 @@ export class AdhamApiClient implements AdhamClient {
       /** Durable reply/edit anchor recorded with this submission; the backend
        *  validates it against persisted history before any write. */
       reference?: { refersToMessageId: string; relation: 'replied' | 'edited-from' };
+      /** Ingested attachment ids attached to this user turn. */
+      attachmentIds?: string[];
     },
     onEvent: (event: StreamEventDto) => void,
     options?: { requestId?: string },

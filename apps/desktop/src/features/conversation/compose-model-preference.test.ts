@@ -49,4 +49,12 @@ describe('compose model preference', () => {
     migratePendingModelChoice('sess-2');
     expect(readComposeModelPreference('sess-2')).toBeNull();
   });
+
+  it('adopts only the pending pick of the matching project scope', () => {
+    writeComposeModelPreference('ws-1:proj-1:pending', 'project-one:latest');
+    writeComposeModelPreference('ws-1:proj-2:pending', 'project-two:latest');
+    migratePendingModelChoice('ws-1:proj-1:sess-1', 'ws-1:proj-1:pending');
+    expect(readComposeModelPreference('ws-1:proj-1:sess-1')).toBe('project-one:latest');
+    expect(readComposeModelPreference('ws-1:proj-2:pending')).toBe('project-two:latest');
+  });
 });

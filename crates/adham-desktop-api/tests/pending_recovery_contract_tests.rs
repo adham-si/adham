@@ -134,6 +134,7 @@ async fn test_lost_response_receipt_replay_zero_duplicate_events() {
             session_id: Some(sess_id.clone()),
         },
         payload: SubmitMessagePayload {
+            attachment_ids: Vec::new(),
             text: "Original message".to_string(),
         },
     };
@@ -271,6 +272,7 @@ async fn test_first_send_replay_creation_and_submit_zero_duplicates() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "First message in lazy session".to_string(),
             },
         },

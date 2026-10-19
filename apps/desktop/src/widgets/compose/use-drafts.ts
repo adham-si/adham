@@ -30,10 +30,13 @@ function readHistoryBucket(sessionId: string): string[] {
  * silently dropped. Pending content is removed only once it has been
  * adopted. Never runs for the pending bucket itself.
  */
-export function migratePendingDraft(nextSessionId: string): void {
-  if (nextSessionId === PENDING_BUCKET) return;
+export function migratePendingDraft(
+  nextSessionId: string,
+  pendingBucket: string = PENDING_BUCKET,
+): void {
+  if (nextSessionId === pendingBucket) return;
   try {
-    const pendingKey = `${DRAFT_PREFIX}${PENDING_BUCKET}`;
+    const pendingKey = `${DRAFT_PREFIX}${pendingBucket}`;
     const targetKey = `${DRAFT_PREFIX}${nextSessionId}`;
     const pending = localStorage.getItem(pendingKey);
     if (!pending) return;
@@ -71,10 +74,17 @@ export function migratePendingDraft(nextSessionId: string): void {
 
 export interface UseDraftsOptions {
   sessionId?: string;
+  /** Bucket carrying the not-yet-created session's draft, scoped like
+   *  `sessionId` (workspace + project) so projects never share it. */
+  pendingBucket?: string;
   maxHistory?: number;
 }
 
-export function useDrafts({ sessionId = 'default', maxHistory = 50 }: UseDraftsOptions = {}) {
+export function useDrafts({
+  sessionId = 'default',
+  pendingBucket = PENDING_BUCKET,
+  maxHistory = 50,
+}: UseDraftsOptions = {}) {
   const [draft, setDraftState] = React.useState<string>(() => readDraftBucket(sessionId));
 
   const [history, setHistory] = React.useState<string[]>(() => readHistoryBucket(sessionId));
@@ -90,11 +100,14 @@ export function useDrafts({ sessionId = 'default', maxHistory = 50 }: UseDraftsO
   React.useEffect(() => {
     if (prevSessionRef.current === sessionId) return;
     prevSessionRef.current = sessionId;
-    migratePendingDraft(sessionId);
+    // A scope that appeared after typing: adopt the scope-less bucket first,
+    // then the scope's own pending bucket into the resolved session.
+    if (pendingBucket !== PENDING_BUCKET) migratePendingDraft(pendingBucket, PENDING_BUCKET);
+    migratePendingDraft(sessionId, pendingBucket);
     setDraftState(readDraftBucket(sessionId));
     setHistory(readHistoryBucket(sessionId));
     setHistoryIndex(-1);
-  }, [sessionId]);
+  }, [sessionId, pendingBucket]);
 
   // Synchronize draft to storage
   const setDraft = React.useCallback(

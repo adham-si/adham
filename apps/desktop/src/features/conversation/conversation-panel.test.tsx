@@ -141,16 +141,19 @@ describe('ConversationPanel', () => {
     expect(screen.queryByRole('button', { name: /stop generation/i })).toBeNull();
   });
 
-  it('discloses that pasted attachments are not transmitted', async () => {
+  it('keeps a long paste inline instead of claiming an unsent attachment', async () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
-    const box = await screen.findByRole('textbox', { name: /composer input/i });
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
 
     await user.click(box);
     await user.paste('A'.repeat(2500));
 
-    expect(screen.getByText(/will not be sent/i)).toBeDefined();
+    expect(box.value).toHaveLength(2500);
+    expect(screen.queryByText(/will not be sent/i)).toBeNull();
   });
 
   it('reloads history from the error banner without resubmitting', async () => {
@@ -212,7 +215,7 @@ describe('ConversationPanel', () => {
       resolveBootstrap();
     });
     await waitFor(() =>
-      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+      expect(localStorage.getItem('adham:compose:draft:ws-1:proj-1:sess-1')).toBe('early thought'),
     );
 
     expect(box.value).toBe('early thought');
@@ -240,7 +243,7 @@ describe('ConversationPanel', () => {
     // resolved session adopts it.
     expect(restored.value).toBe('early thought');
     await waitFor(() =>
-      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+      expect(localStorage.getItem('adham:compose:draft:ws-1:proj-1:sess-1')).toBe('early thought'),
     );
     expect(restored.value).toBe('early thought');
   });

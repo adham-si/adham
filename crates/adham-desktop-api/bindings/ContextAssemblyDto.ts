@@ -14,4 +14,12 @@ inputBudgetTokens: number | null,
  * Older messages dropped to fit caps/budget. Reported so history loss is
  * never silent.
  */
-droppedMessages: number, };
+droppedMessages: number, 
+/**
+ * Attachment files whose extracted text was included in this dispatch.
+ */
+attachmentsIncluded: number, 
+/**
+ * Characters of extracted attachment text included (post-truncation).
+ */
+attachmentChars: number, };

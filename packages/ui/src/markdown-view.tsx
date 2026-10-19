@@ -6,6 +6,8 @@ import { useClipboardCopy } from './use-clipboard-copy';
 /** User-facing strings the renderer needs; the app passes localized copies. */
 export interface MarkdownLabels {
   copyCode: string;
+  /** Shown for a fenced block that names no language. */
+  codeLabel: string;
   copyMessage: string;
   copied: string;
   copyFailed: string;
@@ -35,6 +37,7 @@ export interface MarkdownLabels {
 
 export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   copyCode: 'Copy code',
+  codeLabel: 'Code',
   copyMessage: 'Copy message',
   copied: 'Copied',
   copyFailed: 'Copy failed',
@@ -323,7 +326,7 @@ function CodeBlock({
     <figure className="overflow-hidden rounded-md border border-border-subtle bg-surface-subtle">
       <figcaption className="flex items-center justify-between gap-2 border-b border-border-subtle px-2 py-1">
         <span className="font-mono text-xs text-foreground-muted" dir="ltr">
-          {language}
+          {language || labels.codeLabel}
         </span>
         <span className="flex items-center gap-1">
           <button
@@ -344,7 +347,7 @@ function CodeBlock({
           </span>
         </span>
       </figcaption>
-      <pre className="overflow-x-auto p-2 text-xs" dir="ltr">
+      <pre className="max-h-[60vh] overflow-auto p-2 text-xs" dir="ltr">
         <code className="font-mono">{source}</code>
       </pre>
     </figure>

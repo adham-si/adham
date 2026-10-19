@@ -48,6 +48,9 @@ export type UiMessage = {
   /** Durable reply/edit anchor recorded with this message, when it has one.
    *  Read-side shape: relation arrives as stored text, displayed as-is. */
   reference?: { refersToMessageId: string; relation: string } | null;
+  /** Files this message was sent with (metadata only; a chip exists only
+   *  because the dispatch link row exists). */
+  attachments?: import('@adham/contracts-generated').MessageAttachmentDto[];
   /** True only for a local bubble not yet confirmed persisted: it carries no
    *  durable id and cannot be the anchor of anything. */
   provisional?: boolean;

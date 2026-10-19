@@ -156,6 +156,9 @@ pub struct SessionList {
 #[ts(export)]
 pub struct SubmitMessagePayload {
     pub text: String,
+    /// Explicitly selected attachments. Empty for a plain text message.
+    #[serde(default)]
+    pub attachment_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -254,6 +257,10 @@ pub struct ConversationMessageDto {
     pub completion: Option<MessageCompletionV1>,
     /// Quote anchor or edit lineage of this message, when it recorded one.
     pub reference: Option<MessageReferenceDto>,
+    /// Files this message was sent with. An empty list means none; a chip only
+    /// exists when the link row exists, so it states real dispatch selection.
+    #[serde(default)]
+    pub attachments: Vec<MessageAttachmentDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -481,5 +488,7 @@ impl ErrorEnvelope {
     }
 }
 
+mod attachment;
 pub mod provider;
+pub use attachment::*;
 pub use provider::*;

@@ -188,6 +188,11 @@ pub struct CompleteOncePayload {
     /// original and whatever followed it stay persisted and visible, but are
     /// never fed back to the model.
     pub reference: Option<MessageReferenceDto>,
+    /// Explicitly selected attachments for this send. Every id is validated
+    /// against this session's scope before anything is written; a missing,
+    /// foreign, or over-cap selection refuses the whole send.
+    #[serde(default)]
+    pub attachment_ids: Vec<String>,
 }
 
 /// Retry / regenerate: one NEW assistant attempt for an existing user turn.
@@ -233,6 +238,12 @@ pub struct ContextAssemblyDto {
     /// Older messages dropped to fit caps/budget. Reported so history loss is
     /// never silent.
     pub dropped_messages: u32,
+    /// Attachment files whose extracted text was included in this dispatch.
+    #[serde(default)]
+    pub attachments_included: u32,
+    /// Characters of extracted attachment text included (post-truncation).
+    #[serde(default)]
+    pub attachment_chars: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

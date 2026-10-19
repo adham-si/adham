@@ -39,14 +39,17 @@ export function writeComposeModelPreference(sessionId: string, modelId: string):
  * Only fills an empty bucket: an existing session's own explicit choice is
  * never overwritten by whatever was picked before that session existed.
  */
-export function migratePendingModelChoice(nextSessionId: string): void {
-  if (nextSessionId === PENDING_BUCKET) return;
+export function migratePendingModelChoice(
+  nextSessionId: string,
+  pendingBucket: string = PENDING_BUCKET,
+): void {
+  if (nextSessionId === pendingBucket) return;
   try {
-    const pending = window.localStorage.getItem(bucketKey(PENDING_BUCKET));
+    const pending = window.localStorage.getItem(bucketKey(pendingBucket));
     if (!pending) return;
     if (window.localStorage.getItem(bucketKey(nextSessionId))) return;
     window.localStorage.setItem(bucketKey(nextSessionId), pending);
-    window.localStorage.removeItem(bucketKey(PENDING_BUCKET));
+    window.localStorage.removeItem(bucketKey(pendingBucket));
   } catch {
     // ignore: migration is best-effort, the in-memory selection is unaffected
   }

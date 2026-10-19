@@ -65,6 +65,7 @@ define_id!(MessageId);
 define_id!(RequestId);
 define_id!(CorrelationId);
 define_id!(ContentId);
+define_id!(AttachmentId);
 define_id!(OperationId);
 define_id!(EventId);
 define_id!(StreamId);

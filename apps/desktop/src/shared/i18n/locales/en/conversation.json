@@ -17,6 +17,7 @@
     "turnTruncated": "Truncated by the length limit.",
     "retryTurn": "Retry",
     "regenerateAnswer": "Regenerate",
+    "jumpToLatest": "Jump to latest",
     "retryNeedsModel": "Select a model to retry this turn.",
     "replyNeedsModel": "Select a model to send the reply.",
     "editNeedsModel": "Select a model to send the edited prompt.",

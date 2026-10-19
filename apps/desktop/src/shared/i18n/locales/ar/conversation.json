@@ -17,6 +17,7 @@
     "turnTruncated": "اقتُطع النص عند حدّ الطول.",
     "retryTurn": "إعادة المحاولة",
     "regenerateAnswer": "إعادة التوليد",
+    "jumpToLatest": "الانتقال إلى الأحدث",
     "retryNeedsModel": "اختر نموذجًا لإعادة المحاولة.",
     "replyNeedsModel": "اختر نموذجًا لإرسال الرد.",
     "editNeedsModel": "اختر نموذجًا لإرسال المطالبة المعدَّلة.",

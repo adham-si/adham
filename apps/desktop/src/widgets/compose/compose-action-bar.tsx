@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowUp01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@adham/ui';
+import { AttachmentPicker } from '@/features/conversation/attachments';
 import type { ComposeMode } from './compose-mode-selector';
 import { ComposeModeSelector } from './compose-mode-selector';
 import type { ModelOption } from './compose-model-picker';
 import { ComposeModelPicker } from './compose-model-picker';
-import { ComposeAttachmentMenu } from './compose-attachment-menu';
-import type { ComposeAttachment } from './compose-context-chips';
 import type { ComposeStatus } from './use-compose-state';
 
 export interface ComposeActionBarProps {
@@ -20,7 +19,7 @@ export interface ComposeActionBarProps {
   think?: boolean | string | null | undefined;
   onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
-  onAddAttachments: (attachments: ComposeAttachment[]) => void;
+  onAddFiles: (files: File[]) => void;
   status: ComposeStatus;
   canSubmit: boolean;
   onSubmit: () => void;
@@ -36,7 +35,7 @@ export function ComposeActionBar({
   think = null,
   onChangeThink,
   models,
-  onAddAttachments,
+  onAddFiles,
   status,
   canSubmit,
   onSubmit,
@@ -54,7 +53,7 @@ export function ComposeActionBar({
     >
       {/* Leading controls: Attachment trigger + Mode Selector */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <ComposeAttachmentMenu onAddAttachments={onAddAttachments} disabled={isRunning} />
+        <AttachmentPicker onFiles={onAddFiles} disabled={isRunning} />
 
         <ComposeModeSelector mode={mode} onChangeMode={onChangeMode} disabled={isRunning} />
       </div>

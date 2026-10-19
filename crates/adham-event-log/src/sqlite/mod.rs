@@ -34,6 +34,6 @@ pub use provider_registry::{
     upsert_provider_models,
 };
 pub use store::{
-    AppendEventRequest, AppendEventResult, CommandReceiptRecord, HydratedPendingOperation,
-    PendingOperationRecord, SqliteEventStore,
+    AppendEventRequest, AppendEventResult, AttachmentRecord, CommandReceiptRecord,
+    HydratedPendingOperation, PendingOperationRecord, SqliteEventStore,
 };

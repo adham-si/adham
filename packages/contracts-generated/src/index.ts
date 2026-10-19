@@ -22,6 +22,7 @@ export type MessageId = string;
 export type RequestId = string;
 export type CorrelationId = string;
 export type ContentId = string;
+export type AttachmentId = string;
 export type EventId = string;
 export type ActorId = string;
 export type OperationId = string;
@@ -66,7 +67,11 @@ export type SessionSummary = { sessionId: string, projectId: string, title: stri
 
 export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, };
 
-export type SubmitMessagePayload = { text: string, };
+export type SubmitMessagePayload = { text: string, 
+/**
+ * Explicitly selected attachments. Empty for a plain text message.
+ */
+attachmentIds: Array<string>, };
 
 export type SubmittedMessage = { messageId: string, sessionId: string, text: string, createdAt: string, streamSequence: string, projectionPosition: string, };
 
@@ -79,7 +84,12 @@ completion: MessageCompletionV1 | null,
 /**
  * Quote anchor or edit lineage of this message, when it recorded one.
  */
-reference: MessageReferenceDto | null, };
+reference: MessageReferenceDto | null, 
+/**
+ * Files this message was sent with. An empty list means none; a chip only
+ * exists when the link row exists, so it states real dispatch selection.
+ */
+attachments: Array<MessageAttachmentDto>, };
 
 export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, 
 /**
@@ -240,7 +250,13 @@ think: boolean | string | null,
  * original and whatever followed it stay persisted and visible, but are
  * never fed back to the model.
  */
-reference: MessageReferenceDto | null, };
+reference: MessageReferenceDto | null, 
+/**
+ * Explicitly selected attachments for this send. Every id is validated
+ * against this session's scope before anything is written; a missing,
+ * foreign, or over-cap selection refuses the whole send.
+ */
+attachmentIds: Array<string>, };
 
 export type RetryCompletionPayload = { accountId: string, modelId: string, replyToMessageId: string, mode: string | null, think: boolean | string | null, };
 
@@ -299,7 +315,15 @@ inputBudgetTokens: number | null,
  * Older messages dropped to fit caps/budget. Reported so history loss is
  * never silent.
  */
-droppedMessages: number, };
+droppedMessages: number, 
+/**
+ * Attachment files whose extracted text was included in this dispatch.
+ */
+attachmentsIncluded: number, 
+/**
+ * Characters of extracted attachment text included (post-truncation).
+ */
+attachmentChars: number, };
 
 export type ConfigureGoogleAccountPayload = { accountId: string | null, alias: string | null, apiKey: string, acknowledgeCloudTransfer: boolean, };
 
@@ -318,6 +342,21 @@ export type StreamEventPayloadDto = { "type": "started" } | { "type": "thinking"
  * "completed" | "interrupted" | "failed"
  */
 completion: string, truncated: boolean, usage: MessageUsageV1 | null, };
+
+export type IngestAttachmentPayload = { fileName: string, text: string, };
+
+export type IngestAttachmentPathPayload = { filePath: string, };
+
+export type ReadAttachmentPayload = { attachmentId: string, };
+
+export type AttachmentDto = { attachmentId: string, fileName: string, mediaType: string, byteSize: number, contentHash: string, hashAlgorithm: string, extractedChars: number, truncated: boolean, 
+/**
+ * "session": retained for this session under the sealed content record.
+ * The record states what it is; no other retention scope exists yet.
+ */
+retention: string, text: string, };
+
+export type MessageAttachmentDto = { attachmentId: string, fileName: string, mediaType: string, byteSize: number, contentHash: string, hashAlgorithm: string, extractedChars: number, truncated: boolean, };
 
 export type MessageCompletionV1 = { "Completed": { truncated: boolean, } } | "Interrupted" | "Failed";
 

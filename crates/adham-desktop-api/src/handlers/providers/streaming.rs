@@ -3,6 +3,7 @@
 use super::assembly::{
     AssembledContext, assemble_context, branch_aware_rows, budget_with_reserve, mode_instruction,
 };
+use super::scope::expect_full_scope;
 use super::stream_io::{persist_terminal, run_stream};
 use super::{
     ApiContext, EventSink, StreamIds, ok_result, resolve_dispatch_adapter, validate_mode,
@@ -19,38 +20,10 @@ use adham_provider::domain::request::ThinkValue;
 use adham_provider::domain::stream::StreamCompletionOutcome;
 use adham_provider::registry::{LocalAccount, PinnedModel};
 use sqlx::Row;
+use std::collections::HashMap;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
-
-pub(crate) fn expect_full_scope(context: &CommandContext) -> Result<StreamIds, String> {
-    let ws_id = WorkspaceId::from_string(
-        context
-            .workspace_id
-            .as_deref()
-            .ok_or("VALIDATION_FAILED: workspaceId context required")?,
-    )
-    .map_err(|e| e.to_string())?;
-    let proj_id = ProjectId::from_string(
-        context
-            .project_id
-            .as_deref()
-            .ok_or("VALIDATION_FAILED: projectId context required")?,
-    )
-    .map_err(|e| e.to_string())?;
-    let sess_id = SessionId::from_string(
-        context
-            .session_id
-            .as_deref()
-            .ok_or("VALIDATION_FAILED: sessionId context required")?,
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(StreamIds {
-        ws_id,
-        proj_id,
-        sess_id,
-    })
-}
 
 pub async fn handle_stop_completion(
     ctx: &ApiContext,
@@ -128,7 +101,9 @@ where
     S: EventSink,
 {
     let trimmed = env.payload.text.trim().to_string();
-    if trimmed.is_empty() {
+    // Attachment-only sends are allowed: the files carry the content. An
+    // empty send with neither text nor files is refused.
+    if trimmed.is_empty() && env.payload.attachment_ids.is_empty() {
         return Err("VALIDATION_FAILED: text cannot be empty".to_string());
     }
     if trimmed.len() > 65536 {
@@ -154,6 +129,17 @@ where
         .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         validate_submit_reference(&rows, reference)?;
     }
+
+    // Attachment selection is validated and read before anything is written:
+    // a missing, foreign, or over-cap selection refuses the whole send.
+    let selected_attachments = crate::service::attachment_dispatch::resolve_dispatch_attachments(
+        ctx,
+        &ids.ws_id,
+        &ids.proj_id,
+        &ids.sess_id,
+        &env.payload.attachment_ids,
+    )
+    .await?;
 
     // Model evidence before ANY socket: unknown ids dispatch nothing.
     let (account, pinned, adapter) =
@@ -272,6 +258,18 @@ where
     .await
     .map_err(|e| e.to_string())?;
 
+    // The files this message was sent with, linked in the same transaction:
+    // the timeline chip and any later retry re-send exactly this selection.
+    if !selected_attachments.is_empty() {
+        let attachment_ids: Vec<AttachmentId> = selected_attachments
+            .iter()
+            .map(|attachment| attachment.attachment_id)
+            .collect();
+        SqliteEventStore::link_attachments_to_message_tx(&mut tx, &message_id, &attachment_ids)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
     // Durable op handle BEFORE any socket (fail-closed record-then-POST).
     SqliteEventStore::record_pending_operation_tx(
         &mut tx,
@@ -296,12 +294,23 @@ where
         context: None,
     };
     let persisted = serde_json::to_vec(&start).unwrap_or_default();
-    // The fingerprint covers the semantic input: a reference, when present, is
-    // part of it, so a reused request id with a different reference conflicts.
-    // A reference-free send hashes exactly as before.
-    let request_input = match &env.payload.reference {
-        Some(r) => format!("{trimmed}|{}|{}", r.refers_to_message_id, r.relation),
-        None => trimmed.clone(),
+    // The fingerprint covers the semantic input: a reference and the selected
+    // attachment ids, when present, are part of it, so a reused request id with
+    // a different reference or file selection conflicts. A plain send hashes
+    // exactly as before.
+    let request_input = match (
+        &env.payload.reference,
+        env.payload.attachment_ids.is_empty(),
+    ) {
+        (None, true) => trimmed.clone(),
+        (Some(r), true) => format!("{trimmed}|{}|{}", r.refers_to_message_id, r.relation),
+        (None, false) => format!("{trimmed}|{}", env.payload.attachment_ids.join(",")),
+        (Some(r), false) => format!(
+            "{trimmed}|{}|{}|{}",
+            r.refers_to_message_id,
+            r.relation,
+            env.payload.attachment_ids.join(",")
+        ),
     };
     let request_fp =
         adham_event_log::request_fingerprint("complete_once_streaming", 1, &request_input);
@@ -361,6 +370,13 @@ where
         // A fresh send keeps the whole session history; the branch lives in
         // the row iterator instead of a stop_after cut.
         None,
+        &{
+            let mut by_message: HashMap<String, Vec<_>> = HashMap::new();
+            if !selected_attachments.is_empty() {
+                by_message.insert(message_id.to_string(), selected_attachments);
+            }
+            by_message
+        },
     );
 
     Ok(run_and_settle(
@@ -408,6 +424,8 @@ where
         estimated_input_tokens: assembled.estimated_input_tokens,
         input_budget_tokens: assembled.input_budget_tokens,
         dropped_messages: assembled.dropped_messages,
+        attachments_included: assembled.attachments_included,
+        attachment_chars: assembled.attachment_chars,
     });
 
     info!("provider completion dispatching op {}", start.op_id);

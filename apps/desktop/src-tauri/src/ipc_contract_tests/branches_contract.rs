@@ -96,6 +96,7 @@ fn complete_once_answers_an_edited_branch_without_its_original() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id,
             model_id: "m:latest".to_string(),
             text: "edited prompt".to_string(),
@@ -223,6 +224,7 @@ fn active_alternative_selection_steers_the_next_send_and_survives_read_back() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "edited prompt".to_string(),
@@ -264,6 +266,7 @@ fn active_alternative_selection_steers_the_next_send_and_survives_read_back() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "follow-up".to_string(),

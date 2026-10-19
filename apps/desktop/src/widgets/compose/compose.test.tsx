@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as React from 'react';
 import { render, screen, fireEvent, renderHook, act, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   Composer,
   ComposeInput,
@@ -234,6 +235,18 @@ describe('migratePendingDraft', () => {
     );
     expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
   });
+
+  it('adopts only the pending bucket of the matching project scope', () => {
+    localStorage.setItem('adham:compose:draft:ws-1:proj-1:pending', 'Project one draft');
+    localStorage.setItem('adham:compose:draft:ws-1:proj-2:pending', 'Project two draft');
+    migratePendingDraft('ws-1:proj-1:sess-1', 'ws-1:proj-1:pending');
+    expect(localStorage.getItem('adham:compose:draft:ws-1:proj-1:sess-1')).toBe(
+      'Project one draft',
+    );
+    expect(localStorage.getItem('adham:compose:draft:ws-1:proj-2:pending')).toBe(
+      'Project two draft',
+    );
+  });
 });
 
 describe('RTL and ComposeInput', () => {
@@ -303,31 +316,51 @@ describe('RTL and ComposeInput', () => {
     expect(handleSubmit).not.toHaveBeenCalled();
   });
 
-  it('intercepts pastes exceeding 2000 characters and turns them into a context chip', () => {
-    const handleAttachBlob = vi.fn();
+  it('keeps a long text paste inline instead of fabricating a file chip', () => {
+    const onPasteFiles = vi.fn();
     render(
-      <ComposeInput
-        value=""
-        onChange={vi.fn()}
-        onSubmit={vi.fn()}
-        onAttachPastedBlob={handleAttachBlob}
-      />,
+      <ComposeInput value="" onChange={vi.fn()} onSubmit={vi.fn()} onPasteFiles={onPasteFiles} />,
     );
     const textarea = screen.getByRole('textbox', { name: /composer input/i });
-    const largeText = 'A'.repeat(2500);
 
     fireEvent.paste(textarea, {
       clipboardData: {
-        getData: () => largeText,
+        getData: () => 'A'.repeat(2500),
+        files: [],
       },
     });
 
-    expect(handleAttachBlob).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'pasted-text',
-        charCount: 2500,
-      }),
+    expect(onPasteFiles).not.toHaveBeenCalled();
+  });
+
+  it('keeps a multiline paste inline in the textarea', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ComposeInput value="" onChange={onChange} onSubmit={vi.fn()} />);
+    const textarea = screen.getByRole('textbox', { name: /composer input/i });
+
+    await user.click(textarea);
+    await user.paste('first line\nsecond line');
+
+    expect(onChange).toHaveBeenCalledWith('first line\nsecond line');
+  });
+
+  it('hands clipboard files to ingestion', () => {
+    const onPasteFiles = vi.fn();
+    render(
+      <ComposeInput value="" onChange={vi.fn()} onSubmit={vi.fn()} onPasteFiles={onPasteFiles} />,
     );
+    const textarea = screen.getByRole('textbox', { name: /composer input/i });
+    const file = new File(['# notes'], 'notes.md', { type: 'text/markdown' });
+
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        getData: () => '',
+        files: [file],
+      },
+    });
+
+    expect(onPasteFiles).toHaveBeenCalledWith([file]);
   });
 });
 
@@ -337,15 +370,21 @@ describe('ComposeContextChips', () => {
     render(
       <ComposeContextChips
         attachments={[
-          { id: '1', type: 'file', name: 'src/main.rs', size: 1024 },
-          { id: '2', type: 'folder', name: 'src/widgets' },
+          {
+            key: '1',
+            fileName: 'src/main.rs',
+            byteSize: 1024,
+            charCount: 1000,
+            status: 'ready',
+          },
+          { key: '2', fileName: 'notes.md', status: 'pending' },
         ]}
         onRemove={handleRemove}
       />,
     );
 
     expect(screen.getByText('src/main.rs')).toBeDefined();
-    expect(screen.getByText('src/widgets')).toBeDefined();
+    expect(screen.getByText('notes.md')).toBeDefined();
 
     const removeButtons = screen.getAllByRole('button', { name: /Remove/i });
     fireEvent.click(removeButtons[0]!);

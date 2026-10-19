@@ -1,7 +1,5 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatNumber } from '@/shared/i18n/format';
-import type { ComposeAttachment } from './compose-context-chips';
 
 export interface ComposeInputProps {
   value: string;
@@ -9,7 +7,8 @@ export interface ComposeInputProps {
   onSubmit: () => void;
   onRecallPrevious?: (() => void) | undefined;
   onRecallNext?: (() => void) | undefined;
-  onAttachPastedBlob?: ((attachment: ComposeAttachment) => void) | undefined;
+  /** Files pasted from the clipboard; pasted text itself stays inline. */
+  onPasteFiles?: ((files: File[]) => void) | undefined;
   placeholder?: string | undefined;
   disabled?: boolean | undefined;
   minRows?: number | undefined;
@@ -18,6 +17,8 @@ export interface ComposeInputProps {
   /** Backend preference (Settings → Send message on Enter). Off means Enter
    * inserts a newline like Shift+Enter. Defaults to true. */
   enterToSend?: boolean | undefined;
+  /** True when a send is valid without text (selected attachments). */
+  canSendEmpty?: boolean | undefined;
 }
 
 // Arabic / RTL character range detector
@@ -36,13 +37,14 @@ export function ComposeInput({
   onSubmit,
   onRecallPrevious,
   onRecallNext,
-  onAttachPastedBlob,
+  onPasteFiles,
   placeholder,
   disabled = false,
   minRows = 2,
   maxRows = 10,
   className = '',
   enterToSend = true,
+  canSendEmpty = false,
 }: ComposeInputProps) {
   const { t } = useTranslation();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -60,26 +62,14 @@ export function ComposeInput({
     el.style.height = `${Math.max(nextHeight, minRows * computedLineHeight)}px`;
   }, [value, minRows, maxRows]);
 
-  // Handle paste: intercept large pastes (> 2000 characters) and turn them into a context chip
+  // Paste: clipboard files (a copied file) go through the same ingestion as a
+  // picker selection; pasted text stays inline — long pastes are just text,
+  // never a chip that pretends the model received a file.
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const pastedText = e.clipboardData.getData('text');
-    if (pastedText && pastedText.length > 2000 && onAttachPastedBlob) {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.length > 0 && onPasteFiles) {
       e.preventDefault();
-      const firstLine =
-        pastedText.trim().split('\n')[0]?.slice(0, 30) || t('compose.pastedText', 'Pasted text');
-      const attachment: ComposeAttachment = {
-        id: `paste-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        type: 'pasted-text',
-        // Isolate the user-authored excerpt so mixed-script pastes render
-        // correctly in RTL layouts; the surrounding template is translated.
-        name: t('compose.pastedChars', {
-          count: pastedText.length,
-          formatted: formatNumber(pastedText.length),
-          firstLine: `\u2066${firstLine}\u2069`,
-        }),
-        charCount: pastedText.length,
-      };
-      onAttachPastedBlob(attachment);
+      onPasteFiles(files);
     }
   };
 
@@ -97,7 +87,7 @@ export function ComposeInput({
 
     if (e.key === 'Enter' && !e.shiftKey && enterToSend) {
       e.preventDefault();
-      if (value.trim() && !disabled) {
+      if ((value.trim() || canSendEmpty) && !disabled) {
         onSubmit();
       }
       return;

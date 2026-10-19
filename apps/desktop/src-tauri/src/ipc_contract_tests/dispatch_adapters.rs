@@ -115,6 +115,7 @@ fn g4_envelope(
         request_id: uuid::Uuid::now_v7().to_string(),
         context: scope.clone(),
         payload: CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,

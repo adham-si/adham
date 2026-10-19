@@ -28,6 +28,7 @@ fn complete_once_streams_in_order_and_persists_terminal() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,
@@ -222,6 +223,7 @@ fn completion_history_is_bounded_and_tamper_proofed() {
     let tampered = typed_envelope(
         (&ws, &other_project, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,
@@ -243,6 +245,7 @@ fn completion_history_is_bounded_and_tamper_proofed() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,
@@ -323,6 +326,7 @@ fn unknown_model_blocked_before_socket() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,
@@ -347,6 +351,7 @@ fn unknown_model_blocked_before_socket() {
                 typed_envelope(
                     (&ws, &proj, &sess),
                     CompleteOncePayload {
+                        attachment_ids: Vec::new(),
                         mode: None,
                         think: None,
                         reference: None,
@@ -402,6 +407,7 @@ fn thinking_model_stream_persists_answer_and_resolves() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,

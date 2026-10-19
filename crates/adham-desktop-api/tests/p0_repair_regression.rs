@@ -24,6 +24,7 @@ async fn submit(
                 session_id: Some(sess.to_string()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: text.to_string(),
             },
         },

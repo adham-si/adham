@@ -19,6 +19,7 @@ const BRANCH_SELECTIONS_SQL: &str =
     include_str!("../../migrations/20261018000000_branch_selections.sql");
 const ANSWER_FEEDBACK_SQL: &str =
     include_str!("../../migrations/20261018000001_answer_feedback.sql");
+const ATTACHMENTS_SQL: &str = include_str!("../../migrations/20261019000000_attachments.sql");
 
 pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(&format!("sqlite://{}", db_path.display()))?
@@ -45,6 +46,7 @@ pub async fn create_sqlite_pool(db_path: &Path) -> Result<Pool<Sqlite>, sqlx::Er
     pool.execute(PROVIDER_CREDENTIALS_SQL).await?;
     pool.execute(BRANCH_SELECTIONS_SQL).await?;
     pool.execute(ANSWER_FEEDBACK_SQL).await?;
+    pool.execute(ATTACHMENTS_SQL).await?;
     ensure_assistant_columns(&pool).await?;
     ensure_message_reference_columns(&pool).await?;
     info!("Database schema initialized successfully.");

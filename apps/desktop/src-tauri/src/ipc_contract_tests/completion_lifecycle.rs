@@ -38,6 +38,7 @@ fn stop_during_connect_persists_interrupted_and_resolves() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "slow one".to_string(),
@@ -173,6 +174,7 @@ fn stop_after_thinking_activity_stays_interrupted() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "think then answer".to_string(),
@@ -296,6 +298,7 @@ fn empty_stop_persists_failed_terminal_and_resolves() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "say nothing".to_string(),
@@ -388,6 +391,7 @@ fn tool_only_stop_persists_failed_not_completed() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "use a tool".to_string(),

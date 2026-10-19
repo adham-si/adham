@@ -18,6 +18,22 @@ pub async fn handle_get_conversation(
     .await
     .map_err(|e| e.to_string())?;
 
+    // Attachments linked to this session's messages, grouped by message. A
+    // chip exists only when the link row exists, so it reflects a real send.
+    let mut attachments_by_message: std::collections::HashMap<String, Vec<MessageAttachmentDto>> =
+        std::collections::HashMap::new();
+    for (message_id, record) in ctx
+        .store
+        .list_session_message_attachments(&session_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        attachments_by_message
+            .entry(message_id)
+            .or_default()
+            .push(crate::service::attachment::message_attachment_dto(&record));
+    }
+
     let mut dtos = Vec::with_capacity(messages.len());
     let mut max_pos: i64 = 0;
 
@@ -25,7 +41,7 @@ pub async fn handle_get_conversation(
         let dt = OffsetDateTime::from_unix_timestamp_nanos((m.created_at_us * 1_000) as i128)
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
         dtos.push(ConversationMessageDto {
-            message_id: m.message_id,
+            message_id: m.message_id.clone(),
             role: m.role,
             text: m.content,
             created_at: dt.format(&Rfc3339).unwrap_or_default(),
@@ -39,6 +55,9 @@ pub async fn handle_get_conversation(
                     relation,
                 },
             ),
+            attachments: attachments_by_message
+                .remove(&m.message_id)
+                .unwrap_or_default(),
         });
         max_pos += 1;
     }

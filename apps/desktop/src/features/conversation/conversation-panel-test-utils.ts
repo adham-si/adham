@@ -79,6 +79,21 @@ export function fakeBackend(): ConversationFakeBackend {
     setActiveAlternative: vi.fn().mockResolvedValue([]),
     setAnswerFeedback: vi.fn().mockResolvedValue([]),
     markCompletionInterrupted: vi.fn().mockResolvedValue({ status: 'interrupted' }),
+    ingestAttachment: vi.fn().mockImplementation((_ws, _proj, _session, payload) =>
+      Promise.resolve({
+        attachmentId: 'att-1',
+        fileName: payload.fileName,
+        mediaType: 'text/markdown',
+        byteSize: payload.text.length,
+        contentHash: 'hash-1',
+        hashAlgorithm: 'blake3',
+        extractedChars: payload.text.length,
+        truncated: false,
+        retention: 'session',
+        text: payload.text,
+      }),
+    ),
+    readAttachmentText: vi.fn(),
   };
 }
 

@@ -116,6 +116,7 @@ fn stop_mid_stream_persists_interrupted_partial() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,
@@ -274,6 +275,7 @@ fn renderer_disconnect_still_persists_terminal() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,
@@ -352,6 +354,7 @@ fn premature_eof_persists_failed_terminal_once() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             mode: None,
             think: None,
             reference: None,

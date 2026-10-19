@@ -104,6 +104,7 @@
     "selectModel": "Select a model",
     "markdown": {
       "copyCode": "Copy code",
+      "code": "Code",
       "copyMessage": "Copy message",
       "copied": "Copied",
       "copyFailed": "Copy failed",
@@ -119,6 +120,34 @@
       "likeAnswer": "Like this answer",
       "dislikeAnswer": "Dislike this answer",
       "feedbackReason": "Reason (optional)"
+    }
+  },
+  "attachments": {
+    "picker": "Attach a text or code file",
+    "pickerHint": "Text and code files only (up to 5 MB). PDFs, images, audio and video are not supported yet.",
+    "reading": "Reading…",
+    "pendingRead": "Read when sent",
+    "pendingTitle": "This file is read when the first message of this conversation is sent.",
+    "truncated": "Truncated",
+    "sentLabel": "Files sent with this message",
+    "stillReading": "Wait for the selected files to finish reading, then send again.",
+    "failedSelection": "Remove the files marked as refused, then send again.",
+    "needsModel": "Select a model to send files: attachments are not saved as text-only messages.",
+    "busy": "Files cannot be queued while a turn is running. Wait for it to finish, then send them.",
+    "previewShow": "Preview",
+    "previewHide": "Hide preview",
+    "previewUnavailable": "This attachment's extracted text is not readable.",
+    "previewBound": "Showing the first {{shown}} of {{total}} characters.",
+    "errors": {
+      "tooLarge": "File is larger than 5 MB",
+      "unsupportedType": "File type is not supported (text and code files only)",
+      "binaryContent": "File looks binary, not text",
+      "notUtf8": "File is not valid UTF-8 text",
+      "notFound": "File was not found",
+      "selectionTooLarge": "Selected files exceed the per-message size limit",
+      "unsupportedSource": "Files can only be attached by picking or dropping them here",
+      "unreadable": "File could not be read",
+      "unknown": "File was refused"
     }
   }
 }

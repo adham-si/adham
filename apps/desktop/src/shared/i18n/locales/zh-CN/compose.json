@@ -100,6 +100,7 @@
     "selectModel": "选择模型",
     "markdown": {
       "copyCode": "复制代码",
+      "code": "代码",
       "copyMessage": "复制消息",
       "copied": "已复制",
       "copyFailed": "复制失败",
@@ -115,6 +116,34 @@
       "likeAnswer": "喜欢此回答",
       "dislikeAnswer": "不喜欢此回答",
       "feedbackReason": "原因（可选）"
+    }
+  },
+  "attachments": {
+    "picker": "附加文本或代码文件",
+    "pickerHint": "仅支持文本和代码文件（最大 5 MB）。暂不支持 PDF、图片、音频和视频。",
+    "reading": "正在读取…",
+    "pendingRead": "发送时读取",
+    "pendingTitle": "此文件将在发送本对话第一条消息时读取。",
+    "truncated": "已截断",
+    "sentLabel": "随此消息发送的文件",
+    "stillReading": "请等待所选文件读取完成后再发送。",
+    "failedSelection": "请移除标记为已拒绝的文件后再发送。",
+    "needsModel": "请选择模型以发送文件：附件不会仅以文本消息保存。",
+    "busy": "回合运行期间无法将文件加入队列。请等待结束后再发送。",
+    "previewShow": "预览",
+    "previewHide": "隐藏预览",
+    "previewUnavailable": "无法读取此附件的提取文本。",
+    "previewBound": "显示前 {{shown}} 个字符，共 {{total}} 个。",
+    "errors": {
+      "tooLarge": "文件超过 5 MB",
+      "unsupportedType": "不支持此文件类型（仅限文本和代码文件）",
+      "binaryContent": "文件似乎是二进制内容而非文本",
+      "notUtf8": "文件不是有效的 UTF-8 文本",
+      "notFound": "未找到文件",
+      "selectionTooLarge": "所选文件超过单条消息的大小限制",
+      "unsupportedSource": "只能通过选择或拖放到此处来附加文件",
+      "unreadable": "无法读取文件",
+      "unknown": "文件被拒绝"
     }
   }
 }

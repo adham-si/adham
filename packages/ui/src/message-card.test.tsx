@@ -21,6 +21,18 @@ describe('MessageCard', () => {
     expect(container.querySelector('article')).not.toBeNull();
   });
 
+  it('keeps a very long message complete inside a bounded body', () => {
+    const text = Array.from({ length: 1500 }, (_, i) => `line ${i}`).join('\n');
+    const { container } = render(
+      <MessageCard role="user" content={contentFromText(text)} timestamp="10:04" />,
+    );
+    const body = container.querySelector('p.whitespace-pre-wrap');
+    expect(body?.textContent).toBe(text);
+    const scroller = body?.parentElement;
+    expect(scroller?.className).toContain('max-h-[70vh]');
+    expect(scroller?.className).toContain('overflow-y-auto');
+  });
+
   it('states the role as visible text, not colour alone', () => {
     render(<MessageCard role="assistant" content={contentFromText('Hi')} timestamp="10:04" />);
     expect(screen.getByText('Assistant')).toBeDefined();

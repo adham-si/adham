@@ -1,7 +1,8 @@
 //! Retry / regenerate: one NEW attempt for an existing user turn (Delivery A).
 
 use super::assembly::{assemble_context, budget_with_reserve, mode_instruction};
-use super::streaming::{expect_full_scope, run_and_settle};
+use super::scope::expect_full_scope;
+use super::streaming::run_and_settle;
 use super::{
     ApiContext, EventSink, resolve_dispatch_adapter, validate_mode, validate_session_scope,
     validate_think,
@@ -10,6 +11,7 @@ use super::{
 use crate::dtos::*;
 use adham_core_types::*;
 use adham_event_log::SqliteEventStore;
+use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 
 /// Retry / regenerate: one NEW assistant attempt for an existing user turn.
@@ -160,11 +162,23 @@ where
     // model (they stay persisted and visible) and later turns cannot exist —
     // the latest-turn rule above guarantees it.
     let (input_budget, max_output_tokens) = budget_with_reserve(&pinned.descriptor);
+    // Files the answered turn was sent with, from the durable links: a retry
+    // re-sends exactly what the original send carried (a read failure refuses
+    // the dispatch rather than dropping file content silently).
+    let attachments_by_message: HashMap<_, _> =
+        crate::service::attachment_dispatch::session_dispatch_attachments(
+            ctx,
+            &ids.ws_id,
+            &ids.proj_id,
+            &ids.sess_id,
+        )
+        .await?;
     let assembled = assemble_context(
         history_rows.into_iter(),
         env.payload.mode.as_deref().and_then(mode_instruction),
         input_budget,
         Some(&reply_to),
+        &attachments_by_message,
     );
 
     Ok(run_and_settle(

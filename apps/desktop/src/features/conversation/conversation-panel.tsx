@@ -6,11 +6,16 @@ import {
   Composer,
   EmptyWelcome,
   useDrafts,
-  type ComposeAttachment,
   type ComposeMode,
   type ModelOption,
   type QueuedInstruction,
 } from '@/widgets/compose';
+import {
+  MessageAttachments,
+  useAttachmentDrop,
+  useAttachments,
+  type PendingFile,
+} from './attachments';
 import { adhamClient } from '@/shared/api/adham-client';
 import { formatTime } from '@/shared/i18n/format';
 import {
@@ -103,6 +108,7 @@ export function ConversationPanel({
   const markdownLabels = React.useMemo<Partial<MarkdownLabels>>(
     () => ({
       copyCode: t('compose.markdown.copyCode'),
+      codeLabel: t('compose.markdown.code'),
       copyMessage: t('compose.markdown.copyMessage'),
       copied: t('compose.markdown.copied'),
       copyFailed: t('compose.markdown.copyFailed'),
@@ -170,9 +176,16 @@ export function ConversationPanel({
     step: 'workspace' | 'project';
     origin: 'created' | 'selected';
   } | null>(null);
-  const sessionBucket = conv.sessionId ?? PENDING_DRAFT_BUCKET;
+  // Drafts and model picks live in a workspace+project bucket, so two
+  // projects never share a new-session draft or an explicit selection.
+  const scopeKey = conv.context ? `${conv.context.workspaceId}:${conv.context.projectId}` : null;
+  const pendingBucket = scopeKey ? `${scopeKey}:${PENDING_DRAFT_BUCKET}` : PENDING_DRAFT_BUCKET;
+  const sessionBucket = scopeKey
+    ? `${scopeKey}:${conv.sessionId ?? PENDING_DRAFT_BUCKET}`
+    : (conv.sessionId ?? PENDING_DRAFT_BUCKET);
   const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({
     sessionId: sessionBucket,
+    pendingBucket,
   });
   const draftRef = React.useRef(draft);
   draftRef.current = draft;
@@ -234,14 +247,42 @@ export function ConversationPanel({
   React.useEffect(() => {
     if (prevModelSessionRef.current === sessionBucket) return;
     prevModelSessionRef.current = sessionBucket;
-    migratePendingModelChoice(sessionBucket);
+    if (pendingBucket !== PENDING_DRAFT_BUCKET) {
+      migratePendingModelChoice(pendingBucket, PENDING_DRAFT_BUCKET);
+    }
+    migratePendingModelChoice(sessionBucket, pendingBucket);
     setSelectedModelId(readComposeModelPreference(sessionBucket) ?? '');
     setThink(null);
-  }, [sessionBucket]);
-  const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
+  }, [sessionBucket, pendingBucket]);
   const [stopNotice, setStopNotice] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
-  // "Enabled in chat" curation from the models settings page filters what the
+  /// The timeline follows new output only while the reader is at the bottom.
+  /// Scrolling up stops the follow and offers jump-to-latest; the offset is
+  /// read from the element, never fabricated.
+  const timelineRef = React.useRef<HTMLDivElement>(null);
+  const nearBottomRef = React.useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = React.useState(false);
+  const handleTimelineScroll = React.useCallback(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight <= 64;
+    nearBottomRef.current = near;
+    setShowJumpToLatest(!near);
+  }, []);
+  const scrollToLatest = React.useCallback(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+    nearBottomRef.current = true;
+    setShowJumpToLatest(false);
+    el.scrollTop = el.scrollHeight;
+  }, []);
+  const lastMessageText = conv.messages[conv.messages.length - 1]?.text ?? '';
+  const streamingText = conv.streaming?.text ?? '';
+  React.useEffect(() => {
+    if (!nearBottomRef.current) return;
+    const el = timelineRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [conv.messages.length, lastMessageText, streamingText]); // "Enabled in chat" curation from the models settings page filters what the
   // composer offers (absence = enabled, so a fresh connection stays complete).
   const modelPrefs = useModelPrefs();
 
@@ -298,6 +339,34 @@ export function ConversationPanel({
 
   const busy =
     conv.status === 'submitting' || conv.status === 'bootstrapping' || conv.streaming !== null;
+  // Attachment selections: read and stored now when the session exists,
+  // otherwise pending until the send that materializes the session. A refused
+  // file keeps its chip with the reason; the send then refuses too.
+  const attachmentScope = conv.context
+    ? {
+        workspaceId: conv.context.workspaceId,
+        projectId: conv.context.projectId,
+        sessionId: conv.sessionId,
+      }
+    : null;
+  const attachments = useAttachments({ backend, scope: attachmentScope });
+  const attachmentDrop = useAttachmentDrop({ onPaths: attachments.addPaths });
+  /** Rehydrate the exact extracted text of an attachment on this session. */
+  const readAttachmentText = React.useCallback(
+    (attachmentId: string) => {
+      const ctx = conv.context;
+      if (!ctx || !conv.sessionId || !backend.readAttachmentText) {
+        return Promise.reject(new Error('VALIDATION_FAILED: attachment.unreadable'));
+      }
+      return backend.readAttachmentText(
+        ctx.workspaceId,
+        ctx.projectId,
+        conv.sessionId,
+        attachmentId,
+      );
+    },
+    [backend, conv.context, conv.sessionId],
+  );
   const refreshScope = conv.refreshScope;
   /// Workspace chosen for its first project (an existing workspace without
   /// projects). Project creation binds to it; the workspace itself is never
@@ -384,7 +453,12 @@ export function ConversationPanel({
   /// reference), so a referenced send without a resolved model is refused
   /// visibly rather than sent as an unreferenced message.
   const dispatchTurn = React.useCallback(
-    async (sent: string, reference?: UiMessageReference) => {
+    async (
+      sent: string,
+      reference?: UiMessageReference,
+      attachmentIds: string[] = [],
+      pendingFiles: PendingFile[] = [],
+    ) => {
       setSubmitError(null);
       const refusedReference = reference !== undefined && !streamReady;
       const outcome = refusedReference
@@ -406,6 +480,8 @@ export function ConversationPanel({
               // The documented `think` value; null = model default (omitted).
               think ?? undefined,
               reference,
+              attachmentIds,
+              pendingFiles,
             )
           : await conv.submit(sent);
       // A rejected dispatch (a refused reply, an undocumented think value) must
@@ -427,8 +503,13 @@ export function ConversationPanel({
   /// previous dispatch has fully settled (terminal + authoritative reload);
   /// a refusal stops the drain, since its reason applies to what follows too.
   const dispatchAndDrain = React.useCallback(
-    async (sent: string, reference?: UiMessageReference) => {
-      let outcome = await dispatchTurn(sent, reference);
+    async (
+      sent: string,
+      reference?: UiMessageReference,
+      attachmentIds: string[] = [],
+      pendingFiles: PendingFile[] = [],
+    ) => {
+      let outcome = await dispatchTurn(sent, reference, attachmentIds, pendingFiles);
       // The reference is acknowledged only when its dispatch was accepted; a
       // refused send keeps the pending reference so it can be retried as one.
       if (outcome.ok && reference) {
@@ -450,6 +531,7 @@ export function ConversationPanel({
           });
         }
       }
+      return outcome;
     },
     [dispatchTurn, setQueuedBoth],
   );
@@ -513,14 +595,38 @@ export function ConversationPanel({
 
   const handleSubmit = React.useCallback(async () => {
     const text = draftRef.current.trim();
-    if (!text) return;
+    const readyIds = attachments.readyIds;
+    const pendingFiles = attachments.pendingFiles;
+    const hasFiles = attachments.items.length > 0;
+    // An attachment-only send is valid; text-only needs text.
+    if (!text && !hasFiles) return;
+    // A selection that is unreadable, still being read, or has no model to
+    // receive it refuses the send with its reason — chips are never dropped
+    // silently and a send never leaves them behind without saying so.
+    if (attachments.isReading) {
+      setSubmitError(t('attachments.stillReading'));
+      return;
+    }
+    if (attachments.hasErrors) {
+      setSubmitError(t('attachments.failedSelection'));
+      return;
+    }
+    if (hasFiles && !streamReady) {
+      setSubmitError(t('attachments.needsModel'));
+      return;
+    }
     const reference: UiMessageReference | undefined = pendingReference
       ? { refersToMessageId: pendingReference.id, relation: pendingReference.relation }
       : undefined;
     // Sending while a turn runs queues the instruction visibly: it is never
     // injected into the active call and never a silent no-op. It dispatches
-    // (with the parameters current then) once the turn settles.
+    // (with the parameters current then) once the turn settles. Files have no
+    // queue slot, so a file send waits instead of queueing a chip-less text.
     if (busy) {
+      if (hasFiles) {
+        setSubmitError(t('attachments.busy'));
+        return;
+      }
       queuedIdRef.current += 1;
       setQueuedBoth([
         ...queuedRef.current,
@@ -539,8 +645,20 @@ export function ConversationPanel({
     // user bubble appears and the turn persists), and a follow-up typed while
     // the answer streams must not append to an already-sent instruction.
     if (draftRef.current === text) commitPrompt(text);
-    await dispatchAndDrain(text, reference);
-  }, [busy, commitPrompt, dispatchAndDrain, setQueuedBoth, pendingReference]);
+    const outcome = await dispatchAndDrain(text, reference, readyIds, pendingFiles);
+    // The files were linked to the persisted turn; the composer selection is
+    // done. A refusal keeps them so the same send can be retried.
+    if (outcome.ok && hasFiles) attachments.clear();
+  }, [
+    attachments,
+    busy,
+    commitPrompt,
+    dispatchAndDrain,
+    setQueuedBoth,
+    pendingReference,
+    streamReady,
+    t,
+  ]);
 
   /// A new model invalidates the thinking choice: a level documented for the
   /// previous model may be undocumented for the next one (the backend refuses
@@ -563,7 +681,7 @@ export function ConversationPanel({
   }, [conv]);
 
   const notice = submissionNotice({
-    attachmentCount: attachments.length,
+    attachmentCount: attachments.items.length,
     modelApplied: streamReady,
     modelGapReason,
     staleModelId: modelGapReason === 'stale-selection' ? selectedModelId : undefined,
@@ -634,6 +752,9 @@ export function ConversationPanel({
 
       {/* Conversation Timeline (smoothly expands when messages exist) */}
       <div
+        ref={timelineRef}
+        onScroll={handleTimelineScroll}
+        data-testid="conversation-timeline"
         className={`flex flex-col overflow-y-auto transition-all duration-500 ease-in-out ${
           isEmpty ? 'max-h-0 flex-0 opacity-0 pointer-events-none' : 'flex-1 opacity-100'
         }`}
@@ -707,6 +828,16 @@ export function ConversationPanel({
                         }
                   }
                 />
+                {/* The files this message was sent with, read from the stored
+                    link rows. A chip exists because the turn carried it; the
+                    preview reads back the exact extracted text. */}
+                {!isAssistant && (m.attachments?.length ?? 0) > 0 && (
+                  <MessageAttachments
+                    attachments={m.attachments!}
+                    readText={backend.readAttachmentText ? readAttachmentText : undefined}
+                    className="px-1"
+                  />
+                )}
                 {note && (
                   <p
                     role="status"
@@ -756,6 +887,15 @@ export function ConversationPanel({
               labels={markdownLabels}
               timestamp={formatTimestamp(conv.recoverySnapshot.createdAt)}
             />
+          )}
+          {showJumpToLatest && (
+            <button
+              type="button"
+              onClick={scrollToLatest}
+              className="sticky bottom-0 z-10 self-end rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-xs text-foreground-secondary shadow-sm hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            >
+              {t('conversation.jumpToLatest')}
+            </button>
           )}
         </div>
       </div>
@@ -891,9 +1031,18 @@ export function ConversationPanel({
           onChangeThink={setThink}
           contextLimit={selectedDescriptor?.contextLimit ?? null}
           effectiveContextBudget={selectedDescriptor?.effectiveContextBudget ?? null}
-          attachments={attachments}
-          onAddAttachments={(next) => setAttachments((prev) => [...prev, ...next])}
-          onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
+          attachments={attachments.items.map((item) => ({
+            key: item.key,
+            fileName: item.fileName,
+            byteSize: item.byteSize,
+            charCount: item.charCount,
+            status: item.status,
+            truncated: item.meta?.truncated ?? false,
+            errorCode: item.errorCode,
+          }))}
+          onAddFiles={attachments.addFiles}
+          onRemoveAttachment={attachments.remove}
+          isDragOverExternal={attachmentDrop.dragging}
           approvalRequest={null}
           onRecallPrevious={() => {
             recallPrevious();

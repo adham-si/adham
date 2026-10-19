@@ -4,7 +4,6 @@ export * from './compose-input';
 export * from './compose-context-chips';
 export * from './compose-mode-selector';
 export * from './compose-model-picker';
-export * from './compose-attachment-menu';
 export * from './compose-status-strip';
 export * from './compose-approval-bar';
 export * from './compose-action-bar';

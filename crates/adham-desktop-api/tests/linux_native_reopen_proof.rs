@@ -75,6 +75,7 @@ async fn test_native_linux_context_reopen_and_save_journey() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: canary_text.clone(),
             },
         },

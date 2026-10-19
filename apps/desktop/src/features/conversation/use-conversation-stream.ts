@@ -11,6 +11,7 @@ import {
 import { persistAndAnnounceActiveSession } from './durable-session-storage';
 import { pendingFirstSendBlockedReason, prepareLazyFirstSend } from './lazy-session-creation';
 import { clearDurablePendingOperation } from './pending-recovery/durable-pending-operations';
+import { attachmentErrorCode, type PendingFile } from './attachments';
 import type {
   ConversationStatus,
   StreamingSnapshot,
@@ -250,9 +251,14 @@ export function useConversationStream(deps: StreamDeps) {
       think?: boolean | string,
       /** Durable reply anchor recorded with the turn; omitted = no quote. */
       reference?: UiMessageReference,
+      /** Attachment ids already stored in this session's index. */
+      attachmentIds: string[] = [],
+      /** Selections made before the session existed; ingested now so the turn
+       *  carries exactly what the composer showed. */
+      pendingFiles: PendingFile[] = [],
     ): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
-      if (!trimmed)
+      if (!trimmed && attachmentIds.length === 0 && pendingFiles.length === 0)
         return { ok: false, error: i18n.t('conversation.emptyMessage'), uncertain: false };
       const completeOnceStreaming = backend.completeOnceStreaming;
       if (!completeOnceStreaming || !backend.stopCompletion) {
@@ -294,6 +300,7 @@ export function useConversationStream(deps: StreamDeps) {
           projectId: ctx.projectId,
           text: trimmed,
           installationId: ctx.installationId ?? installationIdRef.current,
+          allowEmptyText: pendingFiles.length > 0 || attachmentIds.length > 0,
           isStale: () => !mountedRef.current || generationRef.current !== generation,
         });
         if (!mountedRef.current || generationRef.current !== generation) {
@@ -316,6 +323,56 @@ export function useConversationStream(deps: StreamDeps) {
 
       submitInFlightRef.current = true;
       setError(null);
+      // A file selected before this conversation existed is ingested against
+      // the session this send materialized. A refusal refuses the whole send:
+      // nothing is dispatched without the file it was sent with.
+      let resolvedIds = attachmentIds;
+      if (pendingFiles.length > 0) {
+        const ingest = backend.ingestAttachment;
+        const ingestPath = backend.ingestAttachmentPath;
+        resolvedIds = [...attachmentIds];
+        try {
+          for (const file of pendingFiles) {
+            if (file.kind === 'text') {
+              if (!ingest) throw new Error('VALIDATION_FAILED: attachment.unreadable');
+              const dto = await ingest(ctx.workspaceId, ctx.projectId, sessionId, {
+                fileName: file.fileName,
+                text: file.text,
+              });
+              resolvedIds.push(dto.attachmentId);
+            } else {
+              if (!ingestPath) throw new Error('VALIDATION_FAILED: attachment.unreadable');
+              const dto = await ingestPath(ctx.workspaceId, ctx.projectId, sessionId, {
+                filePath: file.filePath,
+              });
+              resolvedIds.push(dto.attachmentId);
+            }
+          }
+        } catch (error) {
+          submitInFlightRef.current = false;
+          if (firstSend) {
+            // Nothing persisted: the tracked first-send identity would only
+            // offer a duplicate resend, so it is dismissed like any refusal.
+            await clearDurablePendingOperation(backend, {
+              operationId: firstSend.messageRequestId,
+              expectedMessageRequestId: firstSend.messageRequestId,
+              reason: 'dismissed',
+            });
+          }
+          // A storage refusal is shown in the user's language; anything else
+          // surfaces exactly as it arrived — never a reworded cause.
+          const code = attachmentErrorCode(error);
+          const message =
+            code === 'unknown'
+              ? error instanceof Error
+                ? error.message
+                : String(error)
+              : i18n.t(`attachments.errors.${code}`);
+          setError(message);
+          setStatus('error');
+          return { ok: false, error: message, uncertain: false };
+        }
+      }
       // Optimistic user bubble; the terminal reload replaces the whole list
       // with the authoritative persisted rows (including the streamed turn).
       mutationSeqRef.current += 1;
@@ -347,6 +404,7 @@ export function useConversationStream(deps: StreamDeps) {
               mode,
               ...(think === undefined ? {} : { think }),
               ...(reference === undefined ? {} : { reference }),
+              ...(resolvedIds.length === 0 ? {} : { attachmentIds: resolvedIds }),
             },
             onEvent,
           );

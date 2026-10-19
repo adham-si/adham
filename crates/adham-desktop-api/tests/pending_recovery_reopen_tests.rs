@@ -138,6 +138,7 @@ async fn test_cleanup_does_not_tombstone_saved_message_content() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Authoritative saved message".to_string(),
             },
         },
@@ -318,6 +319,7 @@ async fn test_context_reopen_recovers_pending_operation_and_resend_zero_duplicat
                 request_id: original_msg_req_id.clone(),
                 context: session_ctx.clone(),
                 payload: SubmitMessagePayload {
+                    attachment_ids: Vec::new(),
                     text: test_text.to_string(),
                 },
             },

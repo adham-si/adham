@@ -106,6 +106,22 @@ export const AnswerFeedbackSchema = z.object({
 
 export const AnswerFeedbackListSchema = z.array(AnswerFeedbackSchema);
 
+export const MessageAttachmentDtoSchema = z.object({
+  attachmentId: z.string(),
+  fileName: z.string(),
+  mediaType: z.string(),
+  byteSize: z.number().int(),
+  contentHash: z.string(),
+  hashAlgorithm: z.string(),
+  extractedChars: z.number().int(),
+  truncated: z.boolean(),
+});
+
+export const AttachmentDtoSchema = MessageAttachmentDtoSchema.extend({
+  retention: z.string(),
+  text: z.string(),
+});
+
 export const ConversationMessageDtoSchema = z.object({
   messageId: z.string(),
   role: z.string(),
@@ -114,6 +130,7 @@ export const ConversationMessageDtoSchema = z.object({
   sourceEventId: z.string(),
   completion: MessageCompletionV1Schema.nullable(),
   reference: MessageReferenceDtoSchema.nullable(),
+  attachments: z.array(MessageAttachmentDtoSchema).default([]),
 });
 
 export const ConversationPageSchema = z.object({
@@ -247,6 +264,8 @@ export const ContextAssemblyDtoSchema = z.object({
   estimatedInputTokens: z.number().int().nonnegative(),
   inputBudgetTokens: z.number().int().nonnegative().nullable(),
   droppedMessages: z.number().int().nonnegative(),
+  attachmentsIncluded: z.number().int().nonnegative(),
+  attachmentChars: z.number().int().nonnegative(),
 });
 
 export const CompletionStartDtoSchema = z.object({

@@ -176,7 +176,13 @@ describe('ConversationPanel modes and settings', () => {
       return {
         opId: 'op-c',
         messageId: 'm-c',
-        context: { estimatedInputTokens: 900, inputBudgetTokens: 512, droppedMessages: 3 },
+        context: {
+          estimatedInputTokens: 900,
+          inputBudgetTokens: 512,
+          droppedMessages: 3,
+          attachmentsIncluded: 0,
+          attachmentChars: 0,
+        },
       };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-c', status: 'cancelled' }));

@@ -47,7 +47,7 @@ export interface ConversationBackend {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-    payload: { text: string },
+    payload: { text: string; attachmentIds?: string[] },
     options?: { requestId?: string },
   ): Promise<SubmittedSnapshot>;
   getConversation(
@@ -55,6 +55,28 @@ export interface ConversationBackend {
     projectId: string,
     sessionId: string,
   ): Promise<ConversationSnapshot>;
+  /** Bounded ingestion of a picked or pasted text/code file. A refusal is
+   *  `VALIDATION_FAILED: attachment.<code>` and stores nothing. */
+  ingestAttachment?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { fileName: string; text: string },
+  ): Promise<import('@adham/contracts-generated').AttachmentDto>;
+  /** Bounded Rust-side read for a dropped filesystem path (text/code only). */
+  ingestAttachmentPath?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { filePath: string },
+  ): Promise<import('@adham/contracts-generated').AttachmentDto>;
+  /** Rehydrate the exact extracted text a sent attachment carried. */
+  readAttachmentText?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    attachmentId: string,
+  ): Promise<import('@adham/contracts-generated').AttachmentDto>;
   /** Record which member of an edited branch the session continues from.
    *  Returns the session's selections after the write. */
   setActiveAlternative(
@@ -105,6 +127,8 @@ export interface ConversationBackend {
       think?: boolean | string;
       /** Durable reply/edit anchor; validated against persisted history. */
       reference?: { refersToMessageId: string; relation: 'replied' | 'edited-from' };
+      /** Ingested attachment ids selected for this send. */
+      attachmentIds?: string[];
     },
     onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
     options?: { requestId?: string },
@@ -388,6 +412,7 @@ export const toUiMessage = (dto: {
   createdAt: string;
   completion?: { Completed: { truncated: boolean } } | 'Interrupted' | 'Failed' | null;
   reference?: { refersToMessageId: string; relation: string } | null;
+  attachments?: import('@adham/contracts-generated').MessageAttachmentDto[];
 }): {
   id: string;
   role: string;
@@ -395,6 +420,7 @@ export const toUiMessage = (dto: {
   createdAt: string;
   completion: UiCompletion | null;
   reference: { refersToMessageId: string; relation: string } | null;
+  attachments: import('@adham/contracts-generated').MessageAttachmentDto[];
 } => ({
   id: dto.messageId,
   role: dto.role ?? 'user',
@@ -402,6 +428,7 @@ export const toUiMessage = (dto: {
   createdAt: dto.createdAt,
   completion: normalizeCompletion(dto.completion),
   reference: dto.reference ?? null,
+  attachments: dto.attachments ?? [],
 });
 
 export const switchUnresolved = (

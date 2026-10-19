@@ -54,6 +54,7 @@ fn complete_once_records_a_reply_reference_and_reads_it_back() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
             account_id,
             model_id: "m:latest".to_string(),
             text: "answering the quote".to_string(),
@@ -182,6 +183,7 @@ fn complete_once_refuses_a_reference_that_cannot_be_anchored() {
         mode: None,
         think: None,
         reference,
+        attachment_ids: Vec::new(),
     };
 
     let cases: Vec<(MessageReferenceDto, &str)> = vec![
