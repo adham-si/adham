@@ -28,6 +28,9 @@ GraphQL, CoffeeScript and Reason. Fence hints outside the bundle (for example
 intact — never as fabricated highlighting. Streaming blocks stay plain and are
 tokenized once when the answer settles.
 
+Bundle cost: the ESM build is ~136 KB raw / ~33 KB gzipped; the grammars ship in
+one module, so there is no per-language code splitting to trim.
+
 ## Palette
 
 The theme resolves CSS variables rather than fixed colors, so the `.dark` class
