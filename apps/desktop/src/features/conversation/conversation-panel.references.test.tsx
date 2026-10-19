@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { CompletionStartDto } from '@adham/contracts-generated';
 import type { StreamEventParam } from './conversation-test-utils';
@@ -10,6 +10,16 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 });
+
+/** Reply lives in the card's ⋮ menu. */
+async function clickMessageMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  card: HTMLElement,
+  item: string,
+) {
+  await user.click(within(card).getByRole('button', { name: 'More actions' }));
+  await user.click(within(card).getByRole('menuitem', { name: item }));
+}
 
 describe('ConversationPanel retries and replies', () => {
   it('retries the failed turn as a new attempt without resending the user message', async () => {
@@ -173,7 +183,7 @@ describe('ConversationPanel retries and replies', () => {
     // never replaced by an invented excerpt.
     expect(screen.getByText('Quoted message is not in the loaded history.')).toBeDefined();
 
-    await user.click(screen.getAllByRole('button', { name: 'Reply' })[0]!);
+    await clickMessageMenu(user, screen.getAllByRole('article', { name: 'You' })[0]!, 'Reply');
     expect(screen.getByRole('button', { name: 'Cancel reply' })).toBeDefined();
 
     const box = (await screen.findByRole('textbox', {
@@ -204,7 +214,7 @@ describe('ConversationPanel retries and replies', () => {
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
 
     await screen.findByText('earlier truth');
-    await user.click(screen.getByRole('button', { name: 'Reply' }));
+    await clickMessageMenu(user, screen.getByRole('article', { name: 'You' }), 'Reply');
     const box = (await screen.findByRole('textbox', {
       name: /composer input/i,
     })) as HTMLTextAreaElement;
@@ -257,7 +267,10 @@ describe('ConversationPanel retries and replies', () => {
 
     // A reply clicked during the run is queued as a reply: the queued row says
     // so, and the anchor travels with the instruction.
-    await user.click(screen.getByRole('button', { name: 'Reply' }));
+    const quotedCard = screen
+      .getAllByRole('article', { name: 'You' })
+      .find((card) => within(card).queryByText('earlier truth') !== null)!;
+    await clickMessageMenu(user, quotedCard, 'Reply');
     await user.type(box, 'queued reply');
     await user.keyboard('{Enter}');
     expect(await screen.findByText(/^queued$/i)).toBeDefined();

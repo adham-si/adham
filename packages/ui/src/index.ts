@@ -6,6 +6,7 @@ export * from './input';
 export * from './markdown';
 export * from './markdown-view';
 export * from './menu';
+export * from './message-actions';
 export * from './message-card';
 export * from './message-content';
 export * from './select';

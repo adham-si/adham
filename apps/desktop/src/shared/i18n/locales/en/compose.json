@@ -74,7 +74,8 @@
       "branchMakeActive": "Make active",
       "likeAnswer": "Like this answer",
       "dislikeAnswer": "Dislike this answer",
-      "feedbackReason": "Reason (optional)"
+      "feedbackReason": "Reason (optional)",
+      "moreActions": "More actions"
     },
     "noModelAvailable": "No model available",
     "modelSetupHint": "Set up a model in Settings → AI Providers"

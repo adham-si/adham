@@ -277,7 +277,36 @@ describe('MessageCard', () => {
     expect(screen.getByRole('button', { name: 'Nachricht kopieren' })).toBeDefined();
   });
 
-  it('offers Reply only when the caller can anchor one, and fires it', () => {
+  it('names the author with the caller-provided name instead of the role label', () => {
+    render(
+      <MessageCard
+        role="assistant"
+        name="Qwen 2.5 (latest)"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+      />,
+    );
+    expect(screen.getByText('Qwen 2.5 (latest)')).toBeDefined();
+    expect(screen.queryByText('Assistant')).toBeNull();
+    // The role stays the accessible name, so locate-by-role never depends on
+    // which model answered.
+    expect(screen.getByRole('article').getAttribute('aria-label')).toBe('Assistant');
+  });
+
+  it('renders a caller-provided avatar as a decorative header glyph', () => {
+    const { container } = render(
+      <MessageCard
+        role="assistant"
+        avatar={<span data-testid="glyph" />}
+        content={contentFromText('Body')}
+        timestamp="10:04"
+      />,
+    );
+    const glyph = screen.getByTestId('glyph');
+    expect(container.querySelector('[aria-hidden="true"]')?.contains(glyph)).toBe(true);
+  });
+
+  it('offers Reply in the ⋮ menu only when the caller can anchor one, and fires it', () => {
     const onReply = vi.fn();
     render(
       <MessageCard
@@ -287,16 +316,17 @@ describe('MessageCard', () => {
         onReply={onReply}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reply' }));
     expect(onReply).toHaveBeenCalledTimes(1);
   });
 
-  it('renders no reply action without a handler', () => {
+  it('renders no ⋮ menu when no menu action exists', () => {
     render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
-    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
-  it('offers Edit only when the caller can branch, and fires it', () => {
+  it('offers Edit in the ⋮ menu only when the caller can branch, and fires it', () => {
     const onEdit = vi.fn();
     render(
       <MessageCard
@@ -306,13 +336,91 @@ describe('MessageCard', () => {
         onEdit={onEdit}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
 
-  it('renders no edit action without a handler', () => {
-    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  it('offers Make active in the ⋮ menu for an inactive branch member, and fires it', () => {
+    const onMakeActive = vi.fn();
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        branch={{ active: false, onMakeActive }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Make active' }));
+    expect(onMakeActive).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the active branch member without offering the switch', () => {
+    render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        branch={{ active: true }}
+      />,
+    );
+    expect(screen.getByText('Active')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
+  });
+
+  it('offers Regenerate only when the caller can rerun this attempt, and fires it', () => {
+    const onRegenerate = vi.fn();
+    render(
+      <MessageCard
+        role="assistant"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        onRegenerate={onRegenerate}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Regenerate while a turn is already running', () => {
+    render(
+      <MessageCard
+        role="assistant"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        onRegenerate={() => {}}
+        regenerateDisabled
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Regenerate' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('uses action glyphs when given and keeps the accessible names', () => {
+    render(
+      <MessageCard
+        role="assistant"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        icons={{ copy: <span data-testid="copy-glyph" /> }}
+      />,
+    );
+    expect(screen.getByTestId('copy-glyph')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Copy message' })).toBeDefined();
+  });
+
+  it('trails a still-arriving answer with a caret and keeps settled cards clean', () => {
+    const { container, rerender } = render(
+      <MessageCard
+        role="assistant"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        streaming
+      />,
+    );
+    expect(container.querySelector('.animate-pulse')).not.toBeNull();
+    rerender(<MessageCard role="assistant" content={contentFromText('Body')} timestamp="10:04" />);
+    expect(container.querySelector('.animate-pulse')).toBeNull();
   });
 
   it('labels an edited-from lineage as an edit, not a reply quote', () => {

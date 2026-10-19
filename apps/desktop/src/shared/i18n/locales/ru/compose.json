@@ -76,7 +76,8 @@
       "branchMakeActive": "Сделать активным",
       "likeAnswer": "Нравится этот ответ",
       "dislikeAnswer": "Не нравится этот ответ",
-      "feedbackReason": "Причина (необязательно)"
+      "feedbackReason": "Причина (необязательно)",
+      "moreActions": "Другие действия"
     },
     "noModelAvailable": "Нет доступной модели",
     "modelSetupHint": "Настройте модель в разделе «Настройки → AI-провайдеры»"

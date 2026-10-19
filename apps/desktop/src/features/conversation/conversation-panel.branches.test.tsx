@@ -9,6 +9,16 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
+/** Edit/Reply/Make active live in the card's ⋮ menu. */
+async function clickMessageMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  card: HTMLElement,
+  item: string,
+) {
+  await user.click(within(card).getByRole('button', { name: 'More actions' }));
+  await user.click(within(card).getByRole('menuitem', { name: item }));
+}
+
 describe('ConversationPanel edit branches', () => {
   it('edits a persisted user prompt into a branch and shows the edit lineage', async () => {
     const user = userEvent.setup();
@@ -65,11 +75,15 @@ describe('ConversationPanel edit branches', () => {
     // Edit rewrites a prompt — user-only. The assistant row still offers Reply.
     const userCard = screen.getByRole('article', { name: 'You' });
     const assistantCard = screen.getByRole('article', { name: 'Assistant' });
-    expect(within(userCard).getByRole('button', { name: 'Edit' })).toBeDefined();
-    expect(within(assistantCard).queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(within(assistantCard).getByRole('button', { name: 'Reply' })).toBeDefined();
+    await user.click(within(userCard).getByRole('button', { name: 'More actions' }));
+    expect(within(userCard).getByRole('menuitem', { name: 'Edit' })).toBeDefined();
+    await user.click(within(userCard).getByRole('menuitem', { name: 'Edit' }));
 
-    await user.click(within(userCard).getByRole('button', { name: 'Edit' }));
+    await user.click(within(assistantCard).getByRole('button', { name: 'More actions' }));
+    expect(within(assistantCard).queryByRole('menuitem', { name: 'Edit' })).toBeNull();
+    expect(within(assistantCard).getByRole('menuitem', { name: 'Reply' })).toBeDefined();
+    // Close the assistant menu before the composer takes the interaction.
+    await user.keyboard('{Escape}');
     const box = (await screen.findByRole('textbox', {
       name: /composer input/i,
     })) as HTMLTextAreaElement;
@@ -108,7 +122,7 @@ describe('ConversationPanel edit branches', () => {
     })) as HTMLTextAreaElement;
     await user.type(box, 'draft in progress');
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await clickMessageMenu(user, screen.getByRole('article', { name: 'You' }), 'Edit');
     expect(box.value).toBe('earlier truth');
 
     await user.click(screen.getByRole('button', { name: 'Cancel edit' }));
@@ -125,7 +139,7 @@ describe('ConversationPanel edit branches', () => {
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
 
     await screen.findByText('earlier truth');
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await clickMessageMenu(user, screen.getByRole('article', { name: 'You' }), 'Edit');
     const box = (await screen.findByRole('textbox', {
       name: /composer input/i,
     })) as HTMLTextAreaElement;
@@ -183,10 +197,11 @@ describe('ConversationPanel edit branches', () => {
     // Default rule, the same one the backend applies: the newest edit is the
     // branch the session continues from.
     expect(within(editedCard).getByText('Active')).toBeDefined();
-    expect(within(editedCard).queryByRole('button', { name: 'Make active' })).toBeNull();
-    expect(within(originalCard).getByRole('button', { name: 'Make active' })).toBeDefined();
+    await user.click(within(editedCard).getByRole('button', { name: 'More actions' }));
+    expect(within(editedCard).queryByRole('menuitem', { name: 'Make active' })).toBeNull();
+    await user.keyboard('{Escape}');
 
-    await user.click(within(originalCard).getByRole('button', { name: 'Make active' }));
+    await clickMessageMenu(user, originalCard, 'Make active');
 
     // The switch goes to the server with the branch root; the chips follow the
     // response, never an optimistic guess.
@@ -198,7 +213,9 @@ describe('ConversationPanel edit branches', () => {
       'msg-0',
     );
     await waitFor(() => expect(within(originalCard).getByText('Active')).toBeDefined());
-    expect(within(editedCard).getByRole('button', { name: 'Make active' })).toBeDefined();
+    await user.click(within(editedCard).getByRole('button', { name: 'More actions' }));
+    expect(within(editedCard).getByRole('menuitem', { name: 'Make active' })).toBeDefined();
+    await user.keyboard('{Escape}');
   });
 
   it('shows the persisted selection on load and surfaces a refused switch', async () => {
@@ -240,12 +257,14 @@ describe('ConversationPanel edit branches', () => {
     const editedCard = userCards[1] as HTMLElement;
     expect(within(originalCard).getByText('Active')).toBeDefined();
 
-    await user.click(within(editedCard).getByRole('button', { name: 'Make active' }));
+    await clickMessageMenu(user, editedCard, 'Make active');
 
     // A refusal is stated and nothing flips: the chips still show the stored
     // selection.
     expect(await screen.findByText('selection refused by the server')).toBeDefined();
     expect(within(originalCard).getByText('Active')).toBeDefined();
-    expect(within(editedCard).getByRole('button', { name: 'Make active' })).toBeDefined();
+    await user.click(within(editedCard).getByRole('button', { name: 'More actions' }));
+    expect(within(editedCard).getByRole('menuitem', { name: 'Make active' })).toBeDefined();
+    await user.keyboard('{Escape}');
   });
 });

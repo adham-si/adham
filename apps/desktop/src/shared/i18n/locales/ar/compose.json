@@ -77,7 +77,8 @@
       "branchMakeActive": "تعيين كنشط",
       "likeAnswer": "أعجبني هذا الرد",
       "dislikeAnswer": "لم يعجبني هذا الرد",
-      "feedbackReason": "السبب (اختياري)"
+      "feedbackReason": "السبب (اختياري)",
+      "moreActions": "إجراءات أخرى"
     },
     "noModelAvailable": "لا يوجد نموذج متاح",
     "modelSetupHint": "أعدّ نموذجًا من الإعدادات ← مزودو الذكاء الاصطناعي"

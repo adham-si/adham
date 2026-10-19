@@ -73,7 +73,8 @@
       "branchMakeActive": "设为当前",
       "likeAnswer": "喜欢此回答",
       "dislikeAnswer": "不喜欢此回答",
-      "feedbackReason": "原因（可选）"
+      "feedbackReason": "原因（可选）",
+      "moreActions": "更多操作"
     },
     "noModelAvailable": "暂无可用模型",
     "modelSetupHint": "请在“设置 → AI 服务商”中配置模型"

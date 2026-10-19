@@ -33,6 +33,10 @@ export interface MarkdownLabels {
   dislikeAction: string;
   /** Label and placeholder of the optional feedback reason field. */
   feedbackReason: string;
+  /** Action that asks the model for another answer to the same prompt. */
+  regenerateAction: string;
+  /** Accessible name of the ⋮ trigger that opens the remaining actions. */
+  moreActions: string;
 }
 
 export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
@@ -53,6 +57,8 @@ export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   likeAction: 'Like',
   dislikeAction: 'Dislike',
   feedbackReason: 'Reason (optional)',
+  regenerateAction: 'Regenerate',
+  moreActions: 'More actions',
 };
 
 export function resolveMarkdownLabels(labels?: Partial<MarkdownLabels>): MarkdownLabels {

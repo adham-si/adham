@@ -2,6 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from './cn';
 import { Markdown, resolveMarkdownLabels, type MarkdownLabels } from './markdown-view';
+import { MessageActions, type MessageActionIcons, type MessageActionMenu } from './message-actions';
 import { contentToText, type MessageContent } from './message-content';
 import { useClipboardCopy } from './use-clipboard-copy';
 
@@ -27,7 +28,7 @@ const messageCardVariants = cva(
   },
 );
 
-/** Role is rendered as text, never carried by colour alone (WCAG 1.4.1). */
+/** Role is stated as text, never carried by colour alone (WCAG 1.4.1). */
 const ROLE_LABEL: Record<MessageRole, string> = {
   user: 'You',
   assistant: 'Assistant',
@@ -47,6 +48,12 @@ export interface MessageCardProps
   timestamp: string;
   /** Machine-readable timestamp for the <time> element's dateTime. */
   dateTime?: string;
+  /** Header identity: what this card calls its author. Defaults to the role
+   *  label; the app passes the answering model's name for assistant rows. */
+  name?: string | undefined;
+  /** Header avatar node, supplied by the app (the UI package ships no icon
+   *  set). Decorative: the name next to it carries the identity. */
+  avatar?: React.ReactNode;
   /** Localized renderer strings (code copy, placeholders). */
   labels?: Partial<MarkdownLabels>;
   selected?: boolean;
@@ -57,6 +64,14 @@ export interface MessageCardProps
   /** When set, the card offers an Edit action: the message is resendable as an
    *  edited alternative. Only user messages can be edited. */
   onEdit?: (() => void) | undefined;
+  /** When set, the card offers Regenerate for this answer attempt. */
+  onRegenerate?: (() => void) | undefined;
+  /** Disables Regenerate while a turn is already running. */
+  regenerateDisabled?: boolean | undefined;
+  /** Action-row glyphs; without them the controls show their words. */
+  icons?: MessageActionIcons | undefined;
+  /** True while this answer is still arriving: trails the body with a caret. */
+  streaming?: boolean;
   /** Excerpt of the message this card quotes. undefined = no recorded quote
    *  (nothing renders); null = the quote target is not in the loaded history,
    *  which is stated instead of an invented excerpt. */
@@ -77,9 +92,9 @@ export interface MessageCardProps
 }
 
 /**
- * One conversation turn. The role is stated in words as well as colour so the
- * card is readable without colour perception, and timestamps sit in a <time>
- * element so assistive tech can announce them properly.
+ * One conversation turn: a header naming the author, the content, and the
+ * actions grouped under it. The role remains the article's accessible name,
+ * while the visible name is the model that answered when the caller knows it.
  *
  * Assistant text renders as safe Markdown; user and system text stays literal,
  * because that is what the author typed.
@@ -92,11 +107,17 @@ export function MessageCard({
   content,
   timestamp,
   dateTime,
+  name,
+  avatar,
   labels,
   selected = false,
   editable = false,
   onReply,
   onEdit,
+  onRegenerate,
+  regenerateDisabled,
+  icons,
+  streaming = false,
   quotedExcerpt,
   quotedRelation,
   branch,
@@ -111,6 +132,17 @@ export function MessageCard({
   const copyText = React.useMemo(() => contentToText(content), [content]);
   const { state: copyState, copy } = useClipboardCopy();
 
+  const menu: MessageActionMenu | undefined =
+    onEdit !== undefined ||
+    onReply !== undefined ||
+    (branch !== undefined && !branch.active && branch.onMakeActive !== undefined)
+      ? {
+          edit: onEdit,
+          reply: onReply,
+          makeActive: branch !== undefined && !branch.active ? branch.onMakeActive : undefined,
+        }
+      : undefined;
+
   return (
     <article
       {...props}
@@ -118,68 +150,28 @@ export function MessageCard({
       aria-label={label}
       className={cn(messageCardVariants({ role, selected, editable }), className)}
     >
-      <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-        <span className="flex items-center gap-2">
-          <span className="font-semibold tracking-wide uppercase">{label}</span>
-          {branch &&
-            (branch.active ? (
-              <span className="rounded-sm border border-border-subtle px-1 text-foreground-secondary">
-                {resolved.branchActiveLabel}
-              </span>
-            ) : (
-              branch.onMakeActive && (
-                <button
-                  type="button"
-                  className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  onClick={branch.onMakeActive}
-                >
-                  {resolved.branchMakeActiveLabel}
-                </button>
-              )
-            ))}
-        </span>
-        <span className="flex items-center gap-2">
-          {onEdit && (
-            <button
-              type="button"
-              className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              onClick={onEdit}
-            >
-              {resolved.editAction}
-            </button>
-          )}
-          {onReply && (
-            <button
-              type="button"
-              className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              onClick={onReply}
-            >
-              {resolved.replyAction}
-            </button>
-          )}
-          {copyText.length > 0 && (
-            <button
-              type="button"
-              className="rounded-sm px-1 text-foreground-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              onClick={() => {
-                void copy(copyText);
-              }}
-            >
-              {resolved.copyMessage}
-            </button>
-          )}
-          <span role="status" className="text-foreground-muted">
-            {copyState === 'copied'
-              ? resolved.copied
-              : copyState === 'failed'
-                ? resolved.copyFailed
-                : ''}
+      <header className="mb-2 flex items-center gap-2">
+        {avatar !== undefined && (
+          <span
+            aria-hidden="true"
+            className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-subtle text-foreground-secondary"
+          >
+            {avatar}
           </span>
-          <time className="text-foreground-muted" dateTime={dateTime ?? timestamp}>
-            {timestamp}
-          </time>
-        </span>
-      </div>
+        )}
+        <span className="text-sm font-medium text-foreground">{name ?? label}</span>
+        {branch?.active === true && (
+          <span className="rounded-sm border border-border-subtle px-1 text-xs text-foreground-secondary">
+            {resolved.branchActiveLabel}
+          </span>
+        )}
+        <time
+          className="text-xs text-foreground-muted tabular-nums"
+          dateTime={dateTime ?? timestamp}
+        >
+          {timestamp}
+        </time>
+      </header>
       {quotedExcerpt !== undefined && (
         <div className="mb-2 border-s-2 border-border-strong ps-2">
           <p className="text-xs font-semibold tracking-wide text-foreground-muted uppercase">
@@ -190,77 +182,22 @@ export function MessageCard({
           </p>
         </div>
       )}
-      <MessageBody role={role} content={content} resolved={resolved} />
-      {onFeedback && (
-        <FeedbackControls feedback={feedback} onFeedback={onFeedback} resolved={resolved} />
-      )}
+      <MessageBody role={role} content={content} resolved={resolved} streaming={streaming} />
+      <MessageActions
+        resolved={resolved}
+        icons={icons}
+        copyText={copyText}
+        copyState={copyState}
+        onCopy={() => {
+          void copy(copyText);
+        }}
+        regenerate={onRegenerate}
+        regenerateDisabled={regenerateDisabled}
+        feedback={feedback}
+        onFeedback={onFeedback}
+        menu={menu}
+      />
     </article>
-  );
-}
-
-/** Like/dislike for one answer attempt. The stored verdict is the only
- *  pressed state, so a refused save never flips a button. The reason is
- *  optional: Enter saves it on top of the current verdict, and a pending
- *  draft survives a failed save. */
-function FeedbackControls({
-  feedback,
-  onFeedback,
-  resolved,
-}: {
-  feedback?: { verdict: 'like' | 'dislike'; reason: string | null } | undefined;
-  onFeedback: (verdict: 'like' | 'dislike' | null, reason: string | null) => void;
-  resolved: MarkdownLabels;
-}) {
-  const [draft, setDraft] = React.useState<string | null>(null);
-
-  const verdictButton = (verdict: 'like' | 'dislike', label: string) => (
-    <button
-      type="button"
-      aria-pressed={feedback?.verdict === verdict}
-      className={cn(
-        'rounded-sm px-1 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-        feedback?.verdict === verdict
-          ? 'bg-surface-hover text-foreground'
-          : 'text-foreground-secondary',
-      )}
-      onClick={() => {
-        if (feedback?.verdict === verdict) {
-          // Toggle off: the verdict and its reason are removed together.
-          setDraft(null);
-          onFeedback(null, null);
-        } else {
-          onFeedback(verdict, feedback?.reason ?? null);
-        }
-      }}
-    >
-      {label}
-    </button>
-  );
-
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-      {verdictButton('like', resolved.likeAction)}
-      {verdictButton('dislike', resolved.dislikeAction)}
-      {feedback && (
-        <input
-          type="text"
-          aria-label={resolved.feedbackReason}
-          placeholder={resolved.feedbackReason}
-          value={draft ?? feedback.reason ?? ''}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            // Trimmed now so what is shown is what will be stored; the draft
-            // stays until a response replaces the stored value.
-            const reason = (draft ?? feedback.reason ?? '').trim();
-            setDraft(reason);
-            onFeedback(feedback.verdict, reason);
-          }}
-          className="min-w-0 flex-1 rounded-sm border border-border-subtle bg-surface-muted px-2 py-1 text-xs text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        />
-      )}
-    </div>
   );
 }
 
@@ -268,10 +205,12 @@ function MessageBody({
   role,
   content,
   resolved,
+  streaming,
 }: {
   role: MessageRole;
   content: MessageContent;
   resolved: MarkdownLabels;
+  streaming: boolean;
 }) {
   return (
     <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto text-sm text-foreground">
@@ -296,6 +235,12 @@ function MessageBody({
           </div>
         );
       })}
+      {streaming && (
+        <span
+          aria-hidden="true"
+          className="block h-4 w-0.5 animate-pulse rounded-full bg-foreground-secondary motion-reduce:animate-none"
+        />
+      )}
     </div>
   );
 }

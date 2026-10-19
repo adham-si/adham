@@ -1,7 +1,22 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { contentFromText, MessageCard, type MarkdownLabels } from '@adham/ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  BotMessageSquareIcon,
+  Copy01Icon,
+  MoreVerticalIcon,
+  RefreshIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+  UserIcon,
+} from '@hugeicons/core-free-icons';
+import {
+  contentFromText,
+  MessageCard,
+  type MarkdownLabels,
+  type MessageActionIcons,
+} from '@adham/ui';
 import {
   Composer,
   EmptyWelcome,
@@ -50,6 +65,18 @@ import {
 import { ProviderRecoveryBanner, useProviderRecovery } from './provider-recovery';
 
 const PENDING_DRAFT_BUCKET = 'pending';
+
+/** Header avatars and action glyphs as nodes: the card renders what the app
+ *  hands it, so @adham/ui stays free of an icon dependency. */
+const ASSISTANT_AVATAR = <HugeiconsIcon icon={BotMessageSquareIcon} className="size-4" />;
+const USER_AVATAR = <HugeiconsIcon icon={UserIcon} className="size-4" />;
+const MESSAGE_ICONS: MessageActionIcons = {
+  copy: <HugeiconsIcon icon={Copy01Icon} className="size-4" />,
+  regenerate: <HugeiconsIcon icon={RefreshIcon} className="size-4" />,
+  like: <HugeiconsIcon icon={ThumbsUpIcon} className="size-4" />,
+  dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4" />,
+  more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
+};
 
 function formatTimestamp(createdAt: string): string {
   const parsed = new Date(createdAt);
@@ -121,6 +148,8 @@ export function ConversationPanel({
       likeAction: t('compose.markdown.likeAnswer'),
       dislikeAction: t('compose.markdown.dislikeAnswer'),
       feedbackReason: t('compose.markdown.feedbackReason'),
+      regenerateAction: t('conversation.regenerateAnswer'),
+      moreActions: t('compose.markdown.moreActions'),
     }),
     [t],
   );
@@ -316,6 +345,10 @@ export function ConversationPanel({
       thinkingDefault: m.capabilities.thinkingDefault,
     }));
   const selectedDescriptor = ollama.models.find((m) => m.modelId === selectedModelId) ?? null;
+  /// The name assistant rows speak as: the model resolved for this session.
+  /// Unknown until a model resolves — the card then keeps the role label
+  /// instead of inventing an identity.
+  const assistantName = selectedDescriptor?.humanLabel || undefined;
   const streamReady =
     ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);
   /// A loaded registry that proves nothing is usable reads as unavailable;
@@ -745,13 +778,25 @@ export function ConversationPanel({
             const note = messageNote(m, t);
             const alternative = alternatives.get(m.id);
             const isAssistant = m.role === 'assistant' || m.role === 'agent';
+            // Regenerate is offered on the newest answer attempt only: the
+            // backend reruns that attempt, never an older one.
+            const canRegenerate = turnAction !== null && m.id === turnAction.attemptId;
             return (
               <React.Fragment key={m.id}>
                 <MessageCard
                   role={isAssistant ? 'assistant' : 'user'}
+                  name={isAssistant ? assistantName : undefined}
+                  avatar={isAssistant ? ASSISTANT_AVATAR : USER_AVATAR}
+                  icons={MESSAGE_ICONS}
                   content={contentFromText(m.text)}
-                  labels={markdownLabels}
+                  labels={
+                    canRegenerate && turnAction.verb === 'retry'
+                      ? { ...markdownLabels, regenerateAction: t('conversation.retryTurn') }
+                      : markdownLabels
+                  }
                   timestamp={formatTimestamp(m.createdAt)}
+                  onRegenerate={canRegenerate ? handleTurnAction : undefined}
+                  regenerateDisabled={busy}
                   branch={
                     alternative
                       ? {
@@ -829,20 +874,6 @@ export function ConversationPanel({
                     {note.text}
                   </p>
                 )}
-                {turnAction && m.id === turnAction.attemptId && (
-                  <div className="flex gap-2 px-1">
-                    <button
-                      type="button"
-                      className="text-xs text-foreground-secondary underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
-                      disabled={busy}
-                      onClick={handleTurnAction}
-                    >
-                      {turnAction.verb === 'retry'
-                        ? t('conversation.retryTurn', 'Retry')
-                        : t('conversation.regenerateAnswer', 'Regenerate')}
-                    </button>
-                  </div>
-                )}
               </React.Fragment>
             );
           })}
@@ -850,13 +881,21 @@ export function ConversationPanel({
             <MessageCard
               key={conv.streaming.opId || 'streaming'}
               role="assistant"
+              name={assistantName}
+              avatar={ASSISTANT_AVATAR}
+              icons={MESSAGE_ICONS}
+              streaming
               content={contentFromText(conv.streaming.text)}
               labels={markdownLabels}
               timestamp={formatTime(new Date())}
             />
           )}
           {conv.streaming && conv.streaming.phase !== 'streaming' && (
-            <TurnStatus phase={conv.streaming.phase} startedAt={conv.streaming.startedAt} />
+            <TurnStatus
+              phase={conv.streaming.phase}
+              startedAt={conv.streaming.startedAt}
+              name={assistantName}
+            />
           )}
           {/* Non-authoritative recovery: only when the post-terminal history
               reload failed; replaced atomically by authoritative rows. */}
@@ -864,6 +903,9 @@ export function ConversationPanel({
             <MessageCard
               key={conv.recoverySnapshot.id}
               role="assistant"
+              name={assistantName}
+              avatar={ASSISTANT_AVATAR}
+              icons={MESSAGE_ICONS}
               content={contentFromText(conv.recoverySnapshot.text)}
               labels={markdownLabels}
               timestamp={formatTimestamp(conv.recoverySnapshot.createdAt)}
