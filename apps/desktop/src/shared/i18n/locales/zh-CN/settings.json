@@ -332,7 +332,7 @@
       "syncDirty": "同步前请先保存修改的地址。",
       "offlineMessage": "无法访问 {{url}} 上的 Ollama。请确保 Ollama 应用正在运行。",
       "nothingSaved": "未保存任何内容。",
-      "saveReconnect": "保存并重新连接",
+      "save": "保存",
       "googleKeyNote": "已安全存储在你的设备上。",
       "done": "完成",
       "ollamaConfirmDisconnect": "断开连接将从本设备移除已保存的本地地址及其发现的模型。",

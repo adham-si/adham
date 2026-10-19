@@ -15,9 +15,6 @@ export interface ModelOption {
   name: string;
   provider: string;
   boundary: ModelBoundary;
-  description?: string | undefined;
-  /** Resource key for the translated description; falls back to description. */
-  descKey?: string | undefined;
   supportsReasoning?: boolean | undefined;
   /** `/api/show` `thinking.values`: the only values this model documents for
    *  `think` ("true"/"false" and/or named levels). Absent = no metadata, so
@@ -36,6 +33,8 @@ export interface ComposeModelPickerProps {
   think?: boolean | string | null | undefined;
   onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
+  /** No provider/model is set up (as opposed to still loading). */
+  unavailable?: boolean | undefined;
   disabled?: boolean | undefined;
   className?: string | undefined;
 }
@@ -46,6 +45,7 @@ export function ComposeModelPicker({
   think = null,
   onChangeThink,
   models = [],
+  unavailable = false,
   disabled = false,
   className = '',
 }: ComposeModelPickerProps) {
@@ -58,7 +58,11 @@ export function ComposeModelPicker({
   const selectedModel = selectedModelId
     ? (models.find((m) => m.id === selectedModelId) ?? null)
     : null;
-  const selectedLabel = selectedModel?.name ?? t('compose.selectModel', 'Select a model');
+  const selectedLabel =
+    selectedModel?.name ??
+    (models.length === 0 && unavailable
+      ? t('compose.noModelAvailable', 'No model available')
+      : t('compose.selectModel', 'Select a model'));
 
   // Thinking controls come only from the model's documented `think` values:
   // on/off when "false"/"true" are documented, named levels verbatim. A model
@@ -98,10 +102,9 @@ export function ComposeModelPicker({
     };
   }, [isOpen]);
 
-  // No registry models: no picker — the composer runs the honest text-only
-  // path, so unsupported "catalog" entries are never shown. (Placed after
-  // every hook: the early return must never skip a hook.)
-  if (models.length === 0) return null;
+  // Always visible: an empty registry is a state of the control, not a reason
+  // to hide it — the composer's text-only path is disclosed here instead of
+  // in a separate sentence.
   const isLocal = selectedModel?.boundary === 'local';
 
   return (
@@ -118,7 +121,7 @@ export function ComposeModelPicker({
             ? `Select model. Current model is ${selectedModel.name}, ${
                 isLocal ? 'running locally' : 'cloud provider'
               }`
-            : 'Select a model'
+            : selectedLabel
         }
         className="group flex min-h-control-xs items-center gap-1.5 rounded-lg border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
       >
@@ -166,65 +169,64 @@ export function ComposeModelPicker({
             {t('compose.modelsHeading', 'Models & Privacy Boundary')}
           </div>
 
-          <div className="space-y-0.5">
-            {models.map((model) => {
-              const isSelected = selectedModel !== null && model.id === selectedModel.id;
-              const modelLocal = model.boundary === 'local';
+          {models.length === 0 ? (
+            <p className="px-2 py-1.5 text-[11px] text-foreground-muted">
+              {t('compose.modelSetupHint', 'Set up a model in Settings → AI Providers')}
+            </p>
+          ) : (
+            <div className="space-y-0.5">
+              {models.map((model) => {
+                const isSelected = selectedModel !== null && model.id === selectedModel.id;
+                const modelLocal = model.boundary === 'local';
 
-              return (
-                <button
-                  key={model.id}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    onSelectModel(model.id);
-                    setIsOpen(false);
-                  }}
-                  className={`flex w-full items-start gap-2 rounded-lg p-2 text-start transition-colors ${
-                    isSelected
-                      ? 'bg-selection text-action'
-                      : 'hover:bg-surface-hover text-foreground'
-                  }`}
-                >
-                  <div className="mt-0.5 text-foreground-secondary">
-                    <HugeiconsIcon
-                      icon={modelLocal ? CpuIcon : AiCloud01Icon}
-                      className={`size-4 ${modelLocal ? 'text-success' : 'text-action'}`}
-                    />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-xs font-medium">{model.name}</span>
-                      <span
-                        className={`rounded px-1 py-0.2 text-[9px] font-semibold uppercase ${
-                          modelLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
-                        }`}
-                      >
-                        {modelLocal
-                          ? t('compose.localBadge', 'Local')
-                          : t('compose.cloudBadge', 'Cloud')}
-                      </span>
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      onSelectModel(model.id);
+                      setIsOpen(false);
+                    }}
+                    className={`flex w-full items-start gap-2 rounded-lg p-2 text-start transition-colors ${
+                      isSelected
+                        ? 'bg-selection text-action'
+                        : 'hover:bg-surface-hover text-foreground'
+                    }`}
+                  >
+                    <div className="mt-0.5 text-foreground-secondary">
+                      <HugeiconsIcon
+                        icon={modelLocal ? CpuIcon : AiCloud01Icon}
+                        className={`size-4 ${modelLocal ? 'text-success' : 'text-action'}`}
+                      />
                     </div>
-                    {(model.descKey ?? model.description) && (
-                      <p className="mt-0.5 truncate text-[11px] text-foreground-muted">
-                        {model.descKey
-                          ? t(model.descKey, model.description ?? '')
-                          : model.description}
-                      </p>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-xs font-medium">{model.name}</span>
+                        <span
+                          className={`rounded px-1 py-0.2 text-[9px] font-semibold uppercase ${
+                            modelLocal ? 'bg-success/15 text-success' : 'bg-action/15 text-action'
+                          }`}
+                        >
+                          {modelLocal
+                            ? t('compose.localBadge', 'Local')
+                            : t('compose.cloudBadge', 'Cloud')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <div className="mt-0.5 text-action">
+                        <HugeiconsIcon icon={CheckmarkBadge01Icon} className="size-4" />
+                      </div>
                     )}
-                  </div>
-
-                  {isSelected && (
-                    <div className="mt-0.5 text-action">
-                      <HugeiconsIcon icon={CheckmarkBadge01Icon} className="size-4" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Documented `think` controls: on/off only when the model lists
               those booleans, levels verbatim, plus the documented default. */}

@@ -19,6 +19,8 @@ export interface ComposeActionBarProps {
   think?: boolean | string | null | undefined;
   onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
+  /** No provider/model is set up yet (drives the picker's empty state). */
+  modelUnavailable?: boolean | undefined;
   onAddFiles: (files: File[]) => void;
   status: ComposeStatus;
   canSubmit: boolean;
@@ -35,6 +37,7 @@ export function ComposeActionBar({
   think = null,
   onChangeThink,
   models,
+  modelUnavailable,
   onAddFiles,
   status,
   canSubmit,
@@ -66,6 +69,7 @@ export function ComposeActionBar({
           think={think}
           onChangeThink={onChangeThink}
           models={models}
+          unavailable={modelUnavailable}
           disabled={isRunning}
         />
 

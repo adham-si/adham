@@ -10,14 +10,15 @@ beforeEach(() => {
 });
 
 describe('ConversationPanel model selection', () => {
-  it('renders no unknown-telemetry dashboard and discloses the model gap in production', async () => {
+  it('renders no unknown-telemetry dashboard and keeps the model control visible', async () => {
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
     await screen.findByRole('textbox', { name: /composer input/i });
 
     // no evidence → no context strip at all, and no invented numbers
     expect(screen.queryByText(/unknown/i)).toBeNull();
-    expect(screen.getByText(/model selection is not applied/i)).toBeDefined();
+    // Unresolved provider state is neutral: the control is there to select.
+    expect(screen.getByRole('button', { name: 'Select a model' })).toBeDefined();
     expect(screen.queryByText(/12\.4k \/ 128k/)).toBeNull();
     expect(screen.queryByText(/adham\.si/)).toBeNull();
   });
@@ -55,18 +56,16 @@ describe('ConversationPanel model selection', () => {
     expect(payloads[0]!.modelId).toBe('qwen2.5:latest');
   });
 
-  it('explains a vanished stored model and never silently substitutes another', async () => {
+  it('never silently substitutes a vanished stored model', async () => {
     const user = userEvent.setup();
     localStorage.setItem('adham:compose:model:ws-1:proj-1:sess-1', 'ghost:70b');
     const backend = fakeBackend();
     backend.completeOnceStreaming = vi.fn();
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
 
-    // The stale claim is named, the picker stays the only way to a usable
-    // model, and the send is honestly the text-only path.
-    await screen.findByText(/ghost:70b/);
-    expect(screen.getByText(/no longer available/i)).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Select a model' })).toBeDefined();
+    // The picker stays the only way to a usable model, and the send is
+    // honestly the text-only path.
+    expect(await screen.findByRole('button', { name: 'Select a model' })).toBeDefined();
 
     const box = (await screen.findByRole('textbox', {
       name: /composer input/i,
@@ -77,7 +76,8 @@ describe('ConversationPanel model selection', () => {
     expect(backend.completeOnceStreaming).not.toHaveBeenCalled();
   });
 
-  it('names the missing provider instead of leaving the model gap generic', async () => {
+  it('shows the unavailable state in the picker when no provider is connected', async () => {
+    const user = userEvent.setup();
     const backend = fakeBackend();
     const provider = {
       listAccounts: vi.fn(async () => ({ accounts: [] })),
@@ -85,9 +85,10 @@ describe('ConversationPanel model selection', () => {
     } as unknown as NonNullable<Parameters<typeof ConversationPanel>[0]['provider']>;
     render(<ConversationPanel backend={backend} provider={provider} />);
 
-    await screen.findByText(/no model provider is connected/i);
-    // With no account there is nothing to select, so no shallow picker.
-    expect(screen.queryByRole('button', { name: 'Select a model' })).toBeNull();
+    // The control stays visible and names the state; the popover says what to
+    // do instead of a separate sentence above the composer.
+    await user.click(await screen.findByRole('button', { name: 'No model available' }));
+    expect(screen.getByText(/set up a model in settings/i)).toBeDefined();
     expect(provider.listModels).not.toHaveBeenCalled();
   });
 
@@ -102,7 +103,7 @@ describe('ConversationPanel model selection', () => {
     backend.completeOnceStreaming = vi.fn();
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
 
-    await screen.findByText(/ghost:70b/);
+    await screen.findByRole('button', { name: 'Select a model' });
     const box = (await screen.findByRole('textbox', {
       name: /composer input/i,
     })) as HTMLTextAreaElement;
@@ -113,10 +114,9 @@ describe('ConversationPanel model selection', () => {
       expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:sess-1')).toBe('ghost:70b'),
     );
     expect(localStorage.getItem('adham:compose:model:ws-1:proj-1:pending')).toBeNull();
-    // The vanished claim is still the session's remembered choice: explained,
-    // never silently substituted. (While the turn persisted, the provider list
-    // was briefly unresolved, so the explained block returns only after ready.)
-    await screen.findByText(/no longer available/i);
+    // The vanished claim stays the session's remembered choice: never silently
+    // substituted, and the picker is still the way to replace it.
+    await screen.findByRole('button', { name: 'Select a model' });
     expect(backend.completeOnceStreaming).not.toHaveBeenCalled();
   });
 });

@@ -50,7 +50,7 @@ function resourceValue(language: 'en' | 'ar', key: string): unknown {
   return value;
 }
 
-// Plural bases (e.g. compose.withheldAttachments) have only suffixed leaves;
+// Plural bases (e.g. settings.routing.fallbackModels) have only suffixed leaves;
 // probe the `other` form for those.
 function probeValue(language: 'en' | 'ar', key: string): unknown {
   const direct = resourceValue(language, key);

@@ -453,6 +453,21 @@ describe('ComposeModelPicker with Data Boundary Badge', () => {
     expect(screen.queryByRole('button', { name: /Model default/i })).toBeNull();
     expect(screen.queryByText(/^Thinking$/)).toBeNull();
   });
+  it('stays visible with no model and names the unavailable state', () => {
+    render(
+      <ComposeModelPicker selectedModelId="" onSelectModel={() => {}} models={[]} unavailable />,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'No model available' });
+    fireEvent.click(trigger);
+    expect(screen.getByText(/set up a model in settings/i)).toBeDefined();
+  });
+
+  it('keeps a neutral label while the provider state is unresolved', () => {
+    render(<ComposeModelPicker selectedModelId="" onSelectModel={() => {}} models={[]} />);
+
+    expect(screen.getByRole('button', { name: 'Select a model' })).toBeDefined();
+  });
 });
 
 describe('ComposeStatusStrip', () => {

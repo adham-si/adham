@@ -457,6 +457,71 @@ describe('IPC contract fixture (cross-language)', () => {
     expect(sinkRef).not.toHaveBeenCalled();
   });
 
+  it('keeps its receiver when stream and attachment methods are passed as values', async () => {
+    vi.mocked(invoke).mockReset();
+    channelSinks.length = 0;
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      switch (cmd) {
+        case 'complete_once_streaming':
+        case 'retry_completion_streaming':
+          return { data: { opId: 'op-1', messageId: 'm-1', context: null } };
+        case 'stop_completion':
+          return { data: { opId: 'op-1', status: 'cancelled' } };
+        case 'ingest_attachment':
+          return {
+            data: {
+              attachmentId: 'att-1',
+              fileName: 'a.txt',
+              mediaType: 'text/plain',
+              byteSize: 1,
+              contentHash: 'h',
+              hashAlgorithm: 'sha256',
+              extractedChars: 1,
+              truncated: false,
+              retention: 'session',
+              text: 'a',
+            },
+          };
+        default:
+          throw new Error(`unexpected command ${cmd}`);
+      }
+    });
+
+    const client = new AdhamApiClient();
+    // Hooks receive these as values (`const start = backend.completeOnceStreaming`):
+    // the unbound call must still build its envelope instead of losing `this`.
+    const { completeOnceStreaming, retryCompletionStreaming, stopCompletion, ingestAttachment } =
+      client;
+    const started = await completeOnceStreaming(
+      'ws',
+      'proj',
+      'sess',
+      { accountId: 'acc', modelId: 'm:latest', text: 'q', mode: 'plan' },
+      () => {},
+    );
+    expect(started.opId).toBe('op-1');
+    await expect(
+      retryCompletionStreaming(
+        'ws',
+        'proj',
+        'sess',
+        {
+          accountId: 'acc',
+          modelId: 'm:latest',
+          replyToMessageId: 'u-1',
+          mode: 'plan',
+        },
+        () => {},
+      ),
+    ).resolves.toMatchObject({ opId: 'op-1' });
+    await expect(stopCompletion('ws', 'proj', 'sess', 'op-1')).resolves.toMatchObject({
+      status: 'cancelled',
+    });
+    await expect(
+      ingestAttachment('ws', 'proj', 'sess', { fileName: 'a.txt', text: 'a' }),
+    ).resolves.toMatchObject({ attachmentId: 'att-1' });
+  });
+
   it('lists saved provider accounts and probes unsaved endpoint URLs', async () => {
     vi.mocked(invoke).mockReset();
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {

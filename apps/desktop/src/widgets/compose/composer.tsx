@@ -47,6 +47,8 @@ export interface ComposerProps {
   think?: boolean | string | null | undefined;
   onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
+  /** No provider/model is set up yet (drives the picker's empty state). */
+  modelUnavailable?: boolean | undefined;
   attachments?: ComposeAttachmentChip[] | undefined;
   /** Picked/pasted/dropped files; ingestion and refusals live above this. */
   onAddFiles?: ((files: File[]) => void) | undefined;
@@ -84,6 +86,7 @@ export function Composer({
   think = null,
   onChangeThink,
   models = [],
+  modelUnavailable = false,
   attachments = [],
   onAddFiles = () => {},
   onRemoveAttachment = () => {},
@@ -267,6 +270,7 @@ export function Composer({
           think={think}
           onChangeThink={onChangeThink}
           models={models}
+          modelUnavailable={modelUnavailable}
           onAddFiles={onAddFiles}
           status={status}
           canSubmit={canSubmit}

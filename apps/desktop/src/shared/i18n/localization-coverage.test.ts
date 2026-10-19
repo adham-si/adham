@@ -132,11 +132,9 @@ describe('desktop localization coverage (all selectable languages)', () => {
   it('resolves plural forms without leaking keys', async () => {
     const counts = [0, 1, 2, 3, 5, 11, 100, 100000];
     const bases = [
-      'compose.tokensUsed',
       'settings.budget.tokensAllowed',
       'settings.routing.fallbackModels',
       'settings.routing.seconds',
-      'compose.withheldAttachments',
       'compose.charsCompact',
     ];
     for (const lng of LOCALES) {
@@ -162,17 +160,13 @@ describe('desktop localization coverage (all selectable languages)', () => {
     const en = await translator('en');
     expect(en.t('settings.routing.seconds', { count: 1 })).toBe('1 second');
     expect(en.t('settings.routing.seconds', { count: 30 })).toBe('30 seconds');
-    expect(en.t('compose.tokensUsed', { count: 1, used: '1', total: '1', percent: 0 })).toContain(
-      '1 token ',
-    );
+    expect(en.t('compose.charsCompact', { count: 1, formatted: '1' })).toBe('1k character');
     const ar = await translator('ar');
     expect(ar.t('settings.routing.seconds', { count: 2 })).toBe('ثانيتان');
     expect(ar.t('settings.routing.fallbackModels', { count: 3 })).toContain('نماذج');
     const ru = await translator('ru');
     expect(ru.t('settings.routing.seconds', { count: 5 })).toContain('секунд');
-    expect(ru.t('compose.tokensUsed', { count: 2, used: '1', total: '2', percent: 0 })).toContain(
-      'токена',
-    );
+    expect(ru.t('compose.charsCompact', { count: 2, formatted: '2' })).toContain('символа');
   });
 
   it('persists selection and restores it with document lang/dir', async () => {

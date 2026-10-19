@@ -36,7 +36,6 @@ import {
 import { useSelection, type SelectionBackend } from '../workspace-selection';
 import { ConversationSetupSlot } from './conversation-setup-slot';
 import { alternativeIndex } from './alternative-groups';
-import { submissionNotice, type ModelGapReason } from './submission-notice';
 import { readComposeModePreference, writeComposeModePreference } from './compose-mode-preference';
 import {
   migratePendingModelChoice,
@@ -287,8 +286,8 @@ export function ConversationPanel({
   const modelPrefs = useModelPrefs();
 
   // Registry-driven picker: when an Ollama account has pinned models, the
-  // composer options come from the provider registry (Delivery A). Without
-  // registry models the picker is hidden and dispatch falls back to the
+  // composer options come from the provider registry (Delivery A). The picker
+  // stays visible either way; without registry models dispatch runs the
   // text-only path.
   const ollama = useOllamaProvider({
     backend: provider,
@@ -319,23 +318,11 @@ export function ConversationPanel({
   const selectedDescriptor = ollama.models.find((m) => m.modelId === selectedModelId) ?? null;
   const streamReady =
     ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);
-  /// Why generation is off for the next send, named from what is actually
-  /// known: nothing loaded = unknown; no account = connect one; no pinned
-  /// models = discover them; an unpicked or vanished choice = pick one. The
-  /// composer says which, so a send never silently becomes a note.
-  const modelGapReason: ModelGapReason | null = streamReady
-    ? null
-    : !ollama.accountsLoaded
-      ? 'unknown'
-      : ollama.account === null
-        ? 'no-provider'
-        : !ollama.modelsLoaded
-          ? 'unknown'
-          : pickerModels.length === 0
-            ? 'no-models'
-            : selectedModelId === ''
-              ? 'no-selection'
-              : 'stale-selection';
+  /// A loaded registry that proves nothing is usable reads as unavailable;
+  /// an unresolved read stays neutral, never a claim about the machine.
+  const modelUnavailable =
+    ollama.accountsLoaded &&
+    (ollama.account === null || (ollama.modelsLoaded && pickerModels.length === 0));
 
   const busy =
     conv.status === 'submitting' || conv.status === 'bootstrapping' || conv.streaming !== null;
@@ -680,12 +667,6 @@ export function ConversationPanel({
     setStopNotice(true);
   }, [conv]);
 
-  const notice = submissionNotice({
-    attachmentCount: attachments.items.length,
-    modelApplied: streamReady,
-    modelGapReason,
-    staleModelId: modelGapReason === 'stale-selection' ? selectedModelId : undefined,
-  });
   const composeStatus = conv.streaming
     ? ('streaming' as const)
     : conv.status === 'submitting'
@@ -892,7 +873,7 @@ export function ConversationPanel({
             <button
               type="button"
               onClick={scrollToLatest}
-              className="sticky bottom-0 z-10 self-end rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-xs text-foreground-secondary shadow-sm hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="sticky bottom-0 self-end rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-xs text-foreground-secondary shadow-sm hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
               {t('conversation.jumpToLatest')}
             </button>
@@ -995,7 +976,6 @@ export function ConversationPanel({
             <p>{recovery.cleanupWarning}</p>
           </div>
         )}
-        <p>{notice}</p>
       </div>
 
       {/* Composer: smoothly glides from center to bottom */}
@@ -1027,6 +1007,7 @@ export function ConversationPanel({
           selectedModelId={selectedModelId}
           onSelectModel={handleSelectModel}
           models={pickerModels}
+          modelUnavailable={modelUnavailable}
           think={think}
           onChangeThink={setThink}
           contextLimit={selectedDescriptor?.contextLimit ?? null}

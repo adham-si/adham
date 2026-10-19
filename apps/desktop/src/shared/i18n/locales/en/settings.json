@@ -335,7 +335,7 @@
       "syncDirty": "Save the edited endpoint before syncing.",
       "offlineMessage": "Cannot reach Ollama at {{url}}. Make sure the Ollama app is running.",
       "nothingSaved": "Nothing was saved.",
-      "saveReconnect": "Save & Reconnect",
+      "save": "Save",
       "googleKeyNote": "Stored securely on your device.",
       "done": "Done",
       "ollamaConfirmDisconnect": "Disconnect removes the saved local endpoint and its discovered models from this device.",

@@ -254,8 +254,8 @@ describe('ConversationPanel flows', () => {
     render(<ConversationPanel backend={fakeBackend()} provider={provider} />);
     expect(await screen.findByRole('button', { name: 'Select a model' })).toBeDefined();
 
-    // after disabling it on the models page, the picker has nothing to offer
-    // and is hidden entirely (the composer never falls back to a default).
+    // after disabling it on the models page, the picker stays visible and names
+    // the empty state (the composer never falls back to a default).
     cleanup();
     localStorage.setItem(
       'adham.modelPrefs.v1',
@@ -263,7 +263,7 @@ describe('ConversationPanel flows', () => {
     );
     render(<ConversationPanel backend={fakeBackend()} provider={provider} />);
     await screen.findByRole('textbox', { name: /composer input/i });
-    expect(screen.queryByRole('button', { name: 'Select a model' })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'No model available' })).toBeDefined();
   });
 
   it('keeps the answer as a recovery snapshot on a failed terminal reload; the retry replaces it without rerunning the dispatch', async () => {

@@ -190,6 +190,17 @@ export interface AdhamClient {
 }
 
 export class AdhamApiClient implements AdhamClient {
+  /** These methods cross module boundaries as values (`const start =
+   *  backend.completeOnceStreaming`), which drops the receiver; binding here
+   *  keeps `this.wrapCommand` defined for every caller. */
+  constructor() {
+    this.completeOnceStreaming = this.completeOnceStreaming.bind(this);
+    this.retryCompletionStreaming = this.retryCompletionStreaming.bind(this);
+    this.stopCompletion = this.stopCompletion.bind(this);
+    this.ingestAttachment = this.ingestAttachment.bind(this);
+    this.ingestAttachmentPath = this.ingestAttachmentPath.bind(this);
+  }
+
   private wrapCommand<T>(
     payload: T,
     context: CommandContext = {

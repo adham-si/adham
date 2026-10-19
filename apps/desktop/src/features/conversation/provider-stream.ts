@@ -1,6 +1,7 @@
 import * as React from 'react';
 import type { ProviderAccountDto, ProviderModelDto } from '@adham/contracts-generated';
 import { adhamClient } from '@/shared/api/adham-client';
+import { onProvidersChanged } from '@/shared/providers/provider-events';
 
 /**
  * Read-only seam for provider listing (settings-driven composer models).
@@ -57,7 +58,12 @@ export function useOllamaProvider({
 }): OllamaPicker {
   const [accounts, setAccounts] = React.useState<ProviderAccountDto[] | null>(null);
   const [models, setModels] = React.useState<ProviderModelDto[] | null>(null);
+  const [refreshSeq, setRefreshSeq] = React.useState(0);
   const fetchRef = React.useRef(0);
+
+  // A settings mutation bumps the sequence so both reads below re-run: the
+  // composer never keeps a pre-connection "no provider" claim.
+  React.useEffect(() => onProvidersChanged(() => setRefreshSeq((seq) => seq + 1)), []);
 
   React.useEffect(() => {
     if (!enabled) {
@@ -78,7 +84,7 @@ export function useOllamaProvider({
     return () => {
       stale = true;
     };
-  }, [backend, enabled]);
+  }, [backend, enabled, refreshSeq]);
 
   const account = accounts?.find((a) => a.privacyClass === 'local_only') ?? null;
 
@@ -102,6 +108,9 @@ export function useOllamaProvider({
     };
     // Scope fields, not the context object: callers pass a fresh literal per
     // render, and an identity dep would refetch (and re-render) forever.
+    // `refreshSeq` is intentionally absent: a provider-changed bump re-lists
+    // accounts, and the new account identity re-runs this effect (bumping here
+    // too would invalidate the account fetch's shared sequence).
   }, [backend, enabled, account, context?.workspaceId, context?.projectId, context?.sessionId]);
 
   return {
