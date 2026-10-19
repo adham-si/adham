@@ -77,7 +77,7 @@ Status: `not-implemented`. Durable event/attempt identity repair is tracked in t
 | Requirement clause | Status | Evidence | Notes |
 |---|---|---|---|
 | Draft scoped to project+session/branch, including new-session draft | `implemented` | `conversation-panel.tsx` derives `scopeKey` from the resolved workspace/project and passes `sessionId`/`pendingBucket` to `useDrafts`; keys are `adham:compose:draft:<ws>:<proj>:<session\|pending>`. `use-drafts.ts` migrates the scope-less `pending` bucket into the scoped pending bucket when the scope appears, then adopts the scoped pending bucket into the resolved session. | Two projects can no longer share a draft or a new-session draft. A composer-level branch selector does not exist: alternatives are per message (C3), so the session key is the effective branch scope. |
-| Selected model scoped the same way, no cross-project mixing | `implemented` | `compose-model-preference.ts` (`migratePendingModelChoice(next, pending)`), same scope key in `conversation-panel.tsx`; tests `compose-model-preference.test.ts`, `conversation-panel.model-selection.test.tsx`, `conversation-panel.streaming.test.tsx`. | A legacy scope-less pick is adopted once, then follows the session. A vanished stored id is still explained, never substituted. |
+| Selected model scoped the same way, no cross-project mixing | `implemented` | `compose-model-preference.ts` (`migratePendingModelChoice(next, pending)`), same scope key in `conversation-panel.tsx`; tests `compose-model-preference.test.ts`, `conversation-panel.model-selection.test.tsx`, `conversation-panel.streaming.test.tsx`. | A legacy scope-less pick is adopted once, then follows the session. A vanished stored id is never substituted: the always-visible picker shows its select state (the standalone gap sentence was removed in the 2026-10-19 fix wave). |
 | Enter preference / Shift+Enter / IME | `implemented` | `enterToSend` prop on the panel and composer; `compose-input.tsx` guards `keyCode 229`; tests in `compose.test.tsx` (`submits on Enter but not on Shift+Enter`, `ignores Enter while an IME composition is in progress`, `enterToSend={false}` cases). | — |
 | Pasted multiline content | `implemented` | Long and multiline text pastes stay inline in the textarea as text; no synthetic chip. `compose-input.tsx` only intercepts clipboard *files*. Tests: `keeps a long text paste inline instead of fabricating a file chip`, `keeps a multiline paste inline in the textarea`. | — |
 | Clear-on-ack without losing edits | `implemented` | `conversation-panel.tsx`: `if (draftRef.current === text) commitPrompt(text)` on submit; the failure path restores the sent text only when the visible draft is empty or still that text. | Text typed while a send is in flight is not cleared. |
@@ -117,5 +117,18 @@ Status: `not-implemented`. Durable event/attempt identity repair is tracked in t
 | `npx tsc --noEmit` | clean. |
 | `npx oxlint --deny-warnings apps/desktop/src packages/ui/src` | clean. |
 | `npx biome format --write` (changed paths) | no fixes applied. |
+
+## Post-verification fix wave (operator review, 2026-10-19)
+
+Operator screenshots from the running dev app exposed defects that the test suite did not model; all are fixed in this wave.
+
+| Defect | Root cause | Fix |
+|---|---|---|
+| `undefined is not an object (evaluating 'this.wrapCommand')` on send | Hooks pass client methods as values (`const start = backend.completeOnceStreaming`), which drops the receiver, so `AdhamApiClient.wrapCommand` lost `this`. | `AdhamApiClient` binds the five cross-module methods in its constructor; a regression test calls every destructured method (`adham-client.test.ts`). |
+| Composer kept "no model provider is connected" after Ollama was connected | Provider account/model reads resolved once per scope; settings mutations did not re-run them. | `shared/providers/provider-events.ts` broadcasts connect/sync/disconnect; `useOllamaProvider` re-lists accounts and re-lists models through the updated account identity (`provider-stream.test.ts`). |
+| Model selector hidden before a session; long "Text-only submission" sentence above the composer | The picker returned `null` with zero models and the gap sentence was rendered separately. | The picker is always visible: selected model, `Select a model` while unresolved, or `No model available` with a one-line settings hint. `submission-notice.ts` and its now-dead strings were deleted. |
+| Ollama dialog stayed open and the primary action read "Save & Reconnect" | The save action never closed the dialog; the label described the internal re-probe. | Label is `Save`; a successful save closes the dialog (failures keep it open with the error). |
+
+Verification at the working tree (2026-10-19): `pnpm test` 78 files / 811 tests passed; `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm check:magic-values` clean. No Rust code changed in this wave. Live GUI re-check against the operator's project and `qwen3.5:0.8b` remains the operator's acceptance step.
 
 **Outstanding operator proof.** One live GUI turn against the local Ollama model with a text file attached has not been captured at this revision (the dev app was not running during verification). The deterministic evidence above covers ingestion, dispatch assembly, refusal paths and renderer behavior; a live screenshot/log remains the operator's acceptance step. The backend's bounded reader is not replaced by the renderer path: dropped paths use the Rust reader (`ingestAttachmentPath`) with the same limits.
