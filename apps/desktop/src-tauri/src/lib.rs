@@ -1,18 +1,20 @@
 use adham_desktop_api::{
     AnswerFeedbackDto, ApiContext, BootstrapState, BranchSelectionDto,
     ClearPendingOperationPayload, CommandContext, CommandEnvelope, CommandResult,
-    CompleteOncePayload, CompletionStartDto, ConversationPage, CreateProjectPayload,
-    CreateSessionPayload, CreateWorkspacePayload, DiscoverOllamaModelsPayload, ErrorEnvelope,
-    GetPreferencesResponse, ListProviderAccountsResponse, ListProviderModelsPayload,
-    ListProviderModelsResponse, MarkCompletionInterruptedPayload,
-    MarkCompletionInterruptedResponse, PendingOperationDto, PendingOperationList, PlatformInfo,
-    ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
-    RebuildProjectionsResponse, RecordPendingOperationPayload, ResetPreferencesResponse,
-    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionSummary,
-    SetActiveAlternativePayload, SetAnswerFeedbackPayload, StopCompletionPayload,
-    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
-    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
-    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
+    CompleteOncePayload, CompletionStartDto, ConfigureGoogleAccountPayload, ConversationPage,
+    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
+    DisconnectGoogleAccountPayload, DisconnectOllamaAccountPayload, DiscoverOllamaModelsPayload,
+    ErrorEnvelope, GetPreferencesResponse, GoogleAccountDisconnected, ListProviderAccountsResponse,
+    ListProviderModelsPayload, ListProviderModelsResponse, MarkCompletionInterruptedPayload,
+    MarkCompletionInterruptedResponse, OllamaAccountDisconnected, PendingOperationDto,
+    PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
+    ProviderHealthResponse, ProviderModelsList, RebuildProjectionsResponse,
+    RecordPendingOperationPayload, ResetPreferencesResponse, RetryCompletionPayload,
+    SelectProjectPayload, SessionList, SessionSummary, SetActiveAlternativePayload,
+    SetAnswerFeedbackPayload, StopCompletionPayload, StopCompletionResponse, StorageStatus,
+    StreamEventDto, SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
+    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
+    WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -222,6 +224,36 @@ async fn update_provider_account(
 }
 
 #[tauri::command]
+async fn configure_google_account(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<ConfigureGoogleAccountPayload>,
+) -> Result<CommandResult<ProviderAccountDto>, ErrorEnvelope> {
+    adham_desktop_api::handle_configure_google_account(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn disconnect_google_account(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<DisconnectGoogleAccountPayload>,
+) -> Result<CommandResult<GoogleAccountDisconnected>, ErrorEnvelope> {
+    adham_desktop_api::handle_disconnect_google_account(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn disconnect_ollama_account(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<DisconnectOllamaAccountPayload>,
+) -> Result<CommandResult<OllamaAccountDisconnected>, ErrorEnvelope> {
+    adham_desktop_api::handle_disconnect_ollama_account(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn complete_once_streaming(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<CompleteOncePayload>,
@@ -417,6 +449,9 @@ pub fn run() {
             discover_ollama_models,
             list_provider_models,
             update_provider_account,
+            configure_google_account,
+            disconnect_google_account,
+            disconnect_ollama_account,
             complete_once_streaming,
             retry_completion_streaming,
             stop_completion,

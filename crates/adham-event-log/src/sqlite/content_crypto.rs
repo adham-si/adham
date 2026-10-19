@@ -53,6 +53,50 @@ pub struct SealedContent {
     pub key_reference: String,
 }
 
+// Low-level AEAD primitives over caller-chosen associated data. The credential
+// vault (provider_credentials.rs) binds installation+account instead of a
+// content scope; the content-row seal/open below keep their own contract.
+pub(crate) fn encrypt_aead(
+    key: &[u8; 32],
+    ad: &[u8],
+    plaintext: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>), DomainError> {
+    let cipher = XChaCha20Poly1305::new_from_slice(key)
+        .map_err(|e| DomainError::Integrity(format!("key init failed: {e}")))?;
+    let mut nonce_bytes = [0u8; 24];
+    rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
+    let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(
+            nonce,
+            chacha20poly1305::aead::Payload {
+                msg: plaintext,
+                aad: ad,
+            },
+        )
+        .map_err(|e| DomainError::Integrity(format!("encrypt failed: {e}")))?;
+    Ok((nonce_bytes.to_vec(), ciphertext))
+}
+
+pub(crate) fn decrypt_aead(
+    key: &[u8; 32],
+    nonce: &[u8],
+    ad: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, DomainError> {
+    let cipher = XChaCha20Poly1305::new_from_slice(key)
+        .map_err(|e| DomainError::Integrity(format!("key init failed: {e}")))?;
+    cipher
+        .decrypt(
+            chacha20poly1305::XNonce::from_slice(nonce),
+            chacha20poly1305::aead::Payload {
+                msg: ciphertext,
+                aad: ad,
+            },
+        )
+        .map_err(|_| DomainError::Integrity("content authentication failed".into()))
+}
+
 pub fn seal(
     provider: &dyn ContentKeyProvider,
     content_id: &ContentId,

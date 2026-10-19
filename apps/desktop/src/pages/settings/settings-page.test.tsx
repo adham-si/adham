@@ -99,7 +99,7 @@ describe('SettingsPage Component', () => {
     // A visible id renders its page: the working Ollama section is here.
     expect(
       screen.getByText(
-        'Configure default intelligence runtimes, model parameters, and automatic fallback chains.',
+        'Manage models discovered from your connected providers. Enable or favorite models to make them available in chat.',
       ),
     ).not.toBeNull();
   });

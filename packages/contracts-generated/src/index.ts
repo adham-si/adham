@@ -166,7 +166,16 @@ export type DiscoverOllamaModelsPayload = { accountId: string, };
 
 export type UpdateProviderAccountPayload = { accountId: string | null, alias: string | null, endpointUrl: string | null, };
 
-export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl: string, privacyClass: string, };
+export type DisconnectOllamaAccountPayload = { accountId: string, };
+
+export type OllamaAccountDisconnected = { accountId: string, };
+
+export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl: string, privacyClass: string, 
+/**
+ * Additive (Delivery G1): adapter family of the account — the frontend
+ * must branch on this kind, never on URLs or model names.
+ */
+kind: string, };
 
 export type ProviderModelDto = { modelId: string, digest: string, humanLabel: string, privacyClass: string, capabilities: ProviderCapabilitiesDto, 
 /**
@@ -235,6 +244,19 @@ reference: MessageReferenceDto | null, };
 
 export type RetryCompletionPayload = { accountId: string, modelId: string, replyToMessageId: string, mode: string | null, think: boolean | string | null, };
 
+export type CompletionStartDto = { opId: string, messageId: string, 
+/**
+ * Assembly summary for this dispatch (#[serde] None only when a legacy
+ * receipt is replayed: fresh dispatches always carry it).
+ */
+context: ContextAssemblyDto | null, };
+
+export type ListProviderAccountsResponse = { accounts: Array<ProviderAccountDto>, };
+
+export type ListProviderModelsPayload = { accountId: string, };
+
+export type ListProviderModelsResponse = { models: Array<ProviderModelDto>, };
+
 export type MessageReferenceDto = { refersToMessageId: string, relation: string, };
 
 export type BranchSelectionDto = { 
@@ -279,18 +301,11 @@ inputBudgetTokens: number | null,
  */
 droppedMessages: number, };
 
-export type CompletionStartDto = { opId: string, messageId: string, 
-/**
- * Assembly summary for this dispatch (#[serde] None only when a legacy
- * receipt is replayed: fresh dispatches always carry it).
- */
-context: ContextAssemblyDto | null, };
+export type ConfigureGoogleAccountPayload = { accountId: string | null, alias: string | null, apiKey: string, acknowledgeCloudTransfer: boolean, };
 
-export type ListProviderAccountsResponse = { accounts: Array<ProviderAccountDto>, };
+export type DisconnectGoogleAccountPayload = { accountId: string, };
 
-export type ListProviderModelsPayload = { accountId: string, };
-
-export type ListProviderModelsResponse = { models: Array<ProviderModelDto>, };
+export type GoogleAccountDisconnected = { accountId: string, };
 
 export type StopCompletionPayload = { opId: string, };
 

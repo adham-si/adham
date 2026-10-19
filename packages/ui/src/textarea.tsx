@@ -1,7 +1,7 @@
 import type { VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from './cn';
-import { fieldAccessibility, fieldVariants, type FieldAccessibilityProps } from './field';
+import { type FieldAccessibilityProps, fieldAccessibility, fieldVariants } from './field';
 
 export interface TextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement>,

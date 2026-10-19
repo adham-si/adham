@@ -1,4 +1,8 @@
+import { invoke } from '@tauri-apps/api/core';
 import { describe, expect, it, vi } from 'vitest';
+import ipcBasicSendFixture from '../../../fixtures/ipc-basic-send.json';
+import { AdhamApiClient } from './adham-client';
+import { queryKeys } from './query-keys';
 import {
   BootstrapStateSchema,
   ConversationPageSchema,
@@ -7,10 +11,6 @@ import {
   StreamEventPayloadDtoSchema,
   SubmittedMessageSchema,
 } from './schemas';
-import { queryKeys } from './query-keys';
-import { invoke } from '@tauri-apps/api/core';
-import { AdhamApiClient } from './adham-client';
-import ipcBasicSendFixture from '../../../fixtures/ipc-basic-send.json';
 
 const channelSinks: Array<(raw: unknown) => void> = [];
 vi.mock('@tauri-apps/api/core', () => ({
@@ -353,6 +353,7 @@ describe('IPC contract fixture (cross-language)', () => {
                 digest: 'sha256:abc',
                 humanLabel: 'm:latest',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
                 capabilities: {
                   streaming: 'supported',
                   structuredOutput: 'unknown',
@@ -412,6 +413,7 @@ describe('IPC contract fixture (cross-language)', () => {
         alias: 'A',
         endpointUrl: 'http://127.0.0.1:1',
         privacyClass: 'local_only',
+        kind: 'ollama_local',
       },
     }));
     const minted = await client.updateProviderAccount(
@@ -467,6 +469,7 @@ describe('IPC contract fixture (cross-language)', () => {
                 alias: 'Local',
                 endpointUrl: 'http://127.0.0.1:11434',
                 privacyClass: 'local_only',
+                kind: 'ollama_local',
               },
             ],
           },

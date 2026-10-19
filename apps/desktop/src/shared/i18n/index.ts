@@ -1,54 +1,53 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { LANGUAGE_STORAGE_KEY } from '../../theme/theme-context';
 import {
-  SUPPORTED_LANGUAGES,
   DEFAULT_LANGUAGE,
   getLanguageDirection,
   isRTL,
   isSupportedLanguage,
-  normalizeLanguage,
-  resolveLanguage,
   type LanguageCode,
   type LanguageDefinition,
+  normalizeLanguage,
+  resolveLanguage,
+  SUPPORTED_LANGUAGES,
   type TextDirection,
 } from './languages';
-import { LANGUAGE_STORAGE_KEY } from '../../theme/theme-context';
-
-import enCommon from './locales/en/common.json';
-import enCompose from './locales/en/compose.json';
-import enConversation from './locales/en/conversation.json';
-import enSettings from './locales/en/settings.json';
-import enShell from './locales/en/shell.json';
-import enGallery from './locales/en/gallery.json';
 import arCommon from './locales/ar/common.json';
 import arCompose from './locales/ar/compose.json';
 import arConversation from './locales/ar/conversation.json';
+import arGallery from './locales/ar/gallery.json';
 import arSettings from './locales/ar/settings.json';
 import arShell from './locales/ar/shell.json';
-import arGallery from './locales/ar/gallery.json';
-import zhCommon from './locales/zh-CN/common.json';
-import zhCompose from './locales/zh-CN/compose.json';
-import zhConversation from './locales/zh-CN/conversation.json';
-import zhSettings from './locales/zh-CN/settings.json';
-import zhShell from './locales/zh-CN/shell.json';
-import zhGallery from './locales/zh-CN/gallery.json';
+import enCommon from './locales/en/common.json';
+import enCompose from './locales/en/compose.json';
+import enConversation from './locales/en/conversation.json';
+import enGallery from './locales/en/gallery.json';
+import enSettings from './locales/en/settings.json';
+import enShell from './locales/en/shell.json';
 import ruCommon from './locales/ru/common.json';
 import ruCompose from './locales/ru/compose.json';
 import ruConversation from './locales/ru/conversation.json';
+import ruGallery from './locales/ru/gallery.json';
 import ruSettings from './locales/ru/settings.json';
 import ruShell from './locales/ru/shell.json';
-import ruGallery from './locales/ru/gallery.json';
+import zhCommon from './locales/zh-CN/common.json';
+import zhCompose from './locales/zh-CN/compose.json';
+import zhConversation from './locales/zh-CN/conversation.json';
+import zhGallery from './locales/zh-CN/gallery.json';
+import zhSettings from './locales/zh-CN/settings.json';
+import zhShell from './locales/zh-CN/shell.json';
 
 export {
-  SUPPORTED_LANGUAGES,
   DEFAULT_LANGUAGE,
   getLanguageDirection,
   isRTL,
   isSupportedLanguage,
-  normalizeLanguage,
-  resolveLanguage,
   type LanguageCode,
   type LanguageDefinition,
+  normalizeLanguage,
+  resolveLanguage,
+  SUPPORTED_LANGUAGES,
   type TextDirection,
 };
 

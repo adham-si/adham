@@ -225,6 +225,17 @@ export const ProviderAccountDtoSchema = z.object({
   alias: z.string(),
   endpointUrl: z.string(),
   privacyClass: z.string(),
+  // additive Delivery G1: adapter family; branch on it, never on URL/model names
+  kind: z.string(),
+});
+
+// Delivery G2: disconnect response (account removal confirmation only)
+export const GoogleAccountDisconnectedSchema = z.object({
+  accountId: z.string(),
+});
+
+export const OllamaAccountDisconnectedSchema = z.object({
+  accountId: z.string(),
 });
 
 export const ProviderHealthResponseSchema = z.object({

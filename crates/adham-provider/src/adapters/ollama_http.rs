@@ -301,7 +301,7 @@ fn configured_context(show: &Value) -> Option<u32> {
     })
 }
 
-fn now_us() -> i64 {
+pub(crate) fn now_us() -> i64 {
     // Repo timestamp convention (see event-log): micros since Unix epoch UTC.
     (time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64
 }

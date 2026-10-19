@@ -24,7 +24,8 @@
     "disabled": "Disabled",
     "small": "Small",
     "large": "Large",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "close": "Close"
   },
   "error": {
     "validationFailed": "This name is invalid. Correct it and try again.",

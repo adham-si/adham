@@ -68,7 +68,7 @@
     "modeExecuteUnavailable": "Execution requires the policy and tool runtime, which is not built yet",
     "modeHintExecute": "Direct agent actions & tools",
     "modeHintCode": "Software development focus",
-    "localBoundaryNote": "Zero data leaves this machine",
+    "localBoundaryNote": "Dispatch restricted to the local-only provider endpoint you configured (typically this machine).",
     "cloudBoundaryNote": "Outbound request to {{provider}}",
     "localBadge": "Local",
     "cloudBadge": "Cloud",

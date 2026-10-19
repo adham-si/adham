@@ -77,7 +77,7 @@
     "modeExecuteUnavailable": "يتطلب التنفيذ وقت تشغيل السياسات والأدوات، وهو غير مُنشأ بعد",
     "modeHintExecute": "إجراءات وأدوات مباشرة للوكيل",
     "modeHintCode": "تركيز على تطوير البرمجيات",
-    "localBoundaryNote": "لا تغادر أي بيانات هذا الجهاز",
+    "localBoundaryNote": "الإرسال مقيد بنقطة النهاية المحلية فقط التي قمت بإعدادها للمزود (عادةً هذا الجهاز).",
     "cloudBoundaryNote": "طلب صادر إلى {{provider}}",
     "localBadge": "محلي",
     "cloudBadge": "سحابي",

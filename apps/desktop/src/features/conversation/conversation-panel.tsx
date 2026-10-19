@@ -20,6 +20,7 @@ import {
   type UiMessageReference,
 } from './use-conversation';
 import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
+import { useModelPrefs } from '@/shared/models/model-prefs';
 import { TurnStatus } from './turn-status';
 import {
   announceScopeChanged,
@@ -240,6 +241,9 @@ export function ConversationPanel({
   const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
   const [stopNotice, setStopNotice] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  // "Enabled in chat" curation from the models settings page filters what the
+  // composer offers (absence = enabled, so a fresh connection stays complete).
+  const modelPrefs = useModelPrefs();
 
   // Registry-driven picker: when an Ollama account has pinned models, the
   // composer options come from the provider registry (Delivery A). Without
@@ -257,18 +261,20 @@ export function ConversationPanel({
         : null,
     enabled: conv.status === 'ready',
   });
-  const pickerModels: ModelOption[] = ollama.models.map((m) => ({
-    id: m.modelId,
-    name: m.humanLabel,
-    provider: 'Ollama',
-    boundary: 'local' as const,
-    // Thinking controls appear only for evidenced support; unknown or
-    // unsupported must not present a control the model may not honor.
-    supportsReasoning: m.capabilities.thinking === 'supported',
-    // The control itself comes from the model's documented values.
-    thinkingValues: m.capabilities.thinkingValues ?? undefined,
-    thinkingDefault: m.capabilities.thinkingDefault,
-  }));
+  const pickerModels: ModelOption[] = ollama.models
+    .filter((m) => modelPrefs.isEnabled(ollama.account?.accountId ?? '', m.modelId))
+    .map((m) => ({
+      id: m.modelId,
+      name: m.humanLabel,
+      provider: 'Ollama',
+      boundary: 'local' as const,
+      // Thinking controls appear only for evidenced support; unknown or
+      // unsupported must not present a control the model may not honor.
+      supportsReasoning: m.capabilities.thinking === 'supported',
+      // The control itself comes from the model's documented values.
+      thinkingValues: m.capabilities.thinkingValues ?? undefined,
+      thinkingDefault: m.capabilities.thinkingDefault,
+    }));
   const selectedDescriptor = ollama.models.find((m) => m.modelId === selectedModelId) ?? null;
   const streamReady =
     ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);

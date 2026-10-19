@@ -1,4 +1,8 @@
-export { ProviderFilterTabs, type ProviderFilterTab } from './provider-filter-tabs';
-export { ProviderCard, type ProviderItem } from './provider-card';
-export { ProvidersList } from './providers-list';
-export { OllamaConnect } from './ollama-connect';
+export {
+  ProviderCard,
+  type ProviderCatalogEntry,
+  type ProviderId,
+  type ProviderStatus,
+  StatusBadge,
+} from './provider-card';
+export { ProviderConnectModal, type ProviderConnectModalProps } from './provider-connect-modal';

@@ -100,3 +100,55 @@ fn test_privacy_class_boundary_enforcement() {
     let cloud_res = gateway.execute(&cloud_req);
     assert!(cloud_res.is_ok());
 }
+
+// ==== G3: Gemini boundary pins ===========================================
+
+#[test]
+fn gemini_adapter_accepts_only_the_official_endpoint() {
+    use adham_provider::adapters::gemini_http::{GeminiHttpAdapter, GoogleApiKey};
+    use adham_provider::transport::HttpTransport;
+
+    let key = || GoogleApiKey::new("AIza-pinning").expect("key");
+    assert!(
+        GeminiHttpAdapter::new(
+            HttpTransport::default(),
+            GeminiHttpAdapter::OFFICIAL_BASE_URL,
+            key()
+        )
+        .is_ok()
+    );
+    for url in [
+        // mirrors, typosquatting, re-domains, scheme downgrade, custom ports
+        "https://generativelanguage.api.gemini.evil.test",
+        "https://gemini-proxy-test.test/generativelanguage",
+        "http://generativelanguage.googleapis.com",
+        "https://generativelanguage.googleapis.com:8443",
+        "https://api.openai.com/v1",
+    ] {
+        let res = GeminiHttpAdapter::new(HttpTransport::default(), url, key());
+        assert!(res.is_err(), "{url} must be refused");
+    }
+}
+
+#[test]
+fn gemini_key_material_never_renders_in_debug() {
+    use adham_provider::adapters::gemini_http::{GeminiHttpAdapter, GoogleApiKey};
+    use adham_provider::transport::HttpTransport;
+
+    let key = GoogleApiKey::new("AIzaSECRET-never-leak").expect("key");
+    let adapter = GeminiHttpAdapter::new(
+        HttpTransport::default(),
+        GeminiHttpAdapter::OFFICIAL_BASE_URL,
+        key,
+    )
+    .expect("adapter");
+    let rendered = format!("{adapter:?}");
+    assert!(
+        !rendered.contains("AIzaSECRET-never-leak"),
+        "key leaked: {rendered}"
+    );
+    assert!(
+        !rendered.contains("api_key"),
+        "key structural name must not show: {rendered}"
+    );
+}

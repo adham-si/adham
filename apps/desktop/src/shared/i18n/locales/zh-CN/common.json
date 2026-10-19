@@ -24,7 +24,8 @@
     "disabled": "已禁用",
     "small": "小",
     "large": "大",
-    "cancel": "取消"
+    "cancel": "取消",
+    "close": "关闭"
   },
   "error": {
     "validationFailed": "此名称无效，请更正后重试。",

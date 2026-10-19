@@ -155,6 +155,28 @@ struct BogonResolver {
     inner: Arc<dyn Resolve>,
 }
 
+#[cfg(test)]
+mod port_zero_resolver_pin {
+    // hyper-util keeps a custom resolver's port for port-less URIs
+    // (`set_port` only replaces port 0). A resolver that pins a non-zero
+    // placeholder port makes `https://host/...` connect to the placeholder
+    // port instead of 443 (SYN-SENT forever). Regression pin for the
+    // production SystemResolver contract: `lookup_host((host, 0))` must
+    // keep the 0 port so hyper-util substitutes the scheme/URI port.
+    #[tokio::test]
+    async fn system_resolver_yields_port_zero_addrs() {
+        let addrs = tokio::net::lookup_host(("generativelanguage.googleapis.com", 0))
+            .await
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert!(!addrs.is_empty(), "dns resolution must return addrs");
+        assert!(
+            addrs.iter().all(|a| a.port() == 0),
+            "lookup_host((host, 0)) must not synthesize a non-zero port"
+        );
+    }
+}
+
 impl Resolve for BogonResolver {
     fn resolve(&self, name: Name) -> Resolving {
         let inner = self.inner.clone();
@@ -181,7 +203,12 @@ impl Resolve for SystemResolver {
     fn resolve(&self, name: Name) -> Resolving {
         let host = name.as_str().to_string();
         Box::pin(async move {
-            let addrs = tokio::net::lookup_host((host.as_str(), 9)).await?;
+            // Resolve with port 0: hyper-util's `set_port` overrides port-0 addrs
+            // with the URI's port (or the scheme default when the URI carries no
+            // explicit port — the official Google base url is exactly that).
+            // A non-zero placeholder port made port-less https requests connect
+            // to that placeholder (SYN-SENT forever) instead of 443.
+            let addrs = tokio::net::lookup_host((host.as_str(), 0)).await?;
             Ok(Box::new(addrs.collect::<Vec<_>>().into_iter()) as Addrs)
         })
     }
@@ -320,6 +347,46 @@ impl HttpTransport {
             .await
             .map_err(classify)?;
         document_from(response, self.per_read).await
+    }
+
+    /// GET JSON carrying explicit headers (G3: `x-goog-api-key`; header-only
+    /// authorization — never a query parameter).
+    pub async fn get_json_with_headers(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+    ) -> Result<Value, TransportError> {
+        EndpointDescriptor::validate_url(url).map_err(|e| TransportError::Policy(e.to_string()))?;
+        let mut request = self.client.get(url);
+        for (name, value) in headers {
+            request = request.header(name, value);
+        }
+        let response = request.timeout(self.total).send().await.map_err(classify)?;
+        document_from(response, self.per_read).await
+    }
+
+    /// POST JSON carrying explicit headers, returning a stream (G3 SSE).
+    pub async fn post_json_with_headers(
+        &self,
+        url: &str,
+        body: &Value,
+        headers: &[(String, String)],
+    ) -> Result<ByteStream, TransportError> {
+        EndpointDescriptor::validate_url(url).map_err(|e| TransportError::Policy(e.to_string()))?;
+        let mut request = self.client.post(url).json(body);
+        for (name, value) in headers {
+            request = request.header(name, value);
+        }
+        let response = request.timeout(self.total).send().await.map_err(classify)?;
+        if !response.status().is_success() {
+            return Err(read_error_status(response, self.per_read).await);
+        }
+        Ok(ByteStream {
+            response,
+            per_read: self.per_read,
+            buf: Vec::new(),
+            done: false,
+        })
     }
 }
 
