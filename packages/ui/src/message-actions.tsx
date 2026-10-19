@@ -72,8 +72,8 @@ export function MessageActions({
   };
 
   return (
-    <div className="mt-3 flex flex-col gap-1 text-xs">
-      <div className="flex flex-wrap items-center gap-1 text-foreground-secondary">
+    <footer className="flex flex-col gap-1 text-xs">
+      <div className="flex flex-wrap items-center justify-end gap-1 text-foreground-secondary">
         {copyText.length > 0 && (
           <ActionControl label={resolved.copyMessage} icon={icons?.copy} onClick={onCopy} />
         )}
@@ -151,7 +151,7 @@ export function MessageActions({
       {onFeedback !== undefined && feedback !== undefined && (
         <FeedbackReason feedback={feedback} onFeedback={onFeedback} resolved={resolved} />
       )}
-    </div>
+    </footer>
   );
 }
 

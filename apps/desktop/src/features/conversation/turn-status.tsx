@@ -29,27 +29,29 @@ export function TurnStatus({
   }, []);
   const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
   return (
-    <div className="rounded-lg border border-border-subtle bg-surface p-4">
-      <header className="mb-2 flex items-center gap-2">
+    <div className="flex max-w-[85%] flex-col gap-2 self-start">
+      <header className="flex min-w-0 items-center gap-2">
         <span
           aria-hidden="true"
-          className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-subtle text-foreground-secondary"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-subtle text-foreground-secondary"
         >
-          <HugeiconsIcon icon={BotMessageSquareIcon} className="size-4" />
+          <HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />
         </span>
         <span className="text-sm font-medium text-foreground">{name ?? ROLE_LABEL.assistant}</span>
       </header>
-      <p role="status" className="flex items-center gap-2 text-xs text-foreground-muted">
-        <span aria-hidden="true" className="flex items-center gap-0.5">
-          <span className="animate-chat-dot size-1.5 rounded-full bg-foreground-muted [animation-delay:-0.3s] motion-reduce:animate-none" />
-          <span className="animate-chat-dot size-1.5 rounded-full bg-foreground-muted [animation-delay:-0.15s] motion-reduce:animate-none" />
-          <span className="animate-chat-dot size-1.5 rounded-full bg-foreground-muted motion-reduce:animate-none" />
-        </span>
-        {phase === 'waiting'
-          ? t('conversation.waitingForModel', 'Waiting for the model…')
-          : t('conversation.thinking', 'Thinking…')}{' '}
-        <span className="tabular-nums">{t('conversation.elapsedSeconds', { seconds })}</span>
-      </p>
+      <div className="rounded-lg border border-border-subtle bg-surface p-4">
+        <p role="status" className="flex items-center gap-2 text-xs text-foreground-muted">
+          <span aria-hidden="true" className="flex items-center gap-0.5">
+            <span className="animate-chat-dot size-1.5 rounded-full bg-foreground-muted [animation-delay:-0.3s] motion-reduce:animate-none" />
+            <span className="animate-chat-dot size-1.5 rounded-full bg-foreground-muted [animation-delay:-0.15s] motion-reduce:animate-none" />
+            <span className="animate-chat-dot size-1.5 rounded-full bg-foreground-muted motion-reduce:animate-none" />
+          </span>
+          {phase === 'waiting'
+            ? t('conversation.waitingForModel', 'Waiting for the model…')
+            : t('conversation.thinking', 'Thinking…')}{' '}
+          <span className="tabular-nums">{t('conversation.elapsedSeconds', { seconds })}</span>
+        </p>
+      </div>
     </div>
   );
 }

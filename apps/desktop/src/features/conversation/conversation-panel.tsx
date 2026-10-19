@@ -4,9 +4,9 @@ import type { TFunction } from 'i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   BotMessageSquareIcon,
-  Copy01Icon,
+  CopyIcon,
   MoreVerticalIcon,
-  RefreshIcon,
+  RefreshCcwIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
   UserIcon,
@@ -68,11 +68,11 @@ const PENDING_DRAFT_BUCKET = 'pending';
 
 /** Header avatars and action glyphs as nodes: the card renders what the app
  *  hands it, so @adham/ui stays free of an icon dependency. */
-const ASSISTANT_AVATAR = <HugeiconsIcon icon={BotMessageSquareIcon} className="size-4" />;
-const USER_AVATAR = <HugeiconsIcon icon={UserIcon} className="size-4" />;
+const ASSISTANT_AVATAR = <HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />;
+const USER_AVATAR = <HugeiconsIcon icon={UserIcon} className="size-5" />;
 const MESSAGE_ICONS: MessageActionIcons = {
-  copy: <HugeiconsIcon icon={Copy01Icon} className="size-4" />,
-  regenerate: <HugeiconsIcon icon={RefreshIcon} className="size-4" />,
+  copy: <HugeiconsIcon icon={CopyIcon} className="size-4" />,
+  regenerate: <HugeiconsIcon icon={RefreshCcwIcon} className="size-4" />,
   like: <HugeiconsIcon icon={ThumbsUpIcon} className="size-4" />,
   dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4" />,
   more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
@@ -861,7 +861,7 @@ export function ConversationPanel({
                   <MessageAttachments
                     attachments={m.attachments!}
                     readText={backend.readAttachmentText ? readAttachmentText : undefined}
-                    className="px-1"
+                    className="self-end px-1"
                   />
                 )}
                 {note && (

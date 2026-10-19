@@ -2,9 +2,9 @@ import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   BotMessageSquareIcon,
-  Copy01Icon,
+  CopyIcon,
   MoreVerticalIcon,
-  RefreshIcon,
+  RefreshCcwIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
   UserIcon,
@@ -17,8 +17,8 @@ const DEMO_ISO = '2026-10-07T10:00:00Z';
 
 /** Demo glyphs: the app supplies these nodes to the icon-set-free card. */
 const DEMO_ICONS: MessageActionIcons = {
-  copy: <HugeiconsIcon icon={Copy01Icon} className="size-4" />,
-  regenerate: <HugeiconsIcon icon={RefreshIcon} className="size-4" />,
+  copy: <HugeiconsIcon icon={CopyIcon} className="size-4" />,
+  regenerate: <HugeiconsIcon icon={RefreshCcwIcon} className="size-4" />,
   like: <HugeiconsIcon icon={ThumbsUpIcon} className="size-4" />,
   dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4" />,
   more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
@@ -31,7 +31,7 @@ export function MessageCardSection() {
     <GallerySection title={t('gallery.messages.title')}>
       <MessageCard
         role="user"
-        avatar={<HugeiconsIcon icon={UserIcon} className="size-4" />}
+        avatar={<HugeiconsIcon icon={UserIcon} className="size-5" />}
         icons={DEMO_ICONS}
         content={contentFromText(t('gallery.messages.user'))}
         timestamp={DEMO_TIMESTAMP}
@@ -41,7 +41,7 @@ export function MessageCardSection() {
       <MessageCard
         role="assistant"
         name="qwen2.5:latest"
-        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-4" />}
+        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />}
         icons={DEMO_ICONS}
         content={contentFromText(t('gallery.messages.assistant'))}
         timestamp={DEMO_TIMESTAMP}
@@ -54,7 +54,7 @@ export function MessageCardSection() {
       <MessageCard
         role="assistant"
         name="qwen2.5:latest"
-        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-4" />}
+        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />}
         icons={DEMO_ICONS}
         streaming
         content={contentFromText(t('gallery.messages.assistant'))}
@@ -78,6 +78,7 @@ export function MessageCardSection() {
       />
       <MessageCard
         role="assistant"
+        icons={DEMO_ICONS}
         content={contentFromText(t('gallery.messages.editable'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}

@@ -5,6 +5,12 @@ import { MessageCard } from './message-card';
 
 const DIRECTION_LOCKED = /(^|\s)(left-|right-|ml-|mr-|pl-|pr-)/;
 
+/** The card surface: the article's only direct div child, since the identity
+ *  header and the actions row are header/footer elements outside the card. */
+function surface(container: HTMLElement): Element | null {
+  return container.querySelector('article > div');
+}
+
 function stubClipboard(writeText: (text: string) => Promise<void>) {
   Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 }
@@ -79,32 +85,36 @@ describe('MessageCard', () => {
     expect(time?.getAttribute('datetime')).toBe('2026-10-07T10:04:00Z');
   });
 
-  it('selected applies the selection surface', () => {
-    render(
+  it('selected applies the selection surface to the card, not the identity header', () => {
+    const { container } = render(
       <MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" selected />,
     );
-    expect(screen.getByRole('article').className).toContain('bg-selection');
+    expect(surface(container)?.className).toContain('bg-selection');
   });
 
   it('not selected omits the selection surface', () => {
-    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
-    expect(screen.getByRole('article').className).not.toContain('bg-selection');
+    const { container } = render(
+      <MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />,
+    );
+    expect(surface(container)?.className).not.toContain('bg-selection');
   });
 
   it('editable marks the card with a dashed boundary', () => {
-    render(
+    const { container } = render(
       <MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" editable />,
     );
-    expect(screen.getByRole('article').className).toContain('border-dashed');
+    expect(surface(container)?.className).toContain('border-dashed');
   });
 
   it('read-only by default: no dashed boundary', () => {
-    render(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
-    expect(screen.getByRole('article').className).not.toContain('border-dashed');
+    const { container } = render(
+      <MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />,
+    );
+    expect(surface(container)?.className).not.toContain('border-dashed');
   });
 
   it('keeps the body read-only when editable is false', () => {
-    render(
+    const { container } = render(
       <MessageCard
         role="user"
         content={contentFromText('Body')}
@@ -112,7 +122,34 @@ describe('MessageCard', () => {
         editable={false}
       />,
     );
-    expect(screen.getByRole('article').className).not.toContain('border-dashed');
+    expect(surface(container)?.className).not.toContain('border-dashed');
+  });
+
+  it('keeps the identity header and the actions outside the card surface', () => {
+    const { container } = render(
+      <MessageCard
+        role="user"
+        content={contentFromText('Body')}
+        timestamp="10:04"
+        onReply={() => {}}
+      />,
+    );
+    const card = screen.getByRole('article');
+    const bubble = surface(container);
+    expect(bubble).not.toBeNull();
+    expect(bubble?.contains(screen.getByText('You'))).toBe(false);
+    expect(bubble?.contains(screen.getByText('10:04'))).toBe(false);
+    expect(bubble?.querySelector('button')).toBeNull();
+    expect(card.querySelector('footer button')).not.toBeNull();
+  });
+
+  it('aligns incoming turns to the start and outgoing turns to the end', () => {
+    const { container, rerender } = render(
+      <MessageCard role="assistant" content={contentFromText('Body')} timestamp="10:04" />,
+    );
+    expect(screen.getByRole('article').className).toContain('self-start');
+    rerender(<MessageCard role="user" content={contentFromText('Body')} timestamp="10:04" />);
+    expect(container.querySelector('article')?.className).toContain('self-end');
   });
 
   it('is focusable so a selected card can be reached by keyboard', () => {
@@ -134,19 +171,20 @@ describe('MessageCard', () => {
       />,
     );
     expect(container.querySelector('article')?.className).not.toMatch(DIRECTION_LOCKED);
+    expect(surface(container)?.className).not.toMatch(DIRECTION_LOCKED);
   });
 
   it('uses no magic values', () => {
     const { container } = render(
       <MessageCard role="assistant" content={contentFromText('Body')} timestamp="10:04" selected />,
     );
-    const className = container.querySelector('article')?.className ?? '';
+    const className = surface(container)?.className ?? '';
     expect(className).not.toContain('#');
     expect(className).not.toContain('[var(');
   });
 
-  it('lets a caller className override the base padding', () => {
-    render(
+  it('lets a caller className override the base padding on the card surface', () => {
+    const { container } = render(
       <MessageCard
         role="user"
         content={contentFromText('Body')}
@@ -154,7 +192,7 @@ describe('MessageCard', () => {
         className="p-8"
       />,
     );
-    const { className } = screen.getByRole('article');
+    const className = surface(container)?.className ?? '';
     expect(className).toContain('p-8');
     expect(className).not.toContain('p-4');
   });

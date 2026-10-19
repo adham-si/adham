@@ -6,27 +6,24 @@ import { MessageActions, type MessageActionIcons, type MessageActionMenu } from 
 import { contentToText, type MessageContent } from './message-content';
 import { useClipboardCopy } from './use-clipboard-copy';
 
-const messageCardVariants = cva(
-  'rounded-lg border bg-surface p-4 text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-  {
-    variants: {
-      role: {
-        user: 'border-border-subtle bg-surface-muted',
-        assistant: 'border-border-subtle bg-surface',
-        system: 'border-border-subtle bg-surface-subtle',
-      },
-      selected: {
-        true: 'border-border-interactive bg-selection',
-        false: '',
-      },
-      editable: {
-        true: 'border-dashed',
-        false: '',
-      },
+const messageCardVariants = cva('rounded-lg border bg-surface p-4 text-start transition-colors', {
+  variants: {
+    role: {
+      user: 'border-border-subtle bg-surface-muted',
+      assistant: 'border-border-subtle bg-surface',
+      system: 'border-border-subtle bg-surface-subtle',
     },
-    defaultVariants: { role: 'assistant', selected: false, editable: false },
+    selected: {
+      true: 'border-border-interactive bg-selection',
+      false: '',
+    },
+    editable: {
+      true: 'border-dashed',
+      false: '',
+    },
   },
-);
+  defaultVariants: { role: 'assistant', selected: false, editable: false },
+});
 
 /** Role is stated as text, never carried by colour alone (WCAG 1.4.1). */
 const ROLE_LABEL: Record<MessageRole, string> = {
@@ -92,9 +89,11 @@ export interface MessageCardProps
 }
 
 /**
- * One conversation turn: a header naming the author, the content, and the
- * actions grouped under it. The role remains the article's accessible name,
- * while the visible name is the model that answered when the caller knows it.
+ * One conversation turn: a header naming the author, the content in a card,
+ * and the actions grouped under that card. The header and actions live outside
+ * the card so the bubble carries only what was said. The role remains the
+ * article's accessible name, while the visible name is the model that answered
+ * when the caller knows it.
  *
  * Assistant text renders as safe Markdown; user and system text stays literal,
  * because that is what the author typed.
@@ -148,13 +147,16 @@ export function MessageCard({
       {...props}
       ref={ref}
       aria-label={label}
-      className={cn(messageCardVariants({ role, selected, editable }), className)}
+      className={cn(
+        'flex max-w-[85%] flex-col gap-2 rounded-lg text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+        role === 'user' ? 'self-end' : 'self-start',
+      )}
     >
-      <header className="mb-2 flex items-center gap-2">
+      <header className="flex min-w-0 items-center gap-2">
         {avatar !== undefined && (
           <span
             aria-hidden="true"
-            className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-subtle text-foreground-secondary"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-subtle text-foreground-secondary"
           >
             {avatar}
           </span>
@@ -172,17 +174,19 @@ export function MessageCard({
           {timestamp}
         </time>
       </header>
-      {quotedExcerpt !== undefined && (
-        <div className="mb-2 border-s-2 border-border-strong ps-2">
-          <p className="text-xs font-semibold tracking-wide text-foreground-muted uppercase">
-            {quotedRelation === 'edited-from' ? resolved.quoteEditedLabel : resolved.quoteLabel}
-          </p>
-          <p className="line-clamp-3 whitespace-pre-wrap text-xs text-foreground-secondary">
-            {quotedExcerpt === null ? resolved.quoteUnavailable : quotedExcerpt}
-          </p>
-        </div>
-      )}
-      <MessageBody role={role} content={content} resolved={resolved} streaming={streaming} />
+      <div className={cn(messageCardVariants({ role, selected, editable }), className)}>
+        {quotedExcerpt !== undefined && (
+          <div className="mb-2 border-s-2 border-border-strong ps-2">
+            <p className="text-xs font-semibold tracking-wide text-foreground-muted uppercase">
+              {quotedRelation === 'edited-from' ? resolved.quoteEditedLabel : resolved.quoteLabel}
+            </p>
+            <p className="line-clamp-3 whitespace-pre-wrap text-xs text-foreground-secondary">
+              {quotedExcerpt === null ? resolved.quoteUnavailable : quotedExcerpt}
+            </p>
+          </div>
+        )}
+        <MessageBody role={role} content={content} resolved={resolved} streaming={streaming} />
+      </div>
       <MessageActions
         resolved={resolved}
         icons={icons}
