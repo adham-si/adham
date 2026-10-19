@@ -229,7 +229,13 @@ function MessageBody({
       {content.parts.map((part, index) => {
         if (part.type === 'text') {
           return role === 'assistant' ? (
-            <Markdown key={index} source={part.text} labels={resolved} copyIcon={copyIcon} />
+            <Markdown
+              key={index}
+              source={part.text}
+              labels={resolved}
+              copyIcon={copyIcon}
+              streaming={streaming}
+            />
           ) : (
             <p key={index} className="whitespace-pre-wrap">
               {part.text}

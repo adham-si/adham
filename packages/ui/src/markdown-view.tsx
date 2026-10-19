@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { cn } from './cn';
+import { CodeBlock } from './markdown-code';
 import { parseMarkdown, type InlineToken, type ListItem, type MarkdownBlock } from './markdown';
-import { useClipboardCopy } from './use-clipboard-copy';
 
 /** User-facing strings the renderer needs; the app passes localized copies. */
 export interface MarkdownLabels {
@@ -77,6 +77,8 @@ export interface MarkdownProps {
   /** Glyph for the fenced-block copy control; without it the control shows its
    *  word instead (the UI package ships no icon set). */
   copyIcon?: React.ReactNode | undefined;
+  /** Keeps code plain until the answer settles, then tokenizes it once. */
+  streaming?: boolean | undefined;
   className?: string;
 }
 
@@ -85,7 +87,14 @@ export interface MarkdownProps {
  * HTML in model output stays visible text. Parsing happens per render, so a
  * partial (streaming) document renders as far as it is complete.
  */
-export function Markdown({ source, labels, onOpenLink, copyIcon, className }: MarkdownProps) {
+export function Markdown({
+  source,
+  labels,
+  onOpenLink,
+  copyIcon,
+  streaming,
+  className,
+}: MarkdownProps) {
   const blocks = React.useMemo(() => parseMarkdown(source), [source]);
   const resolved = React.useMemo(() => resolveMarkdownLabels(labels), [labels]);
 
@@ -98,6 +107,7 @@ export function Markdown({ source, labels, onOpenLink, copyIcon, className }: Ma
           labels={resolved}
           onOpenLink={onOpenLink}
           copyIcon={copyIcon}
+          streaming={streaming}
         />
       ))}
     </div>
@@ -109,11 +119,13 @@ function BlockView({
   labels,
   onOpenLink,
   copyIcon,
+  streaming,
 }: {
   block: MarkdownBlock;
   labels: MarkdownLabels;
   onOpenLink?: ((url: string) => void) | undefined;
   copyIcon?: React.ReactNode | undefined;
+  streaming?: boolean | undefined;
 }) {
   switch (block.kind) {
     case 'paragraph':
@@ -146,6 +158,7 @@ function BlockView({
           language={block.language}
           labels={labels}
           copyIcon={copyIcon}
+          streaming={streaming}
         />
       );
     case 'list': {
@@ -165,6 +178,7 @@ function BlockView({
               labels={labels}
               onOpenLink={onOpenLink}
               copyIcon={copyIcon}
+              streaming={streaming}
             />
           ))}
         </List>
@@ -181,6 +195,7 @@ function BlockView({
                 labels={labels}
                 onOpenLink={onOpenLink}
                 copyIcon={copyIcon}
+                streaming={streaming}
               />
             ))}
           </div>
@@ -233,11 +248,13 @@ function ListItemView({
   labels,
   onOpenLink,
   copyIcon,
+  streaming,
 }: {
   item: ListItem;
   labels: MarkdownLabels;
   onOpenLink?: ((url: string) => void) | undefined;
   copyIcon?: React.ReactNode | undefined;
+  streaming?: boolean | undefined;
 }) {
   return (
     <li className="whitespace-pre-wrap">
@@ -251,6 +268,7 @@ function ListItemView({
               labels={labels}
               onOpenLink={onOpenLink}
               copyIcon={copyIcon}
+              streaming={streaming}
             />
           ))}
         </div>
@@ -362,52 +380,5 @@ function LinkView({
         </span>
       )}
     </span>
-  );
-}
-
-function CodeBlock({
-  source,
-  language,
-  labels,
-  copyIcon,
-}: {
-  source: string;
-  language: string;
-  labels: MarkdownLabels;
-  copyIcon?: React.ReactNode | undefined;
-}) {
-  const { state: copyState, copy } = useClipboardCopy();
-
-  return (
-    <figure className="overflow-hidden rounded-lg border border-border-subtle bg-surface-subtle">
-      <figcaption className="flex items-center justify-between gap-2 border-b border-border-subtle px-3 py-1">
-        <span className="font-mono text-xs text-foreground-muted" dir="ltr">
-          {language || labels.codeLabel}
-        </span>
-        <span className="flex items-center gap-2">
-          <button
-            type="button"
-            className="flex min-h-control-sm min-w-8 items-center justify-center gap-1 rounded-md px-2 text-xs text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            aria-label={labels.copyCode}
-            title={labels.copyCode}
-            onClick={() => {
-              void copy(source);
-            }}
-          >
-            {copyIcon ?? labels.copyCode}
-          </button>
-          <span role="status" className="text-xs text-foreground-muted">
-            {copyState === 'copied'
-              ? labels.copied
-              : copyState === 'failed'
-                ? labels.copyFailed
-                : ''}
-          </span>
-        </span>
-      </figcaption>
-      <pre className="max-h-[60vh] overflow-auto px-3 py-3 font-mono text-xs leading-5" dir="ltr">
-        <code>{source}</code>
-      </pre>
-    </figure>
   );
 }

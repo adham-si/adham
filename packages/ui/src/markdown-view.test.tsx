@@ -54,6 +54,16 @@ describe('Markdown rendering', () => {
     expect(pre?.className).toContain('overflow-auto');
   });
 
+  it('keeps code plain while streaming and colors it once settled', () => {
+    const source = '```ts\nconst x = 1;\n```';
+    const { container, rerender } = render(<Markdown source={source} streaming />);
+    expect(container.querySelectorAll('code .token')).toHaveLength(0);
+
+    rerender(<Markdown source={source} />);
+    expect(container.querySelector('pre')?.textContent).toBe('const x = 1;');
+    expect(container.querySelector('code .token.keyword')).not.toBeNull();
+  });
+
   it('copies code through the clipboard and reports success', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     stubClipboard(writeText);

@@ -56,6 +56,15 @@ export const SEMANTIC_VARS = [
   'running',
   'running-surface',
   'running-foreground',
+  'syntax-plain',
+  'syntax-comment',
+  'syntax-keyword',
+  'syntax-string',
+  'syntax-function',
+  'syntax-number',
+  'syntax-tag',
+  'syntax-property',
+  'syntax-operator',
 ] as const;
 
 export type ThemeVar = (typeof SEMANTIC_VARS)[number];
