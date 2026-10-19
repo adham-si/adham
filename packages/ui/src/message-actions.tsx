@@ -208,24 +208,40 @@ function FeedbackReason({
   resolved: MarkdownLabels;
 }) {
   const [draft, setDraft] = React.useState<string | null>(null);
+  const value = draft ?? feedback.reason ?? '';
+
+  const save = () => {
+    // Trimmed now so what is shown is what will be stored; the draft
+    // stays until a response replaces the stored value.
+    const reason = value.trim();
+    setDraft(reason);
+    onFeedback(feedback.verdict, reason);
+  };
 
   return (
-    <input
-      type="text"
-      aria-label={resolved.feedbackReason}
-      placeholder={resolved.feedbackReason}
-      value={draft ?? feedback.reason ?? ''}
-      onChange={(event) => setDraft(event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        // Trimmed now so what is shown is what will be stored; the draft
-        // stays until a response replaces the stored value.
-        const reason = (draft ?? feedback.reason ?? '').trim();
-        setDraft(reason);
-        onFeedback(feedback.verdict, reason);
-      }}
-      className="w-full rounded-sm border border-border-subtle bg-surface-muted px-2 py-1 text-xs text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-    />
+    <div className="mt-1 flex w-full max-w-sm flex-col gap-2 self-end rounded-lg border border-border-subtle bg-surface-subtle p-3 text-start">
+      <div className="flex flex-col gap-0.5">
+        <p className="text-xs font-medium text-foreground">{resolved.feedbackTitle}</p>
+        <p className="text-xs text-foreground-muted">{resolved.feedbackLocalNote}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          aria-label={resolved.feedbackReason}
+          placeholder={resolved.feedbackReason}
+          value={value}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            save();
+          }}
+          className="min-w-0 flex-1 rounded-sm border border-border-subtle bg-surface px-2 py-1 text-xs text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        />
+        <Button type="button" size="xs" variant="secondary" onClick={save}>
+          {resolved.feedbackSave}
+        </Button>
+      </div>
+    </div>
   );
 }

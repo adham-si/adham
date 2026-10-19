@@ -148,8 +148,8 @@ export function MessageCard({
       ref={ref}
       aria-label={label}
       className={cn(
-        'flex max-w-[85%] flex-col gap-2 rounded-lg text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-        role === 'user' ? 'self-end' : 'self-start',
+        'flex min-w-0 flex-col gap-2 rounded-lg text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+        role === 'user' ? 'max-w-full self-end' : 'w-full self-start',
       )}
     >
       <header className="flex min-w-0 items-center gap-2">

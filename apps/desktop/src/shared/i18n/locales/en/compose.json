@@ -74,7 +74,10 @@
       "branchMakeActive": "Make active",
       "likeAnswer": "Like this answer",
       "dislikeAnswer": "Dislike this answer",
-      "feedbackReason": "Reason (optional)",
+      "feedbackReason": "Add a note (optional)",
+      "feedbackTitle": "Answer feedback",
+      "feedbackLocalNote": "Stored on this device with this answer — never sent to the model.",
+      "feedbackSave": "Save",
       "moreActions": "More actions"
     },
     "noModelAvailable": "No model available",

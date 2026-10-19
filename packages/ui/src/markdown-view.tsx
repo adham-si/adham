@@ -33,6 +33,12 @@ export interface MarkdownLabels {
   dislikeAction: string;
   /** Label and placeholder of the optional feedback reason field. */
   feedbackReason: string;
+  /** Heading of the optional feedback note panel. */
+  feedbackTitle: string;
+  /** States that the note stays on the device and never reaches the model. */
+  feedbackLocalNote: string;
+  /** Action that saves the feedback note. */
+  feedbackSave: string;
   /** Action that asks the model for another answer to the same prompt. */
   regenerateAction: string;
   /** Accessible name of the ⋮ trigger that opens the remaining actions. */
@@ -56,7 +62,10 @@ export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   quoteUnavailable: 'Quoted message is not in the loaded history.',
   likeAction: 'Like',
   dislikeAction: 'Dislike',
-  feedbackReason: 'Reason (optional)',
+  feedbackReason: 'Add a note (optional)',
+  feedbackTitle: 'Answer feedback',
+  feedbackLocalNote: 'Stored on this device with this answer — never sent to the model.',
+  feedbackSave: 'Save',
   regenerateAction: 'Regenerate',
   moreActions: 'More actions',
 };

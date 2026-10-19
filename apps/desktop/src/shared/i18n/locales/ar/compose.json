@@ -77,7 +77,10 @@
       "branchMakeActive": "تعيين كنشط",
       "likeAnswer": "أعجبني هذا الرد",
       "dislikeAnswer": "لم يعجبني هذا الرد",
-      "feedbackReason": "السبب (اختياري)",
+      "feedbackReason": "أضف ملاحظة (اختياري)",
+      "feedbackTitle": "ملاحظات على الإجابة",
+      "feedbackLocalNote": "تُحفظ على هذا الجهاز مع هذه الإجابة — ولا تُرسل إلى النموذج.",
+      "feedbackSave": "حفظ",
       "moreActions": "إجراءات أخرى"
     },
     "noModelAvailable": "لا يوجد نموذج متاح",

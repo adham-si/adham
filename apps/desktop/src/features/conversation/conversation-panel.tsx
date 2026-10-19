@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
+  ArrowDownToLineIcon,
   BotMessageSquareIcon,
   CopyIcon,
   MoreVerticalIcon,
@@ -151,6 +152,9 @@ export function ConversationPanel({
       likeAction: t('compose.markdown.likeAnswer'),
       dislikeAction: t('compose.markdown.dislikeAnswer'),
       feedbackReason: t('compose.markdown.feedbackReason'),
+      feedbackTitle: t('compose.markdown.feedbackTitle'),
+      feedbackLocalNote: t('compose.markdown.feedbackLocalNote'),
+      feedbackSave: t('compose.markdown.feedbackSave'),
       regenerateAction: t('conversation.regenerateAnswer'),
       moreActions: t('compose.markdown.moreActions'),
     }),
@@ -776,7 +780,7 @@ export function ConversationPanel({
           isEmpty ? 'max-h-0 flex-0 opacity-0 pointer-events-none' : 'flex-1 opacity-100'
         }`}
       >
-        <div className="flex w-full flex-1 flex-col gap-4 p-4">
+        <div className="flex w-full flex-1 flex-col gap-6 p-4">
           {conv.messages.map((m) => {
             const note = messageNote(m, t);
             const alternative = alternatives.get(m.id);
@@ -918,9 +922,11 @@ export function ConversationPanel({
             <button
               type="button"
               onClick={scrollToLatest}
-              className="sticky bottom-0 self-end rounded-full border border-border-subtle bg-surface-subtle px-3 py-1 text-xs text-foreground-secondary shadow-sm hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              aria-label={t('conversation.jumpToLatest')}
+              title={t('conversation.jumpToLatest')}
+              className="sticky bottom-0 flex size-8 items-center justify-center self-end rounded-full border border-border-subtle bg-surface-subtle text-foreground-secondary shadow-sm hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
-              {t('conversation.jumpToLatest')}
+              <HugeiconsIcon icon={ArrowDownToLineIcon} className="size-4" />
             </button>
           )}
         </div>

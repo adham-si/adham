@@ -73,7 +73,10 @@
       "branchMakeActive": "设为当前",
       "likeAnswer": "喜欢此回答",
       "dislikeAnswer": "不喜欢此回答",
-      "feedbackReason": "原因（可选）",
+      "feedbackReason": "添加备注（可选）",
+      "feedbackTitle": "回答反馈",
+      "feedbackLocalNote": "仅保存在此设备上，不会发送给模型。",
+      "feedbackSave": "保存",
       "moreActions": "更多操作"
     },
     "noModelAvailable": "暂无可用模型",

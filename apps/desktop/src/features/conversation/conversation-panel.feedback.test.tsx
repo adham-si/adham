@@ -42,6 +42,7 @@ describe('ConversationPanel answer feedback', () => {
     backend.setAnswerFeedback = vi
       .fn()
       .mockResolvedValueOnce([{ messageId: 'msg-a', verdict: 'like', reason: null }])
+      .mockResolvedValueOnce([{ messageId: 'msg-a', verdict: 'like', reason: 'clear' }])
       .mockResolvedValueOnce([{ messageId: 'msg-a', verdict: 'dislike', reason: null }])
       .mockResolvedValueOnce([]);
     render(<ConversationPanel backend={backend} provider={registryProvider()} />);
@@ -51,7 +52,7 @@ describe('ConversationPanel answer feedback', () => {
     const dislike = within(card).getByRole('button', { name: 'Dislike this answer' });
     // Nothing stored yet: nothing is pressed, and there is no reason field.
     expect(like.getAttribute('aria-pressed')).toBe('false');
-    expect(within(card).queryByRole('textbox', { name: 'Reason (optional)' })).toBeNull();
+    expect(within(card).queryByRole('textbox', { name: 'Add a note (optional)' })).toBeNull();
 
     await user.click(like);
     expect(backend.setAnswerFeedback).toHaveBeenCalledWith(
@@ -65,7 +66,19 @@ describe('ConversationPanel answer feedback', () => {
     // Only the stored verdict is ever pressed.
     await waitFor(() => expect(like.getAttribute('aria-pressed')).toBe('true'));
     expect(dislike.getAttribute('aria-pressed')).toBe('false');
-    expect(within(card).getByRole('textbox', { name: 'Reason (optional)' })).toBeDefined();
+    expect(within(card).getByRole('textbox', { name: 'Add a note (optional)' })).toBeDefined();
+
+    // The note also saves from its explicit action, not only Enter.
+    await user.type(within(card).getByRole('textbox', { name: 'Add a note (optional)' }), 'clear');
+    await user.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(backend.setAnswerFeedback).toHaveBeenLastCalledWith(
+      'ws-1',
+      'proj-1',
+      'sess-1',
+      'msg-a',
+      'like',
+      'clear',
+    );
 
     await user.click(dislike);
     await waitFor(() => expect(dislike.getAttribute('aria-pressed')).toBe('true'));
@@ -82,7 +95,7 @@ describe('ConversationPanel answer feedback', () => {
       null,
     );
     await waitFor(() => expect(dislike.getAttribute('aria-pressed')).toBe('false'));
-    expect(within(card).queryByRole('textbox', { name: 'Reason (optional)' })).toBeNull();
+    expect(within(card).queryByRole('textbox', { name: 'Add a note (optional)' })).toBeNull();
   });
 
   it('keeps a stored verdict pressed on load and states a refused save', async () => {
@@ -128,7 +141,7 @@ describe('ConversationPanel answer feedback', () => {
     expect(like.getAttribute('aria-pressed')).toBe('false');
 
     // The optional reason saves on Enter, on top of the current verdict.
-    const reason = within(card).getByRole('textbox', { name: 'Reason (optional)' });
+    const reason = within(card).getByRole('textbox', { name: 'Add a note (optional)' });
     await user.type(reason, 'too generic{Enter}');
     expect(backend.setAnswerFeedback).toHaveBeenCalledWith(
       'ws-1',

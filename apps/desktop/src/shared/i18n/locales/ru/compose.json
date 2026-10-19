@@ -76,7 +76,10 @@
       "branchMakeActive": "Сделать активным",
       "likeAnswer": "Нравится этот ответ",
       "dislikeAnswer": "Не нравится этот ответ",
-      "feedbackReason": "Причина (необязательно)",
+      "feedbackReason": "Добавить заметку (необязательно)",
+      "feedbackTitle": "Отзыв об ответе",
+      "feedbackLocalNote": "Хранится на этом устройстве вместе с ответом — не отправляется модели.",
+      "feedbackSave": "Сохранить",
       "moreActions": "Другие действия"
     },
     "noModelAvailable": "Нет доступной модели",
