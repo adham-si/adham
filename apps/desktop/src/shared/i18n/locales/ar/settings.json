@@ -92,8 +92,7 @@
       "chipEnabled": "مُفعّل",
       "enableAll": "تفعيل الكل",
       "disableAll": "إيقاف الكل",
-      "enabledInChatLabel": "مُفعّل في المحادثة",
-      "noVision": "النموذج النشط لا يدعم الرؤية"
+      "enabledInChatLabel": "مُفعّل في المحادثة"
     },
     "storage": {
       "title": "التخزين والنسخ الاحتياطي",

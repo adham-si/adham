@@ -92,8 +92,7 @@
       "chipEnabled": "Включённые",
       "enableAll": "Включить все",
       "disableAll": "Выключить все",
-      "enabledInChatLabel": "Доступно в чате",
-      "noVision": "У активной модели нет зрения"
+      "enabledInChatLabel": "Доступно в чате"
     },
     "storage": {
       "title": "Хранилище и Копии",

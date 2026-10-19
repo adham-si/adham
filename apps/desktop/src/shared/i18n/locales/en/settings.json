@@ -92,8 +92,7 @@
       "chipEnabled": "Enabled",
       "enableAll": "Enable all",
       "disableAll": "Disable all",
-      "enabledInChatLabel": "Enabled in chat",
-      "noVision": "Active model has no vision"
+      "enabledInChatLabel": "Enabled in chat"
     },
     "storage": {
       "title": "Storage & Backup",

@@ -92,8 +92,7 @@
       "chipEnabled": "已启用",
       "enableAll": "全部启用",
       "disableAll": "全部停用",
-      "enabledInChatLabel": "在聊天中启用",
-      "noVision": "当前模型不支持视觉输入"
+      "enabledInChatLabel": "在聊天中启用"
     },
     "storage": {
       "title": "存储与备份",

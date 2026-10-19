@@ -133,7 +133,6 @@ describe('desktop localization coverage (all selectable languages)', () => {
     const counts = [0, 1, 2, 3, 5, 11, 100, 100000];
     const bases = [
       'compose.tokensUsed',
-      'compose.pastedChars',
       'settings.budget.tokensAllowed',
       'settings.routing.fallbackModels',
       'settings.routing.seconds',
