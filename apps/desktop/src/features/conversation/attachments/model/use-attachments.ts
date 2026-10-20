@@ -38,7 +38,7 @@ function nextKey(): string {
   return `attachment-${localCounter}`;
 }
 
-function metaOf(dto: AttachmentDto): MessageAttachmentDto {
+export function messageAttachmentOf(dto: AttachmentDto): MessageAttachmentDto {
   return {
     attachmentId: dto.attachmentId,
     fileName: dto.fileName,
@@ -92,7 +92,7 @@ export function useAttachments({
         });
         patch(key, {
           status: 'ready',
-          meta: metaOf(dto),
+          meta: messageAttachmentOf(dto),
           byteSize: dto.byteSize,
           charCount: dto.extractedChars,
         });
@@ -117,7 +117,7 @@ export function useAttachments({
         });
         patch(key, {
           status: 'ready',
-          meta: metaOf(dto),
+          meta: messageAttachmentOf(dto),
           byteSize: dto.byteSize,
           charCount: dto.extractedChars,
         });
@@ -164,7 +164,11 @@ export function useAttachments({
     setItems((prev) => prev.filter((item) => item.key !== key));
   }, []);
 
-  const clear = React.useCallback(() => setItems([]), []);
+  /** Clears only the selections a send actually carried: files added while that
+   *  dispatch was in flight stay in the composer for the next turn. */
+  const clear = React.useCallback((keys: readonly string[]) => {
+    setItems((prev) => prev.filter((item) => !keys.includes(item.key)));
+  }, []);
 
   // A session switch drops the previous session's selections. The null →
   // session transition is the lazy first-send creation: those files ride into

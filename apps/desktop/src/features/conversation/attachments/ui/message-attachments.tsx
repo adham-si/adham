@@ -59,41 +59,42 @@ export function MessageAttachments({
         aria-label={t('attachments.sentLabel')}
         className="flex flex-wrap items-center gap-2"
       >
-        {attachments.map((item) => (
-          <li
-            key={item.attachmentId}
-            className="flex items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground-secondary"
-          >
-            <HugeiconsIcon icon={DocumentCodeIcon} className="size-4 shrink-0" />
-            <span className="max-w-44 truncate font-medium text-foreground" title={item.fileName}>
-              {item.fileName}
-            </span>
-            <span className="text-xs text-foreground-muted">
-              {t('compose.charsCompact', {
-                count: item.extractedChars,
-                formatted: formatNumber(item.extractedChars / 1000, undefined, {
-                  minimumFractionDigits: 1,
-                  maximumFractionDigits: 1,
-                }),
-              })}
-            </span>
-            {item.truncated && (
-              <span className="rounded-sm border border-border-subtle px-1 text-xs text-foreground-muted">
-                {t('attachments.truncated')}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => toggle(item.attachmentId)}
-              aria-expanded={openId === item.attachmentId}
-              className="ms-1 rounded-sm px-1 text-xs text-foreground-muted underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
-            >
-              {openId === item.attachmentId
-                ? t('attachments.previewHide')
-                : t('attachments.previewShow')}
-            </button>
-          </li>
-        ))}
+        {attachments.map((item) => {
+          const open = openId === item.attachmentId;
+          return (
+            <li key={item.attachmentId}>
+              <button
+                type="button"
+                onClick={() => toggle(item.attachmentId)}
+                aria-expanded={open}
+                title={open ? t('attachments.previewHide') : t('attachments.previewShow')}
+                className="flex max-w-full items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-start text-xs text-foreground-secondary transition-colors hover:border-border hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+              >
+                <HugeiconsIcon icon={DocumentCodeIcon} className="size-4 shrink-0" />
+                <span
+                  className="max-w-44 truncate font-medium text-foreground"
+                  title={item.fileName}
+                >
+                  {item.fileName}
+                </span>
+                <span className="text-xs text-foreground-muted">
+                  {t('compose.charsCompact', {
+                    count: item.extractedChars,
+                    formatted: formatNumber(item.extractedChars / 1000, undefined, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    }),
+                  })}
+                </span>
+                {item.truncated && (
+                  <span className="rounded-sm border border-border-subtle px-1 text-xs text-foreground-muted">
+                    {t('attachments.truncated')}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
       {open && (
         <div className="rounded-md border border-border-subtle bg-surface-subtle p-2">

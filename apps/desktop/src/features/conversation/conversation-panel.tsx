@@ -19,6 +19,7 @@ import {
   type MarkdownLabels,
   type MessageActionIcons,
 } from '@adham/ui';
+import type { MessageAttachmentDto } from '@adham/contracts-generated';
 import {
   Composer,
   EmptyWelcome,
@@ -485,6 +486,8 @@ export function ConversationPanel({
       reference?: UiMessageReference,
       attachmentIds: string[] = [],
       pendingFiles: PendingFile[] = [],
+      attachmentMetas: MessageAttachmentDto[] = [],
+      onAccepted?: () => void,
     ) => {
       setSubmitError(null);
       const refusedReference = reference !== undefined && !streamReady;
@@ -509,6 +512,8 @@ export function ConversationPanel({
               reference,
               attachmentIds,
               pendingFiles,
+              attachmentMetas,
+              onAccepted,
             )
           : await conv.submit(sent);
       // A rejected dispatch (a refused reply, an undocumented think value) must
@@ -535,8 +540,17 @@ export function ConversationPanel({
       reference?: UiMessageReference,
       attachmentIds: string[] = [],
       pendingFiles: PendingFile[] = [],
+      attachmentMetas: MessageAttachmentDto[] = [],
+      onAccepted?: () => void,
     ) => {
-      let outcome = await dispatchTurn(sent, reference, attachmentIds, pendingFiles);
+      let outcome = await dispatchTurn(
+        sent,
+        reference,
+        attachmentIds,
+        pendingFiles,
+        attachmentMetas,
+        onAccepted,
+      );
       // The reference is acknowledged only when its dispatch was accepted; a
       // refused send keeps the pending reference so it can be retried as one.
       if (outcome.ok && reference) {
@@ -625,6 +639,12 @@ export function ConversationPanel({
     const readyIds = attachments.readyIds;
     const pendingFiles = attachments.pendingFiles;
     const hasFiles = attachments.items.length > 0;
+    // The exact selections this send carries: only these leave the composer
+    // once the turn is accepted (a file added meanwhile stays for next turn).
+    const sentKeys = attachments.items.map((item) => item.key);
+    const readyMetas = attachments.items.flatMap((item) =>
+      item.status === 'ready' && item.meta ? [item.meta] : [],
+    );
     // An attachment-only send is valid; text-only needs text.
     if (!text && !hasFiles) return;
     // A selection that is unreadable, still being read, or has no model to
@@ -672,10 +692,13 @@ export function ConversationPanel({
     // user bubble appears and the turn persists), and a follow-up typed while
     // the answer streams must not append to an already-sent instruction.
     if (draftRef.current === text) commitPrompt(text);
-    const outcome = await dispatchAndDrain(text, reference, readyIds, pendingFiles);
-    // The files were linked to the persisted turn; the composer selection is
-    // done. A refusal keeps them so the same send can be retried.
-    if (outcome.ok && hasFiles) attachments.clear();
+    // The composer clears when the backend accepts the turn — not when the
+    // answer settles. Waiting for the stream made a sent file look unsent for
+    // the whole generation. A refusal never reaches onAccepted, so its files
+    // stay for the retry.
+    await dispatchAndDrain(text, reference, readyIds, pendingFiles, readyMetas, () =>
+      attachments.clear(sentKeys),
+    );
   }, [
     attachments,
     busy,
@@ -796,6 +819,14 @@ export function ConversationPanel({
                   avatar={isAssistant ? ASSISTANT_AVATAR : USER_AVATAR}
                   icons={MESSAGE_ICONS}
                   content={contentFromText(m.text)}
+                  leading={
+                    !isAssistant && (m.attachments?.length ?? 0) > 0 ? (
+                      <MessageAttachments
+                        attachments={m.attachments!}
+                        readText={backend.readAttachmentText ? readAttachmentText : undefined}
+                      />
+                    ) : undefined
+                  }
                   labels={
                     canRegenerate && turnAction.verb === 'retry'
                       ? { ...markdownLabels, regenerateAction: t('conversation.retryTurn') }
@@ -861,16 +892,6 @@ export function ConversationPanel({
                         }
                   }
                 />
-                {/* The files this message was sent with, read from the stored
-                    link rows. A chip exists because the turn carried it; the
-                    preview reads back the exact extracted text. */}
-                {!isAssistant && (m.attachments?.length ?? 0) > 0 && (
-                  <MessageAttachments
-                    attachments={m.attachments!}
-                    readText={backend.readAttachmentText ? readAttachmentText : undefined}
-                    className="self-end px-1"
-                  />
-                )}
                 {note && (
                   <p
                     role="status"

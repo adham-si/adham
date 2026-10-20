@@ -41,6 +41,10 @@ export interface MessageCardProps
   role: MessageRole;
   /** Typed message content. Schema 1 is a text part; unknown parts render inert. */
   content: MessageContent;
+  /** Optional content inside the card above the quote/body (e.g. the files a
+   *  user turn was sent with). Kept inside the bubble so it reads as part of
+   *  the message, not a detached row. */
+  leading?: React.ReactNode;
   /** Formatted timestamp. Rendered in a <time> element. */
   timestamp: string;
   /** Machine-readable timestamp for the <time> element's dateTime. */
@@ -109,6 +113,7 @@ export function MessageCard({
   name,
   avatar,
   labels,
+  leading,
   selected = false,
   editable = false,
   onReply,
@@ -175,6 +180,7 @@ export function MessageCard({
         </time>
       </header>
       <div className={cn(messageCardVariants({ role, selected, editable }), className)}>
+        {leading !== undefined && <div className="mb-2">{leading}</div>}
         {quotedExcerpt !== undefined && (
           <div className="mb-2 border-s-2 border-border-strong ps-2">
             <p className="text-xs font-semibold tracking-wide text-foreground-muted uppercase">

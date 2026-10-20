@@ -2,6 +2,7 @@ export { AttachmentPicker } from './ui/attachment-picker';
 export { MessageAttachments } from './ui/message-attachments';
 export {
   useAttachments,
+  messageAttachmentOf,
   type AttachmentScope,
   type ComposeAttachment,
 } from './model/use-attachments';

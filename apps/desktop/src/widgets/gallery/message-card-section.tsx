@@ -11,10 +11,24 @@ import {
   UserIcon,
 } from '@hugeicons/core-free-icons';
 import { contentFromText, MessageCard, type MessageActionIcons } from '@adham/ui';
+import type { MessageAttachmentDto } from '@adham/contracts-generated';
+import { MessageAttachments } from '@/features/conversation/attachments';
 import { GallerySection } from './gallery-section';
 
 const DEMO_TIMESTAMP = '10:00 AM';
 const DEMO_ISO = '2026-10-07T10:00:00Z';
+const DEMO_ATTACHMENTS: MessageAttachmentDto[] = [
+  {
+    attachmentId: 'demo-attachment',
+    fileName: 'notes.md',
+    mediaType: 'text/markdown',
+    byteSize: 7,
+    contentHash: 'demo-hash',
+    hashAlgorithm: 'blake3',
+    extractedChars: 2500,
+    truncated: false,
+  },
+];
 
 /** Demo glyphs: the app supplies these nodes to the icon-set-free card. */
 const DEMO_ICONS: MessageActionIcons = {
@@ -36,6 +50,7 @@ export function MessageCardSection() {
         avatar={<HugeiconsIcon icon={UserIcon} className="size-5" />}
         icons={DEMO_ICONS}
         content={contentFromText(t('gallery.messages.user'))}
+        leading={<MessageAttachments attachments={DEMO_ATTACHMENTS} />}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
         onReply={() => {}}

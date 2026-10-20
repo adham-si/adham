@@ -1,5 +1,9 @@
 import * as React from 'react';
-import type { CompletionStartDto, StreamEventDto } from '@adham/contracts-generated';
+import type {
+  CompletionStartDto,
+  MessageAttachmentDto,
+  StreamEventDto,
+} from '@adham/contracts-generated';
 import i18n from '@/shared/i18n';
 import { sendBlockedReason } from './conversation-identity';
 import {
@@ -11,7 +15,7 @@ import {
 import { persistAndAnnounceActiveSession } from './durable-session-storage';
 import { pendingFirstSendBlockedReason, prepareLazyFirstSend } from './lazy-session-creation';
 import { clearDurablePendingOperation } from './pending-recovery/durable-pending-operations';
-import { attachmentErrorCode, type PendingFile } from './attachments';
+import { attachmentErrorCode, messageAttachmentOf, type PendingFile } from './attachments';
 import type {
   ConversationStatus,
   StreamingSnapshot,
@@ -104,6 +108,9 @@ export function useConversationStream(deps: StreamDeps) {
       /** Starts the op and resolves with the durable start handle. May do
        *  post-write bookkeeping (first-send identity) before returning. */
       dispatch: (onEvent: (event: StreamEventDto) => void) => Promise<CompletionStartDto>;
+      /** Ends once the backend has accepted the turn (before the answer
+       *  settles): the send boundary, for clearing composer selections. */
+      onAccepted?: (() => void) | undefined;
       /** Runs when the dispatch threw before any terminal: the send path
        *  removes its optimistic bubble and dismisses its tracked identity. */
       onDispatchFailure: () => Promise<void> | void;
@@ -120,6 +127,12 @@ export function useConversationStream(deps: StreamDeps) {
 
       let opId: string | null = null;
       let terminalSeen = false;
+      let accepted = false;
+      const acceptDispatch = () => {
+        if (accepted) return;
+        accepted = true;
+        opts.onAccepted?.();
+      };
       let resolveTerminal!: (completion: 'completed' | 'interrupted' | 'failed') => void;
       const terminalPromise = new Promise<'completed' | 'interrupted' | 'failed'>((resolve) => {
         resolveTerminal = resolve;
@@ -130,6 +143,9 @@ export function useConversationStream(deps: StreamDeps) {
           if (!mountedRef.current || generationRef.current !== generation) return;
           if (opId === null) {
             opId = event.opId;
+            // The first frame exists only after the submitted turn is
+            // durable: that is the send boundary, not the answer's end.
+            acceptDispatch();
             const state = streamingRef.current;
             if (state) setStreaming({ ...state, opId: event.opId });
             // A Stop clicked before the op handle arrived is effectuated
@@ -179,6 +195,9 @@ export function useConversationStream(deps: StreamDeps) {
         if (mountedRef.current && generationRef.current === generation) {
           setOmittedMessages(start.context?.droppedMessages ?? 0);
         }
+        // Fallback: a backend that returned a start handle without a first
+        // frame has still accepted the turn.
+        acceptDispatch();
         await terminalPromise;
         // Handoff ordering is atomic in the render sense: the live bubble is
         // dropped BEFORE the authoritative rows land, and on a failed history
@@ -256,6 +275,10 @@ export function useConversationStream(deps: StreamDeps) {
       /** Selections made before the session existed; ingested now so the turn
        *  carries exactly what the composer showed. */
       pendingFiles: PendingFile[] = [],
+      /** Already-stored selections, for the optimistic bubble. */
+      attachmentMetas: MessageAttachmentDto[] = [],
+      /** Accepted (persisted), not merely uploaded: clear the composer here. */
+      onAccepted?: () => void,
     ): Promise<SubmitOutcome> => {
       const trimmed = text.trim();
       if (!trimmed && attachmentIds.length === 0 && pendingFiles.length === 0)
@@ -327,6 +350,7 @@ export function useConversationStream(deps: StreamDeps) {
       // the session this send materialized. A refusal refuses the whole send:
       // nothing is dispatched without the file it was sent with.
       let resolvedIds = attachmentIds;
+      const optimisticAttachments: MessageAttachmentDto[] = [...attachmentMetas];
       if (pendingFiles.length > 0) {
         const ingest = backend.ingestAttachment;
         const ingestPath = backend.ingestAttachmentPath;
@@ -340,12 +364,14 @@ export function useConversationStream(deps: StreamDeps) {
                 text: file.text,
               });
               resolvedIds.push(dto.attachmentId);
+              optimisticAttachments.push(messageAttachmentOf(dto));
             } else {
               if (!ingestPath) throw new Error('VALIDATION_FAILED: attachment.unreadable');
               const dto = await ingestPath(ctx.workspaceId, ctx.projectId, sessionId, {
                 filePath: file.filePath,
               });
               resolvedIds.push(dto.attachmentId);
+              optimisticAttachments.push(messageAttachmentOf(dto));
             }
           }
         } catch (error) {
@@ -384,6 +410,7 @@ export function useConversationStream(deps: StreamDeps) {
           text: trimmed,
           createdAt: new Date().toISOString(),
           reference: reference ?? null,
+          ...(optimisticAttachments.length > 0 ? { attachments: optimisticAttachments } : {}),
           provisional: true,
         },
       ]);
@@ -392,6 +419,7 @@ export function useConversationStream(deps: StreamDeps) {
         ctx,
         sessionId,
         generation,
+        onAccepted,
         dispatch: async (onEvent) => {
           const start = await completeOnceStreaming(
             ctx.workspaceId,

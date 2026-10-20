@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConversationPanel } from './conversation-panel';
 import { fakeBackend, registryProvider, pickRegistryModel } from './conversation-panel-test-utils';
@@ -204,6 +204,42 @@ describe('ConversationPanel attachments', () => {
     release();
   });
 
+  it('clears the composer at send acceptance, before the answer settles', async () => {
+    const user = userEvent.setup();
+    const backend = streamingBackend();
+    let finish!: () => void;
+    backend.completeOnceStreaming = vi.fn(async (_ws, _proj, _session, _payload, onEvent) => {
+      onEvent({ opId: 'op-1', sequence: 0, event: { type: 'started' } });
+      finish = () =>
+        onEvent({
+          opId: 'op-1',
+          sequence: 1,
+          event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
+        });
+      // The start handle returns while the answer is still running.
+      return { opId: 'op-1', messageId: 'm-1', context: null };
+    });
+    render(<ConversationPanel backend={backend} provider={registryProvider()} />);
+    await pickRegistryModel(user);
+
+    pickFile('notes.md', '# notes');
+    expect(await screen.findByText('notes.md')).toBeDefined();
+    const box = await composerBox();
+    await user.type(box, 'see attached');
+    await user.keyboard('{Enter}');
+
+    // Accepted: the composer selection is gone and the sent bubble already
+    // carries the file, even though the completion has not terminaled.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Remove notes.md' })).toBeNull(),
+    );
+    const sentFiles = await screen.findByRole('list', { name: 'Files sent with this message' });
+    expect(within(sentFiles).getByText('notes.md')).toBeDefined();
+    expect(screen.getByText('see attached')).toBeDefined();
+
+    finish();
+  });
+
   it('shows the files a sent message carried and previews the stored text', async () => {
     const user = userEvent.setup();
     const backend = withoutSessions(streamingBackend());
@@ -257,9 +293,10 @@ describe('ConversationPanel attachments', () => {
 
     // After the terminal reload the chip comes from the stored link row, with
     // the truncation state the backend recorded.
-    const preview = await screen.findByRole('button', { name: 'Preview' });
+    const sentFiles = await screen.findByRole('list', { name: 'Files sent with this message' });
+    const chip = within(sentFiles).getByRole('button', { name: /notes\.md/ });
     expect(screen.getByText('Truncated')).toBeDefined();
-    await user.click(preview);
+    await user.click(chip);
     expect(await screen.findByText('stored file body')).toBeDefined();
     expect(backend.readAttachmentText).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1', 'att-1');
   });
