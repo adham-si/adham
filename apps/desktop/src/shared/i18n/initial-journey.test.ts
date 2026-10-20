@@ -11,6 +11,8 @@ const journeyFiles = [
   '../../features/conversation/provisioning-form.tsx',
   '../../features/conversation/conversation-setup-slot.tsx',
   '../../features/conversation/conversation-panel.tsx',
+  '../../features/conversation/conversation-panel-view.tsx',
+  '../../features/conversation/use-turn-dispatch.ts',
   '../../widgets/shell/primary-sidebar/primary-sidebar.tsx',
   '../../widgets/compose/composer.tsx',
   '../../widgets/compose/compose-input.tsx',

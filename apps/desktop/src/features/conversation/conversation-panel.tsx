@@ -1,50 +1,11 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  ArrowDownToLineIcon,
-  BotMessageSquareIcon,
-  CopyIcon,
-  MoreVerticalIcon,
-  PencilLineIcon,
-  RefreshCcwIcon,
-  ThumbsDownIcon,
-  ThumbsUpIcon,
-  UserIcon,
-} from '@hugeicons/core-free-icons';
-import {
-  contentFromText,
-  MessageCard,
-  type MarkdownLabels,
-  type MessageActionIcons,
-} from '@adham/ui';
-import type { MessageAttachmentDto } from '@adham/contracts-generated';
-import {
-  Composer,
-  EmptyWelcome,
-  useDrafts,
-  type ComposeMode,
-  type ModelOption,
-  type QueuedInstruction,
-} from '@/widgets/compose';
-import {
-  MessageAttachments,
-  useAttachmentDrop,
-  useAttachments,
-  type PendingFile,
-} from './attachments';
+import { useDrafts, type ComposeMode, type ModelOption } from '@/widgets/compose';
+import { useAttachmentDrop, useAttachments } from './attachments';
 import { adhamClient } from '@/shared/api/adham-client';
-import { formatTime } from '@/shared/i18n/format';
-import {
-  useConversation,
-  type ConversationBackend,
-  type UiMessage,
-  type UiMessageReference,
-} from './use-conversation';
+import { useConversation, type ConversationBackend } from './use-conversation';
 import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
 import { useModelPrefs } from '@/shared/models/model-prefs';
-import { TurnStatus } from './turn-status';
 import {
   announceScopeChanged,
   SCOPE_CHANGED_EVENT,
@@ -60,54 +21,12 @@ import {
   readComposeModelPreference,
   writeComposeModelPreference,
 } from './compose-model-preference';
-import {
-  PendingRecoveryBanner,
-  PendingRecoveryReviewDialog,
-  usePendingRecovery,
-} from './pending-recovery';
-import { ProviderRecoveryBanner, useProviderRecovery } from './provider-recovery';
+import { usePendingRecovery } from './pending-recovery';
+import { useProviderRecovery } from './provider-recovery';
+import { ConversationPanelView } from './conversation-panel-view';
+import { useTurnDispatch } from './use-turn-dispatch';
 
 const PENDING_DRAFT_BUCKET = 'pending';
-
-/** Header avatars and action glyphs as nodes: the card renders what the app
- *  hands it, so @adham/ui stays free of an icon dependency. */
-const ASSISTANT_AVATAR = <HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />;
-const USER_AVATAR = <HugeiconsIcon icon={UserIcon} className="size-5" />;
-const MESSAGE_ICONS: MessageActionIcons = {
-  copy: <HugeiconsIcon icon={CopyIcon} className="size-4" />,
-  edit: <HugeiconsIcon icon={PencilLineIcon} className="size-4" />,
-  regenerate: <HugeiconsIcon icon={RefreshCcwIcon} className="size-4" />,
-  like: <HugeiconsIcon icon={ThumbsUpIcon} className="size-4" />,
-  // Mirrored so the thumb faces the same way as the like glyph.
-  dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4 -scale-x-100" />,
-  more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
-};
-
-function formatTimestamp(createdAt: string): string {
-  const parsed = new Date(createdAt);
-  if (Number.isNaN(parsed.getTime())) return createdAt;
-  return formatTime(parsed);
-}
-
-/**
- * Honest lifecycle note for a persisted assistant turn. Derived from the
- * stored completion only — never from text length or timing.
- */
-function messageNote(m: UiMessage, t: TFunction): { text: string; tone: 'muted' | 'error' } | null {
-  const completion = m.completion;
-  if (!completion) return null;
-  if (completion.state === 'interrupted') {
-    return { text: t('conversation.turnInterrupted', 'Cancelled'), tone: 'muted' };
-  }
-  if (completion.state === 'failed') {
-    return m.text === ''
-      ? { text: t('conversation.turnNoAnswer', 'No answer was produced.'), tone: 'error' }
-      : { text: t('conversation.turnFailed', 'Generation failed.'), tone: 'error' };
-  }
-  return completion.truncated
-    ? { text: t('conversation.turnTruncated', 'Truncated by the length limit.'), tone: 'muted' }
-    : null;
-}
 
 export interface ConversationPanelProps {
   backend?: ConversationBackend;
@@ -135,32 +54,6 @@ export function ConversationPanel({
   enterToSend = true,
 }: ConversationPanelProps) {
   const { t } = useTranslation();
-  /** Localized strings for the message renderer (code copy, placeholders). */
-  const markdownLabels = React.useMemo<Partial<MarkdownLabels>>(
-    () => ({
-      copyCode: t('compose.markdown.copyCode'),
-      codeLabel: t('compose.markdown.code'),
-      copyMessage: t('compose.markdown.copyMessage'),
-      copied: t('compose.markdown.copied'),
-      copyFailed: t('compose.markdown.copyFailed'),
-      imageNotShown: t('compose.markdown.imageNotShown'),
-      unsupportedContent: t('compose.markdown.unsupportedContent'),
-      replyAction: t('compose.markdown.replyAction'),
-      quoteLabel: t('compose.markdown.quoteLabel'),
-      quoteUnavailable: t('compose.markdown.quoteUnavailable'),
-      branchActiveLabel: t('compose.markdown.branchActive'),
-      branchMakeActiveLabel: t('compose.markdown.branchMakeActive'),
-      likeAction: t('compose.markdown.likeAnswer'),
-      dislikeAction: t('compose.markdown.dislikeAnswer'),
-      feedbackReason: t('compose.markdown.feedbackReason'),
-      feedbackTitle: t('compose.markdown.feedbackTitle'),
-      feedbackLocalNote: t('compose.markdown.feedbackLocalNote'),
-      feedbackSave: t('compose.markdown.feedbackSave'),
-      regenerateAction: t('conversation.regenerateAnswer'),
-      moreActions: t('compose.markdown.moreActions'),
-    }),
-    [t],
-  );
   const conv = useConversation({ backend });
   /** A refused branch switch or feedback save states itself; neither is an
    *  uncertain send, so it is not routed through the send-error notice. */
@@ -242,38 +135,6 @@ export function ConversationPanel({
   );
   /** Documented `think` value for the next turn; null = model default. */
   const [think, setThink] = React.useState<boolean | string | null>(null);
-  /** Sends that arrived while a turn was running, shown above the input. */
-  const [queued, setQueued] = React.useState<QueuedInstruction[]>([]);
-  // The ref mirrors `queued` as the drain's source of truth: drains run in
-  // async continuations after a settled dispatch, where render state lags.
-  const queuedRef = React.useRef<QueuedInstruction[]>([]);
-  const queuedIdRef = React.useRef(0);
-  const setQueuedBoth = React.useCallback((next: QueuedInstruction[]) => {
-    queuedRef.current = next;
-    setQueued(next);
-  }, []);
-  /** The message the next send references: a reply quote or an edited
-   *  alternative; cleared on acknowledgment or session switch, never dropped
-   *  silently. Switching Reply/Edit replaces the pending reference (one send
-   *  carries at most one); only Edit touches the draft (prefill/restore). */
-  const [pendingReference, setPendingReference] = React.useState<{
-    id: string;
-    relation: UiMessageReference['relation'];
-    excerpt: string | null;
-    /** Draft restored when an edit is cancelled; undefined = leave as-is. */
-    priorDraft?: string;
-  } | null>(null);
-  const cancelPendingReference = React.useCallback(() => {
-    if (pendingReference?.priorDraft !== undefined) setDraft(pendingReference.priorDraft);
-    setPendingReference(null);
-  }, [pendingReference, setDraft]);
-  /** Quoted text for a reference: null when the target is not in the loaded
-   *  history, which the card then states instead of inventing an excerpt. */
-  const quotedExcerptOf = React.useCallback(
-    (messageId: string): string | null =>
-      conv.messages.find((m) => m.id === messageId)?.text ?? null,
-    [conv.messages],
-  );
 
   // A session switch hydrates that session's remembered model choice, carrying
   // a pre-session pick into the session a first send materialized (never
@@ -365,8 +226,6 @@ export function ConversationPanel({
     ollama.accountsLoaded &&
     (ollama.account === null || (ollama.modelsLoaded && pickerModels.length === 0));
 
-  const busy =
-    conv.status === 'submitting' || conv.status === 'bootstrapping' || conv.streaming !== null;
   // Attachment selections: read and stored now when the session exists,
   // otherwise pending until the send that materializes the session. A refused
   // file keeps its chip with the reason; the send then refuses too.
@@ -475,240 +334,29 @@ export function ConversationPanel({
 
   const formWorking = prov.working || sel.working || provisionTransition !== null;
 
-  /// Runs one turn with the parameters current at dispatch; a queued
-  /// instruction drains through exactly the same path as a direct send. A
-  /// reference rides only the streaming path (the text-only path records no
-  /// reference), so a referenced send without a resolved model is refused
-  /// visibly rather than sent as an unreferenced message.
-  const dispatchTurn = React.useCallback(
-    async (
-      sent: string,
-      reference?: UiMessageReference,
-      attachmentIds: string[] = [],
-      pendingFiles: PendingFile[] = [],
-      attachmentMetas: MessageAttachmentDto[] = [],
-      onAccepted?: () => void,
-    ) => {
-      setSubmitError(null);
-      const refusedReference = reference !== undefined && !streamReady;
-      const outcome = refusedReference
-        ? {
-            ok: false as const,
-            error: t(
-              reference?.relation === 'edited-from'
-                ? 'conversation.editNeedsModel'
-                : 'conversation.replyNeedsModel',
-            ),
-            uncertain: false as const,
-          }
-        : streamReady
-          ? await conv.streamOnce(
-              sent,
-              ollama.account!.accountId,
-              selectedModelId,
-              mode,
-              // The documented `think` value; null = model default (omitted).
-              think ?? undefined,
-              reference,
-              attachmentIds,
-              pendingFiles,
-              attachmentMetas,
-              onAccepted,
-            )
-          : await conv.submit(sent);
-      // A rejected dispatch (a refused reply, an undocumented think value) must
-      // be visible, never a silent no-op. Text-only failures go through the
-      // hook's error state, which the panel renders below.
-      if (!outcome.ok && (streamReady || refusedReference)) setSubmitError(outcome.error);
-      // Nothing was persisted (the hook drops its optimistic bubble), so the
-      // instruction returns to the composer — never clobbering edits typed
-      // meanwhile. The ref still reads `sent` when a refusal lands before the
-      // just-cleared draft has re-rendered, so that case restores too.
-      if (!outcome.ok && (!draftRef.current || draftRef.current === sent)) setDraft(sent);
-      return outcome;
-    },
-    [conv, streamReady, ollama.account, selectedModelId, mode, think, setDraft, t],
-  );
-
-  /// Dispatches one turn, then drains the visible queue. The hook accepts one
-  /// live dispatch at a time, so a queued instruction may only go once the
-  /// previous dispatch has fully settled (terminal + authoritative reload);
-  /// a refusal stops the drain, since its reason applies to what follows too.
-  const dispatchAndDrain = React.useCallback(
-    async (
-      sent: string,
-      reference?: UiMessageReference,
-      attachmentIds: string[] = [],
-      pendingFiles: PendingFile[] = [],
-      attachmentMetas: MessageAttachmentDto[] = [],
-      onAccepted?: () => void,
-    ) => {
-      let outcome = await dispatchTurn(
-        sent,
-        reference,
-        attachmentIds,
-        pendingFiles,
-        attachmentMetas,
-        onAccepted,
-      );
-      // The reference is acknowledged only when its dispatch was accepted; a
-      // refused send keeps the pending reference so it can be retried as one.
-      if (outcome.ok && reference) {
-        setPendingReference((prev) =>
-          prev && prev.id === reference.refersToMessageId ? null : prev,
-        );
-      }
-      while (outcome.ok && queuedRef.current.length > 0) {
-        const next = queuedRef.current[0]!;
-        setQueuedBoth(queuedRef.current.slice(1));
-        outcome = await dispatchTurn(next.text, next.reference);
-        // A refused queued reference returns to the composer with its target
-        // intact, never silently downgraded to a plain message.
-        if (!outcome.ok && next.reference) {
-          setPendingReference({
-            id: next.reference.refersToMessageId,
-            relation: next.reference.relation,
-            excerpt: next.referenceExcerpt ?? null,
-          });
-        }
-      }
-      return outcome;
-    },
-    [dispatchTurn, setQueuedBoth],
-  );
-
-  /// The newest attempt of the newest turn carries Retry (a failed or
-  /// interrupted attempt) or Regenerate (a completed one): earlier attempts
-  /// are superseded, and an older turn cannot be answered out of order. The
-  /// backend enforces the same rule; this only keeps the offered action true.
-  const turnAction = React.useMemo(() => {
-    const messages = conv.messages;
-    const last = messages[messages.length - 1];
-    if (!last || (last.role !== 'assistant' && last.role !== 'agent')) return null;
-    let userId: string | null = null;
-    for (let i = messages.length - 2; i >= 0; i -= 1) {
-      const m = messages[i]!;
-      if (m.role !== 'assistant' && m.role !== 'agent') {
-        userId = m.id;
-        break;
-      }
-    }
-    if (!userId) return null;
-    const state = last.completion?.state;
-    if (state !== 'failed' && state !== 'interrupted' && state !== 'completed') return null;
-    return {
-      attemptId: last.id,
-      userId,
-      verb: state === 'completed' ? ('regenerate' as const) : ('retry' as const),
-    };
-  }, [conv.messages]);
-
-  /// One new attempt against the same user turn. Nothing is replaced and no
-  /// user row is written; the refusal reason (no model, rejected dispatch) is
-  /// stated, never swallowed.
-  const handleTurnAction = React.useCallback(() => {
-    if (!turnAction || busy) return;
-    setSubmitError(null);
-    if (!streamReady) {
-      setSubmitError(t('conversation.retryNeedsModel', 'Select a model to retry this turn.'));
-      return;
-    }
-    void conv
-      .retryTurn(
-        turnAction.userId,
-        ollama.account!.accountId,
-        selectedModelId,
-        mode,
-        think ?? undefined,
-      )
-      .then((outcome) => {
-        if (!outcome.ok) setSubmitError(outcome.error);
-      });
-  }, [turnAction, busy, streamReady, t, conv, ollama.account, selectedModelId, mode, think]);
-
-  // Queued instructions and the pending reference belong to the session they
-  // were typed in: a session switch drops them rather than dispatching them
-  // into another thread.
-  React.useEffect(() => {
-    setQueuedBoth([]);
-    setPendingReference(null);
-  }, [conv.sessionId, setQueuedBoth]);
-
-  const handleSubmit = React.useCallback(async () => {
-    const text = draftRef.current.trim();
-    const readyIds = attachments.readyIds;
-    const pendingFiles = attachments.pendingFiles;
-    const hasFiles = attachments.items.length > 0;
-    // The exact selections this send carries: only these leave the composer
-    // once the turn is accepted (a file added meanwhile stays for next turn).
-    const sentKeys = attachments.items.map((item) => item.key);
-    const readyMetas = attachments.items.flatMap((item) =>
-      item.status === 'ready' && item.meta ? [item.meta] : [],
-    );
-    // An attachment-only send is valid; text-only needs text.
-    if (!text && !hasFiles) return;
-    // A selection that is unreadable, still being read, or has no model to
-    // receive it refuses the send with its reason — chips are never dropped
-    // silently and a send never leaves them behind without saying so.
-    if (attachments.isReading) {
-      setSubmitError(t('attachments.stillReading'));
-      return;
-    }
-    if (attachments.hasErrors) {
-      setSubmitError(t('attachments.failedSelection'));
-      return;
-    }
-    if (hasFiles && !streamReady) {
-      setSubmitError(t('attachments.needsModel'));
-      return;
-    }
-    const reference: UiMessageReference | undefined = pendingReference
-      ? { refersToMessageId: pendingReference.id, relation: pendingReference.relation }
-      : undefined;
-    // Sending while a turn runs queues the instruction visibly: it is never
-    // injected into the active call and never a silent no-op. It dispatches
-    // (with the parameters current then) once the turn settles. Files have no
-    // queue slot, so a file send waits instead of queueing a chip-less text.
-    if (busy) {
-      if (hasFiles) {
-        setSubmitError(t('attachments.busy'));
-        return;
-      }
-      queuedIdRef.current += 1;
-      setQueuedBoth([
-        ...queuedRef.current,
-        {
-          id: `queued-${queuedIdRef.current}`,
-          text,
-          ...(reference ? { reference, referenceExcerpt: pendingReference?.excerpt ?? null } : {}),
-        },
-      ]);
-      // The queued instruction carries the reference now; the chip is done.
-      if (reference) setPendingReference(null);
-      if (draftRef.current === text) commitPrompt(text);
-      return;
-    }
-    // Clear now, not at stream end: submission is the acknowledgment (the
-    // user bubble appears and the turn persists), and a follow-up typed while
-    // the answer streams must not append to an already-sent instruction.
-    if (draftRef.current === text) commitPrompt(text);
-    // The composer clears when the backend accepts the turn — not when the
-    // answer settles. Waiting for the stream made a sent file look unsent for
-    // the whole generation. A refusal never reaches onAccepted, so its files
-    // stay for the retry.
-    await dispatchAndDrain(text, reference, readyIds, pendingFiles, readyMetas, () =>
-      attachments.clear(sentKeys),
-    );
-  }, [
-    attachments,
+  const {
     busy,
-    commitPrompt,
-    dispatchAndDrain,
-    setQueuedBoth,
+    queued,
     pendingReference,
+    setPendingReference,
+    cancelPendingReference,
+    turnAction,
+    handleTurnAction,
+    handleSubmit,
+    removeQueued,
+  } = useTurnDispatch({
+    conv,
+    attachments,
     streamReady,
-    t,
-  ]);
+    ollamaAccountId: ollama.account?.accountId,
+    selectedModelId,
+    mode,
+    think,
+    draftRef,
+    setDraft,
+    commitPrompt,
+    setSubmitError,
+  });
 
   /// A new model invalidates the thinking choice: a level documented for the
   /// previous model may be undocumented for the next one (the backend refuses
@@ -775,347 +423,67 @@ export function ConversationPanel({
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent">
-      {/* Pending recovery banners: unsent messages and unfinished provider
-          operations have separate lifecycles and separate actions. */}
-      <div className="space-y-2 px-4 pt-2">
-        <PendingRecoveryBanner
-          operations={recovery.operations}
-          truncated={recovery.truncated}
-          onReview={recovery.openReview}
-          onDismiss={(op) => recovery.openDismiss(op)}
-        />
-        <ProviderRecoveryBanner
-          operations={providerRecovery.operations}
-          error={providerRecovery.error}
-          busyOperationId={providerRecovery.busyOperationId}
-          onRetry={() => void providerRecovery.refresh()}
-          onMarkInterrupted={providerRecovery.markInterrupted}
-        />
-      </div>
-
-      {/* Conversation Timeline (smoothly expands when messages exist) */}
-      <div
-        ref={timelineRef}
-        onScroll={handleTimelineScroll}
-        data-testid="conversation-timeline"
-        className={`flex flex-col overflow-y-auto transition-all duration-500 ease-in-out ${
-          isEmpty ? 'max-h-0 flex-0 opacity-0 pointer-events-none' : 'flex-1 opacity-100'
-        }`}
-      >
-        <div className="flex w-full flex-1 flex-col gap-6 p-4">
-          {conv.messages.map((m) => {
-            const note = messageNote(m, t);
-            const alternative = alternatives.get(m.id);
-            const isAssistant = m.role === 'assistant' || m.role === 'agent';
-            // Regenerate is offered on the newest answer attempt only: the
-            // backend reruns that attempt, never an older one.
-            const canRegenerate = turnAction !== null && m.id === turnAction.attemptId;
-            return (
-              <React.Fragment key={m.id}>
-                <MessageCard
-                  role={isAssistant ? 'assistant' : 'user'}
-                  name={isAssistant ? assistantName : undefined}
-                  avatar={isAssistant ? ASSISTANT_AVATAR : USER_AVATAR}
-                  icons={MESSAGE_ICONS}
-                  content={contentFromText(m.text)}
-                  leading={
-                    !isAssistant && (m.attachments?.length ?? 0) > 0 ? (
-                      <MessageAttachments
-                        attachments={m.attachments!}
-                        readText={backend.readAttachmentText ? readAttachmentText : undefined}
-                      />
-                    ) : undefined
-                  }
-                  labels={
-                    canRegenerate && turnAction.verb === 'retry'
-                      ? { ...markdownLabels, regenerateAction: t('conversation.retryTurn') }
-                      : markdownLabels
-                  }
-                  timestamp={formatTimestamp(m.createdAt)}
-                  onRegenerate={canRegenerate ? handleTurnAction : undefined}
-                  regenerateDisabled={busy}
-                  branch={
-                    alternative
-                      ? {
-                          active: alternative.active,
-                          onMakeActive: alternative.active
-                            ? undefined
-                            : () => {
-                                void conv
-                                  .makeAlternativeActive(alternative.rootId, m.id)
-                                  .then((outcome) =>
-                                    setActionNotice(outcome.ok ? null : outcome.error),
-                                  );
-                              },
-                        }
-                      : undefined
-                  }
-                  // Feedback is for a settled, persisted answer attempt: the
-                  // provisional bubble has no durable id to key a verdict to,
-                  // so it is never offered one.
-                  feedback={m.provisional || !isAssistant ? undefined : feedbackByAnswer.get(m.id)}
-                  onFeedback={
-                    m.provisional || !isAssistant
-                      ? undefined
-                      : (verdict, reason) => {
-                          void conv
-                            .setAnswerFeedback(m.id, verdict, reason)
-                            .then((outcome) => setActionNotice(outcome.ok ? null : outcome.error));
-                        }
-                  }
-                  quotedExcerpt={
-                    m.reference ? quotedExcerptOf(m.reference.refersToMessageId) : undefined
-                  }
-                  quotedRelation={m.reference?.relation}
-                  // Only persisted rows can reference a message: the provisional
-                  // bubble carries no durable id the backend could validate.
-                  onReply={
-                    m.provisional
-                      ? undefined
-                      : () =>
-                          setPendingReference({ id: m.id, relation: 'replied', excerpt: m.text })
-                  }
-                  // Edit rewrites the prompt, which the backend accepts only
-                  // for user rows: never offered where it would have to refuse.
-                  onEdit={
-                    m.provisional || m.role !== 'user'
-                      ? undefined
-                      : () => {
-                          setPendingReference({
-                            id: m.id,
-                            relation: 'edited-from',
-                            excerpt: m.text,
-                            priorDraft: draftRef.current,
-                          });
-                          setDraft(m.text);
-                        }
-                  }
-                />
-                {note && (
-                  <p
-                    role="status"
-                    className={`px-1 text-xs ${
-                      note.tone === 'error' ? 'text-destructive' : 'text-foreground-muted'
-                    }`}
-                  >
-                    {note.text}
-                  </p>
-                )}
-              </React.Fragment>
-            );
-          })}
-          {conv.streaming && conv.streaming.text !== '' && (
-            <MessageCard
-              key={conv.streaming.opId || 'streaming'}
-              role="assistant"
-              name={assistantName}
-              avatar={ASSISTANT_AVATAR}
-              icons={MESSAGE_ICONS}
-              streaming
-              content={contentFromText(conv.streaming.text)}
-              labels={markdownLabels}
-              timestamp={formatTime(new Date())}
-            />
-          )}
-          {conv.streaming && conv.streaming.phase !== 'streaming' && (
-            <TurnStatus
-              phase={conv.streaming.phase}
-              startedAt={conv.streaming.startedAt}
-              name={assistantName}
-            />
-          )}
-          {/* Non-authoritative recovery: only when the post-terminal history
-              reload failed; replaced atomically by authoritative rows. */}
-          {conv.recoverySnapshot && (
-            <MessageCard
-              key={conv.recoverySnapshot.id}
-              role="assistant"
-              name={assistantName}
-              avatar={ASSISTANT_AVATAR}
-              icons={MESSAGE_ICONS}
-              content={contentFromText(conv.recoverySnapshot.text)}
-              labels={markdownLabels}
-              timestamp={formatTimestamp(conv.recoverySnapshot.createdAt)}
-            />
-          )}
-          {showJumpToLatest && (
-            <button
-              type="button"
-              onClick={scrollToLatest}
-              aria-label={t('conversation.jumpToLatest')}
-              title={t('conversation.jumpToLatest')}
-              className="sticky bottom-0 flex size-8 items-center justify-center self-end rounded-full border border-border-subtle bg-surface-subtle text-foreground-secondary shadow-sm hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            >
-              <HugeiconsIcon icon={ArrowDownToLineIcon} className="size-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Centered Logo (pushes to center when empty, smoothly collapses when session starts) */}
-      <div
-        className={`flex flex-col items-center justify-end transition-all duration-500 ease-in-out ${
-          isEmpty
-            ? 'flex-1 pb-6 opacity-100 scale-100'
-            : 'max-h-0 flex-0 pb-0 opacity-0 scale-95 pointer-events-none overflow-hidden'
-        }`}
-      >
-        <EmptyWelcome />
-      </div>
-
-      {/* Status and availability notices */}
-      <div aria-live="polite">
-        {conv.status === 'bootstrapping' && (
-          <p>{t('conversation.starting', 'Starting conversation…')}</p>
-        )}
-        {conv.status === 'submitting' && <p>{t('conversation.saving', 'Saving message…')}</p>}
-        {conv.storageWarning && (
-          <div
-            role="status"
-            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
-          >
-            <p>{conv.storageWarning}</p>
-          </div>
-        )}
-        {conv.error && (
-          <div role="alert">
-            <p>{conv.error}</p>
-            <p>
-              {t(
-                'conversation.uncertainHint',
-                'If this message may not have saved, reload history before resending.',
-              )}
-            </p>
-            <button type="button" onClick={() => void conv.reload()}>
-              {t('conversation.reloadHistory', 'Reload history')}
-            </button>
-          </div>
-        )}
-        {actionNotice && (
-          <div
-            role="status"
-            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
-          >
-            <p>{actionNotice}</p>
-          </div>
-        )}
-        {executionUnavailable && (
-          <p>
-            {t(
-              'conversation.executionUnavailable',
-              'Execution is unavailable in this build. Messages are saved as text only.',
-            )}
-          </p>
-        )}
-        {conv.omittedMessages > 0 && (
-          <div
-            role="status"
-            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
-          >
-            <p>
-              {t(
-                'conversation.contextTruncated',
-                'Older messages were omitted so this request fits the model context (estimated).',
-              )}{' '}
-              {t('conversation.omittedMessagesLabel', 'Omitted messages')}: {conv.omittedMessages}
-            </p>
-          </div>
-        )}
-        {stopNotice && (
-          <p>
-            {t(
-              'conversation.stopUnavailable',
-              'Stop is unavailable: there is no running operation to cancel.',
-            )}
-          </p>
-        )}
-        {submitError && (
-          <div role="alert">
-            <p>{submitError}</p>
-          </div>
-        )}
-        {recovery.error && (
-          <div role="alert" className="p-2 text-xs text-destructive bg-destructive/10 rounded">
-            <p>{recovery.error}</p>
-          </div>
-        )}
-        {recovery.cleanupWarning && (
-          <div
-            role="status"
-            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
-          >
-            <p>{recovery.cleanupWarning}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Composer: smoothly glides from center to bottom */}
-      <div
-        className={`w-full transition-all duration-500 ease-in-out ${
-          isEmpty
-            ? 'flex-1 max-w-3xl mx-auto px-4 pb-16 flex flex-col justify-start'
-            : 'flex-0 w-full'
-        }`}
-      >
-        <Composer
-          isCentered={isEmpty}
-          inputText={draft}
-          onChangeInput={setDraft}
-          onSubmit={() => void handleSubmit()}
-          onStop={handleStop}
-          queued={queued}
-          onRemoveQueued={(id) => setQueuedBoth(queuedRef.current.filter((item) => item.id !== id))}
-          replyTo={
-            pendingReference
-              ? { relation: pendingReference.relation, excerpt: pendingReference.excerpt }
-              : null
-          }
-          onCancelReply={cancelPendingReference}
-          status={composeStatus}
-          enterToSend={enterToSend}
-          mode={mode}
-          onChangeMode={handleChangeMode}
-          selectedModelId={selectedModelId}
-          onSelectModel={handleSelectModel}
-          models={pickerModels}
-          modelUnavailable={modelUnavailable}
-          think={think}
-          onChangeThink={setThink}
-          contextLimit={selectedDescriptor?.contextLimit ?? null}
-          effectiveContextBudget={selectedDescriptor?.effectiveContextBudget ?? null}
-          attachments={attachments.items.map((item) => ({
-            key: item.key,
-            fileName: item.fileName,
-            byteSize: item.byteSize,
-            charCount: item.charCount,
-            status: item.status,
-            truncated: item.meta?.truncated ?? false,
-            errorCode: item.errorCode,
-          }))}
-          onAddFiles={attachments.addFiles}
-          onRemoveAttachment={attachments.remove}
-          isDragOverExternal={attachmentDrop.dragging}
-          approvalRequest={null}
-          onRecallPrevious={() => {
-            recallPrevious();
-          }}
-          onRecallNext={() => {
-            recallNext();
-          }}
-        />
-      </div>
-
-      <PendingRecoveryReviewDialog
-        open={recovery.reviewDialogOpen}
-        operation={recovery.activeReviewOp}
-        validatingTarget={recovery.validatingTarget}
-        targetMissing={recovery.targetMissing}
-        initialDismissConfirm={recovery.initialDismissConfirm}
-        onClose={recovery.closeReview}
-        onResend={(op) => recovery.resendOperation(op)}
-        onDismiss={(op) => recovery.dismissOperation(op)}
-      />
-    </div>
+    <ConversationPanelView
+      conv={conv}
+      attachments={attachments}
+      recovery={recovery}
+      providerRecovery={providerRecovery}
+      timeline={{
+        ref: timelineRef,
+        onScroll: handleTimelineScroll,
+        showJumpToLatest,
+        scrollToLatest,
+        isEmpty,
+      }}
+      messages={{
+        alternatives,
+        assistantName,
+        turnAction,
+        busy,
+        feedbackByAnswer,
+        readAttachmentText: backend.readAttachmentText ? readAttachmentText : undefined,
+        onRegenerate: handleTurnAction,
+        setActionNotice,
+        setPendingReference,
+        draftRef,
+        setDraft,
+      }}
+      compose={{
+        draft,
+        onSubmit: () => void handleSubmit(),
+        onStop: handleStop,
+        queued,
+        onRemoveQueued: removeQueued,
+        pendingReference,
+        onCancelReference: cancelPendingReference,
+        status: composeStatus,
+        enterToSend,
+        mode,
+        onChangeMode: handleChangeMode,
+        selectedModelId,
+        onSelectModel: handleSelectModel,
+        models: pickerModels,
+        modelUnavailable,
+        think,
+        onChangeThink: setThink,
+        contextLimit: selectedDescriptor?.contextLimit ?? null,
+        effectiveContextBudget: selectedDescriptor?.effectiveContextBudget ?? null,
+        onAddFiles: attachments.addFiles,
+        onRemoveAttachment: attachments.remove,
+        isDragOverExternal: attachmentDrop.dragging,
+        onRecallPrevious: () => {
+          recallPrevious();
+        },
+        onRecallNext: () => {
+          recallNext();
+        },
+      }}
+      notices={{
+        actionNotice,
+        executionUnavailable,
+        stopNotice,
+        submitError,
+      }}
+    />
   );
 }
