@@ -63,12 +63,24 @@ export const SessionSummarySchema = z.object({
   projectId: z.string(),
   title: z.string().nullable(),
   createdAt: z.string(),
+  summary: z.string().nullable().default(null),
+  summaryOrigin: z.string().nullable().default(null),
+  summaryUnavailable: z.boolean().default(false),
+  pinned: z.boolean().default(false),
+  archived: z.boolean().default(false),
+  lastActivityAt: z.string().default(''),
 });
 
 export const SessionListSchema = z.object({
   projectId: z.string(),
   sessions: z.array(SessionSummarySchema),
   truncated: z.boolean(),
+  unreadableSummaries: z.number().int().nonnegative().default(0),
+});
+
+export const ListSessionsOptionsSchema = z.object({
+  includeArchived: z.boolean().optional(),
+  activeSessionId: z.string().nullable().optional(),
 });
 
 export const SubmittedMessageSchema = z.object({

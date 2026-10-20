@@ -36,7 +36,22 @@
     "contextMismatch": "选择已更改，请重新加载后重试。",
     "requestIdConflict": "请求冲突，请重试。",
     "preferencesConflict": "设置已在别处更改——已重新加载最新值。",
-    "notSaved": "消息未保存。"
+    "notSaved": "消息未保存。",
+    "sessionDeleted": "此会话已删除。",
+    "sessionBusy": "此会话仍有其他操作正在运行。",
+    "duplicateTooLarge": "此会话过大，无法复制。",
+    "exportTooLarge": "此会话过大，无法导出。",
+    "storageRepairRequired": "保存的数据需要修复后才能继续。",
+    "storageUnavailable": "本地存储不可用。请重试。",
+    "validation": {
+      "title_invalid": "请输入 1 到 120 个字符的标题。",
+      "summary_too_long": "摘要不能超过 500 个字符。",
+      "role_requires_query": "按角色筛选前请先输入查询。",
+      "date_range": "开始日期必须早于结束日期。",
+      "empty_query": "请输入查询或选择筛选条件。",
+      "query_too_short": "请至少输入 2 个字符。",
+      "confirm_required": "请确认此操作以继续。"
+    }
   },
   "onboarding": {
     "workspaceHeading": "设置你的工作区",

@@ -121,7 +121,12 @@ export interface AdhamClient {
     payload: { title: string | null },
     options?: { requestId?: string },
   ): Promise<SessionSummary>;
-  listSessions(context: { workspaceId?: string; projectId: string }): Promise<SessionList>;
+  listSessions(context: {
+    workspaceId?: string;
+    projectId: string;
+    includeArchived?: boolean;
+    activeSessionId?: string | null;
+  }): Promise<SessionList>;
   submitMessage(
     workspaceId: string,
     projectId: string,
@@ -281,12 +286,21 @@ export class AdhamApiClientBase implements AdhamClient {
     return SessionSummarySchema.parse(result.data);
   }
 
-  async listSessions(context: { workspaceId?: string; projectId: string }): Promise<SessionList> {
+  async listSessions(context: {
+    workspaceId?: string;
+    projectId: string;
+    includeArchived?: boolean;
+    activeSessionId?: string | null;
+  }): Promise<SessionList> {
     const result = await invoke<SessionList>('list_sessions', {
       context: {
         workspaceId: context.workspaceId ?? null,
         projectId: context.projectId,
         sessionId: null,
+      },
+      options: {
+        includeArchived: context.includeArchived ?? false,
+        activeSessionId: context.activeSessionId ?? null,
       },
     });
     return SessionListSchema.parse(result);

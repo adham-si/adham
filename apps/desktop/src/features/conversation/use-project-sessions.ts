@@ -12,7 +12,13 @@ export interface UseProjectSessionsOptions {
     listSessions(context: {
       workspaceId?: string;
       projectId: string;
-    }): Promise<{ sessions: ContractSessionSummary[]; truncated?: boolean }>;
+      includeArchived?: boolean;
+      activeSessionId?: string | null;
+    }): Promise<{
+      sessions: ContractSessionSummary[];
+      truncated?: boolean;
+      unreadableSummaries?: number;
+    }>;
     createSession(
       workspaceId: string,
       projectId: string,
@@ -35,7 +41,9 @@ export function useProjectSessions({
   const [creating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [truncated, setTruncated] = React.useState(false);
+  const [unreadableSummaries, setUnreadableSummaries] = React.useState(0);
 
+  const activeSessionIdRef = React.useRef<string | null>(null);
   const fetchSeqRef = React.useRef(0);
   const currentWorkspaceRef = React.useRef<string | null>(workspaceId);
   currentWorkspaceRef.current = workspaceId;
@@ -47,7 +55,9 @@ export function useProjectSessions({
   React.useEffect(() => {
     scopeGenerationRef.current += 1;
     setSessions([]);
+    activeSessionIdRef.current = null;
     setActiveSessionId(null);
+    setUnreadableSummaries(0);
     setError(null);
   }, [workspaceId, projectId]);
 
@@ -56,21 +66,33 @@ export function useProjectSessions({
     const seq = fetchSeqRef.current;
     if (!projectId) {
       setSessions([]);
+      activeSessionIdRef.current = null;
       setActiveSessionId(null);
       setTruncated(false);
+      setUnreadableSummaries(0);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const queryContext = workspaceId ? { workspaceId, projectId } : { projectId };
+      const active = activeSessionIdRef.current;
+      const queryContext = {
+        ...(workspaceId ? { workspaceId } : {}),
+        projectId,
+        ...(active ? { activeSessionId: active } : {}),
+      };
       const result = await backend.listSessions(queryContext);
       if (seq !== fetchSeqRef.current) return;
       setTruncated(Boolean(result.truncated));
+      setUnreadableSummaries(result.unreadableSummaries ?? 0);
       const mapped: SidebarSessionSummary[] = result.sessions.map((s) => ({
         id: s.sessionId,
         title: s.title || `Session ${s.sessionId.slice(0, 8)}`,
-        updatedAt: s.createdAt,
+        updatedAt: s.lastActivityAt || s.createdAt,
+        ...(s.summary ? { summary: s.summary } : {}),
+        summaryUnavailable: Boolean(s.summaryUnavailable),
+        pinned: Boolean(s.pinned),
+        archived: Boolean(s.archived),
       }));
       setSessions(mapped);
     } catch (err) {
@@ -111,6 +133,7 @@ export function useProjectSessions({
       ) {
         return;
       }
+      activeSessionIdRef.current = custom.detail.sessionId;
       setActiveSessionId(custom.detail.sessionId);
       void fetchSessionsRef.current();
     };
@@ -152,6 +175,7 @@ export function useProjectSessions({
     }
 
     setError(null);
+    activeSessionIdRef.current = null;
     setActiveSessionId(null);
     window.dispatchEvent(
       new CustomEvent('adham:session-select', {
@@ -167,6 +191,7 @@ export function useProjectSessions({
     creating,
     error,
     truncated,
+    unreadableSummaries,
     selectSession,
     newSession,
     refresh: fetchSessions,

@@ -56,6 +56,7 @@ dependencies = [
  "tracing",
  "ts-rs",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]

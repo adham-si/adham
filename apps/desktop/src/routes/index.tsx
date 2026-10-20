@@ -65,6 +65,7 @@ function AppBody() {
     creating: sessionsCreating,
     error: sessionsError,
     truncated: sessionsTruncated,
+    unreadableSummaries: sessionsUnreadableSummaries,
     refresh: refreshSessions,
   } = useProjectSessions({
     workspaceId: sel.activeWorkspaceId,
@@ -103,6 +104,7 @@ function AppBody() {
             error: sessionsError,
             onRetry: () => void refreshSessions(),
             truncated: sessionsTruncated,
+            unreadableSummaries: sessionsUnreadableSummaries,
             creatingSession: sessionsCreating,
             onSelectSession: selectSession,
             onNewSession: () => void newSession(),

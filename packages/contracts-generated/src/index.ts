@@ -63,9 +63,13 @@ export type ProjectList = { workspaceId: string, projects: Array<ProjectSummary>
 
 export type CreateSessionPayload = { title: string | null, };
 
-export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, };
+export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, summary?: string | null, summaryOrigin?: string | null, summaryUnavailable: boolean, pinned: boolean, archived: boolean, lastActivityAt: string, };
 
-export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, };
+export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, unreadableSummaries: number, };
+
+export type SessionMetadata = { sessionId: string, projectId: string, title: string | null, summaryOrigin: string | null, pinned: boolean, archived: boolean, createdAt: string, lastActivityAt: string, };
+
+export type ListSessionsOptions = { includeArchived: boolean, activeSessionId?: string | null, };
 
 export type SubmitMessagePayload = { text: string, 
 /**

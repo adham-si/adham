@@ -3,6 +3,7 @@
 use super::common::conflict_msg;
 use crate::dtos::*;
 use crate::handlers::ApiContext;
+use adham_core_types::history::validate_title;
 use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use sqlx::Row;
@@ -14,12 +15,17 @@ fn replay(
     receipt: adham_event_log::CommandReceiptRecord,
 ) -> Result<CommandResult<SessionSummary>, String> {
     match serde_json::from_slice::<SessionSummary>(&receipt.response_json) {
-        Ok(data) => Ok(CommandResult {
-            protocol_version: 1,
-            request_id,
-            correlation_id: receipt.correlation_id,
-            data,
-        }),
+        Ok(mut data) => {
+            if data.last_activity_at.is_empty() {
+                data.last_activity_at = data.created_at.clone();
+            }
+            Ok(CommandResult {
+                protocol_version: 1,
+                request_id,
+                correlation_id: receipt.correlation_id,
+                data,
+            })
+        }
         Err(_) => Err("STORAGE_REPAIR_REQUIRED: receipt response unparseable".to_string()),
     }
 }
@@ -45,14 +51,16 @@ pub async fn create_session(
     .map_err(|e| e.to_string())?;
     let request_id = RequestId::from_client_str(&env.request_id)
         .map_err(|_| "VALIDATION_FAILED: request_id must be UUID".to_string())?;
-    let title_str = env
-        .payload
-        .title
-        .as_deref()
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    let request_fp = adham_event_log::request_fingerprint("create_session", 1, &title_str);
+    let title = match env.payload.title.as_deref() {
+        Some(raw) => {
+            let trimmed = raw.trim();
+            validate_title(trimmed).map_err(|_| "VALIDATION_FAILED:title_invalid".to_string())?;
+            Some(trimmed.to_string())
+        }
+        None => None,
+    };
+    let title_str = title.as_deref().unwrap_or("");
+    let request_fp = adham_event_log::request_fingerprint("create_session", 1, title_str);
     let scope_fp = adham_event_log::scope_fingerprint(
         "create_session",
         1,
@@ -113,7 +121,7 @@ pub async fn create_session(
     let payload = SessionCreatedV1 {
         session_id: session_id.clone(),
         project_id: proj_id.clone(),
-        title: env.payload.title.clone(),
+        title: title.clone(),
     };
     let payload_bytes = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
     let correlation_id = CorrelationId::new_v7();
@@ -149,8 +157,14 @@ pub async fn create_session(
     let summary = SessionSummary {
         session_id: session_id.to_string(),
         project_id: proj_id.to_string(),
-        title: env.payload.title.clone(),
-        created_at: created_at_iso,
+        title: title.clone(),
+        created_at: created_at_iso.clone(),
+        summary: None,
+        summary_origin: None,
+        summary_unavailable: false,
+        pinned: false,
+        archived: false,
+        last_activity_at: created_at_iso,
     };
     let response_json = serde_json::to_vec(&summary).unwrap_or_default();
     if let Err(e) = SqliteEventStore::record_receipt_tx(
@@ -195,73 +209,12 @@ pub async fn create_session(
     })
 }
 
-const LIST_LIMIT: i64 = 100;
-
-fn storage_unavailable<E: std::fmt::Display>(e: E) -> String {
-    format!("STORAGE_UNAVAILABLE: {e}")
-}
-
-fn occurred_iso(occurred_at_us: i64) -> String {
-    let dt = OffsetDateTime::from_unix_timestamp_nanos((occurred_at_us * 1_000) as i128)
-        .unwrap_or_else(|_| OffsetDateTime::now_utc());
-    dt.format(&Rfc3339).unwrap_or_default()
-}
-
-/// Project sessions in reverse-chronological order (most recent first).
-/// Validates that the project stream exists and matches workspace context if supplied.
+/// Project sessions in reverse-chronological order with history metadata.
 pub async fn list_sessions(
     ctx: &ApiContext,
     project_id: &str,
     workspace_id: Option<&str>,
+    options: &ListSessionsOptions,
 ) -> Result<SessionList, String> {
-    let proj_id = ProjectId::from_string(project_id)
-        .map_err(|_| "VALIDATION_FAILED: project_id must be UUID".to_string())?;
-    let proj_stream = format!("project:{proj_id}");
-    let proj_row: Option<sqlx::sqlite::SqliteRow> =
-        sqlx::query("SELECT workspace_id FROM events WHERE stream_id = ? AND stream_sequence = 1")
-            .bind(&proj_stream)
-            .fetch_optional(&ctx.pool)
-            .await
-            .map_err(storage_unavailable)?;
-
-    let row = match proj_row {
-        Some(r) => r,
-        None => return Err("PROJECT_NOT_FOUND: project stream does not exist".to_string()),
-    };
-
-    if let Some(expected_ws) = workspace_id {
-        let actual_ws: Option<String> = row.get("workspace_id");
-        if actual_ws.as_deref() != Some(expected_ws) {
-            return Err(
-                "CONTEXT_MISMATCH: project does not belong to specified workspace".to_string(),
-            );
-        }
-    }
-    let rows: Vec<(Vec<u8>, i64)> = sqlx::query_as(
-        "SELECT payload_json, occurred_at_us FROM events
-         WHERE event_type = 'SessionCreated' AND project_id = ?
-         ORDER BY global_position DESC LIMIT ?",
-    )
-    .bind(proj_id.to_string())
-    .bind(LIST_LIMIT + 1)
-    .fetch_all(&ctx.pool)
-    .await
-    .map_err(storage_unavailable)?;
-    let truncated = rows.len() as i64 > LIST_LIMIT;
-    let mut sessions = Vec::with_capacity(rows.len().min(LIST_LIMIT as usize));
-    for (payload_json, occurred_at_us) in rows.into_iter().take(LIST_LIMIT as usize) {
-        let created: SessionCreatedV1 = serde_json::from_slice(&payload_json)
-            .map_err(|_| "STORAGE_REPAIR_REQUIRED: session record unparseable".to_string())?;
-        sessions.push(SessionSummary {
-            session_id: created.session_id.to_string(),
-            project_id: created.project_id.to_string(),
-            title: created.title,
-            created_at: occurred_iso(occurred_at_us),
-        });
-    }
-    Ok(SessionList {
-        project_id: proj_id.to_string(),
-        sessions,
-        truncated,
-    })
+    crate::service::history::list_sessions(ctx, project_id, workspace_id, options).await
 }

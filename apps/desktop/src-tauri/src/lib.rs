@@ -115,8 +115,9 @@ async fn create_session(
 async fn list_sessions(
     state: tauri::State<'_, ApiContext>,
     context: CommandContext,
+    options: Option<ListSessionsOptions>,
 ) -> Result<SessionList, ErrorEnvelope> {
-    adham_desktop_api::handle_list_sessions(&state, context)
+    adham_desktop_api::handle_list_sessions(&state, context, options)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }

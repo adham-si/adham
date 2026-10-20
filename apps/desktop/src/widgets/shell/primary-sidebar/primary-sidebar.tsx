@@ -7,6 +7,10 @@ export interface SessionSummary {
   id: string;
   title: string;
   updatedAt?: string;
+  summary?: string;
+  summaryUnavailable?: boolean;
+  pinned?: boolean;
+  archived?: boolean;
 }
 
 export interface PrimarySidebarProps {
@@ -20,6 +24,7 @@ export interface PrimarySidebarProps {
   error?: string | null;
   onRetry?: () => void;
   truncated?: boolean;
+  unreadableSummaries?: number;
   creatingSession?: boolean;
   /**
    * Deliberate scope-selection UI (workspace/project discovery). When
@@ -44,6 +49,7 @@ export function PrimarySidebar({
   error,
   onRetry,
   truncated,
+  unreadableSummaries,
   creatingSession,
   selectionMenu,
 }: PrimarySidebarProps) {
@@ -203,16 +209,41 @@ export function PrimarySidebar({
           </div>
         ) : (
           <nav aria-label={t('sessions', 'Sessions')} className="flex flex-col gap-1">
+            {unreadableSummaries && unreadableSummaries > 0 ? (
+              <div className="px-2 pb-1 text-[11px] text-foreground-muted">
+                {t('sidebar.summariesUnavailable', 'Some summaries could not be read.')}
+              </div>
+            ) : null}
             {filteredSessions.map((session) => (
               <SidebarItem
                 key={session.id}
                 selected={activeSessionId === session.id}
                 onClick={() => onSelectSession?.(session.id)}
+                className="items-start py-2"
               >
                 <AdhamIcon size="sm" label={session.title}>
                   <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                 </AdhamIcon>
-                <span className="truncate">{session.title}</span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate">{session.title}</span>
+                    {session.pinned ? (
+                      <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
+                        {t('sidebar.pinned', 'Pinned')}
+                      </span>
+                    ) : null}
+                    {session.archived ? (
+                      <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
+                        {t('sidebar.archived', 'Archived')}
+                      </span>
+                    ) : null}
+                  </span>
+                  {session.summary ? (
+                    <span className="line-clamp-2 text-[11px] font-normal leading-snug text-foreground-muted">
+                      {session.summary}
+                    </span>
+                  ) : null}
+                </span>
               </SidebarItem>
             ))}
             {truncated && (

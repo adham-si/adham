@@ -9,7 +9,10 @@
     "resizeLabel": "تغيير حجم الشريط الجانبي الأساسي",
     "defaultWorkspace": "مساحة عمل شخصية",
     "defaultProject": "المشروع الافتراضي",
-    "sessionsTruncated": "عرض أحدث 100 جلسة (مقتطع)"
+    "sessionsTruncated": "عرض أحدث 100 جلسة (مقتطع)",
+    "pinned": "مثبتة",
+    "archived": "مؤرشفة",
+    "summariesUnavailable": "تعذّرت قراءة بعض الملخصات."
   },
   "rail": {
     "compose": "إنشاء",

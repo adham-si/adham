@@ -3,12 +3,14 @@ pub mod attachment_dispatch;
 pub mod branch;
 pub mod common;
 pub mod feedback;
+pub mod history;
 pub mod message;
 pub mod pending;
 pub mod selection;
 pub mod session;
 pub mod workspace;
 
+pub use history::CachedContentKeyProvider;
 pub use message::submit_message as submit_message_atomic;
 pub use pending::{clear_pending_operation, list_pending_operations, record_pending_operation};
 pub use selection::{list_projects, list_workspaces, select_project as select_project_atomic};
