@@ -110,6 +110,38 @@ impl SqliteEventStore {
         response_json: &[u8],
         global_pos: i64,
     ) -> Result<(), DomainError> {
+        Self::record_receipt_range_tx(
+            tx,
+            request_id,
+            command_type,
+            command_version,
+            scope_fingerprint,
+            request_fingerprint,
+            actor_id,
+            correlation_id,
+            outcome_code,
+            response_json,
+            global_pos,
+            global_pos,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn record_receipt_range_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        request_id: &RequestId,
+        command_type: &str,
+        command_version: i32,
+        scope_fingerprint: &str,
+        request_fingerprint: &str,
+        actor_id: &ActorId,
+        correlation_id: &CorrelationId,
+        outcome_code: &str,
+        response_json: &[u8],
+        first_global_position: i64,
+        last_global_position: i64,
+    ) -> Result<(), DomainError> {
         let now_us = (time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
         sqlx::query(
             r#"
@@ -129,8 +161,8 @@ impl SqliteEventStore {
         .bind(correlation_id.to_string())
         .bind(outcome_code)
         .bind(response_json)
-        .bind(global_pos)
-        .bind(global_pos)
+        .bind(first_global_position)
+        .bind(last_global_position)
         .bind(now_us)
         .execute(&mut **tx)
         .await
