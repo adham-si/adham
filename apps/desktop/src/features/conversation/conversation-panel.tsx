@@ -1,16 +1,8 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageCard } from '@adham/ui';
-import {
-  Composer,
-  EmptyWelcome,
-  useDrafts,
-  type ComposeAttachment,
-  type ComposeMode,
-  type ModelOption,
-} from '@/widgets/compose';
+import { useDrafts, type ComposeMode, type ModelOption } from '@/widgets/compose';
+import { useAttachmentDrop, useAttachments } from './attachments';
 import { adhamClient } from '@/shared/api/adham-client';
-import { formatTime } from '@/shared/i18n/format';
 import { useConversation, type ConversationBackend } from './use-conversation';
 import { adhamProviderBackend, useOllamaProvider, type ProviderBackend } from './provider-stream';
 import { useModelPrefs } from '@/shared/models/model-prefs';
@@ -22,20 +14,19 @@ import {
 } from '../provisioning';
 import { useSelection, type SelectionBackend } from '../workspace-selection';
 import { ConversationSetupSlot } from './conversation-setup-slot';
-import { submissionNotice } from './submission-notice';
+import { alternativeIndex } from './alternative-groups';
+import { readComposeModePreference, writeComposeModePreference } from './compose-mode-preference';
 import {
-  PendingRecoveryBanner,
-  PendingRecoveryReviewDialog,
-  usePendingRecovery,
-} from './pending-recovery';
+  migratePendingModelChoice,
+  readComposeModelPreference,
+  writeComposeModelPreference,
+} from './compose-model-preference';
+import { usePendingRecovery } from './pending-recovery';
+import { useProviderRecovery } from './provider-recovery';
+import { ConversationPanelView } from './conversation-panel-view';
+import { useTurnDispatch } from './use-turn-dispatch';
 
 const PENDING_DRAFT_BUCKET = 'pending';
-
-function formatTimestamp(createdAt: string): string {
-  const parsed = new Date(createdAt);
-  if (Number.isNaN(parsed.getTime())) return createdAt;
-  return formatTime(parsed);
-}
 
 export interface ConversationPanelProps {
   backend?: ConversationBackend;
@@ -64,6 +55,21 @@ export function ConversationPanel({
 }: ConversationPanelProps) {
   const { t } = useTranslation();
   const conv = useConversation({ backend });
+  /** A refused branch switch or feedback save states itself; neither is an
+   *  uncertain send, so it is not routed through the send-error notice. */
+  const [actionNotice, setActionNotice] = React.useState<string | null>(null);
+  // Feedback by answer row: the stored verdict is the only pressed state.
+  const feedbackByAnswer = React.useMemo(
+    () => new Map(conv.answerFeedback.map((f) => [f.messageId, f])),
+    [conv.answerFeedback],
+  );
+  // Edited-branch provenance: which messages belong to a branch and which
+  // member the session continues from (default: the newest edit, the same
+  // rule the backend applies).
+  const alternatives = React.useMemo(
+    () => alternativeIndex(conv.messages, conv.branchSelections),
+    [conv.messages, conv.branchSelections],
+  );
   const prov = useProvisioning({ backend: provisioning });
   const needsProvisioning = conv.status === 'needs-workspace' || conv.status === 'needs-project';
   const sel = useSelection({ backend: selection, enabled: needsProvisioning });
@@ -89,6 +95,7 @@ export function ConversationPanel({
       void handleSessionOpened(workspaceId, projectId, sessionId);
     },
   });
+  const providerRecovery = useProviderRecovery({ backend });
   /// Committed creation or selection awaiting authoritative bootstrap.
   /// Holds the confirmed step disabled so a second action cannot fork a
   /// duplicate while the read is in flight. Cleared only when bootstrap
@@ -98,26 +105,87 @@ export function ConversationPanel({
     step: 'workspace' | 'project';
     origin: 'created' | 'selected';
   } | null>(null);
+  // Drafts and model picks live in a workspace+project bucket, so two
+  // projects never share a new-session draft or an explicit selection.
+  const scopeKey = conv.context ? `${conv.context.workspaceId}:${conv.context.projectId}` : null;
+  const pendingBucket = scopeKey ? `${scopeKey}:${PENDING_DRAFT_BUCKET}` : PENDING_DRAFT_BUCKET;
+  const sessionBucket = scopeKey
+    ? `${scopeKey}:${conv.sessionId ?? PENDING_DRAFT_BUCKET}`
+    : (conv.sessionId ?? PENDING_DRAFT_BUCKET);
   const { draft, setDraft, commitPrompt, recallPrevious, recallNext } = useDrafts({
-    sessionId: conv.sessionId ?? PENDING_DRAFT_BUCKET,
+    sessionId: sessionBucket,
+    pendingBucket,
   });
   const draftRef = React.useRef(draft);
   draftRef.current = draft;
 
-  const [mode, setMode] = React.useState<ComposeMode>('plan');
+  // Last-used mode is restored across launches; the previous default ('plan')
+  // only applies on first run or after a stale/unreadable value.
+  const [mode, setMode] = React.useState<ComposeMode>(() => readComposeModePreference() ?? 'plan');
+  const handleChangeMode = React.useCallback((next: ComposeMode) => {
+    setMode(next);
+    writeComposeModePreference(next);
+  }, []);
   // Model choice is explicit: '' until the user picks from the registry, and
-  // discovery order never becomes a silent default.
-  const [selectedModelId, setSelectedModelId] = React.useState('');
-  const [reasoningEffort, setReasoningEffort] = React.useState<'low' | 'medium' | 'high'>('medium');
-  const [attachments, setAttachments] = React.useState<ComposeAttachment[]>([]);
+  // discovery order never becomes a silent default. The pick is remembered per
+  // session bucket (the same one drafts use) so a rerender, a session switch
+  // or reopening restores exactly the choice the user made for that session.
+  const [selectedModelId, setSelectedModelId] = React.useState(
+    () => readComposeModelPreference(sessionBucket) ?? '',
+  );
+  /** Documented `think` value for the next turn; null = model default. */
+  const [think, setThink] = React.useState<boolean | string | null>(null);
+
+  // A session switch hydrates that session's remembered model choice, carrying
+  // a pre-session pick into the session a first send materialized (never
+  // overwriting a choice the target session already made). The thinking choice
+  // resets in the same step: it was validated against the previous model.
+  const prevModelSessionRef = React.useRef(sessionBucket);
+  React.useEffect(() => {
+    if (prevModelSessionRef.current === sessionBucket) return;
+    prevModelSessionRef.current = sessionBucket;
+    if (pendingBucket !== PENDING_DRAFT_BUCKET) {
+      migratePendingModelChoice(pendingBucket, PENDING_DRAFT_BUCKET);
+    }
+    migratePendingModelChoice(sessionBucket, pendingBucket);
+    setSelectedModelId(readComposeModelPreference(sessionBucket) ?? '');
+    setThink(null);
+  }, [sessionBucket, pendingBucket]);
   const [stopNotice, setStopNotice] = React.useState(false);
-  // "Enabled in chat" curation from the models settings page filters what the
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  /// The timeline follows new output only while the reader is at the bottom.
+  /// Scrolling up stops the follow and offers jump-to-latest; the offset is
+  /// read from the element, never fabricated.
+  const timelineRef = React.useRef<HTMLDivElement>(null);
+  const nearBottomRef = React.useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = React.useState(false);
+  const handleTimelineScroll = React.useCallback(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight <= 64;
+    nearBottomRef.current = near;
+    setShowJumpToLatest(!near);
+  }, []);
+  const scrollToLatest = React.useCallback(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+    nearBottomRef.current = true;
+    setShowJumpToLatest(false);
+    el.scrollTop = el.scrollHeight;
+  }, []);
+  const lastMessageText = conv.messages[conv.messages.length - 1]?.text ?? '';
+  const streamingText = conv.streaming?.text ?? '';
+  React.useEffect(() => {
+    if (!nearBottomRef.current) return;
+    const el = timelineRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [conv.messages.length, lastMessageText, streamingText]); // "Enabled in chat" curation from the models settings page filters what the
   // composer offers (absence = enabled, so a fresh connection stays complete).
   const modelPrefs = useModelPrefs();
 
   // Registry-driven picker: when an Ollama account has pinned models, the
-  // composer options come from the provider registry (Delivery A). Without
-  // registry models the picker is hidden and dispatch falls back to the
+  // composer options come from the provider registry (Delivery A). The picker
+  // stays visible either way; without registry models dispatch runs the
   // text-only path.
   const ollama = useOllamaProvider({
     backend: provider,
@@ -138,12 +206,54 @@ export function ConversationPanel({
       name: m.humanLabel,
       provider: 'Ollama',
       boundary: 'local' as const,
+      // Thinking controls appear only for evidenced support; unknown or
+      // unsupported must not present a control the model may not honor.
+      supportsReasoning: m.capabilities.thinking === 'supported',
+      // The control itself comes from the model's documented values.
+      thinkingValues: m.capabilities.thinkingValues ?? undefined,
+      thinkingDefault: m.capabilities.thinkingDefault,
     }));
+  const selectedDescriptor = ollama.models.find((m) => m.modelId === selectedModelId) ?? null;
+  /// The name assistant rows speak as: the model resolved for this session.
+  /// Unknown until a model resolves — the card then keeps the role label
+  /// instead of inventing an identity.
+  const assistantName = selectedDescriptor?.humanLabel || undefined;
   const streamReady =
     ollama.ready && selectedModelId !== '' && pickerModels.some((m) => m.id === selectedModelId);
+  /// A loaded registry that proves nothing is usable reads as unavailable;
+  /// an unresolved read stays neutral, never a claim about the machine.
+  const modelUnavailable =
+    ollama.accountsLoaded &&
+    (ollama.account === null || (ollama.modelsLoaded && pickerModels.length === 0));
 
-  const busy =
-    conv.status === 'submitting' || conv.status === 'bootstrapping' || conv.streaming !== null;
+  // Attachment selections: read and stored now when the session exists,
+  // otherwise pending until the send that materializes the session. A refused
+  // file keeps its chip with the reason; the send then refuses too.
+  const attachmentScope = conv.context
+    ? {
+        workspaceId: conv.context.workspaceId,
+        projectId: conv.context.projectId,
+        sessionId: conv.sessionId,
+      }
+    : null;
+  const attachments = useAttachments({ backend, scope: attachmentScope });
+  const attachmentDrop = useAttachmentDrop({ onPaths: attachments.addPaths });
+  /** Rehydrate the exact extracted text of an attachment on this session. */
+  const readAttachmentText = React.useCallback(
+    (attachmentId: string) => {
+      const ctx = conv.context;
+      if (!ctx || !conv.sessionId || !backend.readAttachmentText) {
+        return Promise.reject(new Error('VALIDATION_FAILED: attachment.unreadable'));
+      }
+      return backend.readAttachmentText(
+        ctx.workspaceId,
+        ctx.projectId,
+        conv.sessionId,
+        attachmentId,
+      );
+    },
+    [backend, conv.context, conv.sessionId],
+  );
   const refreshScope = conv.refreshScope;
   /// Workspace chosen for its first project (an existing workspace without
   /// projects). Project creation binds to it; the workspace itself is never
@@ -224,20 +334,41 @@ export function ConversationPanel({
 
   const formWorking = prov.working || sel.working || provisionTransition !== null;
 
-  const handleSubmit = React.useCallback(async () => {
-    const text = draftRef.current.trim();
-    if (!text || busy) return;
-    const sent = text;
-    // Streaming dispatch when a registry model is wired; otherwise the
-    // honest text-only fallback persists just the message.
-    const outcome = streamReady
-      ? await conv.streamOnce(sent, ollama.account!.accountId, selectedModelId)
-      : await conv.submit(sent);
-    // Retain the draft on failure; never erase edits typed meanwhile.
-    if (outcome.ok && draftRef.current === sent) {
-      commitPrompt(sent);
-    }
-  }, [busy, commitPrompt, conv, streamReady, ollama.account, selectedModelId]);
+  const {
+    busy,
+    queued,
+    pendingReference,
+    setPendingReference,
+    cancelPendingReference,
+    turnAction,
+    handleTurnAction,
+    handleSubmit,
+    removeQueued,
+  } = useTurnDispatch({
+    conv,
+    attachments,
+    streamReady,
+    ollamaAccountId: ollama.account?.accountId,
+    selectedModelId,
+    mode,
+    think,
+    draftRef,
+    setDraft,
+    commitPrompt,
+    setSubmitError,
+  });
+
+  /// A new model invalidates the thinking choice: a level documented for the
+  /// previous model may be undocumented for the next one (the backend refuses
+  /// undocumented values, so carrying it over would refuse an honest send).
+  const handleSelectModel = React.useCallback(
+    (modelId: string) => {
+      setSelectedModelId(modelId);
+      writeComposeModelPreference(sessionBucket, modelId);
+      setThink(null);
+    },
+    [sessionBucket],
+  );
 
   const handleStop = React.useCallback(() => {
     if (conv.streaming) {
@@ -247,16 +378,6 @@ export function ConversationPanel({
     setStopNotice(true);
   }, [conv]);
 
-  const notice = streamReady
-    ? submissionNotice({
-        attachmentCount: attachments.length,
-        hasCustomSettings: reasoningEffort !== 'medium',
-        modelApplied: true,
-      })
-    : submissionNotice({
-        attachmentCount: attachments.length,
-        hasCustomSettings: reasoningEffort !== 'medium',
-      });
   const composeStatus = conv.streaming
     ? ('streaming' as const)
     : conv.status === 'submitting'
@@ -302,170 +423,67 @@ export function ConversationPanel({
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent">
-      {/* Pending recovery banner (unresolved message recovery) */}
-      <div className="px-4 pt-2">
-        <PendingRecoveryBanner
-          operations={recovery.operations}
-          truncated={recovery.truncated}
-          onReview={recovery.openReview}
-          onDismiss={(op) => recovery.openDismiss(op)}
-        />
-      </div>
-
-      {/* Conversation Timeline (smoothly expands when messages exist) */}
-      <div
-        className={`flex flex-col overflow-y-auto transition-all duration-500 ease-in-out ${
-          isEmpty ? 'max-h-0 flex-0 opacity-0 pointer-events-none' : 'flex-1 opacity-100'
-        }`}
-      >
-        <div className="flex w-full flex-1 flex-col gap-4 p-4">
-          {conv.messages.map((m) => (
-            <MessageCard
-              key={m.id}
-              role={m.role === 'assistant' || m.role === 'agent' ? 'assistant' : 'user'}
-              text={m.text}
-              timestamp={formatTimestamp(m.createdAt)}
-            />
-          ))}
-          {conv.streaming && (
-            <MessageCard
-              key={conv.streaming.opId || 'streaming'}
-              role="assistant"
-              text={conv.streaming.text}
-              timestamp={formatTime(new Date())}
-            />
-          )}
-          {/* Non-authoritative recovery: only when the post-terminal history
-              reload failed; replaced atomically by authoritative rows. */}
-          {conv.recoverySnapshot && (
-            <MessageCard
-              key={conv.recoverySnapshot.id}
-              role="assistant"
-              text={conv.recoverySnapshot.text}
-              timestamp={formatTimestamp(conv.recoverySnapshot.createdAt)}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Centered Logo (pushes to center when empty, smoothly collapses when session starts) */}
-      <div
-        className={`flex flex-col items-center justify-end transition-all duration-500 ease-in-out ${
-          isEmpty
-            ? 'flex-1 pb-6 opacity-100 scale-100'
-            : 'max-h-0 flex-0 pb-0 opacity-0 scale-95 pointer-events-none overflow-hidden'
-        }`}
-      >
-        <EmptyWelcome />
-      </div>
-
-      {/* Status and availability notices */}
-      <div aria-live="polite">
-        {conv.status === 'bootstrapping' && (
-          <p>{t('conversation.starting', 'Starting conversation…')}</p>
-        )}
-        {conv.status === 'submitting' && <p>{t('conversation.saving', 'Saving message…')}</p>}
-        {conv.storageWarning && (
-          <div
-            role="status"
-            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
-          >
-            <p>{conv.storageWarning}</p>
-          </div>
-        )}
-        {conv.error && (
-          <div role="alert">
-            <p>{conv.error}</p>
-            <p>
-              {t(
-                'conversation.uncertainHint',
-                'If this message may not have saved, reload history before resending.',
-              )}
-            </p>
-            <button type="button" onClick={() => void conv.reload()}>
-              {t('conversation.reloadHistory', 'Reload history')}
-            </button>
-          </div>
-        )}
-        {executionUnavailable && (
-          <p>
-            {t(
-              'conversation.executionUnavailable',
-              'Execution is unavailable in this build. Messages are saved as text only.',
-            )}
-          </p>
-        )}
-        {stopNotice && (
-          <p>
-            {t(
-              'conversation.stopUnavailable',
-              'Stop is unavailable: there is no running operation to cancel.',
-            )}
-          </p>
-        )}
-        {recovery.error && (
-          <div role="alert" className="p-2 text-xs text-destructive bg-destructive/10 rounded">
-            <p>{recovery.error}</p>
-          </div>
-        )}
-        {recovery.cleanupWarning && (
-          <div
-            role="status"
-            className="p-2 text-xs text-warning-foreground bg-warning-surface rounded"
-          >
-            <p>{recovery.cleanupWarning}</p>
-          </div>
-        )}
-        <p>{notice}</p>
-      </div>
-
-      {/* Composer: smoothly glides from center to bottom */}
-      <div
-        className={`w-full transition-all duration-500 ease-in-out ${
-          isEmpty
-            ? 'flex-1 max-w-3xl mx-auto px-4 pb-16 flex flex-col justify-start'
-            : 'flex-0 w-full'
-        }`}
-      >
-        <Composer
-          isCentered={isEmpty}
-          inputText={draft}
-          onChangeInput={setDraft}
-          onSubmit={() => void handleSubmit()}
-          onStop={handleStop}
-          status={composeStatus}
-          enterToSend={enterToSend}
-          mode={mode}
-          onChangeMode={setMode}
-          selectedModelId={selectedModelId}
-          onSelectModel={setSelectedModelId}
-          models={pickerModels}
-          reasoningEffort={reasoningEffort}
-          onChangeReasoningEffort={setReasoningEffort}
-          attachments={attachments}
-          onAddAttachments={(next) => setAttachments((prev) => [...prev, ...next])}
-          onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
-          approvalRequest={null}
-          onRecallPrevious={() => {
-            recallPrevious();
-          }}
-          onRecallNext={() => {
-            recallNext();
-          }}
-        />
-      </div>
-
-      <PendingRecoveryReviewDialog
-        open={recovery.reviewDialogOpen}
-        operation={recovery.activeReviewOp}
-        validatingTarget={recovery.validatingTarget}
-        targetMissing={recovery.targetMissing}
-        initialDismissConfirm={recovery.initialDismissConfirm}
-        onClose={recovery.closeReview}
-        onResend={(op) => recovery.resendOperation(op)}
-        onDismiss={(op) => recovery.dismissOperation(op)}
-      />
-    </div>
+    <ConversationPanelView
+      conv={conv}
+      attachments={attachments}
+      recovery={recovery}
+      providerRecovery={providerRecovery}
+      timeline={{
+        ref: timelineRef,
+        onScroll: handleTimelineScroll,
+        showJumpToLatest,
+        scrollToLatest,
+        isEmpty,
+      }}
+      messages={{
+        alternatives,
+        assistantName,
+        turnAction,
+        busy,
+        feedbackByAnswer,
+        readAttachmentText: backend.readAttachmentText ? readAttachmentText : undefined,
+        onRegenerate: handleTurnAction,
+        setActionNotice,
+        setPendingReference,
+        draftRef,
+        setDraft,
+      }}
+      compose={{
+        draft,
+        onSubmit: () => void handleSubmit(),
+        onStop: handleStop,
+        queued,
+        onRemoveQueued: removeQueued,
+        pendingReference,
+        onCancelReference: cancelPendingReference,
+        status: composeStatus,
+        enterToSend,
+        mode,
+        onChangeMode: handleChangeMode,
+        selectedModelId,
+        onSelectModel: handleSelectModel,
+        models: pickerModels,
+        modelUnavailable,
+        think,
+        onChangeThink: setThink,
+        contextLimit: selectedDescriptor?.contextLimit ?? null,
+        effectiveContextBudget: selectedDescriptor?.effectiveContextBudget ?? null,
+        onAddFiles: attachments.addFiles,
+        onRemoveAttachment: attachments.remove,
+        isDragOverExternal: attachmentDrop.dragging,
+        onRecallPrevious: () => {
+          recallPrevious();
+        },
+        onRecallNext: () => {
+          recallNext();
+        },
+      }}
+      notices={{
+        actionNotice,
+        executionUnavailable,
+        stopNotice,
+        submitError,
+      }}
+    />
   );
 }

@@ -16,13 +16,15 @@
 use crate::domain::account::PrivacyClass;
 use crate::domain::endpoint::EndpointDescriptor;
 use crate::domain::error::ProviderError;
-use crate::domain::model::{CapabilityStatus, ModelCapabilities, ModelId};
+use crate::domain::model::{CapabilityStatus, ModelCapabilities, ModelEvidence, ModelId};
+
+use super::ollama_http::now_us;
 use crate::domain::request::{MessageRole, ProviderRequestV1};
 use crate::domain::stream::{NormalizedStreamEvent, StreamCompletionOutcome, StreamUsage};
 use crate::registry::PinnedModel;
 use crate::transport::{HttpTransport, MAX_FRAME_BYTES};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::VecDeque;
 use std::fmt;
 
@@ -168,6 +170,16 @@ impl GeminiHttpAdapter {
                     human_label: display_name.to_string(),
                     privacy_class: PrivacyClass::CloudStandard,
                     capabilities: map_discovery_capabilities(&entry),
+                    // The endpoint reports no version here, and token limits
+                    // stay unmapped until a Gemini budgeting decision exists:
+                    // nothing is claimed that this source did not say.
+                    evidence: ModelEvidence {
+                        source: "google /v1beta/models".into(),
+                        server_version: None,
+                        observed_at_us: now_us(),
+                    },
+                    context_limit: None,
+                    configured_context: None,
                 },
             });
         }
@@ -218,6 +230,9 @@ fn map_discovery_capabilities(entry: &Value) -> ModelCapabilities {
         structured_output: CapabilityStatus::Unknown,
         tool_proposals: CapabilityStatus::Unknown,
         thinking: CapabilityStatus::Unknown,
+        // No modality or thinking metadata in this payload: both stay unknown.
+        image_input: CapabilityStatus::Unknown,
+        thinking_control: None,
     }
 }
 

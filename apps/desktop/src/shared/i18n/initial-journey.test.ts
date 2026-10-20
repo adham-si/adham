@@ -11,13 +11,15 @@ const journeyFiles = [
   '../../features/conversation/provisioning-form.tsx',
   '../../features/conversation/conversation-setup-slot.tsx',
   '../../features/conversation/conversation-panel.tsx',
+  '../../features/conversation/conversation-panel-view.tsx',
+  '../../features/conversation/use-turn-dispatch.ts',
   '../../widgets/shell/primary-sidebar/primary-sidebar.tsx',
   '../../widgets/compose/composer.tsx',
   '../../widgets/compose/compose-input.tsx',
   '../../widgets/compose/compose-action-bar.tsx',
   '../../widgets/compose/compose-mode-selector.tsx',
   '../../widgets/compose/compose-model-picker.tsx',
-  '../../widgets/compose/compose-attachment-menu.tsx',
+  '../../features/conversation/attachments/ui/attachment-picker.tsx',
   '../../widgets/compose/compose-approval-bar.tsx',
   '../../widgets/compose/compose-status-strip.tsx',
 ];
@@ -50,7 +52,7 @@ function resourceValue(language: 'en' | 'ar', key: string): unknown {
   return value;
 }
 
-// Plural bases (e.g. compose.pastedChars) have only suffixed leaves;
+// Plural bases (e.g. settings.routing.fallbackModels) have only suffixed leaves;
 // probe the `other` form for those.
 function probeValue(language: 'en' | 'ar', key: string): unknown {
   const direct = resourceValue(language, key);

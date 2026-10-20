@@ -80,18 +80,65 @@ export const SubmittedMessageSchema = z.object({
   projectionPosition: z.string(),
 });
 
+export const MessageCompletionV1Schema = z.union([
+  z.object({ Completed: z.object({ truncated: z.boolean() }) }),
+  z.literal('Interrupted'),
+  z.literal('Failed'),
+]);
+
+export const MessageReferenceDtoSchema = z.object({
+  refersToMessageId: z.string(),
+  relation: z.string(),
+});
+
+export const BranchSelectionSchema = z.object({
+  rootMessageId: z.string(),
+  activeMessageId: z.string(),
+});
+
+export const BranchSelectionListSchema = z.array(BranchSelectionSchema);
+
+export const AnswerFeedbackSchema = z.object({
+  messageId: z.string(),
+  verdict: z.enum(['like', 'dislike']),
+  reason: z.string().nullable(),
+});
+
+export const AnswerFeedbackListSchema = z.array(AnswerFeedbackSchema);
+
+export const MessageAttachmentDtoSchema = z.object({
+  attachmentId: z.string(),
+  fileName: z.string(),
+  mediaType: z.string(),
+  byteSize: z.number().int(),
+  contentHash: z.string(),
+  hashAlgorithm: z.string(),
+  extractedChars: z.number().int(),
+  truncated: z.boolean(),
+});
+
+export const AttachmentDtoSchema = MessageAttachmentDtoSchema.extend({
+  retention: z.string(),
+  text: z.string(),
+});
+
 export const ConversationMessageDtoSchema = z.object({
   messageId: z.string(),
   role: z.string(),
   text: z.string(),
   createdAt: z.string(),
   sourceEventId: z.string(),
+  completion: MessageCompletionV1Schema.nullable(),
+  reference: MessageReferenceDtoSchema.nullable(),
+  attachments: z.array(MessageAttachmentDtoSchema).default([]),
 });
 
 export const ConversationPageSchema = z.object({
   items: z.array(ConversationMessageDtoSchema),
   nextCursor: z.string().nullable(),
   projectionPosition: z.string(),
+  branchSelections: z.array(BranchSelectionSchema),
+  feedback: z.array(AnswerFeedbackSchema),
 });
 
 export const StorageStatusSchema = z.object({
@@ -145,6 +192,10 @@ export const PendingOperationListSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const MarkCompletionInterruptedResponseSchema = z.object({
+  status: z.string(),
+});
+
 // ===== Delivery A: provider commands + streaming completions =====
 
 export const MessageUsageV1Schema = z.object({
@@ -153,17 +204,21 @@ export const MessageUsageV1Schema = z.object({
   totalTokens: z.number().int().nonnegative().nullable(),
 });
 
-export const MessageCompletionV1Schema = z.union([
-  z.object({ Completed: z.object({ truncated: z.boolean() }) }),
-  z.literal('Interrupted'),
-  z.literal('Failed'),
-]);
-
 export const ProviderCapabilitiesDtoSchema = z.object({
   streaming: z.enum(['supported', 'unsupported', 'unknown']),
   structuredOutput: z.enum(['supported', 'unsupported', 'unknown']),
   toolProposals: z.enum(['supported', 'unsupported', 'unknown']),
   thinking: z.enum(['supported', 'unsupported', 'unknown']),
+  imageInput: z.enum(['supported', 'unsupported', 'unknown']),
+  // Documented `think` values from /api/show; null = no metadata.
+  thinkingValues: z.array(z.string()).nullable(),
+  thinkingDefault: z.string().nullable(),
+});
+
+export const ProviderModelEvidenceDtoSchema = z.object({
+  source: z.string(),
+  serverVersion: z.string().nullable(),
+  observedAt: z.string().nullable(),
 });
 
 export const ProviderModelDtoSchema = z.object({
@@ -172,6 +227,10 @@ export const ProviderModelDtoSchema = z.object({
   humanLabel: z.string(),
   privacyClass: z.string(),
   capabilities: ProviderCapabilitiesDtoSchema,
+  contextLimit: z.number().int().positive().nullable(),
+  configuredContext: z.number().int().positive().nullable(),
+  effectiveContextBudget: z.number().int().positive().nullable(),
+  evidence: ProviderModelEvidenceDtoSchema,
 });
 
 export const ProviderModelsListSchema = z.object({
@@ -201,9 +260,18 @@ export const ProviderHealthResponseSchema = z.object({
   modelTagCount: z.number().int().nonnegative(),
 });
 
+export const ContextAssemblyDtoSchema = z.object({
+  estimatedInputTokens: z.number().int().nonnegative(),
+  inputBudgetTokens: z.number().int().nonnegative().nullable(),
+  droppedMessages: z.number().int().nonnegative(),
+  attachmentsIncluded: z.number().int().nonnegative(),
+  attachmentChars: z.number().int().nonnegative(),
+});
+
 export const CompletionStartDtoSchema = z.object({
   opId: z.string(),
   messageId: z.string(),
+  context: ContextAssemblyDtoSchema.nullable(),
 });
 
 export const StopCompletionResponseSchema = z.object({
@@ -213,6 +281,9 @@ export const StopCompletionResponseSchema = z.object({
 
 export const StreamEventPayloadDtoSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('started') }),
+  // Reasoning activity marker: payload-free by design (reasoning text never
+  // crosses the IPC boundary).
+  z.object({ type: z.literal('thinking') }),
   z.object({ type: z.literal('delta'), text: z.string() }),
   z.object({
     type: z.literal('completed'),

@@ -20,14 +20,20 @@
 //! every platform.
 
 use super::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody};
-use tauri::test::{get_ipc_response, mock_builder, MockRuntime, INVOKE_KEY};
+use tauri::test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder};
 
+mod answer_feedback;
+mod branches_contract;
 mod common;
+mod completion_lifecycle;
 mod dispatch_adapters;
+mod dispatch_contract;
 mod google_accounts;
 mod provider_commands;
+mod references_contract;
+mod retry_contract;
 mod streaming_contract;
 mod streaming_recovery;
 

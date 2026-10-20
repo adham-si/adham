@@ -1,29 +1,25 @@
 import { useTranslation } from 'react-i18next';
-import * as React from 'react';
 import { formatNumber } from '@/shared/i18n/format';
 import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  File01Icon,
-  Image01Icon,
-  Folder01Icon,
-  Cancel01Icon,
-  DocumentCodeIcon,
-} from '@hugeicons/core-free-icons';
+import { DocumentCodeIcon, Cancel01Icon } from '@hugeicons/core-free-icons';
 
-export interface ComposeAttachment {
-  id: string;
-  type: 'file' | 'image' | 'folder' | 'pasted-text';
-  name: string;
-  size?: number; // bytes
-  charCount?: number;
-  preview?: string;
-  file?: File;
+/** One composer file selection as the chip renders it. `reading`/`pending` are
+ *  states, not types: nothing is claimed ready until the backend stored it. */
+export interface ComposeAttachmentChip {
+  key: string;
+  fileName: string;
+  byteSize?: number | undefined;
+  charCount?: number | undefined;
+  status: 'reading' | 'ready' | 'pending' | 'error';
+  truncated?: boolean | undefined;
+  /** Refusal code shown to the user; never guessed by the UI. */
+  errorCode?: string | undefined;
 }
 
 export interface ComposeContextChipsProps {
-  attachments: ComposeAttachment[];
-  onRemove: (id: string) => void;
-  className?: string;
+  attachments: ComposeAttachmentChip[];
+  onRemove: (key: string) => void;
+  className?: string | undefined;
 }
 
 // Byte units stay symbolic (B/KB/MB everywhere); only the numerals follow
@@ -51,54 +47,70 @@ export function ComposeContextChips({
     <div
       role="list"
       aria-label={t('compose.attachedContext')}
-      className={`flex flex-wrap items-center gap-1.5 px-3 pt-2 pb-1 ${className}`}
+      className={`flex flex-wrap items-center gap-2 px-4 pt-3 pb-1 ${className}`}
     >
-      {attachments.map((item) => {
-        let IconComponent = File01Icon;
-        if (item.type === 'image') IconComponent = Image01Icon;
-        if (item.type === 'folder') IconComponent = Folder01Icon;
-        if (item.type === 'pasted-text') IconComponent = DocumentCodeIcon;
+      {attachments.map((item) => (
+        <div
+          key={item.key}
+          role="listitem"
+          className={`group flex items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
+            item.status === 'error'
+              ? 'border-danger/40 bg-danger/5 text-foreground'
+              : 'border-border-subtle bg-surface-subtle text-foreground hover:border-border'
+          }`}
+        >
+          <span className="text-foreground-secondary [&_svg]:size-4">
+            <HugeiconsIcon icon={DocumentCodeIcon} />
+          </span>
 
-        return (
-          <div
-            key={item.id}
-            role="listitem"
-            className="group flex items-center gap-1.5 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground transition-colors hover:border-border"
+          <span className="max-w-44 truncate font-medium" title={item.fileName}>
+            {item.fileName}
+          </span>
+
+          {item.status === 'error' ? (
+            <span role="alert" className="text-xs text-danger-foreground">
+              {t(`attachments.errors.${item.errorCode ?? 'unknown'}`)}
+            </span>
+          ) : item.status === 'reading' ? (
+            <span className="text-xs text-foreground-muted">{t('attachments.reading')}</span>
+          ) : item.status === 'pending' ? (
+            <span className="text-xs text-foreground-muted" title={t('attachments.pendingTitle')}>
+              {t('attachments.pendingRead')}
+            </span>
+          ) : (
+            <>
+              {item.charCount !== undefined ? (
+                <span className="text-xs text-foreground-muted">
+                  {t('compose.charsCompact', {
+                    count: item.charCount,
+                    formatted: formatNumber(item.charCount / 1000, undefined, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    }),
+                  })}
+                </span>
+              ) : item.byteSize ? (
+                <span className="text-xs text-foreground-muted">{formatBytes(item.byteSize)}</span>
+              ) : null}
+              {item.truncated && (
+                <span className="rounded-sm border border-border-subtle px-1 text-xs text-foreground-muted">
+                  {t('attachments.truncated')}
+                </span>
+              )}
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onRemove(item.key)}
+            aria-label={t('compose.removeAttachment', { name: item.fileName })}
+            title={t('compose.removeAttachment', { name: item.fileName })}
+            className="ms-1 flex size-4 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus [&_svg]:size-3"
           >
-            <span className="text-foreground-secondary [&_svg]:size-3.5">
-              <HugeiconsIcon icon={IconComponent} />
-            </span>
-
-            <span className="max-w-44 truncate font-medium" title={item.name}>
-              {item.name}
-            </span>
-
-            {item.size ? (
-              <span className="text-[10px] text-foreground-muted">{formatBytes(item.size)}</span>
-            ) : item.charCount ? (
-              <span className="text-[10px] text-foreground-muted">
-                {t('compose.charsCompact', {
-                  count: item.charCount,
-                  formatted: formatNumber(item.charCount / 1000, undefined, {
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  }),
-                })}
-              </span>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => onRemove(item.id)}
-              aria-label={t('compose.removeAttachment', { name: item.name })}
-              title={t('compose.removeAttachment', { name: item.name })}
-              className="ms-1 flex size-4 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus [&_svg]:size-3"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} />
-            </button>
-          </div>
-        );
-      })}
+            <HugeiconsIcon icon={Cancel01Icon} />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

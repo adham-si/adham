@@ -9,8 +9,11 @@
 //! and persists even when the renderer is gone.
 
 pub mod accounts;
+pub mod assembly;
 pub mod discovery;
 pub mod google;
+pub mod retry;
+pub(crate) mod scope;
 pub mod stream_io;
 pub mod streaming;
 
@@ -22,16 +25,22 @@ pub use google::{
     handle_configure_google_account, handle_disconnect_google_account,
     handle_disconnect_ollama_account,
 };
-pub use streaming::{handle_complete_once_streaming, handle_stop_completion};
+pub use retry::handle_retry_completion_streaming;
+pub use streaming::{
+    handle_complete_once_streaming, handle_mark_completion_interrupted, handle_stop_completion,
+};
 
-use super::streaming::expect_full_scope;
 use super::ApiContext;
+use super::assembly::mode_instruction;
+use super::scope::expect_full_scope;
+use super::streaming::resolve_pinned;
 use crate::dtos::*;
 use adham_core_types::*;
-use adham_provider::adapters::ollama_http::OllamaHttpAdapter;
 use adham_provider::adapters::AnyAdapter;
+use adham_provider::adapters::ollama_http::OllamaHttpAdapter;
 use adham_provider::domain::model::ModelDescriptor;
-use adham_provider::registry::LocalAccount;
+use adham_provider::domain::request::ThinkValue;
+use adham_provider::registry::{LocalAccount, PinnedModel};
 use adham_provider::transport::HttpTransport;
 use serde::Serialize;
 use sqlx::Row;
@@ -78,6 +87,12 @@ impl CompletionRuns {
             }
             None => false,
         }
+    }
+
+    /// Liveness check without cancelling: recovery must never treat a running
+    /// op as a crashed one.
+    pub fn is_live(&self, op: &str) -> bool {
+        self.runs.lock().expect("runs mutex").contains_key(op)
     }
 
     pub fn remove(&self, op: &str) {
@@ -168,6 +183,78 @@ pub(crate) fn any_adapter(
     }
 }
 
+/// Account + pinned model evidence + kind-routed adapter. Google-style kinds
+/// hold their credential in the sealed vault; it is loaded per-dispatch,
+/// moved into the adapter, and dropped with it. A missing or unopenable seal
+/// refuses pre-session — before op creation, so no pending op ever leaks.
+pub(crate) async fn resolve_dispatch_adapter(
+    ctx: &ApiContext,
+    account_id: &str,
+    model_id: &str,
+) -> Result<(LocalAccount, PinnedModel, AnyAdapter), String> {
+    let account = local_account(ctx, account_id).await?;
+    let pinned = resolve_pinned(ctx, &account.account_id, model_id).await?;
+    let credential = match account.kind {
+        adham_provider::domain::account::ProviderKind::GoogleGemini => Some(
+            adham_event_log::read_provider_credential_plaintext(
+                &ctx.pool,
+                ctx.content_key.as_ref(),
+                &account.account_id.0,
+                &ctx.installation_id.0.to_string(),
+            )
+            .await
+            .map_err(|e| {
+                format!("VALIDATION_FAILED: no usable credential for this Google account: {e}")
+            })?,
+        ),
+        _ => None,
+    };
+    let adapter = any_adapter(&account, credential)?;
+    Ok((account, pinned, adapter))
+}
+
+/// Modes are declarations with real semantics. "execute" has no runtime to
+/// execute under, so it is refused rather than silently downgraded; unknown
+/// modes never reach a socket. Shared by send and retry.
+pub(crate) fn validate_mode(mode: Option<&str>) -> Result<(), String> {
+    if let Some(mode) = mode {
+        if mode == "execute" {
+            return Err(
+                "EXECUTE_UNAVAILABLE: execution requires the policy and tool runtime, which is not built"
+                    .to_string(),
+            );
+        }
+        if mode_instruction(mode).is_none() {
+            return Err(format!("VALIDATION_FAILED: unknown mode '{mode}'"));
+        }
+    }
+    Ok(())
+}
+
+/// `think` values are documented per model by `/api/show` (`thinking.values`).
+/// Only an exact documented value may be sent: Ollama silently falls back to
+/// the model default for anything else, which would turn the UI's
+/// applied-state into a lie. No documented values = refused.
+pub(crate) fn validate_think(pinned: &PinnedModel, think: &ThinkValue) -> Result<(), String> {
+    let documented: &[String] = pinned
+        .descriptor
+        .capabilities
+        .thinking_control
+        .as_ref()
+        .map(|control| control.values.as_slice())
+        .unwrap_or_default();
+    if documented.is_empty() {
+        return Err("THINKING_UNSUPPORTED: model has no documented thinking values".to_string());
+    }
+    let requested = think.as_documented();
+    if !documented.contains(&requested) {
+        return Err(format!(
+            "THINKING_VALUE_UNSUPPORTED: '{requested}' is not a documented thinking value"
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn ok_result<T: Serialize + TS>(request_id: String, data: T) -> CommandResult<T> {
     CommandResult {
         protocol_version: 1,
@@ -188,7 +275,51 @@ pub(crate) fn provider_model_dto(descriptor: &ModelDescriptor, digest: &str) -> 
             structured_output: cap_str(descriptor.capabilities.structured_output).to_string(),
             tool_proposals: cap_str(descriptor.capabilities.tool_proposals).to_string(),
             thinking: cap_str(descriptor.capabilities.thinking).to_string(),
+            image_input: cap_str(descriptor.capabilities.image_input).to_string(),
+            thinking_values: descriptor
+                .capabilities
+                .thinking_control
+                .as_ref()
+                .map(|control| control.values.clone()),
+            thinking_default: descriptor
+                .capabilities
+                .thinking_control
+                .as_ref()
+                .and_then(|control| control.default_value.clone()),
         },
+        context_limit: descriptor.context_limit,
+        configured_context: descriptor.configured_context,
+        effective_context_budget: effective_context_budget(descriptor),
+        evidence: ProviderModelEvidenceDto {
+            source: descriptor.evidence.source.clone(),
+            server_version: descriptor.evidence.server_version.clone(),
+            observed_at: format_observed_at(descriptor.evidence.observed_at_us),
+        },
+    }
+}
+
+/// Micros → RFC3339 UTC (the DTO timestamp convention). Zero/negative means
+/// never observed → None, never a fabricated epoch date.
+fn format_observed_at(observed_at_us: i64) -> Option<String> {
+    if observed_at_us <= 0 {
+        return None;
+    }
+    let dt =
+        time::OffsetDateTime::from_unix_timestamp_nanos((observed_at_us * 1_000) as i128).ok()?;
+    Some(
+        dt.format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default(),
+    )
+}
+
+/// The request-time budget is only claimed when both bounds are evidenced —
+/// the model maximum and the endpoint-configured context. Either one alone
+/// overstates: the server-wide default is not queryable, and a configured
+/// value above the model maximum is not a real budget.
+pub(crate) fn effective_context_budget(descriptor: &ModelDescriptor) -> Option<u32> {
+    match (descriptor.context_limit, descriptor.configured_context) {
+        (Some(model_max), Some(configured)) => Some(model_max.min(configured)),
+        _ => None,
     }
 }
 
@@ -199,7 +330,8 @@ pub(crate) fn serde_plain_repr<T: Serialize>(value: &T) -> String {
         .unwrap_or_default()
 }
 
-/// Dispatch-scope plumbing shared by discovery, streaming, and accounts.
+// ===== completion =====
+
 pub(crate) struct StreamIds {
     ws_id: WorkspaceId,
     proj_id: ProjectId,
@@ -219,6 +351,8 @@ pub(crate) fn optional_full_scope(context: &CommandContext) -> Result<Option<Str
     expect_full_scope(context).map(Some)
 }
 
+/// Ownership check: the session's stream row must carry exactly this
+/// workspace/project pair (renderer-supplied scope can never cross).
 pub(crate) async fn validate_session_scope(
     ctx: &ApiContext,
     ids: &StreamIds,

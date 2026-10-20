@@ -19,7 +19,21 @@ export type BootstrapSnapshot = {
 
 export type SessionSnapshot = { sessionId: string };
 export type SubmittedSnapshot = { messageId: string; text: string; createdAt: string };
-export type ConversationSnapshot = { items: ConversationMessageDto[] };
+/** Which member of an edited branch the session continues from. */
+export type BranchSelection = { rootMessageId: string; activeMessageId: string };
+/** A stored like/dislike verdict for one persisted answer row (one attempt). */
+export type AnswerFeedback = {
+  messageId: string;
+  verdict: 'like' | 'dislike';
+  reason: string | null;
+};
+export type ConversationSnapshot = {
+  items: ConversationMessageDto[];
+  /** Present on real pages; a backend that cannot read selections omits it. */
+  branchSelections?: BranchSelection[] | undefined;
+  /** Present on real pages; a backend without stored verdicts omits it. */
+  feedback?: AnswerFeedback[] | undefined;
+};
 
 export interface ConversationBackend {
   getBootstrapState(): Promise<BootstrapSnapshot>;
@@ -33,7 +47,7 @@ export interface ConversationBackend {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-    payload: { text: string },
+    payload: { text: string; attachmentIds?: string[] },
     options?: { requestId?: string },
   ): Promise<SubmittedSnapshot>;
   getConversation(
@@ -41,6 +55,47 @@ export interface ConversationBackend {
     projectId: string,
     sessionId: string,
   ): Promise<ConversationSnapshot>;
+  /** Bounded ingestion of a picked or pasted text/code file. A refusal is
+   *  `VALIDATION_FAILED: attachment.<code>` and stores nothing. */
+  ingestAttachment?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { fileName: string; text: string },
+  ): Promise<import('@adham/contracts-generated').AttachmentDto>;
+  /** Bounded Rust-side read for a dropped filesystem path (text/code only). */
+  ingestAttachmentPath?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: { filePath: string },
+  ): Promise<import('@adham/contracts-generated').AttachmentDto>;
+  /** Rehydrate the exact extracted text a sent attachment carried. */
+  readAttachmentText?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    attachmentId: string,
+  ): Promise<import('@adham/contracts-generated').AttachmentDto>;
+  /** Record which member of an edited branch the session continues from.
+   *  Returns the session's selections after the write. */
+  setActiveAlternative(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    rootMessageId: string,
+    activeMessageId: string,
+  ): Promise<BranchSelection[]>;
+  /** Record, switch, or remove (verdict null) the local verdict for one
+   *  answer row. Returns the session's feedback after the write. */
+  setAnswerFeedback(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    verdict: 'like' | 'dislike' | null,
+    reason: string | null,
+  ): Promise<AnswerFeedback[]>;
   listSessions?(context: {
     workspaceId?: string;
     projectId: string;
@@ -62,7 +117,39 @@ export interface ConversationBackend {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-    payload: { accountId: string; modelId: string; text: string },
+    payload: {
+      accountId: string;
+      modelId: string;
+      text: string;
+      /** Turn mode; dispatched as a request-only system instruction. */
+      mode: 'ask' | 'plan' | 'code' | 'execute';
+      /** Documented thinking parameter value; omitted = model default. */
+      think?: boolean | string;
+      /** Durable reply/edit anchor; validated against persisted history. */
+      reference?: { refersToMessageId: string; relation: 'replied' | 'edited-from' };
+      /** Ingested attachment ids selected for this send. */
+      attachmentIds?: string[];
+    },
+    onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
+    options?: { requestId?: string },
+  ): Promise<import('@adham/contracts-generated').CompletionStartDto>;
+  /**
+   * One NEW attempt for an existing user turn (retry / regenerate): the user
+   * row is not duplicated and previous attempts stay persisted.
+   */
+  retryCompletionStreaming?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: {
+      accountId: string;
+      modelId: string;
+      replyToMessageId: string;
+      /** Turn mode; dispatched as a request-only system instruction. */
+      mode: 'ask' | 'plan' | 'code' | 'execute';
+      /** Documented thinking parameter value; omitted = model default. */
+      think?: boolean | string;
+    },
     onEvent: (event: import('@adham/contracts-generated').StreamEventDto) => void,
     options?: { requestId?: string },
   ): Promise<import('@adham/contracts-generated').CompletionStartDto>;
@@ -73,6 +160,13 @@ export interface ConversationBackend {
     opId: string,
     options?: { requestId?: string },
   ): Promise<import('@adham/contracts-generated').StopCompletionResponse>;
+  markCompletionInterrupted?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    payload: import('@adham/contracts-generated').MarkCompletionInterruptedPayload,
+    options?: { requestId?: string },
+  ): Promise<import('@adham/contracts-generated').MarkCompletionInterruptedResponse>;
 }
 
 export type ConversationContext = {
@@ -292,22 +386,55 @@ export const conversationCapabilities = {
   stop: true,
 } as const;
 
+/**
+ * UI-normalized terminal lifecycle of an assistant turn. The wire carries
+ * the core `MessageCompletionV1` shape; the UI works with a flat state so
+ * labels never depend on string matching at render time.
+ */
+export type UiCompletion =
+  | { state: 'completed'; truncated: boolean }
+  | { state: 'interrupted' }
+  | { state: 'failed' };
+
+const normalizeCompletion = (
+  completion: { Completed: { truncated: boolean } } | 'Interrupted' | 'Failed' | null | undefined,
+): UiCompletion | null => {
+  if (completion === null || completion === undefined) return null;
+  if (completion === 'Interrupted') return { state: 'interrupted' };
+  if (completion === 'Failed') return { state: 'failed' };
+  return { state: 'completed', truncated: completion.Completed.truncated === true };
+};
+
 export const toUiMessage = (dto: {
   messageId: string;
   role?: string;
   text: string;
   createdAt: string;
-}): { id: string; role: string; text: string; createdAt: string } => ({
+  completion?: { Completed: { truncated: boolean } } | 'Interrupted' | 'Failed' | null;
+  reference?: { refersToMessageId: string; relation: string } | null;
+  attachments?: import('@adham/contracts-generated').MessageAttachmentDto[];
+}): {
+  id: string;
+  role: string;
+  text: string;
+  createdAt: string;
+  completion: UiCompletion | null;
+  reference: { refersToMessageId: string; relation: string } | null;
+  attachments: import('@adham/contracts-generated').MessageAttachmentDto[];
+} => ({
   id: dto.messageId,
   role: dto.role ?? 'user',
   text: dto.text,
   createdAt: dto.createdAt,
+  completion: normalizeCompletion(dto.completion),
+  reference: dto.reference ?? null,
+  attachments: dto.attachments ?? [],
 });
 
 export const switchUnresolved = (
   req: ConversationContext | null,
   curId: string | null | undefined,
-): SubmitOutcome | null =>
+): Extract<SubmitOutcome, { ok: false }> | null =>
   req && req.sessionId !== curId
     ? {
         ok: false,

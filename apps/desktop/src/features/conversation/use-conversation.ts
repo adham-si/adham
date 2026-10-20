@@ -8,8 +8,11 @@ import {
   sameScope,
 } from './conversation-identity';
 import {
+  type AnswerFeedback,
+  type BranchSelection,
   type ConversationBackend,
   type ConversationContext,
+  type UiCompletion,
   conversationCapabilities,
   resolveAuthoritativeSession,
   toUiMessage,
@@ -19,7 +22,9 @@ import {
   persistAndAnnounceActiveSession,
 } from './durable-session-storage';
 import { readPendingFirstSend } from './lazy-session-creation';
+import { useConversationActions } from './use-conversation-actions';
 import { useConversationDispatch } from './use-conversation-dispatch';
+import { useConversationStream } from './use-conversation-stream';
 
 export type { PendingSend } from './conversation-identity';
 export type {
@@ -33,10 +38,42 @@ export type {
 } from './conversation-scope';
 export { conversationCapabilities } from './conversation-scope';
 
-export type UiMessage = { id: string; role: string; text: string; createdAt: string };
+export type UiMessage = {
+  id: string;
+  role: string;
+  text: string;
+  createdAt: string;
+  /** Assistant terminal lifecycle; absent on optimistic/streaming bubbles. */
+  completion?: UiCompletion | null;
+  /** Durable reply/edit anchor recorded with this message, when it has one.
+   *  Read-side shape: relation arrives as stored text, displayed as-is. */
+  reference?: { refersToMessageId: string; relation: string } | null;
+  /** Files this message was sent with (metadata only; a chip exists only
+   *  because the dispatch link row exists). */
+  attachments?: import('@adham/contracts-generated').MessageAttachmentDto[];
+  /** True only for a local bubble not yet confirmed persisted: it carries no
+   *  durable id and cannot be the anchor of anything. */
+  provisional?: boolean;
+};
 
-/** Live streaming state for the composer (deltas + terminal op handle). */
-export type StreamingSnapshot = { opId: string; text: string };
+/** A durable anchor for a NEW submission: the only relations the backend
+ *  accepts, and what the composer can actually produce. */
+export type UiMessageReference = {
+  refersToMessageId: string;
+  relation: 'replied' | 'edited-from';
+};
+
+/** Live streaming state for the timeline (phase drives the visible status). */
+export type StreamingSnapshot = {
+  /** Server op handle: '' until the first stream event lands. */
+  opId: string;
+  text: string;
+  /** waiting = dispatch in flight, thinking = reasoning activity seen,
+   * streaming = answer text arriving. Never advanced from elapsed time. */
+  phase: 'waiting' | 'thinking' | 'streaming';
+  /** Dispatch start (epoch ms), for the elapsed display. */
+  startedAt: number;
+};
 
 export type ConversationStatus =
   | 'bootstrapping'
@@ -56,6 +93,16 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // after a terminal whose authoritative history reload failed. Cleared in
   // the same flush as the authoritative rows inside loadHistory.
   const [recoverySnapshot, setRecoverySnapshot] = React.useState<UiMessage | null>(null);
+  // Older messages dropped from the last dispatch's assembled context
+  // (reported by the server-side assembler; 0 when nothing was dropped).
+  const [omittedMessages, setOmittedMessages] = React.useState(0);
+  // Active-alternative selections for the loaded session (line 65). Local
+  // state: choosing a branch never rewrites history, only what the next
+  // dispatch is answered against.
+  const [branchSelections, setBranchSelections] = React.useState<BranchSelection[]>([]);
+  // Local like/dislike verdicts keyed by answer row: server-authoritative, so
+  // a refusal never flips a chip, and a reload restores the stored verdict.
+  const [answerFeedback, setAnswerFeedbackRows] = React.useState<AnswerFeedback[]>([]);
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
@@ -131,6 +178,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         const items = page.items.map(toUiMessage);
         setContext(ctx);
         setMessages(items);
+        setBranchSelections(page.branchSelections ?? []);
+        setAnswerFeedbackRows(page.feedback ?? []);
         // Same-flush swap: the recovery snapshot (if any) is replaced by the
         // authoritative rows atomically — never two copies of an answer.
         setRecoverySnapshot(null);
@@ -434,10 +483,21 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     return () => window.removeEventListener('adham:session-select', onSelect);
   }, [context, openSession]);
 
-  const dispatch = useConversationDispatch({
+  const actions = useConversationActions({
     backend,
     context,
-    bootstrap,
+    isStale,
+    generationRef,
+    loadSeqRef,
+    mutationSeqRef,
+    setBranchSelections,
+    setAnswerFeedbackRows,
+  });
+  const { makeAlternativeActive, setAnswerFeedback } = actions;
+
+  const stream = useConversationStream({
+    backend,
+    context,
     loadHistory,
     isStale,
     mountedRef,
@@ -454,10 +514,31 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     setError,
     setStatus,
     setStorageWarning,
-    setPendingSend,
+    setOmittedMessages,
     setRecoverySnapshot,
   });
-  const { submit, streamOnce, stop, streaming } = dispatch;
+  const { streamOnce, retryTurn, stop, streaming } = stream;
+
+  const dispatch = useConversationDispatch({
+    backend,
+    context,
+    bootstrap,
+    mountedRef,
+    generationRef,
+    mutationSeqRef,
+    requestedRef,
+    scopeStaleRef,
+    submitInFlightRef,
+    installationIdRef,
+    createdRef,
+    setContext,
+    setMessages,
+    setError,
+    setStatus,
+    setStorageWarning,
+    setPendingSend,
+  });
+  const { submit } = dispatch;
 
   return {
     status,
@@ -467,10 +548,16 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     activeWorkspaceId,
     error,
     storageWarning,
+    omittedMessages,
     pendingSend,
     submit,
     streamOnce,
+    retryTurn,
     stop,
+    branchSelections,
+    makeAlternativeActive,
+    answerFeedback,
+    setAnswerFeedback,
     streaming,
     recoverySnapshot,
     retry,

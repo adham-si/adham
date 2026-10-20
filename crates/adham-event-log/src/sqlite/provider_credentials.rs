@@ -7,7 +7,7 @@
 //! associated data, so a copied DB row cannot be replayed under another
 //! account or installation.
 
-use super::content_crypto::{decrypt_aead, encrypt_aead, PROTECTION_AEAD_V1};
+use super::content_crypto::{PROTECTION_AEAD_V1, decrypt_aead, encrypt_aead};
 use super::content_key::ContentKeyProvider;
 use super::provider_registry::ProviderRegistryError;
 use adham_core_types::DomainError;

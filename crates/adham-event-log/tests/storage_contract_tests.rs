@@ -1,5 +1,5 @@
 use adham_core_types::*;
-use adham_event_log::{create_sqlite_pool, verify_storage_health, SqliteEventStore};
+use adham_event_log::{SqliteEventStore, create_sqlite_pool, verify_storage_health};
 use sqlx::Row;
 use std::path::PathBuf;
 
@@ -224,11 +224,13 @@ async fn test_content_tombstone_lifecycle() {
         .await
         .expect("put content");
 
-    assert!(store
-        .get_content(&provider, &content_id, &scope)
-        .await
-        .unwrap()
-        .is_some());
+    assert!(
+        store
+            .get_content(&provider, &content_id, &scope)
+            .await
+            .unwrap()
+            .is_some()
+    );
 
     // Transactionally erase content and create tombstone
     let mut tx = pool.begin().await.expect("begin erase tx");
@@ -249,11 +251,13 @@ async fn test_content_tombstone_lifecycle() {
     tx.commit().await.expect("commit erase tx");
 
     // Verify content erased and tombstone recorded
-    assert!(store
-        .get_content(&provider, &content_id, &scope)
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        store
+            .get_content(&provider, &content_id, &scope)
+            .await
+            .unwrap()
+            .is_none()
+    );
 
     let tombstone_row =
         sqlx::query("SELECT reason_code FROM content_tombstones WHERE content_id = ?")

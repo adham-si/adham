@@ -24,6 +24,12 @@
       "version": 1,
       "scope": "session",
       "schema": "./user/message-submitted/v1.json"
+    },
+    {
+      "type": "user/message-submitted",
+      "version": 2,
+      "scope": "session",
+      "schema": "./user/message-submitted/v2.json"
     }
   ]
 }

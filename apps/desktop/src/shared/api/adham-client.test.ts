@@ -75,10 +75,14 @@ describe('P0-04 IPC Schemas & Query Keys', () => {
           text: 'Hello Adham',
           createdAt: '2026-10-07T00:00:00Z',
           sourceEventId: '01925b68-0000-7000-8000-000000000003',
+          completion: null,
+          reference: null,
         },
       ],
       nextCursor: null,
       projectionPosition: '1',
+      branchSelections: [],
+      feedback: [],
     });
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.role).toBe('user');
@@ -236,10 +240,14 @@ describe('IPC contract fixture (cross-language)', () => {
           text: submitted.text,
           createdAt: submitted.createdAt,
           sourceEventId: '01925b68-4000-7000-8000-000000000002',
+          completion: null,
+          reference: null,
         },
       ],
       nextCursor: null,
       projectionPosition: '1',
+      branchSelections: [],
+      feedback: [],
     };
 
     vi.mocked(invoke).mockClear();
@@ -294,6 +302,14 @@ describe('IPC contract fixture (cross-language)', () => {
         event: { type: 'delta', text: 'hi' },
       }).event.type,
     ).toBe('delta');
+    // Reasoning activity marker from thinking-capable models: payload-free.
+    expect(
+      StreamEventDtoSchema.parse({
+        opId: 'op-1',
+        sequence: 3,
+        event: { type: 'thinking' },
+      }).event.type,
+    ).toBe('thinking');
     const terminal = StreamEventDtoSchema.parse({
       opId: 'op-1',
       sequence: 3,
@@ -342,7 +358,18 @@ describe('IPC contract fixture (cross-language)', () => {
                   streaming: 'supported',
                   structuredOutput: 'unknown',
                   toolProposals: 'supported',
-                  thinking: 'unknown',
+                  thinking: 'supported',
+                  imageInput: 'supported',
+                  thinkingValues: ['true', 'false', 'high'],
+                  thinkingDefault: 'true',
+                },
+                contextLimit: 131072,
+                configuredContext: 8192,
+                effectiveContextBudget: 8192,
+                evidence: {
+                  source: 'ollama /api/show',
+                  serverVersion: '0.12.3',
+                  observedAt: '2026-10-17T00:00:00Z',
                 },
               },
             ],
@@ -365,6 +392,10 @@ describe('IPC contract fixture (cross-language)', () => {
       sessionId: 'sess',
     });
     expect(models.models[0]?.capabilities.streaming).toBe('supported');
+    expect(models.models[0]?.capabilities.thinkingValues).toEqual(['true', 'false', 'high']);
+    expect(models.models[0]?.capabilities.thinkingDefault).toBe('true');
+    expect(models.models[0]?.effectiveContextBudget).toBe(8192);
+    expect(models.models[0]?.evidence.serverVersion).toBe('0.12.3');
     const stop = await client.stopCompletion('ws', 'proj', 'sess', 'op-1');
     expect(stop.status).toBe('cancelled');
 
@@ -399,13 +430,15 @@ describe('IPC contract fixture (cross-language)', () => {
   it('streams through the tauri channel with schema validation', async () => {
     vi.mocked(invoke).mockReset();
     const sinkRef = vi.fn();
+    const payloads: Array<Record<string, unknown>> = [];
     channelSinks.length = 0;
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {
       expect(cmd).toBe('complete_once_streaming');
+      payloads.push((args as { request: { payload: Record<string, unknown> } }).request.payload);
       // backend fans events into the registered channel sink
       channelSinks[0]?.({ opId: 'op-1', sequence: 1, event: { type: 'started' } });
       channelSinks[0]?.({ opId: 'op-1', sequence: 2, event: { type: 'delta', text: 'hello' } });
-      return { data: { opId: 'op-1', messageId: 'm-1' } };
+      return { data: { opId: 'op-1', messageId: 'm-1', context: null } };
     });
 
     const client = new AdhamApiClient();
@@ -414,13 +447,79 @@ describe('IPC contract fixture (cross-language)', () => {
       'ws',
       'proj',
       'sess',
-      { accountId: 'acc', modelId: 'm:latest', text: 'q' },
+      { accountId: 'acc', modelId: 'm:latest', text: 'q', mode: 'plan' },
       (event) => received.push(event as unknown as { sequence: number; event: { type: string } }),
     );
     expect(start.opId).toBe('op-1');
+    expect(payloads[0]?.mode).toBe('plan');
     expect(received.map((r) => r.sequence)).toEqual([1, 2]);
     expect(received[1]?.event.type).toBe('delta');
     expect(sinkRef).not.toHaveBeenCalled();
+  });
+
+  it('keeps its receiver when stream and attachment methods are passed as values', async () => {
+    vi.mocked(invoke).mockReset();
+    channelSinks.length = 0;
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      switch (cmd) {
+        case 'complete_once_streaming':
+        case 'retry_completion_streaming':
+          return { data: { opId: 'op-1', messageId: 'm-1', context: null } };
+        case 'stop_completion':
+          return { data: { opId: 'op-1', status: 'cancelled' } };
+        case 'ingest_attachment':
+          return {
+            data: {
+              attachmentId: 'att-1',
+              fileName: 'a.txt',
+              mediaType: 'text/plain',
+              byteSize: 1,
+              contentHash: 'h',
+              hashAlgorithm: 'sha256',
+              extractedChars: 1,
+              truncated: false,
+              retention: 'session',
+              text: 'a',
+            },
+          };
+        default:
+          throw new Error(`unexpected command ${cmd}`);
+      }
+    });
+
+    const client = new AdhamApiClient();
+    // Hooks receive these as values (`const start = backend.completeOnceStreaming`):
+    // the unbound call must still build its envelope instead of losing `this`.
+    const { completeOnceStreaming, retryCompletionStreaming, stopCompletion, ingestAttachment } =
+      client;
+    const started = await completeOnceStreaming(
+      'ws',
+      'proj',
+      'sess',
+      { accountId: 'acc', modelId: 'm:latest', text: 'q', mode: 'plan' },
+      () => {},
+    );
+    expect(started.opId).toBe('op-1');
+    await expect(
+      retryCompletionStreaming(
+        'ws',
+        'proj',
+        'sess',
+        {
+          accountId: 'acc',
+          modelId: 'm:latest',
+          replyToMessageId: 'u-1',
+          mode: 'plan',
+        },
+        () => {},
+      ),
+    ).resolves.toMatchObject({ opId: 'op-1' });
+    await expect(stopCompletion('ws', 'proj', 'sess', 'op-1')).resolves.toMatchObject({
+      status: 'cancelled',
+    });
+    await expect(
+      ingestAttachment('ws', 'proj', 'sess', { fileName: 'a.txt', text: 'a' }),
+    ).resolves.toMatchObject({ attachmentId: 'att-1' });
   });
 
   it('lists saved provider accounts and probes unsaved endpoint URLs', async () => {

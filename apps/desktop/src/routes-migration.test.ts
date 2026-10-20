@@ -10,6 +10,10 @@ const panelSource = readFileSync(
   path.join(desktopRoot, 'src', 'features', 'conversation', 'conversation-panel.tsx'),
   'utf8',
 );
+const panelViewSource = readFileSync(
+  path.join(desktopRoot, 'src', 'features', 'conversation', 'conversation-panel-view.tsx'),
+  'utf8',
+);
 const rootSource = readFileSync(path.join(desktopRoot, 'src', 'routes', '__root.tsx'), 'utf8');
 const stylesSource = readFileSync(path.join(desktopRoot, 'src', 'styles', 'index.css'), 'utf8');
 
@@ -58,7 +62,9 @@ describe('route migration to semantic utilities', () => {
   it('index.tsx composes design-system components rather than reinventing them', () => {
     // The thin route delegates conversation rendering to the feature panel;
     // either layer must source visuals from the design system, not raw markup.
-    expect(`${routeSource}\n${panelSource}`).toMatch(/import\s+\{[^}]*\}\s+from\s+'@adham\/ui'/);
+    expect(`${routeSource}\n${panelSource}\n${panelViewSource}`).toMatch(
+      /import\s+\{[^}]*\}\s+from\s+'@adham\/ui'/,
+    );
   });
 
   it('__root.tsx wraps the app in the theme provider', () => {

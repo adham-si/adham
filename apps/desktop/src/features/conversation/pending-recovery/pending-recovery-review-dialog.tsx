@@ -1,6 +1,13 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DialogContent, DialogDescription, DialogRoot, DialogTitle } from '@adham/ui';
+import {
+  Button,
+  DialogContent,
+  DialogDescription,
+  DialogRoot,
+  DialogTitle,
+  useClipboardCopy,
+} from '@adham/ui';
 import type { ReviewDialogProps } from './pending-recovery-types';
 
 export function PendingRecoveryReviewDialog({
@@ -15,14 +22,14 @@ export function PendingRecoveryReviewDialog({
   onDismiss,
 }: ReviewDialogProps) {
   const { t } = useTranslation();
-  const [copied, setCopied] = React.useState(false);
+  const { state: copyState, copy, reset: resetCopy } = useClipboardCopy();
   const [submitting, setSubmitting] = React.useState(false);
   const [dismissConfirmOpen, setDismissConfirmOpen] = React.useState(false);
   const [dialogError, setDialogError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) {
-      setCopied(false);
+      resetCopy();
       setSubmitting(false);
       setDismissConfirmOpen(false);
       setDialogError(null);
@@ -30,18 +37,12 @@ export function PendingRecoveryReviewDialog({
       setDismissConfirmOpen(Boolean(initialDismissConfirm));
       setDialogError(null);
     }
-  }, [open, initialDismissConfirm]);
+  }, [open, initialDismissConfirm, resetCopy]);
 
   if (!operation) return null;
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(operation.text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback ignore
-    }
+    await copy(operation.text);
   };
 
   const handleResendClick = async () => {
@@ -212,10 +213,15 @@ export function PendingRecoveryReviewDialog({
             <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={() => void handleCopy()}>
-                  {copied
-                    ? t('conversation.recovery.textCopied', 'Copied')
-                    : t('conversation.recovery.copyText', 'Copy Text')}
+                  {t('conversation.recovery.copyText', 'Copy Text')}
                 </Button>
+                <span role="status" className="self-center text-xs text-foreground-muted">
+                  {copyState === 'copied'
+                    ? t('conversation.recovery.textCopied', 'Copied to clipboard')
+                    : copyState === 'failed'
+                      ? t('conversation.recovery.copyFailed', 'Copy failed')
+                      : ''}
+                </span>
                 <Button
                   variant="ghost"
                   size="sm"

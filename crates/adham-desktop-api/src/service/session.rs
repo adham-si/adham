@@ -6,8 +6,8 @@ use crate::handlers::ApiContext;
 use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use sqlx::Row;
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 fn replay(
     request_id: String,

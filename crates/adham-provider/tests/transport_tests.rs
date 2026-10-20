@@ -6,14 +6,14 @@
 //! per-read + total deadlines, bounded error bodies.
 
 use adham_provider::transport::{
-    HttpTransport, TransportError, MAX_ERROR_BODY_BYTES, MAX_FRAME_BYTES,
+    HttpTransport, MAX_ERROR_BODY_BYTES, MAX_FRAME_BYTES, TransportError,
 };
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use serde_json::json;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -210,7 +210,10 @@ async fn test_ambient_proxy_env_ignored() {
     ]
     .to_vec();
     for (k, _) in &saved {
-        std::env::set_var(k, "http://10.255.255.1:9");
+        // SAFETY: edition 2024 marks env mutation unsafe. This test owns these
+        // vars for its duration, restores them below, and the transport under
+        // test ignores ambient proxy vars, so parallel tests are unaffected.
+        unsafe { std::env::set_var(k, "http://10.255.255.1:9") };
     }
 
     let url = spawn_one_shot(|mut s| async move {
@@ -230,8 +233,10 @@ async fn test_ambient_proxy_env_ignored() {
 
     for (k, v) in saved {
         match v {
-            Some(val) => std::env::set_var(k, val),
-            None => std::env::remove_var(k),
+            // SAFETY: restore of the values saved above.
+            Some(val) => unsafe { std::env::set_var(k, val) },
+            // SAFETY: restore of the absence saved above.
+            None => unsafe { std::env::remove_var(k) },
         }
     }
 }
@@ -286,9 +291,9 @@ async fn test_resolved_loopback_is_allowed() {
     // The gate must allow loopback resolutions (Ollama-on-loopback). Nothing
     // listens on port 9, so a successful gate pass ends as Unreachable, not
     // Policy — proving the gate let the address through, deterministically.
-    let transport = HttpTransport::with_resolver(Arc::new(FakeResolver(vec!["127.0.0.1:9"
-        .parse()
-        .expect("parse")])));
+    let transport = HttpTransport::with_resolver(Arc::new(FakeResolver(vec![
+        "127.0.0.1:9".parse().expect("parse"),
+    ])));
     let err = transport
         .post_json("https://fake-provider.invalid:9/api/chat", &json!({}))
         .await

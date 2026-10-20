@@ -1,7 +1,7 @@
 //! Provider account listing, models, and transient probes.
 
 use super::{
-    local_account, ok_result, ollama_adapter, provider_model_dto, serde_plain_repr, ApiContext,
+    ApiContext, local_account, ok_result, ollama_adapter, provider_model_dto, serde_plain_repr,
 };
 
 use crate::dtos::*;

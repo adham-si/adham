@@ -15,25 +15,25 @@ pub use content_key::{
     ContentKeyProvider, InMemoryProvider, OsKeyringProvider, UnavailableKeyProvider,
 };
 pub use fingerprint::{request_fingerprint, scope_fingerprint};
-pub use health::{verify_storage_health, StorageHealthReport};
+pub use health::{StorageHealthReport, verify_storage_health};
 pub use identity::{
-    load_or_create_installation, set_active_scope, set_active_scope_tx, InstallationInit,
-    InstallationRecord,
+    InstallationInit, InstallationRecord, load_or_create_installation, set_active_scope,
+    set_active_scope_tx,
 };
 pub use preferences::{
-    read_preferences, reset_preferences, write_preferences, PreferenceWriteError,
-    StoredPreferences, PREFERENCES_SCHEMA_VERSION,
+    PREFERENCES_SCHEMA_VERSION, PreferenceWriteError, StoredPreferences, read_preferences,
+    reset_preferences, write_preferences,
 };
 pub use provider_credentials::{
     put_provider_credential, read_provider_credential_plaintext, remove_provider_credential,
 };
 pub use provider_registry::{
+    PROVIDER_REGISTRY_SCHEMA_VERSION, ProviderAccountRow, ProviderModelRow, ProviderRegistryError,
     delete_provider_account, invalidate_provider_models, read_provider_accounts,
     read_provider_models, read_provider_registry_revision, upsert_provider_account,
-    upsert_provider_models, ProviderAccountRow, ProviderModelRow, ProviderRegistryError,
-    PROVIDER_REGISTRY_SCHEMA_VERSION,
+    upsert_provider_models,
 };
 pub use store::{
-    AppendEventRequest, AppendEventResult, CommandReceiptRecord, HydratedPendingOperation,
-    PendingOperationRecord, SqliteEventStore,
+    AppendEventRequest, AppendEventResult, AttachmentRecord, CommandReceiptRecord,
+    HydratedPendingOperation, PendingOperationRecord, SqliteEventStore,
 };

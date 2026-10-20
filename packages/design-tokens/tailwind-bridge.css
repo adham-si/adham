@@ -77,4 +77,13 @@
   --color-running: var(--running);
   --color-running-surface: var(--running-surface);
   --color-running-foreground: var(--running-foreground);
+  --color-syntax-plain: var(--syntax-plain);
+  --color-syntax-comment: var(--syntax-comment);
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-function: var(--syntax-function);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-tag: var(--syntax-tag);
+  --color-syntax-property: var(--syntax-property);
+  --color-syntax-operator: var(--syntax-operator);
 }

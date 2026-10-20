@@ -1,4 +1,4 @@
-use adham_platform::{validate_project_relative_path, PlatformError};
+use adham_platform::{PlatformError, validate_project_relative_path};
 use std::path::PathBuf;
 
 #[test]

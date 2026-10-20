@@ -1,7 +1,7 @@
 use adham_tools::domain::approval::ApprovalScope;
 use adham_tools::domain::policy::{PolicyDecision, PolicyEngine, PolicyPreset};
 use adham_tools::domain::proposal::{
-    normalize_proposal, ProposalError, ToolProposal, ToolProposalId,
+    ProposalError, ToolProposal, ToolProposalId, normalize_proposal,
 };
 use serde_json::json;
 

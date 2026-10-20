@@ -45,6 +45,8 @@ describe('Pending Recovery Fencing and Regressions', () => {
         truncated: false,
       }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
+      setAnswerFeedback: vi.fn().mockResolvedValue([]),
     };
 
     // 1. User tries to send different text in the session that has an unresolved operation
@@ -119,6 +121,8 @@ describe('Pending Recovery Fencing and Regressions', () => {
         truncated: false,
       }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
+      setAnswerFeedback: vi.fn().mockResolvedValue([]),
     };
 
     const outcome = await performSingleMessageSend({
@@ -175,6 +179,8 @@ describe('Pending Recovery Fencing and Regressions', () => {
       recordPendingOperation,
       listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
       clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
+      setAnswerFeedback: vi.fn().mockResolvedValue([]),
     };
 
     const outcome = await performSingleMessageSend({
@@ -217,6 +223,8 @@ describe('Pending Recovery Fencing and Regressions', () => {
       }),
       // Cleanup fails!
       clearPendingOperation: vi.fn().mockRejectedValue(new Error('SQLite lock conflict on clear')),
+      setActiveAlternative: vi.fn().mockResolvedValue([]),
+      setAnswerFeedback: vi.fn().mockResolvedValue([]),
     };
 
     const { result } = renderHook(() => usePendingRecovery({ backend: mockBackend }));

@@ -95,6 +95,7 @@ fn stop_mid_stream_persists_interrupted_partial() {
         Some(ctx.pool.clone()),
         captures.clone(),
         ChatProgram {
+            header_gate: None,
             pre: vec![
                 ndjson_delta("Hello "),
                 ndjson_delta("partial "),
@@ -115,6 +116,10 @@ fn stop_mid_stream_persists_interrupted_partial() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "say something".to_string(),
@@ -270,6 +275,10 @@ fn renderer_disconnect_still_persists_terminal() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "disconnect test".to_string(),
@@ -328,6 +337,7 @@ fn premature_eof_persists_failed_terminal_once() {
         Some(ctx.pool.clone()),
         captures.clone(),
         ChatProgram {
+            header_gate: None,
             pre: vec![ndjson_delta("before the line went "), ndjson_delta("dead")],
             post: vec![],
             gate: None,
@@ -344,6 +354,10 @@ fn premature_eof_persists_failed_terminal_once() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "stream until you die".to_string(),

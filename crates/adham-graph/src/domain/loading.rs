@@ -7,7 +7,7 @@
 
 use super::edge::EdgeDefinition;
 use super::graph::{GraphError, GraphId, TaskGraph};
-use super::node::{has_text, NodeId, NodeLifecycle, NodeState};
+use super::node::{NodeId, NodeLifecycle, NodeState, has_text};
 use serde::Deserialize;
 use std::collections::HashSet;
 

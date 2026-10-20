@@ -4,7 +4,11 @@ import type { ConversationBackend } from './use-conversation';
 // Streaming dispatch signatures straight from the real backend contract, so
 // test double assignments typecheck exactly like production wiring.
 export type CompletionStreamFn = NonNullable<ConversationBackend['completeOnceStreaming']>;
+export type RetryCompletionFn = NonNullable<ConversationBackend['retryCompletionStreaming']>;
 export type StopCompletionFn = NonNullable<ConversationBackend['stopCompletion']>;
+export type MarkCompletionInterruptedFn = NonNullable<
+  ConversationBackend['markCompletionInterrupted']
+>;
 /** The stream-event callback parameter of the completion dispatch. */
 export type StreamEventParam = Parameters<CompletionStreamFn>[4];
 // Explicit, publicly-nameable mock signatures: bare vi.fn() infers vitest's
@@ -34,6 +38,25 @@ export interface ConversationFakeBackend {
     ) => any
   >;
   getConversation: Mock<(workspaceId: string, projectId: string, sessionId: string) => any>;
+  setActiveAlternative: Mock<
+    (
+      workspaceId: string,
+      projectId: string,
+      sessionId: string,
+      rootMessageId: string,
+      activeMessageId: string,
+    ) => any
+  >;
+  setAnswerFeedback: Mock<
+    (
+      workspaceId: string,
+      projectId: string,
+      sessionId: string,
+      messageId: string,
+      verdict: 'like' | 'dislike' | null,
+      reason: string | null,
+    ) => any
+  >;
   listSessions: Mock<(...args: any[]) => any>;
   getStorageStatus: Mock<(...args: any[]) => any>;
   recordPendingOperation: Mock<(...args: any[]) => any>;
@@ -42,7 +65,19 @@ export interface ConversationFakeBackend {
   // Optional: absent means the capability gate stays closed, matching the
   // contract represented by `ConversationBackend` itself.
   completeOnceStreaming?: Mock<CompletionStreamFn>;
+  retryCompletionStreaming?: Mock<RetryCompletionFn>;
   stopCompletion?: Mock<StopCompletionFn>;
+  markCompletionInterrupted?: Mock<MarkCompletionInterruptedFn>;
+  ingestAttachment?: Mock<
+    (
+      workspaceId: string,
+      projectId: string,
+      sessionId: string,
+      payload: { fileName: string; text: string },
+    ) => any
+  >;
+  ingestAttachmentPath?: Mock<(...args: any[]) => any>;
+  readAttachmentText?: Mock<(...args: any[]) => any>;
 }
 
 export function fakeBackend(): ConversationFakeBackend {
@@ -73,6 +108,8 @@ export function fakeBackend(): ConversationFakeBackend {
       nextCursor: null,
       projectionPosition: '0',
     }),
+    setActiveAlternative: vi.fn().mockResolvedValue([]),
+    setAnswerFeedback: vi.fn().mockResolvedValue([]),
     listSessions: vi.fn().mockResolvedValue({
       sessions: [
         {
@@ -104,6 +141,21 @@ export function fakeBackend(): ConversationFakeBackend {
       truncated: false,
     }),
     clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+    ingestAttachment: vi.fn().mockImplementation((_ws, _proj, _session, payload) =>
+      Promise.resolve({
+        attachmentId: 'att-1',
+        fileName: payload.fileName,
+        mediaType: 'text/markdown',
+        byteSize: payload.text.length,
+        contentHash: 'hash-1',
+        hashAlgorithm: 'blake3',
+        extractedChars: payload.text.length,
+        truncated: false,
+        retention: 'session',
+        text: payload.text,
+      }),
+    ),
+    readAttachmentText: vi.fn(),
   };
 }
 

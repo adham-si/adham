@@ -1,3 +1,4 @@
+mod attachment;
 pub mod conversation;
 pub mod message;
 pub mod pending;
@@ -7,6 +8,7 @@ pub mod session;
 pub mod system;
 pub mod workspace;
 
+pub use attachment::*;
 pub use conversation::*;
 pub use message::*;
 pub use pending::*;

@@ -26,6 +26,7 @@ async fn test_scenario_5_conflicting_request_reuse() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Original Text".to_string(),
             },
         },
@@ -45,6 +46,7 @@ async fn test_scenario_5_conflicting_request_reuse() {
                 session_id: Some(sess_id),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Completely Different Text".to_string(),
             },
         },
@@ -122,6 +124,7 @@ async fn test_scenario_7_wrong_project_context_mismatch() {
                 session_id: Some(sess_a),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Should fail with mismatch".to_string(),
             },
         },

@@ -2,3 +2,49 @@ pub fn conflict_msg() -> String {
     "REQUEST_ID_CONFLICT: request_id reused with differing command, scope, actor, or payload"
         .to_string()
 }
+
+/// Resolve the context's session and prove it exists inside the requested
+/// workspace/project scope. Every session-scoped command validates this the
+/// same way, with the same refusal strings.
+pub async fn resolve_scoped_session(
+    ctx: &crate::handlers::ApiContext,
+    context: &crate::dtos::CommandContext,
+) -> Result<adham_core_types::SessionId, String> {
+    use sqlx::Row;
+
+    let session_id = adham_core_types::SessionId::from_string(
+        context
+            .session_id
+            .as_deref()
+            .ok_or("sessionId context required")?,
+    )
+    .map_err(|e| e.to_string())?;
+
+    let sess_stream = format!("session:{session_id}");
+    let sess_row: Option<sqlx::sqlite::SqliteRow> = sqlx::query(
+        "SELECT workspace_id, project_id FROM events WHERE stream_id = ? AND stream_sequence = 1",
+    )
+    .bind(&sess_stream)
+    .fetch_optional(&ctx.pool)
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    let sess_row =
+        sess_row.ok_or("SESSION_NOT_FOUND: session stream does not exist".to_string())?;
+    if let Some(expected) = context.workspace_id.as_deref() {
+        let actual: Option<String> = sess_row.get("workspace_id");
+        if actual.as_deref() != Some(expected) {
+            return Err(
+                "CONTEXT_MISMATCH: session does not belong to specified workspace".to_string(),
+            );
+        }
+    }
+    if let Some(expected) = context.project_id.as_deref() {
+        let actual: Option<String> = sess_row.get("project_id");
+        if actual.as_deref() != Some(expected) {
+            return Err(
+                "CONTEXT_MISMATCH: session does not belong to specified project".to_string(),
+            );
+        }
+    }
+    Ok(session_id)
+}

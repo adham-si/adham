@@ -376,6 +376,10 @@ fn provider_management_runs_app_level_without_a_session() {
             session_id: None,
         },
         payload: CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),

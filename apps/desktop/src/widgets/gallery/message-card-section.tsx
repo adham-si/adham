@@ -1,9 +1,44 @@
 import { useTranslation } from 'react-i18next';
-import { MessageCard } from '@adham/ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  BotMessageSquareIcon,
+  CopyIcon,
+  MoreVerticalIcon,
+  PencilLineIcon,
+  RefreshCcwIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+  UserIcon,
+} from '@hugeicons/core-free-icons';
+import { contentFromText, MessageCard, type MessageActionIcons } from '@adham/ui';
+import type { MessageAttachmentDto } from '@adham/contracts-generated';
+import { MessageAttachments } from '@/features/conversation/attachments';
 import { GallerySection } from './gallery-section';
 
 const DEMO_TIMESTAMP = '10:00 AM';
 const DEMO_ISO = '2026-10-07T10:00:00Z';
+const DEMO_ATTACHMENTS: MessageAttachmentDto[] = [
+  {
+    attachmentId: 'demo-attachment',
+    fileName: 'notes.md',
+    mediaType: 'text/markdown',
+    byteSize: 7,
+    contentHash: 'demo-hash',
+    hashAlgorithm: 'blake3',
+    extractedChars: 2500,
+    truncated: false,
+  },
+];
+
+/** Demo glyphs: the app supplies these nodes to the icon-set-free card. */
+const DEMO_ICONS: MessageActionIcons = {
+  copy: <HugeiconsIcon icon={CopyIcon} className="size-4" />,
+  edit: <HugeiconsIcon icon={PencilLineIcon} className="size-4" />,
+  regenerate: <HugeiconsIcon icon={RefreshCcwIcon} className="size-4" />,
+  like: <HugeiconsIcon icon={ThumbsUpIcon} className="size-4" />,
+  dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4 -scale-x-100" />,
+  more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
+};
 
 export function MessageCardSection() {
   const { t } = useTranslation();
@@ -12,32 +47,67 @@ export function MessageCardSection() {
     <GallerySection title={t('gallery.messages.title')}>
       <MessageCard
         role="user"
-        text={t('gallery.messages.user')}
+        avatar={<HugeiconsIcon icon={UserIcon} className="size-5" />}
+        icons={DEMO_ICONS}
+        content={contentFromText(t('gallery.messages.user'))}
+        leading={<MessageAttachments attachments={DEMO_ATTACHMENTS} />}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
+        onReply={() => {}}
+        onEdit={() => {}}
       />
       <MessageCard
         role="assistant"
-        text={t('gallery.messages.assistant')}
+        name="qwen2.5:latest"
+        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />}
+        icons={DEMO_ICONS}
+        content={contentFromText(t('gallery.messages.assistant'))}
+        timestamp={DEMO_TIMESTAMP}
+        dateTime={DEMO_ISO}
+        feedback={{ verdict: 'like', reason: null }}
+        onFeedback={() => {}}
+        onRegenerate={() => {}}
+        onReply={() => {}}
+      />
+      <MessageCard
+        role="assistant"
+        name="qwen2.5:latest"
+        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />}
+        icons={DEMO_ICONS}
+        content={contentFromText(t('gallery.messages.rich'))}
+        timestamp={DEMO_TIMESTAMP}
+        dateTime={DEMO_ISO}
+        onReply={() => {}}
+      />
+      <MessageCard
+        role="assistant"
+        name="qwen2.5:latest"
+        avatar={<HugeiconsIcon icon={BotMessageSquareIcon} className="size-5" />}
+        icons={DEMO_ICONS}
+        streaming
+        content={contentFromText(t('gallery.messages.assistant'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
       />
       <MessageCard
         role="system"
-        text={t('gallery.messages.system')}
+        icons={DEMO_ICONS}
+        content={contentFromText(t('gallery.messages.system'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
       />
       <MessageCard
         role="user"
-        text={t('gallery.messages.selected')}
+        icons={DEMO_ICONS}
+        content={contentFromText(t('gallery.messages.selected'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
         selected
       />
       <MessageCard
         role="assistant"
-        text={t('gallery.messages.editable')}
+        icons={DEMO_ICONS}
+        content={contentFromText(t('gallery.messages.editable'))}
         timestamp={DEMO_TIMESTAMP}
         dateTime={DEMO_ISO}
         editable

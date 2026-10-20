@@ -30,6 +30,7 @@ async fn test_scenario_1_create_and_display() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Hello Adham".to_string(),
             },
         },
@@ -86,6 +87,7 @@ async fn test_scenario_2_restart_and_replay() {
                     session_id: Some(sess_id.clone()),
                 },
                 payload: SubmitMessagePayload {
+                    attachment_ids: Vec::new(),
                     text: "Persistent text".to_string(),
                 },
             },
@@ -154,6 +156,7 @@ async fn test_scenario_3_projection_rebuild() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Original message to rebuild".to_string(),
             },
         },
@@ -221,6 +224,7 @@ async fn test_scenario_4_duplicate_request_idempotency() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Same content".to_string(),
             },
         },
@@ -240,6 +244,7 @@ async fn test_scenario_4_duplicate_request_idempotency() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: "Same content".to_string(),
             },
         },

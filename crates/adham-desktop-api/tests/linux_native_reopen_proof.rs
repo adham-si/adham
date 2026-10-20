@@ -12,7 +12,7 @@ use common::*;
 
 use adham_core_types::*;
 use adham_desktop_api::*;
-use adham_event_log::{create_sqlite_pool, ContentKeyProvider, OsKeyringProvider};
+use adham_event_log::{ContentKeyProvider, OsKeyringProvider, create_sqlite_pool};
 use adham_platform::PlatformStoragePolicy;
 use std::sync::Arc;
 
@@ -75,6 +75,7 @@ async fn test_native_linux_context_reopen_and_save_journey() {
                 session_id: Some(sess_id.clone()),
             },
             payload: SubmitMessagePayload {
+                attachment_ids: Vec::new(),
                 text: canary_text.clone(),
             },
         },

@@ -1,6 +1,6 @@
 use adham_extensions::domain::identity::SkillSourceKind;
 use adham_extensions::domain::skill::{
-    InertResourceRef, SkillValidationError, MAX_RESOURCE_BYTES, MAX_SKILL_BODY_BYTES,
+    InertResourceRef, MAX_RESOURCE_BYTES, MAX_SKILL_BODY_BYTES, SkillValidationError,
 };
 use adham_extensions::service::skill_loader::{SkillLoader, SkillLoaderError};
 

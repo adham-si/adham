@@ -1,5 +1,5 @@
 use adham_core_types::{ContentId, DomainError, EventScope};
-use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
+use chacha20poly1305::{KeyInit, XChaCha20Poly1305, aead::Aead};
 use rand::RngCore;
 use zeroize::Zeroize;
 

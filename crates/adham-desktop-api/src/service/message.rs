@@ -8,8 +8,8 @@ use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 /// Persisted receipt: structural references only, never cleartext.
 /// The authorized IPC response (`SubmittedMessage`) still carries `text`,
@@ -136,7 +136,14 @@ pub async fn submit_message(
     .map_err(|e| e.to_string())?;
     let request_id = RequestId::from_client_str(&env.request_id)
         .map_err(|_| "VALIDATION_FAILED: request_id must be UUID".to_string())?;
-    let request_fp = adham_event_log::request_fingerprint("submit_message", 1, &trimmed);
+    // Attachment selection is part of the semantic input; a plain send keeps
+    // the historical fingerprint byte-for-byte.
+    let request_input = if env.payload.attachment_ids.is_empty() {
+        trimmed.clone()
+    } else {
+        format!("{trimmed}|{}", env.payload.attachment_ids.join(","))
+    };
+    let request_fp = adham_event_log::request_fingerprint("submit_message", 1, &request_input);
     let scope_fp = adham_event_log::scope_fingerprint(
         "submit_message",
         1,
@@ -147,6 +154,21 @@ pub async fn submit_message(
         Some(&sess_id),
     );
     let scope = expected_scope(ctx, &ws_id, &proj_id, &sess_id);
+
+    // Validate the selected files against this session before anything is
+    // written; a missing or foreign id refuses the whole submit.
+    let selected_attachment_ids: Vec<AttachmentId> =
+        crate::service::attachment_dispatch::resolve_dispatch_attachments(
+            ctx,
+            &ws_id,
+            &proj_id,
+            &sess_id,
+            &env.payload.attachment_ids,
+        )
+        .await?
+        .into_iter()
+        .map(|attachment| attachment.attachment_id)
+        .collect();
 
     let mut tx = ctx
         .pool
@@ -274,11 +296,28 @@ pub async fn submit_message(
         &append_res.event_id.to_string(),
         append_res.global_position,
         now_us,
+        // The text-only submit path carries no reference (its IPC payload has
+        // no reference field); a reply is refused in the composer without a
+        // resolved model rather than dropping the anchor silently.
+        None,
     )
     .await
     {
         let _ = tx.rollback().await;
         return Err(e.to_string());
+    }
+
+    if !selected_attachment_ids.is_empty() {
+        if let Err(e) = SqliteEventStore::link_attachments_to_message_tx(
+            &mut tx,
+            &message_id,
+            &selected_attachment_ids,
+        )
+        .await
+        {
+            let _ = tx.rollback().await;
+            return Err(e.to_string());
+        }
     }
 
     // Persisted receipt carries structural refs only, never cleartext.

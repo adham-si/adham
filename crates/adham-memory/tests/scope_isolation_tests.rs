@@ -58,7 +58,9 @@ fn test_session_memory_isolation() {
             .len(),
         1
     );
-    assert!(service
-        .retrieve(&MemoryScope::Session(session_2), None)
-        .is_empty());
+    assert!(
+        service
+            .retrieve(&MemoryScope::Session(session_2), None)
+            .is_empty()
+    );
 }

@@ -14,6 +14,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { adhamClient } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
+import { notifyProvidersChanged } from '@/shared/providers/provider-events';
 import { type ProviderCatalogEntry, type ProviderStatus, StatusBadge } from './provider-card';
 
 interface CheckResult {
@@ -88,6 +89,7 @@ export function ProviderConnectModal({
             initialCheck={initialCheck}
             onProbeOutcome={onProbeOutcome}
             refreshAccounts={refreshAccounts}
+            onClose={onClose}
           />
         )}
       </DialogContent>
@@ -383,7 +385,7 @@ function GoogleFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts, onCl
   );
 }
 
-function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: FlowProps) {
+function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts, onClose }: FlowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   // Recorded inventory: restored on reopen straight from the registry read.
@@ -442,6 +444,9 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(accountId) });
       // the minted/updated identity must reach the page's account state
       if (!saved || dirty) await refreshAccounts?.();
+      else notifyProvidersChanged();
+      // the saved provider is done: the dialog closes, the card shows status
+      onClose?.();
     } catch (error) {
       setProbeError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -456,6 +461,7 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
     try {
       await adhamClient.discoverOllamaModels(saved.accountId);
       queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(saved.accountId) });
+      notifyProvidersChanged();
     } catch (error) {
       setProbeError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -580,7 +586,7 @@ function OllamaFlow({ saved, initialCheck, onProbeOutcome, refreshAccounts }: Fl
               disabled={busy || current.length === 0}
               className={saved !== null ? undefined : 'col-span-2'}
             >
-              {busy ? t('settings.providers.testing') : t('settings.providers.saveReconnect')}
+              {busy ? t('settings.providers.testing') : t('settings.providers.save')}
             </Button>
           </>
         )}

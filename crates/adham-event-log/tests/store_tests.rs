@@ -1,6 +1,6 @@
 use adham_core_types::*;
 use adham_event_log::{
-    create_sqlite_pool, AppendEventRequest, ChecksumCalculator, SqliteEventStore,
+    AppendEventRequest, ChecksumCalculator, SqliteEventStore, create_sqlite_pool,
 };
 use std::path::PathBuf;
 

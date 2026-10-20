@@ -10,7 +10,7 @@ pub async fn handle_submit_message(
     if env.protocol_version != 1 {
         return Err("INVALID_COMMAND_VERSION: protocol_version must be 1".to_string());
     }
-    if env.payload.text.trim().is_empty() {
+    if env.payload.text.trim().is_empty() && env.payload.attachment_ids.is_empty() {
         return Err("VALIDATION_FAILED: message text cannot be empty".to_string());
     }
     if env.payload.text.len() > 65536 {

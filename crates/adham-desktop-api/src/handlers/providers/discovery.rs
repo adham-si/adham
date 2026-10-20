@@ -1,8 +1,8 @@
 //! Discovery, connection probes, and account management (Delivery A).
 
 use super::{
-    any_adapter, local_account, ok_result, ollama_adapter, optional_full_scope, provider_model_dto,
-    serde_plain_repr, transient_probe, validate_session_scope, ApiContext,
+    ApiContext, any_adapter, local_account, ok_result, ollama_adapter, optional_full_scope,
+    provider_model_dto, serde_plain_repr, transient_probe, validate_session_scope,
 };
 
 use crate::dtos::*;

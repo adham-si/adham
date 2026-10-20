@@ -4,8 +4,8 @@ use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderK
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId};
 use adham_provider::registry::LocalAccount;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::Manager;
 // ===== G4: dispatch generalization — adapter independence + proofs ============
 
@@ -53,6 +53,9 @@ fn g4_seed_google_account(
                     ModelId::new(model_id),
                     String::new(),
                     ModelDescriptor {
+                        evidence: Default::default(),
+                        context_limit: None,
+                        configured_context: None,
                         model_id: ModelId::new(model_id),
                         human_label: "Gemini 2.5 Flash".to_string(),
                         privacy_class: PrivacyClass::CloudStandard,
@@ -112,6 +115,10 @@ fn g4_envelope(
         request_id: uuid::Uuid::now_v7().to_string(),
         context: scope.clone(),
         payload: CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account.to_string(),
             model_id: model.to_string(),
             text: "hello gemini".to_string(),
@@ -281,6 +288,9 @@ fn ollama_failure_terminal_dispatches_nothing_to_google() {
                     ModelId::new("m:latest"),
                     "sha256:g4-pinned".to_string(),
                     ModelDescriptor {
+                        evidence: Default::default(),
+                        context_limit: None,
+                        configured_context: None,
                         model_id: ModelId::new("m:latest"),
                         human_label: "m:latest".to_string(),
                         privacy_class: PrivacyClass::LocalOnly,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Composer } from '@/widgets/compose';
@@ -41,11 +41,11 @@ describe('i18n live runtime integration', () => {
 
     // Verify Arabic placeholder from messages.json
     expect(screen.getByPlaceholderText('اكتب رسالة أو تعليمة...')).not.toBeNull();
-    // Verify Arabic mode labels
-    expect(screen.getByText('سؤال')).not.toBeNull();
-    expect(screen.getByText('خطة')).not.toBeNull();
-    expect(screen.getByText('تنفيذ')).not.toBeNull();
-    expect(screen.getByText('برمجة')).not.toBeNull();
+    // Mode choices live in the mode dropdown: open it, then read the labels.
+    fireEvent.click(screen.getByRole('button', { name: /خطة/ }));
+    for (const label of ['سؤال', 'خطة', 'تنفيذ', 'برمجة']) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    }
   });
 
   it('restores English LTR properly', async () => {

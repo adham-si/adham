@@ -9,19 +9,23 @@ use adham_provider::gateway::ProviderGateway;
 #[test]
 fn test_endpoint_loopback_validation() {
     // Valid loopback HTTP endpoints
-    assert!(EndpointDescriptor::new(
-        EndpointId::new("local-1"),
-        "http://localhost:11434",
-        ServiceKind::OllamaLocal,
-    )
-    .is_ok());
+    assert!(
+        EndpointDescriptor::new(
+            EndpointId::new("local-1"),
+            "http://localhost:11434",
+            ServiceKind::OllamaLocal,
+        )
+        .is_ok()
+    );
 
-    assert!(EndpointDescriptor::new(
-        EndpointId::new("local-2"),
-        "http://127.0.0.1:11434",
-        ServiceKind::OllamaLocal,
-    )
-    .is_ok());
+    assert!(
+        EndpointDescriptor::new(
+            EndpointId::new("local-2"),
+            "http://127.0.0.1:11434",
+            ServiceKind::OllamaLocal,
+        )
+        .is_ok()
+    );
 
     // Invalid non-loopback HTTP endpoint
     let res = EndpointDescriptor::new(
@@ -38,12 +42,14 @@ fn test_endpoint_loopback_validation() {
     }
 
     // Valid HTTPS cloud endpoint
-    assert!(EndpointDescriptor::new(
-        EndpointId::new("cloud-secure"),
-        "https://api.openai.com/v1",
-        ServiceKind::OfficialCloudApi,
-    )
-    .is_ok());
+    assert!(
+        EndpointDescriptor::new(
+            EndpointId::new("cloud-secure"),
+            "https://api.openai.com/v1",
+            ServiceKind::OfficialCloudApi,
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -103,12 +109,14 @@ fn gemini_adapter_accepts_only_the_official_endpoint() {
     use adham_provider::transport::HttpTransport;
 
     let key = || GoogleApiKey::new("AIza-pinning").expect("key");
-    assert!(GeminiHttpAdapter::new(
-        HttpTransport::default(),
-        GeminiHttpAdapter::OFFICIAL_BASE_URL,
-        key()
-    )
-    .is_ok());
+    assert!(
+        GeminiHttpAdapter::new(
+            HttpTransport::default(),
+            GeminiHttpAdapter::OFFICIAL_BASE_URL,
+            key()
+        )
+        .is_ok()
+    );
     for url in [
         // mirrors, typosquatting, re-domains, scheme downgrade, custom ports
         "https://generativelanguage.api.gemini.evil.test",

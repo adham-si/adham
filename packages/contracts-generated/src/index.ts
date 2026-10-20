@@ -22,6 +22,7 @@ export type MessageId = string;
 export type RequestId = string;
 export type CorrelationId = string;
 export type ContentId = string;
+export type AttachmentId = string;
 export type EventId = string;
 export type ActorId = string;
 export type OperationId = string;
@@ -66,13 +67,41 @@ export type SessionSummary = { sessionId: string, projectId: string, title: stri
 
 export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, };
 
-export type SubmitMessagePayload = { text: string, };
+export type SubmitMessagePayload = { text: string, 
+/**
+ * Explicitly selected attachments. Empty for a plain text message.
+ */
+attachmentIds: Array<string>, };
 
 export type SubmittedMessage = { messageId: string, sessionId: string, text: string, createdAt: string, streamSequence: string, projectionPosition: string, };
 
-export type ConversationMessageDto = { messageId: string, role: string, text: string, createdAt: string, sourceEventId: string, };
+export type ConversationMessageDto = { messageId: string, role: string, text: string, createdAt: string, sourceEventId: string, 
+/**
+ * Terminal lifecycle of assistant turns (None for user turns). The UI
+ * labels failed/interrupted/truncated turns from this, never from text.
+ */
+completion: MessageCompletionV1 | null, 
+/**
+ * Quote anchor or edit lineage of this message, when it recorded one.
+ */
+reference: MessageReferenceDto | null, 
+/**
+ * Files this message was sent with. An empty list means none; a chip only
+ * exists when the link row exists, so it states real dispatch selection.
+ */
+attachments: Array<MessageAttachmentDto>, };
 
-export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, };
+export type ConversationPage = { items: Array<ConversationMessageDto>, nextCursor: string | null, projectionPosition: string, 
+/**
+ * Active-alternative selections for this session, so the timeline can
+ * label every edited branch without a second round trip.
+ */
+branchSelections: Array<BranchSelectionDto>, 
+/**
+ * Local like/dislike verdicts for this session's answers, so a card shows
+ * its stored verdict without a second round trip.
+ */
+feedback: Array<AnswerFeedbackDto>, };
 
 export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, 
 /**
@@ -125,6 +154,15 @@ export type PendingOperationList = { operations: Array<PendingOperationDto>, tru
 
 export type ClearPendingOperationPayload = { operationId: string, expectedMessageRequestId: string, reason: string, };
 
+export type MarkCompletionInterruptedPayload = { operationId: string, expectedMessageRequestId: string, };
+
+export type MarkCompletionInterruptedResponse = { 
+/**
+ * `interrupted` when this call closed the op, `already-resolved` when a
+ * previous call (or the live run) had already recorded a terminal.
+ */
+status: string, };
+
 export type TestProviderConnectionPayload = { accountId: string, 
 /**
  * When set (with an empty `accountId`), probe this URL without saving
@@ -149,21 +187,143 @@ export type ProviderAccountDto = { accountId: string, alias: string, endpointUrl
  */
 kind: string, };
 
-export type ProviderModelDto = { modelId: string, digest: string, humanLabel: string, privacyClass: string, capabilities: ProviderCapabilitiesDto, };
+export type ProviderModelDto = { modelId: string, digest: string, humanLabel: string, privacyClass: string, capabilities: ProviderCapabilitiesDto, 
+/**
+ * Model maximum context in tokens (model metadata), when evidenced.
+ */
+contextLimit: number | null, 
+/**
+ * Endpoint-configured context (e.g. Modelfile num_ctx), when reported.
+ */
+configuredContext: number | null, 
+/**
+ * Model max ∩ configured context; None when either bound is unknown.
+ */
+effectiveContextBudget: number | null, evidence: ProviderModelEvidenceDto, };
 
-export type ProviderCapabilitiesDto = { streaming: string, structuredOutput: string, toolProposals: string, thinking: string, };
+export type ProviderCapabilitiesDto = { streaming: string, structuredOutput: string, toolProposals: string, thinking: string, 
+/**
+ * Image input (vision); unknown never renders as unsupported.
+ */
+imageInput: string, 
+/**
+ * Documented `think` values from `/api/show` (`thinking.values`):
+ * "true"/"false" and/or named levels. None = no documented metadata.
+ */
+thinkingValues: Array<string> | null, 
+/**
+ * The value Ollama uses when `think` is absent, when documented.
+ */
+thinkingDefault: string | null, };
+
+export type ProviderModelEvidenceDto = { source: string, serverVersion: string | null, 
+/**
+ * RFC3339 UTC when discovery observed this descriptor; None means never
+ * observed (legacy stored row) and must render as unknown, not fresh.
+ */
+observedAt: string | null, };
 
 export type ProviderModelsList = { models: Array<ProviderModelDto>, };
 
-export type CompleteOncePayload = { accountId: string, modelId: string, text: string, };
+export type CompleteOncePayload = { accountId: string, modelId: string, text: string, 
+/**
+ * Turn mode ("ask" | "plan" | "code"): dispatched as a system instruction
+ * for this request only, never persisted to history. Absent = no
+ * instruction. "execute" is refused: no policy/tool runtime exists.
+ */
+mode: string | null, 
+/**
+ * Documented Ollama `think` value for this request only: false disables
+ * reasoning, true requests it, a string selects a documented level.
+ * Absent = model default. Refused (THINKING_UNSUPPORTED / value not in
+ * `thinking_values`) unless the model documents that exact value —
+ * capability and parameter values are never assumed from a request.
+ */
+think: boolean | string | null, 
+/**
+ * Optional durable reference this submission records: a reply quote
+ * anchor ("replied") or an edit alternative ("edited-from"). Validated
+ * against persisted history before anything is written — the target must
+ * be a message of this session, and only a user message can be edited.
+ * An "edited-from" branch is answered against the context its original
+ * had (everything before the edited message, plus this text): the
+ * original and whatever followed it stay persisted and visible, but are
+ * never fed back to the model.
+ */
+reference: MessageReferenceDto | null, 
+/**
+ * Explicitly selected attachments for this send. Every id is validated
+ * against this session's scope before anything is written; a missing,
+ * foreign, or over-cap selection refuses the whole send.
+ */
+attachmentIds: Array<string>, };
 
-export type CompletionStartDto = { opId: string, messageId: string, };
+export type RetryCompletionPayload = { accountId: string, modelId: string, replyToMessageId: string, mode: string | null, think: boolean | string | null, };
+
+export type CompletionStartDto = { opId: string, messageId: string, 
+/**
+ * Assembly summary for this dispatch (#[serde] None only when a legacy
+ * receipt is replayed: fresh dispatches always carry it).
+ */
+context: ContextAssemblyDto | null, };
 
 export type ListProviderAccountsResponse = { accounts: Array<ProviderAccountDto>, };
 
 export type ListProviderModelsPayload = { accountId: string, };
 
 export type ListProviderModelsResponse = { models: Array<ProviderModelDto>, };
+
+export type MessageReferenceDto = { refersToMessageId: string, relation: string, };
+
+export type BranchSelectionDto = { 
+/**
+ * The user message the alternatives edited.
+ */
+rootMessageId: string, 
+/**
+ * The branch member currently being continued from (root or one edit).
+ */
+activeMessageId: string, };
+
+export type SetActiveAlternativePayload = { rootMessageId: string, activeMessageId: string, };
+
+export type AnswerVerdict = "like" | "dislike";
+
+export type AnswerFeedbackDto = { 
+/**
+ * The persisted assistant row (one attempt) this verdict is keyed to.
+ */
+messageId: string, verdict: AnswerVerdict, 
+/**
+ * Optional user note; null when absent.
+ */
+reason: string | null, };
+
+export type SetAnswerFeedbackPayload = { messageId: string, 
+/**
+ * null removes the stored feedback.
+ */
+verdict: AnswerVerdict | null, reason: string | null, };
+
+export type ContextAssemblyDto = { estimatedInputTokens: number, 
+/**
+ * Evidenced input budget (model max ∩ configured num_ctx, minus the
+ * output reserve). None when either bound is unevidenced.
+ */
+inputBudgetTokens: number | null, 
+/**
+ * Older messages dropped to fit caps/budget. Reported so history loss is
+ * never silent.
+ */
+droppedMessages: number, 
+/**
+ * Attachment files whose extracted text was included in this dispatch.
+ */
+attachmentsIncluded: number, 
+/**
+ * Characters of extracted attachment text included (post-truncation).
+ */
+attachmentChars: number, };
 
 export type ConfigureGoogleAccountPayload = { accountId: string | null, alias: string | null, apiKey: string, acknowledgeCloudTransfer: boolean, };
 
@@ -177,11 +337,26 @@ export type StopCompletionResponse = { opId: string, status: string, };
 
 export type StreamEventDto = { opId: string, sequence: number, event: StreamEventPayloadDto, };
 
-export type StreamEventPayloadDto = { "type": "started" } | { "type": "delta", text: string, } | { "type": "completed", 
+export type StreamEventPayloadDto = { "type": "started" } | { "type": "thinking" } | { "type": "delta", text: string, } | { "type": "completed", 
 /**
  * "completed" | "interrupted" | "failed"
  */
 completion: string, truncated: boolean, usage: MessageUsageV1 | null, };
+
+export type IngestAttachmentPayload = { fileName: string, text: string, };
+
+export type IngestAttachmentPathPayload = { filePath: string, };
+
+export type ReadAttachmentPayload = { attachmentId: string, };
+
+export type AttachmentDto = { attachmentId: string, fileName: string, mediaType: string, byteSize: number, contentHash: string, hashAlgorithm: string, extractedChars: number, truncated: boolean, 
+/**
+ * "session": retained for this session under the sealed content record.
+ * The record states what it is; no other retention scope exists yet.
+ */
+retention: string, text: string, };
+
+export type MessageAttachmentDto = { attachmentId: string, fileName: string, mediaType: string, byteSize: number, contentHash: string, hashAlgorithm: string, extractedChars: number, truncated: boolean, };
 
 export type MessageCompletionV1 = { "Completed": { truncated: boolean, } } | "Interrupted" | "Failed";
 

@@ -95,6 +95,18 @@
   --running: #0f766e;
   --running-surface: #ccfbf1;
   --running-foreground: #0f766e;
+
+  /* Code tokens (GitHub light). The renderer resolves them as CSS variables so
+     the `.dark` class switches the palette without a re-render. */
+  --syntax-plain: #1f2328;
+  --syntax-comment: #57606a;
+  --syntax-keyword: #cf222e;
+  --syntax-string: #0a3069;
+  --syntax-function: #8250df;
+  --syntax-number: #0550ae;
+  --syntax-tag: #116329;
+  --syntax-property: #0550ae;
+  --syntax-operator: #24292f;
 }
 
 .dark {
@@ -148,6 +160,17 @@
   --running: #2dd4bf;
   --running-surface: #042f2e;
   --running-foreground: #2dd4bf;
+
+  /* Code tokens (GitHub dark). */
+  --syntax-plain: #e6edf3;
+  --syntax-comment: #8b949e;
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-function: #d2a8ff;
+  --syntax-number: #79c0ff;
+  --syntax-tag: #7ee787;
+  --syntax-property: #79c0ff;
+  --syntax-operator: #c9d1d9;
 }
 
 ::selection {

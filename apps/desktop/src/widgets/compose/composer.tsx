@@ -1,7 +1,9 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { ComposeInput } from './compose-input';
-import type { ComposeAttachment } from './compose-context-chips';
+import type { ComposeAttachmentChip } from './compose-context-chips';
 import { ComposeContextChips } from './compose-context-chips';
 import { ComposeActionBar } from './compose-action-bar';
 import { ComposeStatusStrip } from './compose-status-strip';
@@ -10,31 +12,54 @@ import { ComposeApprovalBar } from './compose-approval-bar';
 import type { ComposeMode } from './compose-mode-selector';
 import type { ComposeStatus } from './use-compose-state';
 import type { ModelOption } from './compose-model-picker';
-import { DEFAULT_MODELS } from './compose-model-picker';
+
+/** A send that arrived while a turn was running; it stays visible here until
+ *  it is dispatched (or removed) — never injected into the active call. */
+export interface QueuedInstruction {
+  id: string;
+  text: string;
+  /** Reference captured when it was queued; the drain dispatches with it. */
+  reference?: { refersToMessageId: string; relation: 'replied' | 'edited-from' } | undefined;
+  /** Referenced text as seen when queued (display only); null = not loaded then. */
+  referenceExcerpt?: string | null | undefined;
+}
 
 export interface ComposerProps {
   inputText: string;
   onChangeInput: (text: string) => void;
   onSubmit: () => void;
   onStop?: (() => void) | undefined;
+  /** Instructions waiting for the running turn to settle, shown above the
+   *  input so a queueing send is never a silent no-op. */
+  queued?: QueuedInstruction[] | undefined;
+  onRemoveQueued?: ((id: string) => void) | undefined;
+  /** Pending reference: the next send quotes this message ('replied') or
+   *  resends it as an edited alternative ('edited-from'). Excerpt is null when
+   *  the referenced message is not in the loaded history. */
+  replyTo?: { relation: 'replied' | 'edited-from'; excerpt: string | null } | null | undefined;
+  onCancelReply?: (() => void) | undefined;
   status?: ComposeStatus | undefined;
   mode?: ComposeMode | undefined;
   onChangeMode?: ((mode: ComposeMode) => void) | undefined;
   selectedModelId?: string | undefined;
   onSelectModel?: ((modelId: string) => void) | undefined;
-  reasoningEffort?: ('low' | 'medium' | 'high') | undefined;
-  onChangeReasoningEffort?: ((effort: 'low' | 'medium' | 'high') => void) | undefined;
+  /** Thinking on/off for evidenced thinking models (documented parameter). */
+  think?: boolean | string | null | undefined;
+  onChangeThink?: ((value: boolean | string | null) => void) | undefined;
   models?: ModelOption[] | undefined;
-  attachments?: ComposeAttachment[] | undefined;
-  onAddAttachments?: ((attachments: ComposeAttachment[]) => void) | undefined;
-  onRemoveAttachment?: ((id: string) => void) | undefined;
+  /** No provider/model is set up yet (drives the picker's empty state). */
+  modelUnavailable?: boolean | undefined;
+  attachments?: ComposeAttachmentChip[] | undefined;
+  /** Picked/pasted/dropped files; ingestion and refusals live above this. */
+  onAddFiles?: ((files: File[]) => void) | undefined;
+  onRemoveAttachment?: ((key: string) => void) | undefined;
+  /** Native (Tauri) file-drag hover over the window. */
+  isDragOverExternal?: boolean | undefined;
   approvalRequest?: Omit<ComposeApprovalBarProps, 'className'> | null | undefined;
-  scopeFolder?: string | null | undefined;
-  scopePolicy?: ('standing-approval' | 'always-ask') | null | undefined;
-  usedTokens?: number | null | undefined;
-  maxTokens?: number | null | undefined;
-  sessionSpend?: string | null | undefined;
-  spendCap?: string | null | undefined;
+  /** Model maximum context in tokens, when the provider evidenced one. */
+  contextLimit?: number | null | undefined;
+  /** Effective request budget (model max ∩ configured), when evidenced. */
+  effectiveContextBudget?: number | null | undefined;
   onRecallPrevious?: (() => void) | undefined;
   onRecallNext?: (() => void) | undefined;
   placeholder?: string | undefined;
@@ -49,24 +74,26 @@ export function Composer({
   onChangeInput,
   onSubmit,
   onStop = () => {},
+  queued = [],
+  onRemoveQueued,
+  replyTo = null,
+  onCancelReply,
   status = 'idle',
   mode = 'plan',
   onChangeMode = () => {},
-  selectedModelId = DEFAULT_MODELS[0]!.id,
+  selectedModelId = '',
   onSelectModel = () => {},
-  reasoningEffort = 'medium',
-  onChangeReasoningEffort,
-  models = DEFAULT_MODELS,
+  think = null,
+  onChangeThink,
+  models = [],
+  modelUnavailable = false,
   attachments = [],
-  onAddAttachments = () => {},
+  onAddFiles = () => {},
   onRemoveAttachment = () => {},
+  isDragOverExternal = false,
   approvalRequest = null,
-  scopeFolder = null,
-  scopePolicy = null,
-  usedTokens = null,
-  maxTokens = null,
-  sessionSpend = null,
-  spendCap = null,
+  contextLimit = null,
+  effectiveContextBudget = null,
   onRecallPrevious,
   onRecallNext,
   placeholder,
@@ -79,7 +106,8 @@ export function Composer({
 
   const canSubmit = Boolean(inputText.trim() || attachments.length > 0) && status !== 'error';
 
-  // Drag and drop handlers
+  // Browser drag/drop (the app shell reports native drops separately); both
+  // routes hand the files to the same ingestion.
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -97,26 +125,14 @@ export function Composer({
     e.stopPropagation();
     setIsDragOver(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const items: ComposeAttachment[] = Array.from(e.dataTransfer.files).map((f) => ({
-        id: `drop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        type: f.type.startsWith('image/') ? 'image' : 'file',
-        name: f.name,
-        size: f.size,
-        file: f,
-      }));
-      onAddAttachments(items);
-    }
-  };
-
-  const handleAttachPastedBlob = (attachment: ComposeAttachment) => {
-    onAddAttachments([attachment]);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0) onAddFiles(files);
   };
 
   return (
     <footer
       className={`w-full transition-all duration-500 ease-in-out ${
-        isCentered ? 'bg-transparent p-0' : 'bg-transparent px-4 pb-4 pt-1'
+        isCentered ? 'bg-transparent p-0' : 'bg-transparent px-4 pb-4 pt-2'
       } ${className}`}
     >
       {/* Screen reader announcement for streaming state */}
@@ -134,18 +150,16 @@ export function Composer({
         onDrop={handleDrop}
         className={`w-full transition-all duration-500 ease-in-out ${
           isCentered ? 'max-w-2xl mx-auto border-border' : 'border-border-subtle'
-        } rounded-2xl border bg-surface hover:border-border focus-within:border-focus focus-within:ring-1 focus-within:ring-focus ${
-          isDragOver ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20' : ''
+        } rounded-xl border bg-surface hover:border-border focus-within:border-focus focus-within:ring-1 focus-within:ring-focus ${
+          isDragOver || isDragOverExternal
+            ? 'border-focus border-dashed bg-focus/5 ring-2 ring-focus/20'
+            : ''
         }`}
       >
-        {/* Top: Scope & Budget Status Strip */}
+        {/* Top: evidenced context status (renders nothing without evidence) */}
         <ComposeStatusStrip
-          scopeFolder={scopeFolder}
-          scopePolicy={scopePolicy}
-          usedTokens={usedTokens}
-          maxTokens={maxTokens}
-          sessionSpend={sessionSpend}
-          spendCap={spendCap}
+          contextLimit={contextLimit}
+          effectiveContextBudget={effectiveContextBudget}
           className="border-b border-border-subtle/60"
         />
 
@@ -162,8 +176,77 @@ export function Composer({
           </div>
         )}
 
-        {/* Attached Context Chips (Files, Folders, Pasted Text Blobs) */}
+        {/* Attached files: each chip states what is known (read/pending/refused) */}
         <ComposeContextChips attachments={attachments} onRemove={onRemoveAttachment} />
+
+        {/* Pending reference: the next send quotes this message (reply) or
+            resends it as an edited alternative, until acknowledged or
+            cancelled — never silently dropped. */}
+        {replyTo && (
+          <div className="flex items-center gap-2 px-4 pt-3 text-xs text-foreground-secondary">
+            <span className="shrink-0 rounded-sm border border-border-subtle bg-surface px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+              {replyTo.relation === 'edited-from'
+                ? t('compose.editing', 'Editing')
+                : t('compose.replyTo', 'Replying to')}
+            </span>
+            <span className="truncate" title={replyTo.excerpt ?? undefined}>
+              {replyTo.excerpt ?? t('compose.replyUnavailable', 'Quoted message is not loaded.')}
+            </span>
+            <button
+              type="button"
+              onClick={() => onCancelReply?.()}
+              aria-label={
+                replyTo.relation === 'edited-from'
+                  ? t('compose.cancelEdit', 'Cancel edit')
+                  : t('compose.cancelReply', 'Cancel reply')
+              }
+              title={
+                replyTo.relation === 'edited-from'
+                  ? t('compose.cancelEdit', 'Cancel edit')
+                  : t('compose.cancelReply', 'Cancel reply')
+              }
+              className="ms-auto shrink-0 rounded-sm p-1 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} className="size-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Queued instructions: visible while a turn runs; each is dispatched
+            when the turn settles unless the user removes it first. */}
+        {queued.length > 0 && (
+          <div aria-live="polite" className="space-y-2 px-4 pt-3">
+            {queued.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-2 rounded-md border border-border-subtle bg-surface-subtle px-2 py-1 text-xs text-foreground-secondary"
+              >
+                <span className="shrink-0 rounded-sm border border-border-subtle bg-surface px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                  {t('compose.queuedHeading', 'Queued')}
+                </span>
+                {item.reference && (
+                  <span className="shrink-0 rounded-sm border border-border-subtle bg-surface px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                    {item.reference.relation === 'edited-from'
+                      ? t('compose.queuedEdit', 'Edit')
+                      : t('compose.queuedReply', 'Reply')}
+                  </span>
+                )}
+                <span className="truncate" title={item.text}>
+                  {item.text}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveQueued?.(item.id)}
+                  aria-label={t('compose.removeQueued', 'Remove queued instruction')}
+                  title={t('compose.removeQueued', 'Remove queued instruction')}
+                  className="ms-auto shrink-0 rounded-sm p-1 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} className="size-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* RTL-aware Textarea */}
         <ComposeInput
@@ -172,9 +255,9 @@ export function Composer({
           onSubmit={onSubmit}
           onRecallPrevious={onRecallPrevious}
           onRecallNext={onRecallNext}
-          onAttachPastedBlob={handleAttachPastedBlob}
+          onPasteFiles={onAddFiles}
+          canSendEmpty={attachments.length > 0}
           placeholder={placeholder}
-          disabled={status === 'sending' || status === 'streaming'}
           enterToSend={enterToSend}
         />
 
@@ -184,10 +267,11 @@ export function Composer({
           onChangeMode={onChangeMode}
           selectedModelId={selectedModelId}
           onSelectModel={onSelectModel}
-          reasoningEffort={reasoningEffort}
-          onChangeReasoningEffort={onChangeReasoningEffort}
+          think={think}
+          onChangeThink={onChangeThink}
           models={models}
-          onAddAttachments={onAddAttachments}
+          modelUnavailable={modelUnavailable}
+          onAddFiles={onAddFiles}
           status={status}
           canSubmit={canSubmit}
           onSubmit={onSubmit}

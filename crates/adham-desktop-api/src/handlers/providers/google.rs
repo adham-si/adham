@@ -1,6 +1,6 @@
 //! Google Gemini account configuration and disconnect (G2).
 
-use super::{local_account, ok_result, serde_plain_repr, ApiContext};
+use super::{ApiContext, local_account, ok_result, serde_plain_repr};
 
 use crate::dtos::*;
 use adham_provider::domain::account::{PrivacyClass, ProviderAccountId};
@@ -13,6 +13,7 @@ use adham_provider::registry::LocalAccount;
 /// the hard host allowlist lives in the adapter (adapter-side enforcement), but
 /// the stored base_url is the same constant so registry data cannot drift.
 pub const GOOGLE_GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com";
+
 pub const GOOGLE_GEMINI_ENDPOINT_ID: &str = "google-gemini-cloud";
 
 /// Write-only Google account configuration: consent gate, mint-or-rotate,

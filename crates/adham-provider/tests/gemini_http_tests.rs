@@ -10,7 +10,7 @@ use adham_provider::domain::account::PrivacyClass;
 use adham_provider::domain::error::ProviderError;
 use adham_provider::domain::model::{CapabilityStatus, ModelId};
 use adham_provider::transport::HttpTransport;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 const FIXTURE_KEY: &str = "AIza-fixture-key";

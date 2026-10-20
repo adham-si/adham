@@ -105,7 +105,7 @@ fn adapter(base: &str) -> OllamaHttpAdapter {
 }
 
 fn pinned(model_id: &str, digest: &str) -> PinnedModel {
-    use adham_provider::domain::model::{ModelCapabilities, ModelDescriptor};
+    use adham_provider::domain::model::{ModelCapabilities, ModelDescriptor, ModelEvidence};
     PinnedModel {
         model_id: ModelId::new(model_id),
         digest: digest.into(),
@@ -114,6 +114,9 @@ fn pinned(model_id: &str, digest: &str) -> PinnedModel {
             human_label: model_id.into(),
             privacy_class: PrivacyClass::LocalOnly,
             capabilities: ModelCapabilities::default(),
+            evidence: ModelEvidence::default(),
+            context_limit: None,
+            configured_context: None,
         },
     }
 }
@@ -133,6 +136,7 @@ fn request(model: &str) -> ProviderRequestV1 {
         }],
         max_output_tokens: Some(64),
         temperature: Some(0.7),
+        think: None,
     }
 }
 
@@ -147,6 +151,7 @@ async fn discover_pins_digests_and_maps_show_capabilities() {
                 {"name": "smol:latest", "digest": "sha256:bbb", "size": 50}
             ]
         }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.12.3"}))),
         "/api/show" => Some(http_200_json(&json!({
             "capabilities": ["completion", "tools"]
         }))),
@@ -168,6 +173,119 @@ async fn discover_pins_digests_and_maps_show_capabilities() {
         models[0].descriptor.capabilities.streaming,
         CapabilityStatus::Supported
     );
+    // A capabilities array present without "vision" is the server stating
+    // image input is unsupported — absence is evidence here, not unknown.
+    assert_eq!(
+        models[0].descriptor.capabilities.image_input,
+        CapabilityStatus::Unsupported
+    );
+}
+
+#[tokio::test]
+async fn discover_maps_show_evidence_limits_and_modalities() {
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "qwen3.5:0.8b", "digest": "sha256:qqq", "size": 100}]
+        }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.12.3"}))),
+        "/api/show" => Some(http_200_json(&json!({
+            "capabilities": ["completion", "tools", "vision", "thinking"],
+            "model_info": {"qwen3.context_length": 131072},
+            "parameters": "num_ctx 8192\nstop \"<|im_end|>\""
+        }))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    let descriptor = &models[0].descriptor;
+    assert_eq!(
+        descriptor.capabilities.thinking,
+        CapabilityStatus::Supported
+    );
+    assert_eq!(
+        descriptor.capabilities.image_input,
+        CapabilityStatus::Supported
+    );
+    // model maximum from model_info; configured num_ctx from parameters
+    assert_eq!(descriptor.context_limit, Some(131072));
+    assert_eq!(descriptor.configured_context, Some(8192));
+    assert_eq!(descriptor.evidence.source, "ollama /api/show");
+    assert_eq!(
+        descriptor.evidence.server_version.as_deref(),
+        Some("0.12.3")
+    );
+    assert!(
+        descriptor.evidence.observed_at_us > 0,
+        "observation time must be recorded"
+    );
+}
+
+#[tokio::test]
+async fn discover_maps_documented_thinking_values() {
+    // `/api/show` `thinking` is the only authority for which `think` values a
+    // model accepts (booleans and/or named levels) and its default.
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "gpt-oss:20b", "digest": "sha256:g", "size": 100}]
+        }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.13.0"}))),
+        "/api/show" => Some(http_200_json(&json!({
+            "capabilities": ["completion", "thinking"],
+            "thinking": {"values": ["low", "medium", "high"], "default": "medium"}
+        }))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    let capabilities = &models[0].descriptor.capabilities;
+    assert_eq!(capabilities.thinking, CapabilityStatus::Supported);
+    let control = capabilities
+        .thinking_control
+        .as_ref()
+        .expect("documented values");
+    assert_eq!(control.values, ["low", "medium", "high"]);
+    assert_eq!(control.default_value.as_deref(), Some("medium"));
+
+    // `values: [false]` is the server stating the model does not think.
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "plain:1b", "digest": "sha256:p", "size": 100}]
+        }))),
+        "/api/version" => Some(http_200_json(&json!({"version": "0.13.0"}))),
+        "/api/show" => Some(http_200_json(&json!({
+            "capabilities": ["completion"],
+            "thinking": {"values": [false]}
+        }))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    assert_eq!(
+        models[0].descriptor.capabilities.thinking,
+        CapabilityStatus::Unsupported
+    );
+}
+
+#[tokio::test]
+async fn discover_tolerates_an_unavailable_version_endpoint() {
+    let base = spawn_routed(|req| match req.path.as_str() {
+        "/api/tags" => Some(http_200_json(&json!({
+            "models": [{"name": "llama3.2:latest", "digest": "sha256:aaa", "size": 100}]
+        }))),
+        // old daemons lack /api/version: a status error must not fail discovery
+        "/api/version" => Some(http_500()),
+        "/api/show" => Some(http_200_json(&json!({"capabilities": ["completion"]}))),
+        _ => None,
+    })
+    .await;
+
+    let models = adapter(&base).discover().await.expect("discover");
+    assert_eq!(models.len(), 1);
+    assert_eq!(models[0].descriptor.evidence.server_version, None);
+    assert!(models[0].descriptor.evidence.observed_at_us > 0);
 }
 
 #[tokio::test]
@@ -176,6 +294,7 @@ async fn discover_marks_capabilities_unknown_when_show_fails() {
         "/api/tags" => Some(http_200_json(&json!({
             "models": [{"name": "llama3.2:latest", "digest": "sha256:aaa", "size": 100}]
         }))),
+        "/api/version" => Some(http_500()),
         "/api/show" => Some(http_500()),
         _ => None,
     })
@@ -189,6 +308,18 @@ async fn discover_marks_capabilities_unknown_when_show_fails() {
         models[0].descriptor.capabilities.tool_proposals,
         CapabilityStatus::Unknown
     );
+    assert_eq!(
+        models[0].descriptor.capabilities.image_input,
+        CapabilityStatus::Unknown
+    );
+    // nothing beyond the transport-structural stream claim may be asserted
+    assert_eq!(
+        models[0].descriptor.capabilities.streaming,
+        CapabilityStatus::Supported
+    );
+    assert_eq!(models[0].descriptor.context_limit, None);
+    assert_eq!(models[0].descriptor.configured_context, None);
+    assert!(models[0].descriptor.evidence.observed_at_us > 0);
 }
 
 // --- 2. chat stream: deltas in order, StreamStarted first, usage on final ------
@@ -423,125 +554,8 @@ async fn done_without_usage_completes_stop_without_progress() {
     );
 }
 
-// --- 8. unknown done_reason: documented older-daemon mapping to clean stop ------
+// --- 8. done_reason semantics: missing reason keeps legacy stop; an explicit
+// --- reason this build does not know is never a successful completion -------
 
-#[tokio::test]
-async fn unknown_done_reason_maps_to_stop() {
-    let base = spawn_routed(|req| {
-        if req.path == "/api/chat" {
-            Some(ndjson_response(&[
-                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":"tail"},"done":false}"#,
-                r#"{"model":"llama3.2:latest","message":{"role":"assistant","content":""},"done":true,"done_reason":"cuda"}"#,
-            ]))
-        } else {
-            None
-        }
-    })
-    .await;
-
-    let adapter = adapter(&base);
-    let mut stream = adapter
-        .stream_chat(
-            &pinned("llama3.2:latest", "sha256:aaa"),
-            &request("llama3.2:latest"),
-        )
-        .await
-        .expect("chat started");
-    let mut got = Vec::new();
-    while let Some(event) = stream.next_event().await {
-        got.push(event.expect("stream events"));
-    }
-    assert_eq!(
-        got.last(),
-        Some(&NormalizedStreamEvent::StreamCompleted(
-            StreamCompletionOutcome::Stop
-        )),
-        "unknown done_reason terminates the stream (never hangs, never silent EOF)"
-    );
-}
-
-// --- 9. real qwen3.5 thinking-model shape: contentless frames must not panic ---
-
-#[tokio::test]
-async fn thinking_frames_do_not_panic_and_stream_continues() {
-    // qwen3.5:0.8b (live shape, 2026-10-17): thinking runs emit frames with
-    // empty content and a `thinking` string; the parser normalizes none of
-    // them in Delivery A. The old `expect("events queued")` panicked on the
-    // first of these, aborting the whole completion op.
-    let base = spawn_routed(|req| {
-        if req.path == "/api/chat" {
-            Some(ndjson_response(&[
-                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"","thinking":"let me think"},"done":false}"#,
-                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"","thinking":"more"},"done":false}"#,
-                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"OK"},"done":false}"#,
-                r#"{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":9,"eval_count":4}"#,
-            ]))
-        } else {
-            None
-        }
-    })
-    .await;
-
-    let adapter = adapter(&base);
-    let mut stream = adapter
-        .stream_chat(
-            &pinned("qwen3.5:0.8b", "sha256:bbb"),
-            &request("qwen3.5:0.8b"),
-        )
-        .await
-        .expect("chat started");
-    let mut got = Vec::new();
-    while let Some(event) = stream.next_event().await {
-        got.push(event.expect("stream events"));
-    }
-    assert_eq!(
-        got,
-        vec![
-            NormalizedStreamEvent::StreamStarted,
-            NormalizedStreamEvent::TextDelta("OK".into()),
-            NormalizedStreamEvent::Progress(StreamUsage {
-                prompt_tokens: 9,
-                completion_tokens: 4,
-                total_tokens: 13,
-            }),
-            NormalizedStreamEvent::StreamCompleted(StreamCompletionOutcome::Stop),
-        ],
-        "contentless thinking frames are skipped, the answer still streams: {got:?}"
-    );
-}
-
-// --- 10. bare heartbeat frames (no thinking field) are equally inert -----------
-
-#[tokio::test]
-async fn heartbeat_frames_are_skipped_without_events() {
-    let base = spawn_routed(|req| {
-        if req.path == "/api/chat" {
-            Some(ndjson_response(&[
-                r#"{"model":"m","message":{"role":"assistant","content":""},"done":false}"#,
-                r#"{"model":"m","message":{"role":"assistant","content":"hi"},"done":false}"#,
-                r#"{"model":"m","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}"#,
-            ]))
-        } else {
-            None
-        }
-    })
-    .await;
-
-    let adapter = adapter(&base);
-    let mut stream = adapter
-        .stream_chat(&pinned("m", "sha256:ccc"), &request("m"))
-        .await
-        .expect("chat started");
-    let mut got = Vec::new();
-    while let Some(event) = stream.next_event().await {
-        got.push(event.expect("stream events"));
-    }
-    assert_eq!(
-        got,
-        vec![
-            NormalizedStreamEvent::StreamStarted,
-            NormalizedStreamEvent::TextDelta("hi".into()),
-            NormalizedStreamEvent::StreamCompleted(StreamCompletionOutcome::Stop),
-        ]
-    );
-}
+#[path = "ollama_http_tests/streaming_shapes.rs"]
+mod streaming_shapes;

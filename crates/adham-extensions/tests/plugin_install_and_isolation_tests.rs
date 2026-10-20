@@ -33,9 +33,11 @@ fn test_plugin_installation_starts_strictly_disabled() {
     assert_eq!(receipt.state, PluginInstallationState::InstalledDisabled);
     assert_eq!(receipt.package_id.0, "docker-helper");
     assert_eq!(instance.data_generation, 1);
-    assert!(instance
-        .plugin_root_readonly
-        .contains("packages/docker-helper/"));
+    assert!(
+        instance
+            .plugin_root_readonly
+            .contains("packages/docker-helper/")
+    );
     assert!(instance.plugin_data_isolated.contains("instances/"));
 }
 

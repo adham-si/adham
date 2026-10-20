@@ -1,8 +1,8 @@
 //! Conversation projection. ID newtypes are `Copy`; `.clone()` follows codebase style.
 #![allow(clippy::clone_on_copy)]
 use adham_core_types::{
-    DomainError, MessageCompletedV1, MessageCompletionV1, MessageSubmittedV1, MessageUsageV1,
-    OperationId, SessionId, EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED,
+    DomainError, EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED, MessageCompletedV1, MessageCompletionV1,
+    MessageSubmittedV1, MessageSubmittedV2, MessageUsageV1, OperationId, SessionId,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Row, Sqlite};
@@ -21,6 +21,11 @@ pub struct ConversationMessageView {
     /// Terminal lifecycle outcome carried on assistant turns (None for user).
     pub completion: Option<MessageCompletionV1>,
     pub usage: Option<MessageUsageV1>,
+    /// The message this one references (reply quote anchor or edit lineage)
+    /// and its relation ("replied" | "edited-from"). Both are present
+    /// together or absent together.
+    pub refers_to_message_id: Option<String>,
+    pub refers_to_relation: Option<String>,
 }
 
 pub struct ConversationProjection;
@@ -38,18 +43,24 @@ impl ConversationProjection {
         source_event_id: &str,
         source_global_position: i64,
         created_at_us: i64,
+        // Optional message reference (refers_to_message_id, relation) — a
+        // reply quote anchor or an edit lineage. Both or neither.
+        reference: Option<(&str, &str)>,
     ) -> Result<(), DomainError> {
         sqlx::query(
             r#"
             INSERT INTO conversation_messages (
                 message_id, workspace_id, project_id, session_id, role,
-                content_id, source_event_id, source_global_position, created_at_us
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                content_id, source_event_id, source_global_position, created_at_us,
+                refers_to_message_id, refers_to_relation
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(message_id) DO UPDATE SET
                 role = excluded.role,
                 source_event_id = excluded.source_event_id,
                 source_global_position = excluded.source_global_position,
-                created_at_us = excluded.created_at_us
+                created_at_us = excluded.created_at_us,
+                refers_to_message_id = excluded.refers_to_message_id,
+                refers_to_relation = excluded.refers_to_relation
             "#,
         )
         .bind(message_id)
@@ -61,6 +72,8 @@ impl ConversationProjection {
         .bind(source_event_id)
         .bind(source_global_position)
         .bind(created_at_us)
+        .bind(reference.map(|(id, _)| id))
+        .bind(reference.map(|(_, rel)| rel))
         .execute(pool)
         .await
         .map_err(|e| DomainError::Storage(e.to_string()))?;
@@ -98,18 +111,24 @@ impl ConversationProjection {
         source_event_id: &str,
         source_global_position: i64,
         created_at_us: i64,
+        // Optional message reference (refers_to_message_id, relation) — a
+        // reply quote anchor or an edit lineage. Both or neither.
+        reference: Option<(&str, &str)>,
     ) -> Result<(), DomainError> {
         sqlx::query(
             r#"
             INSERT INTO conversation_messages (
                 message_id, workspace_id, project_id, session_id, role,
-                content_id, source_event_id, source_global_position, created_at_us
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                content_id, source_event_id, source_global_position, created_at_us,
+                refers_to_message_id, refers_to_relation
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(message_id) DO UPDATE SET
                 role = excluded.role,
                 source_event_id = excluded.source_event_id,
                 source_global_position = excluded.source_global_position,
-                created_at_us = excluded.created_at_us
+                created_at_us = excluded.created_at_us,
+                refers_to_message_id = excluded.refers_to_message_id,
+                refers_to_relation = excluded.refers_to_relation
             "#,
         )
         .bind(message_id)
@@ -121,6 +140,8 @@ impl ConversationProjection {
         .bind(source_event_id)
         .bind(source_global_position)
         .bind(created_at_us)
+        .bind(reference.map(|(id, _)| id))
+        .bind(reference.map(|(_, rel)| rel))
         .execute(&mut **tx)
         .await
         .map_err(|e| DomainError::Storage(e.to_string()))?;
@@ -234,6 +255,7 @@ impl ConversationProjection {
             r#"
             SELECT cm.message_id, cm.workspace_id, cm.project_id, cm.session_id, cm.role,
                    cm.created_at_us, cm.content_id, cm.op_id, cm.completion_json, cm.usage_json,
+                   cm.refers_to_message_id, cm.refers_to_relation,
                    cr.content_kind, cr.protection_scheme,
                    cr.nonce, cr.protected_bytes
             FROM conversation_messages cm
@@ -331,6 +353,12 @@ impl ConversationProjection {
                 op_id,
                 completion,
                 usage,
+                refers_to_message_id: row
+                    .try_get::<Option<String>, _>("refers_to_message_id")
+                    .map_err(|e| DomainError::Storage(e.to_string()))?,
+                refers_to_relation: row
+                    .try_get::<Option<String>, _>("refers_to_relation")
+                    .map_err(|e| DomainError::Storage(e.to_string()))?,
             });
         }
 
@@ -354,7 +382,7 @@ impl ConversationProjection {
         // strict global order so the rebuild is deterministic.
         let rows = sqlx::query(&format!(
             r#"
-            SELECT global_position, event_id, event_type, workspace_id, project_id, session_id,
+            SELECT global_position, event_id, event_type, event_version, workspace_id, project_id, session_id,
                    occurred_at_us, payload_json
             FROM events
             WHERE event_type IN ('MessageSubmitted', '{}')
@@ -377,6 +405,7 @@ impl ConversationProjection {
             let project_id: String = row.get("project_id");
             let session_id: String = row.get("session_id");
             let occurred_at_us: i64 = row.get("occurred_at_us");
+            let event_version: i64 = row.get("event_version");
             let payload_bytes: Vec<u8> = row.get("payload_json");
 
             if event_type == EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED {
@@ -427,28 +456,72 @@ impl ConversationProjection {
                 .await
                 .map_err(|e| DomainError::Storage(e.to_string()))?;
             } else {
-                let payload: MessageSubmittedV1 =
-                    serde_json::from_slice(&payload_bytes).map_err(|e| {
-                        DomainError::Validation(format!("Invalid MessageSubmittedV1 payload: {e}"))
-                    })?;
+                // Version-aware decode: v1 rows decode as v2 with no reference
+                // (in-memory upcast; stored bytes untouched). An unknown
+                // version stops the rebuild instead of guessing.
+                let (message_id, content_id, reference) = match event_version {
+                    1 => {
+                        let payload: MessageSubmittedV1 = serde_json::from_slice(&payload_bytes)
+                            .map_err(|e| {
+                                DomainError::Validation(format!(
+                                    "Invalid MessageSubmittedV1 payload: {e}"
+                                ))
+                            })?;
+                        (
+                            payload.message_id.to_string(),
+                            payload.content_id.to_string(),
+                            None,
+                        )
+                    }
+                    2 => {
+                        let payload: MessageSubmittedV2 = serde_json::from_slice(&payload_bytes)
+                            .map_err(|e| {
+                                DomainError::Validation(format!(
+                                    "Invalid MessageSubmittedV2 payload: {e}"
+                                ))
+                            })?;
+                        payload.validate().map_err(|m| {
+                            DomainError::Validation(format!(
+                                "Invalid MessageSubmittedV2 payload: {m}"
+                            ))
+                        })?;
+                        let reference = payload
+                            .reference
+                            .as_ref()
+                            .map(|r| (r.refers_to_message_id.to_string(), r.relation.clone()));
+                        (
+                            payload.message_id.to_string(),
+                            payload.content_id.to_string(),
+                            reference,
+                        )
+                    }
+                    other => {
+                        return Err(DomainError::Validation(format!(
+                            "UNSUPPORTED_EVENT_VERSION: MessageSubmitted v{other}"
+                        )));
+                    }
+                };
 
                 sqlx::query(
                     r#"
                     INSERT INTO conversation_messages (
                         message_id, workspace_id, project_id, session_id, role,
-                        content_id, source_event_id, source_global_position, created_at_us
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        content_id, source_event_id, source_global_position, created_at_us,
+                        refers_to_message_id, refers_to_relation
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     "#,
                 )
-                .bind(payload.message_id.to_string())
+                .bind(&message_id)
                 .bind(&workspace_id)
                 .bind(&project_id)
                 .bind(&session_id)
                 .bind("user")
-                .bind(payload.content_id.to_string())
+                .bind(&content_id)
                 .bind(&event_id)
                 .bind(global_position)
                 .bind(occurred_at_us)
+                .bind(reference.as_ref().map(|(id, _)| id.as_str()))
+                .bind(reference.as_ref().map(|(_, rel)| rel.as_str()))
                 .execute(&mut *tx)
                 .await
                 .map_err(|e| DomainError::Storage(e.to_string()))?;

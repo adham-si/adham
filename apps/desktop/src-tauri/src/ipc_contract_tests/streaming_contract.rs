@@ -28,6 +28,10 @@ fn complete_once_streams_in_order_and_persists_terminal() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "Tell me about rust generics".to_string(),
@@ -219,6 +223,10 @@ fn completion_history_is_bounded_and_tamper_proofed() {
     let tampered = typed_envelope(
         (&ws, &other_project, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hi".to_string(),
@@ -237,6 +245,10 @@ fn completion_history_is_bounded_and_tamper_proofed() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "the latest question".to_string(),
@@ -314,6 +326,10 @@ fn unknown_model_blocked_before_socket() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "nosuchmodel:latest".to_string(),
             text: "hi".to_string(),
@@ -335,6 +351,10 @@ fn unknown_model_blocked_before_socket() {
                 typed_envelope(
                     (&ws, &proj, &sess),
                     CompleteOncePayload {
+                        attachment_ids: Vec::new(),
+                        mode: None,
+                        think: None,
+                        reference: None,
                         account_id: "ghost".to_string(),
                         model_id: "m:latest".to_string(),
                         text: "hi".to_string(),
@@ -387,6 +407,10 @@ fn thinking_model_stream_persists_answer_and_resolves() {
     let env = typed_envelope(
         (&ws, &proj, &sess),
         CompleteOncePayload {
+            attachment_ids: Vec::new(),
+            mode: None,
+            think: None,
+            reference: None,
             account_id: account_id.clone(),
             model_id: "m:latest".to_string(),
             text: "hello".to_string(),

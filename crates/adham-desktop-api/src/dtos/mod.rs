@@ -1,3 +1,4 @@
+use adham_core_types::MessageCompletionV1;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -155,6 +156,9 @@ pub struct SessionList {
 #[ts(export)]
 pub struct SubmitMessagePayload {
     pub text: String,
+    /// Explicitly selected attachments. Empty for a plain text message.
+    #[serde(default)]
+    pub attachment_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -169,6 +173,76 @@ pub struct SubmittedMessage {
     pub projection_position: String,
 }
 
+/// A durable reference from a submitted message to another persisted message:
+/// the quote anchor of a reply, or the "edited-from" lineage of an alternative
+/// (a branch). `relation` is "replied" | "edited-from".
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct MessageReferenceDto {
+    pub refers_to_message_id: String,
+    pub relation: String,
+}
+
+/// Which member of an edited branch the session continues from. Local state,
+/// not an event: history is never rewritten, only what a later dispatch is
+/// answered against. Absence of a row means the default: the newest edit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BranchSelectionDto {
+    /// The user message the alternatives edited.
+    pub root_message_id: String,
+    /// The branch member currently being continued from (root or one edit).
+    pub active_message_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetActiveAlternativePayload {
+    pub root_message_id: String,
+    pub active_message_id: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum AnswerVerdict {
+    Like,
+    Dislike,
+}
+
+impl AnswerVerdict {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AnswerVerdict::Like => "like",
+            AnswerVerdict::Dislike => "dislike",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AnswerFeedbackDto {
+    /// The persisted assistant row (one attempt) this verdict is keyed to.
+    pub message_id: String,
+    pub verdict: AnswerVerdict,
+    /// Optional user note; null when absent.
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetAnswerFeedbackPayload {
+    pub message_id: String,
+    /// null removes the stored feedback.
+    pub verdict: Option<AnswerVerdict>,
+    pub reason: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -178,6 +252,15 @@ pub struct ConversationMessageDto {
     pub text: String,
     pub created_at: String,
     pub source_event_id: String,
+    /// Terminal lifecycle of assistant turns (None for user turns). The UI
+    /// labels failed/interrupted/truncated turns from this, never from text.
+    pub completion: Option<MessageCompletionV1>,
+    /// Quote anchor or edit lineage of this message, when it recorded one.
+    pub reference: Option<MessageReferenceDto>,
+    /// Files this message was sent with. An empty list means none; a chip only
+    /// exists when the link row exists, so it states real dispatch selection.
+    #[serde(default)]
+    pub attachments: Vec<MessageAttachmentDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -187,6 +270,12 @@ pub struct ConversationPage {
     pub items: Vec<ConversationMessageDto>,
     pub next_cursor: Option<String>,
     pub projection_position: String,
+    /// Active-alternative selections for this session, so the timeline can
+    /// label every edited branch without a second round trip.
+    pub branch_selections: Vec<BranchSelectionDto>,
+    /// Local like/dislike verdicts for this session's answers, so a card shows
+    /// its stored verdict without a second round trip.
+    pub feedback: Vec<AnswerFeedbackDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -399,5 +488,7 @@ impl ErrorEnvelope {
     }
 }
 
+mod attachment;
 pub mod provider;
+pub use attachment::*;
 pub use provider::*;

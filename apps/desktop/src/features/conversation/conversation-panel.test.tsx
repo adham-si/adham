@@ -77,6 +77,8 @@ function fakeBackend(): ConversationFakeBackend {
       truncated: false,
     }),
     clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+    setActiveAlternative: vi.fn().mockResolvedValue([]),
+    setAnswerFeedback: vi.fn().mockResolvedValue([]),
   };
 }
 
@@ -87,17 +89,6 @@ describe('ConversationPanel', () => {
     await waitFor(() => expect(screen.getByText('earlier truth')).toBeDefined());
     expect(screen.queryByText(/Analyzing prompt/i)).toBeNull();
     expect(screen.queryByText(/Verified sandbox execution/i)).toBeNull();
-  });
-
-  it('renders telemetry as unknown and discloses the model gap in production', async () => {
-    const backend = fakeBackend();
-    render(<ConversationPanel backend={backend} />);
-    await screen.findByRole('textbox', { name: /composer input/i });
-
-    expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/model selection is not applied/i)).toBeDefined();
-    expect(screen.queryByText(/12\.4k \/ 128k/)).toBeNull();
-    expect(screen.queryByText(/adham\.si/)).toBeNull();
   });
 
   it('submits text and shows the backend-issued message while clearing the draft', async () => {
@@ -142,20 +133,6 @@ describe('ConversationPanel', () => {
     expect(screen.getByRole('button', { name: /reload history/i })).toBeDefined();
   });
 
-  it('marks execution unavailable in execute mode without any approval flow', async () => {
-    const user = userEvent.setup();
-    const backend = fakeBackend();
-    render(<ConversationPanel backend={backend} />);
-    await screen.findByRole('textbox', { name: /composer input/i });
-
-    expect(screen.queryByText(/execution.*unavailable|unavailable.*execution/i)).toBeNull();
-    // Switch to execute mode via the mode radiogroup.
-    await user.click(screen.getByRole('radio', { name: /execute/i }));
-
-    expect(screen.getByText(/execution.*unavailable|unavailable.*execution/i)).toBeDefined();
-    expect(screen.queryByText(/Verified sandbox execution/i)).toBeNull();
-  });
-
   it('does not offer a Stop affordance in the text-only fallback flow', async () => {
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
@@ -164,16 +141,19 @@ describe('ConversationPanel', () => {
     expect(screen.queryByRole('button', { name: /stop generation/i })).toBeNull();
   });
 
-  it('discloses that pasted attachments are not transmitted', async () => {
+  it('keeps a long paste inline instead of claiming an unsent attachment', async () => {
     const user = userEvent.setup();
     const backend = fakeBackend();
     render(<ConversationPanel backend={backend} />);
-    const box = await screen.findByRole('textbox', { name: /composer input/i });
+    const box = (await screen.findByRole('textbox', {
+      name: /composer input/i,
+    })) as HTMLTextAreaElement;
 
     await user.click(box);
     await user.paste('A'.repeat(2500));
 
-    expect(screen.getByText(/will not be sent/i)).toBeDefined();
+    expect(box.value).toHaveLength(2500);
+    expect(screen.queryByText(/will not be sent/i)).toBeNull();
   });
 
   it('reloads history from the error banner without resubmitting', async () => {
@@ -235,7 +215,7 @@ describe('ConversationPanel', () => {
       resolveBootstrap();
     });
     await waitFor(() =>
-      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+      expect(localStorage.getItem('adham:compose:draft:ws-1:proj-1:sess-1')).toBe('early thought'),
     );
 
     expect(box.value).toBe('early thought');
@@ -263,7 +243,7 @@ describe('ConversationPanel', () => {
     // resolved session adopts it.
     expect(restored.value).toBe('early thought');
     await waitFor(() =>
-      expect(localStorage.getItem('adham:compose:draft:sess-1')).toBe('early thought'),
+      expect(localStorage.getItem('adham:compose:draft:ws-1:proj-1:sess-1')).toBe('early thought'),
     );
     expect(restored.value).toBe('early thought');
   });

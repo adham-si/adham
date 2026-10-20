@@ -15,9 +15,9 @@ use adham_provider::domain::account::{PrivacyClass, ProviderAccountId, ProviderK
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::model::{ModelDescriptor, ModelId};
 use adham_provider::registry::LocalAccount;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub struct StubCaptures {
     accepts: AtomicU64,
@@ -86,10 +86,13 @@ pub fn ndjson_done(prompt: u64, eval: u64) -> String {
 
 /// Programmed chat response: `pre` chunks stream, then (optionally) the stub
 /// holds until `gate` fires, then `post` chunks stream and the body ends.
+/// `header_gate` holds before any response byte, representing a socket that
+/// is still connecting.
 pub struct ChatProgram {
     pub pre: Vec<String>,
     pub post: Vec<String>,
     pub gate: Option<Arc<tokio::sync::Notify>>,
+    pub header_gate: Option<Arc<tokio::sync::Notify>>,
 }
 
 impl ChatProgram {
@@ -98,12 +101,16 @@ impl ChatProgram {
             pre: Vec::new(),
             post: lines,
             gate: None,
+            header_gate: None,
         }
     }
 }
 
 pub const TAGS_BODY: &str = r#"{"models":[{"name":"m:latest","digest":"sha256:unittest-digest"},{"name":"tiny2:1b","digest":""}]}"#;
-pub const SHOW_BODY: &str = r#"{"capabilities":["streaming","tools"]}"#;
+pub const VERSION_BODY: &str = r#"{"version":"0.12.3"}"#;
+/// `/api/show` carries capability, context-limit, and configured-context
+/// evidence: the union of what both sides' tests need to observe.
+pub const SHOW_BODY: &str = r#"{"capabilities":["streaming","tools"],"model_info":{"llama.context_length":131072},"parameters":"num_ctx 8192"}"#;
 
 /// Minimal loopback Ollama stub. `/api/chat` bodies stream chunked so a
 /// mid-stream stall is representable (no content-length lie).
@@ -173,7 +180,20 @@ pub fn spawn_stub_ollama(
 
             let response: Vec<u8> = match path.as_str() {
                 "/api/tags" => http_ok("application/json", TAGS_BODY.as_bytes()),
-                "/api/show" => http_ok("application/json", SHOW_BODY.as_bytes()),
+                "/api/version" => http_ok("application/json", VERSION_BODY.as_bytes()),
+                "/api/show" => {
+                    // per-model show: tiny2 evidences only the model maximum,
+                    // so its effective budget must stay unclaimed
+                    let body = String::from_utf8_lossy(&request_body);
+                    if body.contains("tiny2") {
+                        http_ok(
+                            "application/json",
+                            br#"{"capabilities":["completion"],"model_info":{"llama.context_length":131072}}"#,
+                        )
+                    } else {
+                        http_ok("application/json", SHOW_BODY.as_bytes())
+                    }
+                }
                 "/api/chat" => {
                     // from the socket's side: is the pending op already durable?
                     if let Some(pool) = &observe_pool {
@@ -189,6 +209,11 @@ pub fn spawn_stub_ollama(
                             .lock()
                             .expect("stub facts")
                             .push(in_flight);
+                    }
+                    if let Some(gate) = &chat.header_gate {
+                        // hold before any response byte: the client stays in
+                        // connect for the whole test
+                        gate.notified().await;
                     }
                     let mut body: Vec<u8> = b"HTTP/1.1 200 OK\r\ncontent-type: application/x-ndjson\r\ntransfer-encoding: chunked\r\nconnection: close\r\n\r\n".to_vec();
                     for line in &chat.pre {
@@ -225,6 +250,8 @@ pub fn provider_mock_app(ctx: ApiContext) -> tauri::App<MockRuntime> {
             create_project,
             create_session,
             get_conversation,
+            set_active_alternative,
+            set_answer_feedback,
             list_provider_accounts,
             test_provider_connection,
             list_provider_models,
@@ -234,7 +261,9 @@ pub fn provider_mock_app(ctx: ApiContext) -> tauri::App<MockRuntime> {
             disconnect_google_account,
             disconnect_ollama_account,
             complete_once_streaming,
-            stop_completion
+            retry_completion_streaming,
+            stop_completion,
+            mark_completion_interrupted
         ])
         .build(app_context())
         .expect("build mock app")
@@ -336,6 +365,9 @@ pub fn model_descriptor(id: &str) -> ModelDescriptor {
         human_label: id.to_string(),
         privacy_class: PrivacyClass::LocalOnly,
         capabilities: Default::default(),
+        evidence: Default::default(),
+        context_limit: None,
+        configured_context: None,
     }
 }
 
@@ -475,6 +507,7 @@ pub fn seed_history_row(
                 &append_res.event_id.to_string(),
                 append_res.global_position,
                 now_us,
+                None,
             )
             .await
             .expect("seed projection");
@@ -500,10 +533,7 @@ pub fn seed_history_row(
     });
 }
 
-pub fn typed_envelope(
-    context_scope: (&str, &str, &str),
-    payload: CompleteOncePayload,
-) -> CommandEnvelope<CompleteOncePayload> {
+pub fn typed_envelope<T>(context_scope: (&str, &str, &str), payload: T) -> CommandEnvelope<T> {
     let (ws, proj, sess) = context_scope;
     CommandEnvelope {
         protocol_version: 1,

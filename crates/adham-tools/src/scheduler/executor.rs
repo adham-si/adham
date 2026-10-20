@@ -1,4 +1,4 @@
-use crate::broker::patch::{apply_project_patch, PatchArtifact};
+use crate::broker::patch::{PatchArtifact, apply_project_patch};
 use crate::broker::read::read_project_text;
 use crate::domain::grant::{ExecutionGrant, GrantError, RootGrant};
 use crate::domain::proposal::NormalizedAction;

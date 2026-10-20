@@ -5,12 +5,11 @@
 //! AEAD associated data, so a copied row cannot be replayed elsewhere.
 
 use adham_event_log::{
-    create_sqlite_pool,
+    InMemoryProvider, create_sqlite_pool,
     provider_credentials::{
         put_provider_credential, read_provider_credential_plaintext, remove_provider_credential,
     },
-    provider_registry::{upsert_provider_account, ProviderAccountRow},
-    InMemoryProvider,
+    provider_registry::{ProviderAccountRow, upsert_provider_account},
 };
 use std::path::PathBuf;
 

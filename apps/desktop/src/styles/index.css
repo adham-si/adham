@@ -117,6 +117,24 @@ body {
   --animate-mascot-sway: mascot-sway 7s ease-in-out infinite;
 }
 
+/* Three-dot "the model is working" pulse (conversation turn status). Each dot
+   is delayed separately by the caller; reduced motion renders it static. */
+@theme {
+  --animate-chat-dot: chat-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes chat-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
 @keyframes mascot-float {
   0%,
   100% {
@@ -135,4 +153,15 @@ body {
   50% {
     transform: rotate(2.5deg);
   }
+}
+
+/* The app's motion preference (and the OS preference resolved into it by
+   applyPresentation) disables decorative animation and long transitions. */
+[data-reduced-motion="reduce"] *,
+[data-reduced-motion="reduce"] *::before,
+[data-reduced-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

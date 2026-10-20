@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use thiserror::Error;
 
 pub const MAX_CONCURRENT_READS: u32 = 4;

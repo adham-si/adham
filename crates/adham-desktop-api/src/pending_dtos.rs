@@ -46,3 +46,20 @@ pub struct ClearPendingOperationPayload {
     pub expected_message_request_id: String,
     pub reason: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct MarkCompletionInterruptedPayload {
+    pub operation_id: String,
+    pub expected_message_request_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct MarkCompletionInterruptedResponse {
+    /// `interrupted` when this call closed the op, `already-resolved` when a
+    /// previous call (or the live run) had already recorded a terminal.
+    pub status: String,
+}

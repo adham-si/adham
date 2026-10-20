@@ -27,7 +27,10 @@ async fn test_backend_issued_ids_survive_restart_reload() {
                 project_id: Some(proj_id.clone()),
                 session_id: Some(sess_id.clone()),
             },
-            payload: SubmitMessagePayload { text },
+            payload: SubmitMessagePayload {
+                text,
+                attachment_ids: Vec::new(),
+            },
         };
 
         let first = handle_submit_message(&ctx, submit_envelope("first truth".to_string()))
@@ -55,6 +58,7 @@ async fn test_backend_issued_ids_survive_restart_reload() {
                     session_id: Some(sess_id.clone()),
                 },
                 payload: SubmitMessagePayload {
+                    attachment_ids: Vec::new(),
                     text: "   ".to_string(),
                 },
             },

@@ -1,21 +1,77 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as React from 'react';
 import { render, screen, fireEvent, renderHook, act, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   Composer,
   ComposeInput,
   isRtlText,
   ComposeContextChips,
   ComposeModelPicker,
+  ComposeModeSelector,
   ComposeStatusStrip,
   ComposeApprovalBar,
   migratePendingDraft,
   useComposeState,
   useDrafts,
 } from './index';
+import type { ModelOption } from './compose-model-picker';
 
 afterEach(() => {
   cleanup();
+});
+
+/// Explicit picker fixture: production ships no static model catalog; models
+/// come only from provider discovery.
+const TEST_MODELS: ModelOption[] = [
+  {
+    id: 'local:qwen2.5-coder:32b',
+    name: 'Qwen 2.5 Coder 32B',
+    provider: 'Ollama',
+    boundary: 'local',
+    supportsReasoning: false,
+  },
+  {
+    id: 'cloud:claude-3-7-sonnet',
+    name: 'Claude 3.7 Sonnet',
+    provider: 'Anthropic',
+    boundary: 'cloud',
+    supportsReasoning: true,
+    thinkingValues: ['true', 'false', 'low', 'medium', 'high'],
+    thinkingDefault: 'medium',
+  },
+  {
+    // Legacy daemon: the capability array says thinking, but /api/show
+    // documents no values — no control may be offered.
+    id: 'local:legacy-thinker:7b',
+    name: 'Legacy Thinker 7B',
+    provider: 'Ollama',
+    boundary: 'local',
+    supportsReasoning: true,
+  },
+];
+
+describe('ComposeModeSelector', () => {
+  it('selects ask/plan/code from the dropdown and explains the unavailable execute', () => {
+    const onChangeMode = vi.fn();
+    render(<ComposeModeSelector mode="plan" onChangeMode={onChangeMode} />);
+
+    // Trigger reads the current mode; the menu carries the choices.
+    const trigger = screen.getByRole('button', { name: /execution mode/i });
+    expect(trigger.textContent).toContain('Plan');
+    fireEvent.click(trigger);
+
+    fireEvent.click(screen.getByRole('option', { name: /ask/i }));
+    expect(onChangeMode).toHaveBeenCalledWith('ask');
+
+    // Re-open for the unavailable entry: focusable, explained, refused.
+    fireEvent.click(trigger);
+    const execute = screen.getByRole('option', { name: /execute/i });
+    expect(execute.getAttribute('aria-disabled')).toBe('true');
+    expect(execute.textContent).toMatch(/policy and tool runtime/i);
+    fireEvent.click(execute);
+    expect(onChangeMode).not.toHaveBeenCalledWith('execute');
+  });
 });
 
 describe('useComposeState', () => {
@@ -179,6 +235,18 @@ describe('migratePendingDraft', () => {
     );
     expect(localStorage.getItem('adham:compose:draft:pending')).toBeNull();
   });
+
+  it('adopts only the pending bucket of the matching project scope', () => {
+    localStorage.setItem('adham:compose:draft:ws-1:proj-1:pending', 'Project one draft');
+    localStorage.setItem('adham:compose:draft:ws-1:proj-2:pending', 'Project two draft');
+    migratePendingDraft('ws-1:proj-1:sess-1', 'ws-1:proj-1:pending');
+    expect(localStorage.getItem('adham:compose:draft:ws-1:proj-1:sess-1')).toBe(
+      'Project one draft',
+    );
+    expect(localStorage.getItem('adham:compose:draft:ws-1:proj-2:pending')).toBe(
+      'Project two draft',
+    );
+  });
 });
 
 describe('RTL and ComposeInput', () => {
@@ -248,31 +316,51 @@ describe('RTL and ComposeInput', () => {
     expect(handleSubmit).not.toHaveBeenCalled();
   });
 
-  it('intercepts pastes exceeding 2000 characters and turns them into a context chip', () => {
-    const handleAttachBlob = vi.fn();
+  it('keeps a long text paste inline instead of fabricating a file chip', () => {
+    const onPasteFiles = vi.fn();
     render(
-      <ComposeInput
-        value=""
-        onChange={vi.fn()}
-        onSubmit={vi.fn()}
-        onAttachPastedBlob={handleAttachBlob}
-      />,
+      <ComposeInput value="" onChange={vi.fn()} onSubmit={vi.fn()} onPasteFiles={onPasteFiles} />,
     );
     const textarea = screen.getByRole('textbox', { name: /composer input/i });
-    const largeText = 'A'.repeat(2500);
 
     fireEvent.paste(textarea, {
       clipboardData: {
-        getData: () => largeText,
+        getData: () => 'A'.repeat(2500),
+        files: [],
       },
     });
 
-    expect(handleAttachBlob).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'pasted-text',
-        charCount: 2500,
-      }),
+    expect(onPasteFiles).not.toHaveBeenCalled();
+  });
+
+  it('keeps a multiline paste inline in the textarea', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ComposeInput value="" onChange={onChange} onSubmit={vi.fn()} />);
+    const textarea = screen.getByRole('textbox', { name: /composer input/i });
+
+    await user.click(textarea);
+    await user.paste('first line\nsecond line');
+
+    expect(onChange).toHaveBeenCalledWith('first line\nsecond line');
+  });
+
+  it('hands clipboard files to ingestion', () => {
+    const onPasteFiles = vi.fn();
+    render(
+      <ComposeInput value="" onChange={vi.fn()} onSubmit={vi.fn()} onPasteFiles={onPasteFiles} />,
     );
+    const textarea = screen.getByRole('textbox', { name: /composer input/i });
+    const file = new File(['# notes'], 'notes.md', { type: 'text/markdown' });
+
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        getData: () => '',
+        files: [file],
+      },
+    });
+
+    expect(onPasteFiles).toHaveBeenCalledWith([file]);
   });
 });
 
@@ -282,15 +370,21 @@ describe('ComposeContextChips', () => {
     render(
       <ComposeContextChips
         attachments={[
-          { id: '1', type: 'file', name: 'src/main.rs', size: 1024 },
-          { id: '2', type: 'folder', name: 'src/widgets' },
+          {
+            key: '1',
+            fileName: 'src/main.rs',
+            byteSize: 1024,
+            charCount: 1000,
+            status: 'ready',
+          },
+          { key: '2', fileName: 'notes.md', status: 'pending' },
         ]}
         onRemove={handleRemove}
       />,
     );
 
     expect(screen.getByText('src/main.rs')).toBeDefined();
-    expect(screen.getByText('src/widgets')).toBeDefined();
+    expect(screen.getByText('notes.md')).toBeDefined();
 
     const removeButtons = screen.getAllByRole('button', { name: /Remove/i });
     fireEvent.click(removeButtons[0]!);
@@ -302,7 +396,11 @@ describe('ComposeModelPicker with Data Boundary Badge', () => {
   it('displays local boundary badge and switches models', () => {
     const handleSelect = vi.fn();
     render(
-      <ComposeModelPicker selectedModelId="local:qwen2.5-coder:32b" onSelectModel={handleSelect} />,
+      <ComposeModelPicker
+        selectedModelId="local:qwen2.5-coder:32b"
+        onSelectModel={handleSelect}
+        models={TEST_MODELS}
+      />,
     );
 
     // Check boundary badge
@@ -319,32 +417,81 @@ describe('ComposeModelPicker with Data Boundary Badge', () => {
 
     expect(handleSelect).toHaveBeenCalledWith('cloud:claude-3-7-sonnet');
   });
+
+  it('offers only the model-documented thinking values, verbatim', () => {
+    const onChangeThink = vi.fn();
+    // Documented on/off + levels: both controls exist and dispatch the exact
+    // documented values (the backend refuses anything else).
+    const { unmount } = render(
+      <ComposeModelPicker
+        selectedModelId="cloud:claude-3-7-sonnet"
+        onSelectModel={() => {}}
+        models={TEST_MODELS}
+        onChangeThink={onChangeThink}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Select model/i }));
+    fireEvent.click(screen.getByLabelText(/Disable thinking/i));
+    expect(onChangeThink).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByRole('button', { name: 'high' }));
+    expect(onChangeThink).toHaveBeenCalledWith('high');
+    fireEvent.click(screen.getByRole('button', { name: /Model default \(medium\)/i }));
+    expect(onChangeThink).toHaveBeenCalledWith(null);
+    unmount();
+
+    // No documented values: no control at all — nothing may be sent.
+    render(
+      <ComposeModelPicker
+        selectedModelId="local:legacy-thinker:7b"
+        onSelectModel={() => {}}
+        models={TEST_MODELS}
+        onChangeThink={onChangeThink}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Select model/i }));
+    expect(screen.queryByLabelText(/Disable thinking/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Model default/i })).toBeNull();
+    expect(screen.queryByText(/^Thinking$/)).toBeNull();
+  });
+  it('stays visible with no model and names the unavailable state', () => {
+    render(
+      <ComposeModelPicker selectedModelId="" onSelectModel={() => {}} models={[]} unavailable />,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'No model available' });
+    fireEvent.click(trigger);
+    expect(screen.getByText(/set up a model in settings/i)).toBeDefined();
+  });
+
+  it('keeps a neutral label while the provider state is unresolved', () => {
+    render(<ComposeModelPicker selectedModelId="" onSelectModel={() => {}} models={[]} />);
+
+    expect(screen.getByRole('button', { name: 'Select a model' })).toBeDefined();
+  });
 });
 
 describe('ComposeStatusStrip', () => {
-  it('displays folder scope, policy and context token budget', () => {
-    render(
-      <ComposeStatusStrip
-        scopeFolder="my-project"
-        scopePolicy="standing-approval"
-        usedTokens={16000}
-        maxTokens={128000}
-        sessionSpend="$0.12"
-        spendCap="$5.00"
-      />,
-    );
+  it('shows the evidenced request budget and the model maximum', () => {
+    render(<ComposeStatusStrip contextLimit={131072} effectiveContextBudget={8192} />);
 
-    expect(screen.getByText('my-project')).toBeDefined();
-    expect(screen.getByText(/Standing Approval/i)).toBeDefined();
-    expect(screen.getByText(/16.0k \/ 128k/i)).toBeDefined();
-    expect(screen.getByText('$0.12')).toBeDefined();
+    expect(screen.getByText(/Context budget: 8k/)).toBeDefined();
+    // no invented usage split: only evidenced numbers render
+    expect(screen.queryByText(/16\.0k/)).toBeNull();
+    expect(screen.queryByText(/\$/)).toBeNull();
   });
 
-  it('renders unknown instead of invented telemetry when nothing is reported', () => {
+  it('shows only the model maximum when no request budget is reported', () => {
+    render(<ComposeStatusStrip contextLimit={131072} />);
+
+    expect(screen.getByText(/Model context: 131k/)).toBeDefined();
+    expect(screen.queryByText(/Context budget/i)).toBeNull();
+  });
+
+  it('renders nothing instead of invented telemetry when nothing is evidenced', () => {
     const { container } = render(<ComposeStatusStrip />);
 
-    expect(screen.getAllByText(/unknown/i).length).toBeGreaterThan(0);
-    expect(container.textContent).not.toMatch(/12\.4k \/ 128k/);
+    expect(container.textContent).toBe('');
+    expect(screen.queryByText(/unknown/i)).toBeNull();
     expect(container.textContent).not.toMatch(/\$0\.00/);
     expect(container.textContent).not.toMatch(/adham\.si/);
   });

@@ -19,11 +19,14 @@ impl fmt::Display for ModelId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CapabilityStatus {
     Supported,
     Unsupported,
+    /// No evidence is no claim: a missing field never reads as a support
+    /// claim, so stored rows from older schemas deserialize as unknown.
+    #[default]
     Unknown,
 }
 
@@ -33,17 +36,56 @@ pub struct ModelCapabilities {
     pub structured_output: CapabilityStatus,
     pub tool_proposals: CapabilityStatus,
     pub thinking: CapabilityStatus,
+    /// Image input (vision), evidenced by endpoint/model metadata. Model-name
+    /// guesses and adapter field support do not prove it.
+    #[serde(default)]
+    pub image_input: CapabilityStatus,
+    /// Documented `think` values from `/api/show` (`thinking.values` and
+    /// `thinking.default`): booleans for on/off models, strings for named
+    /// levels. None = no documented metadata, so no value may be sent.
+    #[serde(default)]
+    pub thinking_control: Option<ThinkingControl>,
+}
+
+/// `/api/show` `thinking` object: the values a model documents for `think`
+/// and the value used when `think` is absent. Values are kept exactly as the
+/// server states them (`"true"`/`"false"` from JSON booleans, or level names).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ThinkingControl {
+    #[serde(default)]
+    pub values: Vec<String>,
+    #[serde(default)]
+    pub default_value: Option<String>,
 }
 
 impl Default for ModelCapabilities {
     fn default() -> Self {
         Self {
-            streaming: CapabilityStatus::Supported,
+            // Every capability starts Unknown; only a specific wire/metadata
+            // source may raise one to Supported or Unsupported.
+            streaming: CapabilityStatus::Unknown,
             structured_output: CapabilityStatus::Unknown,
             tool_proposals: CapabilityStatus::Unknown,
             thinking: CapabilityStatus::Unknown,
+            image_input: CapabilityStatus::Unknown,
+            thinking_control: None,
         }
     }
+}
+
+/// Where a descriptor's claims came from and when. Legacy rows deserialize
+/// with empty evidence, which must render as unknown — never as fresh data.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ModelEvidence {
+    /// Short wire-metadata label, e.g. "ollama /api/show".
+    #[serde(default)]
+    pub source: String,
+    /// Endpoint/daemon revision, when the endpoint reports one.
+    #[serde(default)]
+    pub server_version: Option<String>,
+    /// Unix microseconds when discovery observed this descriptor.
+    #[serde(default)]
+    pub observed_at_us: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,6 +94,17 @@ pub struct ModelDescriptor {
     pub human_label: String,
     pub privacy_class: PrivacyClass,
     pub capabilities: ModelCapabilities,
+    /// Evidence for the capability/limit claims above (empty = legacy row).
+    #[serde(default)]
+    pub evidence: ModelEvidence,
+    /// Model maximum context in tokens, as reported by model metadata.
+    #[serde(default)]
+    pub context_limit: Option<u32>,
+    /// Context configured for this model on the endpoint (e.g. Modelfile
+    /// `num_ctx`), when reported. The server-wide default is not queryable
+    /// and stays unknown rather than guessed.
+    #[serde(default)]
+    pub configured_context: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

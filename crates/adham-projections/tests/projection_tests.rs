@@ -1,7 +1,7 @@
 // ID newtypes are `Copy`; `.clone()` follows codebase style.
 #![allow(clippy::clone_on_copy)]
 use adham_core_types::*;
-use adham_event_log::{create_sqlite_pool, AppendEventRequest, SqliteEventStore};
+use adham_event_log::{AppendEventRequest, SqliteEventStore, create_sqlite_pool};
 use adham_projections::{ConversationMessageView, ConversationProjection};
 use std::path::PathBuf;
 
@@ -92,6 +92,7 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
         &evt1.event_id.to_string(),
         evt1.global_position,
         1000,
+        None,
     )
     .await
     .expect("insert message 1 projection");
@@ -161,6 +162,7 @@ async fn test_conversation_projection_and_deterministic_rebuild() {
         &evt2.event_id.to_string(),
         evt2.global_position,
         2000,
+        None,
     )
     .await
     .expect("insert message 2 projection");
@@ -250,12 +252,21 @@ impl Harness {
     }
 
     async fn append(&mut self, event_type: &str, payload: &impl serde::Serialize) -> i64 {
+        self.append_versioned(event_type, 1, payload).await
+    }
+
+    async fn append_versioned(
+        &mut self,
+        event_type: &str,
+        event_version: u16,
+        payload: &impl serde::Serialize,
+    ) -> i64 {
         let req = AppendEventRequest {
             stream_id: self.stream_id.clone(),
             stream_kind: "session".to_string(),
             expected_sequence: self.seq,
             event_type: event_type.to_string(),
-            event_version: 1,
+            event_version,
             scope: self.scope.clone(),
             actor: EventActor {
                 actor_id: ActorId::new_v7(),
@@ -394,128 +405,119 @@ async fn test_assistant_completed_replays_in_order_with_roles_and_usage() {
 }
 
 #[tokio::test]
-async fn test_interrupted_failed_and_length_markers_survive_rebuild() {
+async fn test_message_reference_survives_rebuild_and_read_back() {
     let mut h = Harness::new().await;
 
-    h.put_assistant(
-        OperationId::new_v7(),
-        MessageId::new_v7(),
-        "interrupted partial",
-        MessageCompletionV1::Interrupted,
-        None,
+    // Original message (v2, no reference), then a reply anchored to it.
+    let original_id = MessageId::new_v7();
+    let original_content = ContentId::new_v7();
+    h.store
+        .put_content(
+            &h.provider,
+            &original_content,
+            "user_text",
+            "text/plain",
+            &h.scope,
+            b"Original",
+        )
+        .await
+        .expect("put original");
+    h.append_versioned(
+        "MessageSubmitted",
+        2,
+        &MessageSubmittedV2 {
+            message_id: original_id,
+            content_id: original_content,
+            content_kind: "user_text".to_string(),
+            size_bytes: 8,
+            reference: None,
+        },
     )
     .await;
 
-    h.put_assistant(
-        OperationId::new_v7(),
-        MessageId::new_v7(),
-        "failed partial",
-        MessageCompletionV1::Failed,
-        None,
-    )
-    .await;
-
-    h.put_assistant(
-        OperationId::new_v7(),
-        MessageId::new_v7(),
-        "cut at limit",
-        MessageCompletionV1::Completed { truncated: true },
-        Some(MessageUsageV1 {
-            prompt_tokens: Some(8),
-            completion_tokens: Some(2),
-            total_tokens: Some(10),
-        }),
+    let reply_content = ContentId::new_v7();
+    h.store
+        .put_content(
+            &h.provider,
+            &reply_content,
+            "user_text",
+            "text/plain",
+            &h.scope,
+            b"Reply",
+        )
+        .await
+        .expect("put reply");
+    h.append_versioned(
+        "MessageSubmitted",
+        2,
+        &MessageSubmittedV2 {
+            message_id: MessageId::new_v7(),
+            content_id: reply_content,
+            content_kind: "user_text".to_string(),
+            size_bytes: 5,
+            reference: Some(MessageReferenceV1 {
+                refers_to_message_id: original_id,
+                relation: "replied".to_string(),
+            }),
+        },
     )
     .await;
 
     let replayed = ConversationProjection::rebuild(&h.pool)
         .await
         .expect("rebuild");
-    assert_eq!(replayed, 3);
+    assert_eq!(replayed, 2);
 
     let view = h.messages().await;
-    assert_eq!(view.len(), 3);
-    assert_eq!(view[0].content, "interrupted partial");
-    assert_eq!(view[0].completion, Some(MessageCompletionV1::Interrupted));
-    assert_eq!(view[1].content, "failed partial");
-    assert_eq!(view[1].completion, Some(MessageCompletionV1::Failed));
-    assert_eq!(view[2].content, "cut at limit");
+    assert_eq!(view.len(), 2);
+    assert_eq!(view[0].content, "Original");
+    assert_eq!(view[0].refers_to_message_id, None);
+    assert_eq!(view[0].refers_to_relation, None);
+    assert_eq!(view[1].content, "Reply");
     assert_eq!(
-        view[2].completion,
-        Some(MessageCompletionV1::Completed { truncated: true })
+        view[1].refers_to_message_id.as_deref(),
+        Some(original_id.to_string().as_str())
     );
-    assert_eq!(view[2].usage.as_ref().unwrap().completion_tokens, Some(2));
+    assert_eq!(view[1].refers_to_relation.as_deref(), Some("replied"));
 }
 
 #[tokio::test]
-async fn test_double_terminal_write_yields_single_first_won_row() {
+async fn test_unknown_message_version_stops_rebuild() {
     let mut h = Harness::new().await;
 
-    // Stop racing completion: two terminals exist in the log for one op.
-    let op_id = OperationId::new_v7();
-    let message_id = MessageId::new_v7();
-    h.put_assistant(
-        op_id,
-        message_id,
-        "first body",
-        MessageCompletionV1::Completed { truncated: false },
-        None,
-    )
-    .await;
-    h.put_assistant(
-        op_id,
-        message_id,
-        "second body",
-        MessageCompletionV1::Interrupted,
-        None,
-    )
-    .await;
-
-    // an unrelated op must still be replayed normally
-    h.put_assistant(
-        OperationId::new_v7(),
-        MessageId::new_v7(),
-        "other",
-        MessageCompletionV1::Completed { truncated: false },
-        None,
-    )
-    .await;
-
-    ConversationProjection::rebuild(&h.pool)
+    let content_id = ContentId::new_v7();
+    h.store
+        .put_content(
+            &h.provider,
+            &content_id,
+            "user_text",
+            "text/plain",
+            &h.scope,
+            b"Future",
+        )
         .await
-        .expect("rebuild");
-    let view = h.messages().await;
-    assert_eq!(view.len(), 2, "double terminal collapses to one row");
-    let first_op_rows: Vec<_> = view.iter().filter(|m| m.op_id == Some(op_id)).collect();
-    assert_eq!(first_op_rows.len(), 1, "exactly one terminal row per op");
-    assert_eq!(
-        first_op_rows[0].completion,
-        Some(MessageCompletionV1::Completed { truncated: false }),
-        "first terminal in global order wins"
+        .expect("put content");
+    h.append_versioned(
+        "MessageSubmitted",
+        3,
+        &MessageSubmittedV2 {
+            message_id: MessageId::new_v7(),
+            content_id,
+            content_kind: "user_text".to_string(),
+            size_bytes: 6,
+            reference: None,
+        },
+    )
+    .await;
+
+    let err = ConversationProjection::rebuild(&h.pool)
+        .await
+        .expect_err("an unknown version must stop the rebuild, never guess");
+    assert!(
+        format!("{err:?}").contains("UNSUPPORTED_EVENT_VERSION"),
+        "{err:?}"
     );
-    assert_eq!(first_op_rows[0].content, "first body");
 }
 
-#[tokio::test]
-async fn test_unknown_completion_value_is_rejected_by_rebuild() {
-    let mut h = Harness::new().await;
-    h.put_user("Question").await;
-
-    let raw = serde_json::json!({
-        "op_id": uuid::Uuid::now_v7().to_string(),
-        "message_id": uuid::Uuid::now_v7().to_string(),
-        "content_id": uuid::Uuid::now_v7().to_string(),
-        "content_kind": "assistant_text",
-        "size_bytes": 4,
-        "completion": { "TotallyUnknown": null },
-        "usage": null
-    });
-    h.append(EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED, &raw).await;
-
-    let err = ConversationProjection::rebuild(&h.pool).await;
-    let msg = format!(
-        "{:?}",
-        err.expect_err("unknown completion must be rejected")
-    );
-    assert!(msg.contains("Invalid MessageCompletedV1 payload"), "{msg}");
-}
+#[path = "projection_tests/terminal.rs"]
+mod terminal;

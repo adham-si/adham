@@ -7,9 +7,9 @@
 use adham_event_log::{
     create_sqlite_pool,
     provider_registry::{
-        read_provider_accounts, read_provider_models, read_provider_registry_revision,
-        upsert_provider_account, upsert_provider_models, ProviderAccountRow, ProviderModelRow,
-        ProviderRegistryError,
+        ProviderAccountRow, ProviderModelRow, ProviderRegistryError, read_provider_accounts,
+        read_provider_models, read_provider_registry_revision, upsert_provider_account,
+        upsert_provider_models,
     },
 };
 use std::path::PathBuf;

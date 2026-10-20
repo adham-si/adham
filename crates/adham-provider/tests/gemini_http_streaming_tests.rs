@@ -9,14 +9,14 @@ use adham_provider::domain::account::{PrivacyClass, ProviderAccountId};
 use adham_provider::domain::endpoint::EndpointId;
 use adham_provider::domain::error::ProviderError;
 use adham_provider::domain::model::{
-    ModelCapabilities, ModelDescriptor, ModelId, ModelSelectionSnapshot,
+    ModelCapabilities, ModelDescriptor, ModelEvidence, ModelId, ModelSelectionSnapshot,
 };
 use adham_provider::domain::request::{ChatMessage, MessageRole, ProviderRequestV1};
 use adham_provider::domain::stream::{NormalizedStreamEvent, StreamCompletionOutcome, StreamUsage};
 use adham_provider::registry::PinnedModel;
 use adham_provider::transport::HttpTransport;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 const FIXTURE_KEY: &str = "AIza-fixture-key";
@@ -123,6 +123,9 @@ fn model(model_id: &str, privacy: PrivacyClass) -> PinnedModel {
             human_label: model_id.into(),
             privacy_class: privacy,
             capabilities: ModelCapabilities::default(),
+            evidence: ModelEvidence::default(),
+            context_limit: None,
+            configured_context: None,
         },
     }
 }
@@ -142,6 +145,7 @@ fn cloud_request(model_id: &str) -> ProviderRequestV1 {
         }],
         max_output_tokens: Some(64),
         temperature: Some(0.7),
+        think: None,
     }
 }
 

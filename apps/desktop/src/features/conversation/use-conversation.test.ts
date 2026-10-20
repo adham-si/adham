@@ -2,7 +2,6 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBackend } from './conversation-test-utils';
-import { submissionNotice } from './submission-notice';
 import { useConversation } from './use-conversation';
 
 beforeEach(() => {
@@ -171,42 +170,6 @@ describe('conversation capabilities', () => {
       execution: false,
       stop: true,
     });
-  });
-});
-
-describe('submissionNotice', () => {
-  it('discloses that the model selection is not applied when no model is wired', () => {
-    expect(submissionNotice({ attachmentCount: 0, hasCustomSettings: false })).toMatch(
-      /model selection is not applied/i,
-    );
-  });
-
-  it('stays silent when the selected model is applied through streaming', () => {
-    expect(
-      submissionNotice({ attachmentCount: 0, hasCustomSettings: false, modelApplied: true }),
-    ).toBe('');
-  });
-
-  it('warns that attachments are not transmitted', () => {
-    expect(submissionNotice({ attachmentCount: 2, hasCustomSettings: false })).toMatch(
-      /attachment/i,
-    );
-  });
-
-  it('discloses only the reasoning gap when the model is applied with custom effort', () => {
-    const notice = submissionNotice({
-      attachmentCount: 0,
-      hasCustomSettings: true,
-      modelApplied: true,
-    });
-    expect(notice).toMatch(/reasoning effort/i);
-    expect(notice).not.toMatch(/model selection is not applied/i);
-  });
-
-  it('warns that model and scope settings are not applied in the fallback', () => {
-    expect(submissionNotice({ attachmentCount: 0, hasCustomSettings: true })).toMatch(
-      /not applied|not sent/i,
-    );
   });
 });
 

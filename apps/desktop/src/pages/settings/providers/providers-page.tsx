@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { adhamClient } from '@/shared/api/adham-client';
 import { queryKeys } from '@/shared/api/query-keys';
+import { notifyProvidersChanged } from '@/shared/providers/provider-events';
 import {
   ProviderCard,
   type ProviderCatalogEntry,
@@ -114,7 +115,10 @@ export function ProvidersPage() {
   };
 
   const refreshAccounts = React.useCallback(
-    () => accountsQuery.refetch().then(() => undefined),
+    () =>
+      accountsQuery.refetch().then(() => {
+        notifyProvidersChanged();
+      }),
     [accountsQuery],
   );
 

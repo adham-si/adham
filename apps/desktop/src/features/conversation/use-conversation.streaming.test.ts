@@ -19,7 +19,7 @@ describe('useConversation streaming (Delivery A)', () => {
       emit = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => {
       if (holdTerminal && emit) {
@@ -66,14 +66,14 @@ describe('useConversation streaming (Delivery A)', () => {
         sequence: 2,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     const { result } = renderHook(() => useConversation({ backend }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
 
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -81,6 +81,7 @@ describe('useConversation streaming (Delivery A)', () => {
       accountId: 'acc-1',
       modelId: 'qwen2.5:latest',
       text: 'hi',
+      mode: 'plan',
     });
     expect(outcome).toEqual({ ok: true });
     expect(result.current.streaming).toBeNull();
@@ -99,7 +100,7 @@ describe('useConversation streaming (Delivery A)', () => {
     let stopOutcome: unknown;
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     // Live streamed deltas render in the composer state; no terminal yet.
     expect(result.current.streaming?.text).toBe('partial answer');
@@ -184,7 +185,7 @@ describe('useConversation streaming (Delivery A)', () => {
       emitLocal = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     const { result } = renderHook(() => useConversation({ backend }));
@@ -192,7 +193,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(result.current.streaming?.text).toBe('partial answer');
 
@@ -268,7 +269,7 @@ describe('useConversation streaming (Delivery A)', () => {
       emitLocal = onEvent;
       onEvent({ opId: 'op-9', sequence: 0, event: { type: 'started' } });
       onEvent({ opId: 'op-9', sequence: 1, event: { type: 'delta', text: 'partial answer' } });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => {
       // Server-side Interrupted terminal arrives with the stop response.
@@ -284,7 +285,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let streamPromise!: Promise<unknown>;
     await act(async () => {
-      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      streamPromise = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(result.current.streaming?.text).toBe('partial answer');
 
@@ -374,7 +375,7 @@ describe('useConversation streaming (Delivery A)', () => {
         sequence: 2,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     const { result } = renderHook(() => useConversation({ backend }));
@@ -382,7 +383,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
 
     // The turn itself succeeded (terminal, persisted server-side); the
@@ -426,7 +427,7 @@ describe('useConversation streaming (Delivery A)', () => {
         sequence: 1,
         event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
       });
-      return { opId: 'op-9', messageId: 'm-9' };
+      return { opId: 'op-9', messageId: 'm-9', context: null };
     });
     backend.stopCompletion = vi.fn(async () => ({ opId: 'op-9', status: 'cancelled' }));
     const { result } = renderHook(() => useConversation({ backend }));
@@ -434,7 +435,7 @@ describe('useConversation streaming (Delivery A)', () => {
 
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      outcome = await result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(outcome).toEqual({ ok: true });
     expect(result.current.recoverySnapshot).toBeNull();
@@ -453,7 +454,7 @@ describe('useConversation streaming (Delivery A)', () => {
               sequence: 1,
               event: { type: 'completed', completion: 'completed', truncated: false, usage: null },
             });
-            resolve({ opId: 'op-9', messageId: 'm-9' });
+            resolve({ opId: 'op-9', messageId: 'm-9', context: null });
           };
         }),
     );
@@ -463,10 +464,10 @@ describe('useConversation streaming (Delivery A)', () => {
     let first!: Promise<unknown>;
     let second: unknown;
     await act(async () => {
-      first = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest');
+      first = result.current.streamOnce('hi', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     await act(async () => {
-      second = await result.current.streamOnce('again', 'acc-1', 'qwen2.5:latest');
+      second = await result.current.streamOnce('again', 'acc-1', 'qwen2.5:latest', 'plan');
     });
     expect(second).toMatchObject({ ok: false });
 

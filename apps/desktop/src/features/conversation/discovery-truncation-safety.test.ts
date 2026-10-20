@@ -29,6 +29,8 @@ function createMockBackend(overrides?: Partial<ConversationBackend>): Conversati
     recordPendingOperation: vi.fn().mockResolvedValue({} as PendingOperationDto),
     listPendingOperations: vi.fn().mockResolvedValue({ operations: [], truncated: false }),
     clearPendingOperation: vi.fn().mockResolvedValue(undefined),
+    setActiveAlternative: vi.fn().mockResolvedValue([]),
+    setAnswerFeedback: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }

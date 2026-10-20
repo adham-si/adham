@@ -7,62 +7,26 @@ use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::adapters::AnyAdapter;
 use adham_provider::domain::model::ModelSelectionSnapshot;
-use adham_provider::domain::request::{ChatMessage, MessageRole, ProviderRequestV1};
+use adham_provider::domain::request::{ChatMessage, ProviderRequestV1, ThinkValue};
 use adham_provider::domain::stream::{NormalizedStreamEvent, StreamCompletionOutcome, StreamUsage};
 use adham_provider::registry::{LocalAccount, PinnedModel};
 use sqlx::Row;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 
-/// Bounded server-side history: cap N messages and N bytes, trimmed from the
-/// oldest end. The newest user message (the dispatch input) is always kept.
-const MAX_HISTORY_MESSAGES: usize = 20;
-const MAX_HISTORY_BYTES: usize = 16_384;
 /// Assistant accumulation bound: provider output beyond this is a protocol
 /// failure (bounded content, never an unbounded write).
 const MAX_ASSISTANT_BYTES: usize = 262_144;
-
-/// Bounded server-side history: newest-last message list, capped; interrupted
-/// and failed rows never enter next-dispatch context.
-pub(crate) fn bounded_history(
-    rows: impl Iterator<Item = adham_projections::ConversationMessageView>,
-) -> Vec<ChatMessage> {
-    let mut kept: Vec<(usize, String, String)> = Vec::new(); // (index, role, content)
-    for row in rows.enumerate() {
-        if matches!(
-            row.1.completion,
-            Some(MessageCompletionV1::Interrupted) | Some(MessageCompletionV1::Failed)
-        ) {
-            continue;
-        }
-        kept.push((row.0, row.1.role, row.1.content));
-    }
-    // trim from the oldest end; the newest messages win
-    while kept.len() > MAX_HISTORY_MESSAGES {
-        kept.remove(0);
-    }
-    let mut bytes: usize = kept.iter().map(|(_, _, c)| c.len()).sum();
-    while bytes > MAX_HISTORY_BYTES && kept.len() > 1 {
-        bytes -= kept.remove(0).2.len();
-    }
-    kept.into_iter()
-        .map(|(_, role, content)| ChatMessage {
-            role: if role == "assistant" {
-                MessageRole::Assistant
-            } else {
-                MessageRole::User
-            },
-            content,
-        })
-        .collect()
-}
 
 fn terminal_status(outcome: &StreamCompletionOutcome) -> (&'static str, bool) {
     match outcome {
         StreamCompletionOutcome::Stop => ("completed", false),
         StreamCompletionOutcome::LengthExceeded => ("completed", true),
         StreamCompletionOutcome::Interrupted => ("interrupted", false),
-        StreamCompletionOutcome::ContentFilter => ("failed", false),
+        StreamCompletionOutcome::ContentFilter
+        | StreamCompletionOutcome::EmptyAnswer
+        | StreamCompletionOutcome::StructuredOnly
+        | StreamCompletionOutcome::Unknown { .. } => ("failed", false),
     }
 }
 
@@ -73,7 +37,10 @@ fn map_completion(outcome: &StreamCompletionOutcome) -> MessageCompletionV1 {
             MessageCompletionV1::Completed { truncated: true }
         }
         StreamCompletionOutcome::Interrupted => MessageCompletionV1::Interrupted,
-        StreamCompletionOutcome::ContentFilter => MessageCompletionV1::Failed,
+        StreamCompletionOutcome::ContentFilter
+        | StreamCompletionOutcome::EmptyAnswer
+        | StreamCompletionOutcome::StructuredOnly
+        | StreamCompletionOutcome::Unknown { .. } => MessageCompletionV1::Failed,
     }
 }
 
@@ -87,28 +54,25 @@ pub(crate) async fn run_stream<S>(
     request_id: &str,
     ids: &StreamIds,
     token: &CancellationToken,
+    // Assembled + budgeted by the caller after the submitted row was durable.
+    messages: Vec<ChatMessage>,
+    max_output_tokens: Option<u32>,
+    // Documented `think` parameter; validated against model evidence already.
+    think: Option<ThinkValue>,
     sink: &S,
 ) -> &'static str
 where
     S: EventSink,
 {
-    // bounded history from protected content (server-side, never the renderer's)
-    let history_rows = adham_projections::ConversationProjection::get_session_messages(
-        &ctx.pool,
-        ctx.content_key.as_ref(),
-        &ctx.installation_id,
-        &ids.sess_id,
-    )
-    .await
-    .unwrap_or_default();
-    let mut messages = bounded_history(history_rows.into_iter());
-    // non-empty content guard: model gets a user prompt (the submitted row is in history)
-    if messages.last().map(|m| m.role) != Some(MessageRole::User) {
-        messages.push(ChatMessage {
-            role: MessageRole::User,
-            content: "(empty prompt)".to_string(),
-        });
-    }
+    // The op handle is announced before dispatch: the renderer must be able
+    // to Stop while the socket is still connecting, before any frame.
+    let mut sequence: u64 = 0;
+    sink.send(stream_event(
+        op_id,
+        &mut sequence,
+        StreamEventPayloadDto::Started,
+    ))
+    .ok_or_log(op_id);
 
     let request = ProviderRequestV1 {
         operation_id: op_id.to_string(),
@@ -119,20 +83,52 @@ where
             privacy_class: pinned.descriptor.privacy_class,
         },
         messages,
-        max_output_tokens: None,
+        max_output_tokens,
+        think,
         temperature: None,
     };
 
-    let stream = match adapter.stream_chat(pinned, &request).await {
-        Ok(s) => s,
-        Err(e) => {
+    // A user Stop during connect cancels the in-flight request instead of
+    // waiting for a first frame; `biased` also observes a token cancelled
+    // before dispatch (no socket is kept). Cancellation never depends on an
+    // answer delta.
+    let dispatch = tokio::select! {
+        biased;
+        _ = token.cancelled() => None,
+        res = adapter.stream_chat(pinned, &request) => Some(res),
+    };
+    let mut stream = match dispatch {
+        None => {
+            // cancelled while connecting: Interrupted, even with no text yet
+            sink.send(stream_event(
+                op_id,
+                &mut sequence,
+                StreamEventPayloadDto::Completed {
+                    completion: "interrupted".to_string(),
+                    truncated: false,
+                    usage: None,
+                },
+            ))
+            .ok_or_log(op_id);
+            return persist_terminal(
+                ctx,
+                op_id,
+                request_id,
+                ids,
+                "",
+                &StreamCompletionOutcome::Interrupted,
+                None,
+                false,
+            )
+            .await;
+        }
+        Some(Err(e)) => {
             tracing::debug!("completion op {op_id}: dispatch failed pre-wire: {e}");
             // after the op handle exists: a pre-wire dispatch failure is a
             // failed terminal, never a vanished generation
-            let mut seq = 0u64;
             sink.send(stream_event(
                 op_id,
-                &mut seq,
+                &mut sequence,
                 StreamEventPayloadDto::Completed {
                     completion: "failed".to_string(),
                     truncated: false,
@@ -148,25 +144,19 @@ where
                 "",
                 &StreamCompletionOutcome::ContentFilter,
                 None,
+                false,
             )
             .await;
         }
+        Some(Ok(s)) => s,
     };
-
-    // StreamStarted first, per-op sequence numbers increase in order.
-    let mut sequence: u64 = 0;
-    sink.send(stream_event(
-        op_id,
-        &mut sequence,
-        StreamEventPayloadDto::Started,
-    ))
-    .ok_or_log(op_id);
 
     let mut acc = String::new();
     let mut usage: Option<MessageUsageV1> = None;
-    let mut stream = stream;
     let mut terminal_outcome: Option<StreamCompletionOutcome> = None;
     let mut failed_reason: Option<String> = None;
+    let mut saw_thinking = false;
+    let mut saw_structured = false;
 
     loop {
         if token.is_cancelled() {
@@ -200,9 +190,25 @@ where
                         total_tokens: Some(total_tokens as u64),
                     });
                 }
-                Some(Ok(NormalizedStreamEvent::ThinkingDelta(_))) => {
-                    // provider-internal reasoning: not part of the persisted
-                    // assistant answer in Delivery A
+                Some(Ok(NormalizedStreamEvent::ThinkingActivity))
+                | Some(Ok(NormalizedStreamEvent::ThinkingDelta(_))) => {
+                    // reasoning text never crosses this boundary: exactly one
+                    // activity marker per op, so the UI can say "Thinking…"
+                    // without ever seeing the model's reasoning
+                    if !saw_thinking {
+                        saw_thinking = true;
+                        sink.send(stream_event(
+                            op_id,
+                            &mut sequence,
+                            StreamEventPayloadDto::Thinking,
+                        ))
+                        .ok_or_log(op_id);
+                    }
+                }
+                Some(Ok(NormalizedStreamEvent::StructuredActivity)) => {
+                    // non-text output seen: the empty-answer rule must not
+                    // claim this turn as a silent refusal
+                    saw_structured = true;
                 }
                 Some(Ok(NormalizedStreamEvent::StreamCompleted(outcome))) => {
                     terminal_outcome = Some(outcome);
@@ -217,49 +223,51 @@ where
         }
     }
 
-    let outcome = terminal_outcome.unwrap_or(StreamCompletionOutcome::ContentFilter);
-    // sink failure path: log; persistence below is unconditional
-    if failed_reason.is_some()
-        || matches!(
-            outcome,
-            StreamCompletionOutcome::ContentFilter | StreamCompletionOutcome::Interrupted
-        )
-    {
-        sink.send(stream_event(
-            op_id,
-            &mut sequence,
-            StreamEventPayloadDto::Completed {
-                completion: if failed_reason.is_some() {
-                    "failed"
-                } else {
-                    "interrupted"
-                }
-                .to_string(),
-                truncated: false,
-                usage: usage.clone(),
-            },
-        ))
-        .ok_or_log(op_id);
+    let mut outcome = terminal_outcome.unwrap_or(StreamCompletionOutcome::ContentFilter);
+    if let Some(reason) = &failed_reason {
+        // bounded: transport/accounting reason only, never model output
+        tracing::debug!("completion op {op_id}: error terminal ({reason})");
     }
-    // completed terminals go straight to the same DTO shape
-    if matches!(
-        outcome,
-        StreamCompletionOutcome::Stop | StreamCompletionOutcome::LengthExceeded
-    ) {
-        let (completion, truncated) = terminal_status(&outcome);
-        sink.send(stream_event(
-            op_id,
-            &mut sequence,
-            StreamEventPayloadDto::Completed {
-                completion: completion.to_string(),
-                truncated,
-                usage: usage.clone(),
-            },
-        ))
-        .ok_or_log(op_id);
+    if failed_reason.is_none() && acc.is_empty() {
+        // A normal terminal with no answer text at all is not a success:
+        // thinking-only runs and silent refusals fail visibly. Tool-only
+        // output is its own outcome, never an "empty answer" error.
+        outcome = match outcome {
+            StreamCompletionOutcome::Stop | StreamCompletionOutcome::LengthExceeded => {
+                if saw_structured {
+                    StreamCompletionOutcome::StructuredOnly
+                } else {
+                    StreamCompletionOutcome::EmptyAnswer
+                }
+            }
+            other => other,
+        };
     }
 
-    persist_terminal(ctx, op_id, request_id, ids, &acc, &outcome, usage.as_ref()).await
+    // one honest terminal on the wire, in contract order (Started is first)
+    let (completion, truncated) = terminal_status(&outcome);
+    sink.send(stream_event(
+        op_id,
+        &mut sequence,
+        StreamEventPayloadDto::Completed {
+            completion: completion.to_string(),
+            truncated,
+            usage: usage.clone(),
+        },
+    ))
+    .ok_or_log(op_id);
+
+    persist_terminal(
+        ctx,
+        op_id,
+        request_id,
+        ids,
+        &acc,
+        &outcome,
+        usage.as_ref(),
+        false,
+    )
+    .await
 }
 
 pub(crate) fn stream_event(
@@ -290,6 +298,7 @@ impl SinkLog for Result<(), String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn persist_terminal(
     ctx: &ApiContext,
     op_id: &str,
@@ -298,6 +307,9 @@ pub(crate) async fn persist_terminal(
     text: &str,
     outcome: &StreamCompletionOutcome,
     usage: Option<&MessageUsageV1>,
+    // Recovery callers claim the pending row exactly once inside this tx:
+    // zero rows claimed means another call already recorded a terminal.
+    require_pending: bool,
 ) -> &'static str {
     let scope = EventScope {
         installation_id: ctx.installation_id,
@@ -308,6 +320,8 @@ pub(crate) async fn persist_terminal(
     let sess_stream = format!("session:{}", ids.sess_id);
     let message_id = MessageId::new_v7();
     let content_id = ContentId::new_v7();
+    let now = OffsetDateTime::now_utc();
+    let now_us = (now.unix_timestamp_nanos() / 1_000) as i64;
 
     let mut tx = match ctx.pool.begin().await {
         Ok(tx) => tx,
@@ -316,6 +330,33 @@ pub(crate) async fn persist_terminal(
             return "failed";
         }
     };
+
+    if require_pending {
+        let claimed = match sqlx::query(
+            "UPDATE pending_operations SET status = 'resolved', updated_at_us = ? \
+             WHERE operation_id = ? AND message_request_id = ? \
+               AND kind = 'provider-completion' AND status = 'pending'",
+        )
+        .bind(now_us)
+        .bind(op_id)
+        .bind(request_id)
+        .execute(&mut *tx)
+        .await
+        {
+            Ok(result) => result.rows_affected(),
+            Err(e) => {
+                tracing::error!("completion op {op_id}: pending claim failed: {e}");
+                let _ = tx.rollback().await;
+                return "failed";
+            }
+        };
+        if claimed == 0 {
+            // The claim and the terminal roll back together, so a crash
+            // between them leaves the op recoverable.
+            let _ = tx.rollback().await;
+            return "already-resolved";
+        }
+    }
 
     if let Err(e) = SqliteEventStore::put_content_tx(
         &mut tx,
@@ -345,8 +386,6 @@ pub(crate) async fn persist_terminal(
         .map(|r| r.get::<i64, _>("current_sequence") as u64)
         .unwrap_or(0);
 
-    let now = OffsetDateTime::now_utc();
-    let now_us = (now.unix_timestamp_nanos() / 1_000) as i64;
     let completion = map_completion(outcome);
     let event_payload = MessageCompletedV1 {
         op_id: OperationId::from_string(op_id).unwrap_or_else(|_| OperationId::new_v7()),
