@@ -80,11 +80,16 @@ cargo check --target x86_64-pc-windows-msvc -p adham-pdf-island
 cargo test -p adham-desktop-api still_refuses_pdf_attachments   # PASS
 ```
 
+## Final code review (2026-10-22) — synthetic scope only
+
+Full-diff review at head `2ce01ea` (island crate + tests + CI sweep + docs + lock): **approved, strictly for the synthetic scope as shipped** — no PDF parser, stdin-synthetic worker only, PDF attachments still refuse at ingest. The verdict does not cover parser-integrated behavior, real PDFs, hostile input, or OS confinement (not implemented; resource walls only). No security-critical defect found in the synthetic scope; the review's non-blocking resource/protocol notes were promoted to design gates ("Stage-2 hardening prerequisites" in the design doc).
+
 ## Unverified / open
 
 - Parser behavior on real PDFs (`pdfEncrypted` vs `pdfCorrupt` distinguishability), PoC-style fixtures, fuzz, and production wiring — Stage 2+, authorization-gated. Not attempted in Stage 1.
 - The dependency-risk decision itself — `docs/reports/dependency-record-pdf-inspector.md` awaits the PM's sign-off.
 - fs/network **confinement** remains unimplemented (by-construction only); OS sandboxing is a separate design decision (design doc "Open decisions" #4).
+- PM-ordered gates recorded 2026-10-22: bounded stderr draining (+ stderr-flood regression test) is **mandatory before parser integration**; terminal-TRUNC handling and Unicode-safe truncation are **prerequisites for the real-parser hand-off**.
 
 ## Files
 

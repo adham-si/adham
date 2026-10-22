@@ -119,6 +119,14 @@ Branches: this lane `feat/conversation-02-pdf` (= main + PR #36 merge), teammate
 - **Stage 3 (needs sign-off):** wire-in — allowlist pdf, ingest path spawns supervisor, status strings in DTOs + i18n + chips, page markers `[page N]` through the sealed store, truncated flag reuse.
 - **Stage 4:** contract tests vs `crates/adham-desktop-api/tests/attachments.rs` style + P0-10-style evidence report at the logged revision.
 
+## Stage-2 hardening prerequisites (recorded 2026-10-22, PM-ordered — gates, not notes)
+
+From the Stage-1 full-diff review at `2ce01ea`; each holds regardless of other sign-offs:
+
+1. **Bounded stderr draining — mandatory before parser integration.** `supervisor.rs` currently collects the island's stderr with an unbounded read; a parser-era island that floods stderr could exhaust the supervisor itself. Land a capped tail (ring, ~64 KiB) **plus a stderr-flood regression test** (a stdin-only island mode that floods stderr indefinitely, with a proof the supervisor stays bounded and reaps) before any parser code enters the island.
+2. **Terminal-TRUNC handling — prerequisite for the real-parser hand-off.** Stage 1 tolerates `TRUNC` mid-stream and pages after it (chars stay cap-guarded). The parser wave must enforce: at most one `TRUNC`, as the final stdout line only; anything after it is a `MalformedOutput` refusal.
+3. **Unicode-safe truncation — prerequisite for the real-parser hand-off.** Page/total char capping must never panic on a multi-byte char boundary (`String::truncate` does). The synthetic Latin-1 path is safe by accident, not by design; the parser wave truncates on char boundaries by construction.
+
 ## Teammate coordination (as instructed)
 
 The parallel teammate is on `feat/conversation-03-history` (issue #32 history; worktree `.kilo/worktrees/conversation-01-lifecycle`; history events in core-types, event-log schema, projections, settings/conversation UI). Measured ownership above replaces the draft's warnings: Stage-1 files cannot collide; wave 3 files are exactly where the 75-file divergence ends (dtos/handlers/i18n) — rebase after history merges, do not rebase the teammate.
