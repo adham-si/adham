@@ -1,5 +1,5 @@
 import type * as React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { SessionDetailsDialog } from './session-details-dialog';
@@ -57,9 +57,9 @@ describe('SessionDetailsDialog summary', () => {
     const summary = screen.getByRole('textbox', { name: 'Summary' });
 
     await user.clear(summary);
-    await user.type(summary, 'a'.repeat(501));
+    fireEvent.change(summary, { target: { value: 'a'.repeat(501) } });
 
-    expect(screen.getByText('The summary must be 500 characters or fewer.')).toBeDefined();
+    expect(await screen.findByText('The summary must be 500 characters or fewer.')).toBeDefined();
     const save = screen.getByRole('button', { name: 'Save summary' }) as HTMLButtonElement;
     expect(save.disabled).toBe(true);
     await user.click(save);
