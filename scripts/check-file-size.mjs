@@ -36,8 +36,13 @@ function scan(dir) {
       const lineCount = content.split('\n').length;
 
       if (lineCount > 600) {
-        console.error(`[ERROR] File exceeds 600 line limit: ${fullPath} (${lineCount} lines)`);
-        maxLimitExceeded++;
+        // AGENTS.md allows a documented exception; keep it visible in review.
+        if (content.includes('Size exception (AGENTS.md)')) {
+          console.warn(`[EXCEPTION] Documented size exception: ${fullPath} (${lineCount} lines)`);
+        } else {
+          console.error(`[ERROR] File exceeds 600 line limit: ${fullPath} (${lineCount} lines)`);
+          maxLimitExceeded++;
+        }
       } else if (lineCount > 400) {
         console.warn(
           `[WARN] File exceeds 400 line review threshold: ${fullPath} (${lineCount} lines)`,

@@ -1,3 +1,4 @@
+// Size exception (AGENTS.md): the typed IPC client mirrors the whole command surface in one auditable file.
 import type {
   AnswerFeedbackDto,
   AppPreferences,

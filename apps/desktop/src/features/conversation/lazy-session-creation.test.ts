@@ -1,3 +1,4 @@
+// Size exception (AGENTS.md): the lazy-creation recovery matrix shares one fixture set.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';

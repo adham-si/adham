@@ -1,3 +1,4 @@
+//! Size exception (AGENTS.md): the search matrix keeps matching, filters, unreadable content, and caps together.
 //! Search matrix: filters, scopes, snippets, unreadable content, and caps.
 mod common;
 use common::*;

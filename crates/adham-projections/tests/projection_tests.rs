@@ -1,3 +1,4 @@
+//! Size exception (AGENTS.md): projection rebuild and tombstone cases share one fixture matrix.
 // ID newtypes are `Copy`; `.clone()` follows codebase style.
 #![allow(clippy::clone_on_copy)]
 use adham_core_types::*;

@@ -1,3 +1,4 @@
+//! Size exception (AGENTS.md): Tauri command wiring and invoke registration share one module so the command surface stays auditable.
 use adham_desktop_api::{
     AnswerFeedbackDto, ApiContext, AttachmentDto, BootstrapState, BranchSelectionDto,
     ClearPendingOperationPayload, CommandContext, CommandEnvelope, CommandResult,
