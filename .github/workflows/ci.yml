@@ -72,6 +72,19 @@ jobs:
       - name: Rust tests
         run: cargo test --workspace --locked
 
+      # Stage-1 proof (issue #33): after every island spawn/fault path in the
+      # suite, no adham-pdf-island worker process may remain alive.
+      - name: PDF island left-alive sweep
+        run: |
+          $left = Get-Process -Name adham-pdf-island -ErrorAction SilentlyContinue
+          if ($left) {
+            $left | Format-Table Id, ProcessName, StartTime -AutoSize
+            Write-Error "::error::PDF island worker survived its reaping"
+            exit 1
+          } else {
+            Write-Host "OK: no adham-pdf-island processes remain"
+          }
+
       - name: P0 repair regression suite
         run: cargo test -p adham-desktop-api --test p0_repair_regression --locked
 
@@ -155,6 +168,18 @@ jobs:
 
       - name: Rust tests
         run: cargo test --workspace --locked
+
+      # Stage-1 proof (issue #33): after every island spawn/fault path in the
+      # suite, no adham-pdf-island worker process may remain alive.
+      - name: PDF island left-alive sweep
+        run: |
+          if pgrep -x adham-pdf-island >/dev/null 2>&1; then
+            pgrep -ax adham-pdf-island || true
+            echo "::error::PDF island worker survived its reaping"
+            exit 1
+          else
+            echo "OK: no adham-pdf-island processes remain"
+          fi
 
       - name: P0 repair regression suite
         run: cargo test -p adham-desktop-api --test p0_repair_regression --locked
@@ -262,6 +287,18 @@ jobs:
 
       - name: Rust tests
         run: xvfb-run -a cargo test --workspace --locked
+
+      # Stage-1 proof (issue #33): after every island spawn/fault path in the
+      # suite, no adham-pdf-island worker process may remain alive.
+      - name: PDF island left-alive sweep
+        run: |
+          if pgrep -x adham-pdf-island >/dev/null 2>&1; then
+            pgrep -ax adham-pdf-island || true
+            echo "::error::PDF island worker survived its reaping"
+            exit 1
+          else
+            echo "OK: no adham-pdf-island processes remain"
+          fi
 
       - name: P0 repair regression suite
         run: xvfb-run -a cargo test -p adham-desktop-api --test p0_repair_regression --locked
