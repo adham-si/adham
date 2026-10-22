@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-20
 - **Revision inspected:** `980d899` (this report is a docs-only change on top of it). Section E was re-verified against `a8b6880` after the reading-typography (`123cf4f`) and syntax-highlighting (`a8b6880`) waves, against `07a1433` after the turn-width/feedback-disclosure wave, and against `f5365c1` after the attachment send-boundary wave; the other findings remain as verified at `980d899`.
-- **Scope:** sections A–C are read-only verification. Sections D–F record the implementation shipped at `980d899`, plus the rendering waves at `123cf4f`/`a8b6880`/`07a1433` and the attachment wave at `f5365c1`, and the verification commands run at those revisions.
+- **Scope:** sections A–C are read-only verification. Sections D–F record the implementation shipped at `980d899`, plus the rendering waves at `123cf4f`/`a8b6880`/`07a1433` and the attachment wave at `f5365c1`, and the verification commands run at those revisions. Section G (2026-10-22) records the delivered session-history suite at `ca0f1d0` and supersedes section A and the history row in section F.
 - **Data:** this report contains no user content, no secrets, no real app-data paths, and no key material.
 
 Status values: `implemented` means backend and UI behavior were both found; `implemented-locally` means real renderer-only behavior over already-loaded data; `honest-unavailability` means the capability has no implementation, and any control that exists is local-only and disclosed as not transmitted.
@@ -107,6 +107,44 @@ Status: `not-implemented`. Durable event/attempt identity repair is tracked in t
 | Keyboard navigation and accessible action menus | `implemented` | Message actions, composer controls, menus and the picker are native buttons/inputs; menu keyboard behavior is tested (`packages/ui/src/menu.test.tsx`); attachment removal buttons carry localized `aria-label`s. | — |
 | Focused/announced status without reading every streamed token | `implemented` | Status region is `aria-live="polite"` and contains status strings, not the streamed text; `TurnStatus` uses `role="status"` for phase changes; the timeline itself is not a live region. Attachment errors announce through `role="alert"` (chip error) and the send-refusal alert. | Screen readers get phase changes, not every delta. |
 | Stable turn/attempt ids, cursor semantics, bounded pagination | `see section C` | Section C above. | Blocked on the P0 identity repair; no claim is made. |
+
+## G. Session-history suite (conversation 03) — at `ca0f1d0`
+
+**Supersession.** This section supersedes section A and the history row in section F. The earlier text remains the historical baseline at `980d899`; it is not rewritten.
+
+**Scope.** Delivered on `feat/conversation-03-history`: list/fold, rename, pin, archive, message bookmarks, editable summaries, bounded cross-content search, duplicate, Markdown export, and delete. Evidence and exact command logs are in `docs/reports/conversation-03-session-history.md`.
+
+| Capability | Status | Evidence | Honest limits |
+|---|---|---|---|
+| Session list/fold | `implemented` | `crates/adham-desktop-api/tests/session_history_list.rs` (8 tests); events folded on read, pinned-first ordering, 100-row cap, `truncated`, summary hydration, `summary_unavailable`, active archived insertion, deleted/foreign active id ignored. | No stable cursor or full pagination; #35 remains blocked. No session metadata projection table. |
+| Rename | `implemented` | `session_history_actions.rs` (3 tests); event/receipt, 120-scalar limit, empty/control rejection, tombstone guard, sidebar menu and inline dialog. | No rich-text titles. |
+| Pin / archive | `implemented` | Same actions suite; events/receipts, pinned ordering, archived excluded by default, `active_session_id` keeps the open archived row visible, show-archived refetches the list. | No folders or retention policy beyond explicit archive. |
+| Message bookmarks | `implemented` | `session_history_bookmarks.rs` (3 tests); stored toggle, `bookmarked_message_ids` on `get_conversation`, star controls, search filter. | Bookmarks are message-level, not session-level. |
+| Editable summary | `implemented` | `session_history_summaries.rs` (5 tests); user summary overrides auto, reset restores auto, 500-scalar cap, AEAD storage, tombstone on replace/clear, receipt excludes text, unreadable fallback. | Summary remains local/extractive; no model-generated summary. |
+| Search | `implemented` | `session_history_search.rs` (10 tests); title, hydrated summary, all-branch message text, linked attachment names/text; 250 ms debounced UI; 100 sessions / 50 results / 10,000 message-row caps; one cached key read; stale-response rejection. | No plaintext index, embeddings, background indexer, semantic search, or cross-project search. Unreadable rows are skipped and counted. |
+| Search filters | `implemented` | Archived, pinned, bookmarked, role, has-attachments, and date range are wired end to end. Filter-only searches require at least one filter; role is disabled/cleared when the query empties. | Agents, participants, task status, model/provider, tags/folders, cost, artifacts, and cross-project filters are absent because their durable data does not exist; the panel says so and renders no fake control. |
+| Duplicate | `implemented` | `session_history_duplicate.rs` (7 tests); every branch row, linked attachments, references, user summary, and bookmarks copied; fresh ids and re-sealed content; feedback/branch choice/pin/archive reset; 500-message and 5 MB caps; pending/null-session first send blocks. | Does not copy feedback or active branch choices by design. |
+| Markdown export | `implemented` | `session_history_export.rs` (5 tests); fixed `<app-data>/exports/{slug}-{session-id}.md`, unique sibling `.tmp` + replacement, Unix `0o600`, 5 MB cap, summary and all branch rows, deleted/busy/unreadable refusal. | No native Save As; `tauri-plugin-dialog` needs separate approval. Exported Markdown remains after delete. |
+| Delete from history | `implemented` | `session_history_delete.rs` (8 tests); `SessionDeleted` + receipt, content/projection/attachment/bookmark/feedback/branch/pending purge, null-session pending purge by request id, receipt replay, late submit/pending/attachment/create replay rejection, rebuild exclusion. | Not forensic erasure: SQLite journals, backups, and exported Markdown may retain copies. The UI says so and cannot undo. |
+| PDF input (#33) | `honest-unavailability` | No parser dependency; best Rust candidates need subprocess isolation and caps; `pdfjs-dist` misses the Safari 18.2/WebView floor. | Blocked; no PDF control ships. |
+| Other modalities (#34) | `honest-unavailability` | No image/vision, OCR, audio, video, or artifact adapter or dependency. | Blocked; no fabricated controls. |
+| Stable ids/cursors (#35) | `not-implemented` | Cursor fields remain placeholder-only; P0 durable-identity repair is still required. | Blocked; no pagination claim. |
+
+**Verification at `ca0f1d0`** (verification-only tests/tooling on top; full log in the conversation-03 report):
+
+| Command | Result |
+|---|---|
+| `node scripts/check-file-size.mjs` | exit 0; 0 errors over 600 lines; 54 warnings. The gate honors AGENTS.md documented exceptions. |
+| `cargo fmt --all -- --check` | clean |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | clean |
+| `cargo xtask contracts` | generated; no residual diff |
+| `cargo test --workspace --locked` | 520 passed, 0 failed, 107 binaries |
+| `cargo test -p adham-desktop-api --test p0_repair_regression --locked` | 8 passed |
+| Targeted history backend + projection | 49 passed; rebuild exclusion 1 passed |
+| Targeted history frontend | 8 files, 27 tests passed |
+| `pnpm check` | exit 0; 88 files / 855 tests, format/lint/types/magic-values/deny-exceptions clean |
+
+No new third-party package was added. `Cargo.lock` only records the existing workspace `zeroize` edge for `adham-desktop-api`.
 
 ## Verification run at `980d899`
 

@@ -126,6 +126,32 @@ describe('SessionHistoryPanel', () => {
     window.removeEventListener('adham:session-focus-message', focus);
   });
 
+  it('clears and disables the role filter when the query empties', async () => {
+    const api = backend(response());
+    renderPanel({ backend: api });
+
+    const input = screen.getByRole('textbox', { name: 'Search sessions and messages' });
+    fireEvent.change(input, { target: { value: 'needle' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const role = screen.getByRole('combobox', { name: 'Role' }) as HTMLSelectElement;
+    expect(role.disabled).toBe(false);
+    fireEvent.change(role, { target: { value: 'user' } });
+    await waitFor(() =>
+      expect(api.searchHistory).toHaveBeenCalledWith(
+        'ws-1',
+        'proj-1',
+        expect.objectContaining({
+          filters: expect.objectContaining({ role: 'user' }),
+        }),
+      ),
+    );
+
+    fireEvent.change(input, { target: { value: '' } });
+    await waitFor(() => expect(role.value).toBe(''));
+    expect(role.disabled).toBe(true);
+    expect(screen.getByText(/Not available yet:/)).toBeDefined();
+  });
+
   it('reports archived filtering, unreadable skips, scan limits, and truncation', async () => {
     const api = backend(
       response({

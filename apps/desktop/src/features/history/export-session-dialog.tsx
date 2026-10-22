@@ -1,7 +1,14 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ExportSessionResponse } from '@adham/contracts-generated';
-import { Button, DialogContent, DialogDescription, DialogRoot, DialogTitle, Input } from '@adham/ui';
+import {
+  Button,
+  DialogContent,
+  DialogDescription,
+  DialogRoot,
+  DialogTitle,
+  Input,
+} from '@adham/ui';
 
 export interface ExportSessionDialogProps {
   open: boolean;
@@ -54,13 +61,14 @@ export function ExportSessionDialog({
   };
 
   return (
-    <DialogRoot open onOpenChange={(next) => {
-          if (!next && !busy) onClose();
-        }}>
+    <DialogRoot
+      open
+      onOpenChange={(next) => {
+        if (!next && !busy) onClose();
+      }}
+    >
       <DialogContent>
-        <DialogTitle>
-          {t('conversation.sessionActions.exportTitle', 'Export session')}
-        </DialogTitle>
+        <DialogTitle>{t('conversation.sessionActions.exportTitle', 'Export session')}</DialogTitle>
         <DialogDescription>
           {t(
             'conversation.sessionActions.exportWarning',

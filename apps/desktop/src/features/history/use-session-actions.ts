@@ -234,12 +234,7 @@ export function useSessionActions({
           }),
         );
         const title = Array.from(localized).slice(0, 120).join('') || `${target.title} copy`;
-        const metadata = await backend.duplicateSession(
-          workspaceId,
-          projectId,
-          target.id,
-          title,
-        );
+        const metadata = await backend.duplicateSession(workspaceId, projectId, target.id, title);
         await onChanged();
         window.dispatchEvent(
           new CustomEvent('adham:session-select', {

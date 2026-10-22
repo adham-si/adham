@@ -11,9 +11,7 @@ describe('ExportSessionDialog', () => {
       configurable: true,
       value: { writeText },
     });
-    const onExport = vi
-      .fn()
-      .mockResolvedValue({ path: '/tmp/exports/History-id.md', bytes: 1536 });
+    const onExport = vi.fn().mockResolvedValue({ path: '/tmp/exports/History-id.md', bytes: 1536 });
     render(
       <ExportSessionDialog
         open
@@ -35,9 +33,7 @@ describe('ExportSessionDialog', () => {
     expect(screen.getByText('1,536 bytes')).toBeDefined();
 
     await user.click(screen.getByRole('button', { name: 'Copy path' }));
-    await waitFor(() =>
-      expect(writeText).toHaveBeenCalledWith('/tmp/exports/History-id.md'),
-    );
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('/tmp/exports/History-id.md'));
     expect(screen.getByRole('button', { name: 'Copied' })).toBeDefined();
   });
 

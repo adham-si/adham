@@ -59,12 +59,7 @@ describe('PrimarySidebar session actions', () => {
   });
 
   it('renders a supplied history panel instead of the built-in title filter', () => {
-    render(
-      <PrimarySidebar
-        sessions={[session]}
-        historyPanel={<div>Custom history panel</div>}
-      />,
-    );
+    render(<PrimarySidebar sessions={[session]} historyPanel={<div>Custom history panel</div>} />);
     expect(screen.getByText('Custom history panel')).toBeDefined();
     expect(screen.queryByPlaceholderText('Search')).toBeNull();
   });

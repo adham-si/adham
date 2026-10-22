@@ -68,12 +68,14 @@ export function ConversationPanel({
   } | null>(null);
   React.useEffect(() => {
     const onFocus = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        workspaceId?: string;
-        projectId?: string;
-        sessionId?: string;
-        messageId?: string;
-      }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          workspaceId?: string;
+          projectId?: string;
+          sessionId?: string;
+          messageId?: string;
+        }>
+      ).detail;
       if (!detail?.sessionId || !detail.messageId) {
         return;
       }
@@ -96,9 +98,9 @@ export function ConversationPanel({
     ) {
       return;
     }
-    const element = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-message-id]'),
-    ).find((node) => node.dataset.messageId === messageFocus.messageId);
+    const element = Array.from(document.querySelectorAll<HTMLElement>('[data-message-id]')).find(
+      (node) => node.dataset.messageId === messageFocus.messageId,
+    );
     if (!element) return;
     setMessageFocus(null);
     element.scrollIntoView({ block: 'center' });
