@@ -18,6 +18,7 @@ pub async fn setup_ctx(db_path: &Path) -> ApiContext {
     ApiContext::load_or_create_with_key(pool, provider)
         .await
         .expect("load identity")
+        .with_export_dir(db_path.with_extension("exports"))
 }
 
 #[allow(dead_code)]
@@ -29,6 +30,7 @@ pub async fn setup_ctx_with_key(
     ApiContext::load_or_create_with_key(pool, provider)
         .await
         .expect("load identity")
+        .with_export_dir(db_path.with_extension("exports"))
 }
 
 #[allow(dead_code)]

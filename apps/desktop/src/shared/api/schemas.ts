@@ -333,3 +333,8 @@ export const ListProviderAccountsResponseSchema = z.object({
 export const ListProviderModelsResponseSchema = z.object({
   models: z.array(ProviderModelDtoSchema),
 });
+
+export const ExportSessionResponseSchema = z.object({
+  path: z.string(),
+  bytes: z.number(),
+});

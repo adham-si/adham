@@ -53,7 +53,7 @@ fn fallback_title(source: Option<&str>) -> String {
     title
 }
 
-fn map_source_error(error: DomainError) -> String {
+pub(crate) fn map_source_error(error: DomainError) -> String {
     match error {
         DomainError::Storage(message) => format!("STORAGE_UNAVAILABLE: {message}"),
         _ => "STORAGE_REPAIR_REQUIRED: source content is missing or unreadable".to_string(),
@@ -115,7 +115,7 @@ async fn append_event<T: Serialize>(
     .map_err(|e| e.to_string())
 }
 
-async fn ensure_source_scope_tx(
+pub(crate) async fn ensure_source_scope_tx(
     tx: &mut Transaction<'_, Sqlite>,
     session_id: &str,
     expected_ws: &WorkspaceId,
@@ -142,7 +142,7 @@ async fn ensure_source_scope_tx(
     Ok(())
 }
 
-async fn read_title_tx(
+pub(crate) async fn read_title_tx(
     tx: &mut Transaction<'_, Sqlite>,
     session_id: &str,
 ) -> Result<Option<String>, String> {
@@ -176,7 +176,7 @@ async fn read_title_tx(
     Ok(title)
 }
 
-async fn read_summary_id_tx(
+pub(crate) async fn read_summary_id_tx(
     tx: &mut Transaction<'_, Sqlite>,
     session_id: &str,
 ) -> Result<Option<ContentId>, String> {
@@ -238,7 +238,7 @@ async fn precheck_source_tx(
     Ok(())
 }
 
-async fn read_summary_text_tx(
+pub(crate) async fn read_summary_text_tx(
     tx: &mut Transaction<'_, Sqlite>,
     provider: &dyn adham_event_log::ContentKeyProvider,
     scope: &EventScope,

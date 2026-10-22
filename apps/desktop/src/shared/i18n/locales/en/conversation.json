@@ -116,7 +116,20 @@
       "saveSummary": "Save summary",
       "resetToAuto": "Reset to auto",
       "duplicate": "Duplicate",
-      "duplicateTitle": "{{title}} copy"
+      "duplicateTitle": "{{title}} copy",
+      "export": "Export Markdown",
+      "exportTitle": "Export session",
+      "exportWarning": "This writes an unencrypted Markdown file that anyone with access to the folder can read. It is not deleted when you delete the session.",
+      "exportSession": "Session: {{title}}",
+      "exportFixedFolder": "The file is written to the app's fixed exports folder. There is no Save As dialog in this build.",
+      "exportPathLabel": "File path",
+      "copyPath": "Copy path",
+      "copied": "Copied",
+      "copyFailed": "Could not copy the path.",
+      "exportBytes": "{{bytes}} bytes",
+      "exportAction": "Export Markdown",
+      "exporting": "Exporting…",
+      "close": "Close"
     },
     "bookmarkUnavailable": "Bookmarks are unavailable in this build.",
     "bookmarkUpdateFailed": "Could not update the bookmark."

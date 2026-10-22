@@ -1,6 +1,7 @@
 mod actions;
 mod bookmarks;
 mod duplicate;
+mod export;
 mod key_cache;
 mod list;
 mod summary;
@@ -8,6 +9,7 @@ mod summary;
 pub use actions::{rename_session, set_session_archived, set_session_pinned};
 pub use bookmarks::{read_bookmarked_message_ids, set_message_bookmark};
 pub use duplicate::duplicate_session;
+pub use export::export_session_markdown;
 pub use key_cache::CachedContentKeyProvider;
 pub use list::list_sessions;
 #[allow(unused_imports)]

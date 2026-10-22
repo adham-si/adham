@@ -65,6 +65,8 @@ export type CreateSessionPayload = { title: string | null, };
 
 export type DuplicateSessionPayload = { title?: string | null, };
 
+export type ExportSessionResponse = { path: string, bytes: number, };
+
 export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, summary?: string | null, summaryOrigin?: string | null, summaryUnavailable: boolean, pinned: boolean, archived: boolean, lastActivityAt: string, };
 
 export type RenameSessionPayload = { title: string, };

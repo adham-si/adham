@@ -4,20 +4,20 @@ use adham_desktop_api::{
     CompleteOncePayload, CompletionStartDto, ConfigureGoogleAccountPayload, ConversationPage,
     CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
     DisconnectGoogleAccountPayload, DisconnectOllamaAccountPayload, DiscoverOllamaModelsPayload,
-    DuplicateSessionPayload, ErrorEnvelope, GetPreferencesResponse, GoogleAccountDisconnected,
-    IngestAttachmentPathPayload, IngestAttachmentPayload, ListProviderAccountsResponse,
-    ListProviderModelsPayload, ListProviderModelsResponse, ListSessionsOptions,
-    MarkCompletionInterruptedPayload, MarkCompletionInterruptedResponse, OllamaAccountDisconnected,
-    PendingOperationDto, PendingOperationList, PlatformInfo, ProjectList, ProjectSummary,
-    ProviderAccountDto, ProviderHealthResponse, ProviderModelsList, ReadAttachmentPayload,
-    RebuildProjectionsResponse, RecordPendingOperationPayload, RenameSessionPayload,
-    ResetPreferencesResponse, RetryCompletionPayload, SelectProjectPayload, SessionList,
-    SessionMetadata, SessionSummary, SetActiveAlternativePayload, SetAnswerFeedbackPayload,
-    SetMessageBookmarkPayload, SetSessionArchivedPayload, SetSessionPinnedPayload,
-    SetSessionSummaryPayload, StopCompletionPayload, StopCompletionResponse, StorageStatus,
-    StreamEventDto, SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
-    WorkspaceList, WorkspaceSummary,
+    DuplicateSessionPayload, ErrorEnvelope, ExportSessionResponse, GetPreferencesResponse,
+    GoogleAccountDisconnected, IngestAttachmentPathPayload, IngestAttachmentPayload,
+    ListProviderAccountsResponse, ListProviderModelsPayload, ListProviderModelsResponse,
+    ListSessionsOptions, MarkCompletionInterruptedPayload, MarkCompletionInterruptedResponse,
+    OllamaAccountDisconnected, PendingOperationDto, PendingOperationList, PlatformInfo,
+    ProjectList, ProjectSummary, ProviderAccountDto, ProviderHealthResponse, ProviderModelsList,
+    ReadAttachmentPayload, RebuildProjectionsResponse, RecordPendingOperationPayload,
+    RenameSessionPayload, ResetPreferencesResponse, RetryCompletionPayload, SelectProjectPayload,
+    SessionList, SessionMetadata, SessionSummary, SetActiveAlternativePayload,
+    SetAnswerFeedbackPayload, SetMessageBookmarkPayload, SetSessionArchivedPayload,
+    SetSessionPinnedPayload, SetSessionSummaryPayload, StopCompletionPayload,
+    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
+    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
+    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -362,6 +362,16 @@ async fn mark_completion_interrupted(
 }
 
 #[tauri::command]
+async fn export_session_markdown(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+) -> Result<ExportSessionResponse, ErrorEnvelope> {
+    adham_desktop_api::handle_export_session_markdown(&state, context)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn duplicate_session(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<DuplicateSessionPayload>,
@@ -536,6 +546,7 @@ pub fn run() {
             set_session_archived,
             set_session_summary,
             duplicate_session,
+            export_session_markdown,
             submit_message,
             ingest_attachment,
             ingest_attachment_path,

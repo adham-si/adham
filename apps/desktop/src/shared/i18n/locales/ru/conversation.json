@@ -116,7 +116,20 @@
       "saveSummary": "Сохранить сводку",
       "resetToAuto": "Вернуть автосводку",
       "duplicate": "Дублировать",
-      "duplicateTitle": "Копия {{title}}"
+      "duplicateTitle": "Копия {{title}}",
+      "export": "Экспорт Markdown",
+      "exportTitle": "Экспорт сессии",
+      "exportWarning": "Будет создан незашифрованный файл Markdown, который сможет прочитать любой, у кого есть доступ к папке. Он не удаляется при удалении сессии.",
+      "exportSession": "Сессия: {{title}}",
+      "exportFixedFolder": "Файл записывается в фиксированную папку экспорта приложения. Диалога «Сохранить как» в этой сборке нет.",
+      "exportPathLabel": "Путь к файлу",
+      "copyPath": "Копировать путь",
+      "copied": "Скопировано",
+      "copyFailed": "Не удалось скопировать путь.",
+      "exportBytes": "{{bytes}} байт",
+      "exportAction": "Экспорт Markdown",
+      "exporting": "Экспорт…",
+      "close": "Закрыть"
     },
     "bookmarkUnavailable": "Закладки недоступны в этой сборке.",
     "bookmarkUpdateFailed": "Не удалось обновить закладку."

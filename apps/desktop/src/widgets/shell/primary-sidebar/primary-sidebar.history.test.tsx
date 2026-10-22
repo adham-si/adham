@@ -16,6 +16,7 @@ describe('PrimarySidebar session actions', () => {
   it('opens the row menu and dispatches rename, pin, and archive', () => {
     const onRenameSession = vi.fn();
     const onDuplicateSession = vi.fn();
+    const onExportSession = vi.fn();
     const onSetPinned = vi.fn();
     const onSetArchived = vi.fn();
     render(
@@ -24,6 +25,7 @@ describe('PrimarySidebar session actions', () => {
         activeSessionId={session.id}
         onRenameSession={onRenameSession}
         onDuplicateSession={onDuplicateSession}
+        onExportSession={onExportSession}
         onSetPinned={onSetPinned}
         onSetArchived={onSetArchived}
       />,
@@ -36,6 +38,10 @@ describe('PrimarySidebar session actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
     expect(onDuplicateSession).toHaveBeenCalledWith(session);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export Markdown' }));
+    expect(onExportSession).toHaveBeenCalledWith(session);
 
     fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin' }));
@@ -62,6 +68,9 @@ describe('useSessionActions', () => {
       setSessionArchived: vi.fn().mockResolvedValue({}),
       setSessionSummary: vi.fn().mockResolvedValue({ summaryOrigin: 'user' }),
       duplicateSession: vi.fn().mockResolvedValue({ sessionId: 'copy-1' }),
+      exportSessionMarkdown: vi
+        .fn()
+        .mockResolvedValue({ path: '/tmp/exports/History.md', bytes: 12 }),
     };
     const onChanged = vi.fn();
     const { result } = renderHook(() =>
@@ -116,6 +125,14 @@ describe('useSessionActions', () => {
     const detail = (onSelect.mock.calls[0]?.[0] as CustomEvent | undefined)?.detail;
     expect(detail).toEqual({ workspaceId: 'ws-1', projectId: 'proj-1', sessionId: 'copy-1' });
     window.removeEventListener('adham:session-select', onSelect);
+
+    act(() => result.current.openExport(session));
+    let exported: { path: string; bytes: number } | null = null;
+    await act(async () => {
+      exported = await result.current.exportSession(session);
+    });
+    expect(backend.exportSessionMarkdown).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1');
+    expect(exported).toEqual({ path: '/tmp/exports/History.md', bytes: 12 });
     expect(onChanged).toHaveBeenCalledTimes(5);
     await waitFor(() => expect(result.current.busyId).toBeNull());
   });

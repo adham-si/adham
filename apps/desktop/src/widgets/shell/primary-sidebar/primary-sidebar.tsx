@@ -31,6 +31,7 @@ export interface PrimarySidebarProps {
   onNewSession?: () => void;
   onRenameSession?: (session: SessionSummary) => void;
   onDuplicateSession?: (session: SessionSummary) => void;
+  onExportSession?: (session: SessionSummary) => void;
   onSetPinned?: (sessionId: string, pinned: boolean) => void;
   onSetArchived?: (sessionId: string, archived: boolean) => void;
   actionsDisabled?: boolean;
@@ -62,6 +63,7 @@ export function PrimarySidebar({
   onNewSession,
   onRenameSession,
   onDuplicateSession,
+  onExportSession,
   onSetPinned,
   onSetArchived,
   actionsDisabled = false,
@@ -237,7 +239,11 @@ export function PrimarySidebar({
             ) : null}
             {filteredSessions.map((session) => {
               const hasActions = Boolean(
-                onRenameSession || onDuplicateSession || onSetPinned || onSetArchived,
+                onRenameSession ||
+                  onDuplicateSession ||
+                  onExportSession ||
+                  onSetPinned ||
+                  onSetArchived,
               );
               return (
                 <div key={session.id} className="group relative">
@@ -285,6 +291,7 @@ export function PrimarySidebar({
                         onSelect={(value) => {
                           if (value === 'rename') onRenameSession?.(session);
                           if (value === 'duplicate') onDuplicateSession?.(session);
+                          if (value === 'export') onExportSession?.(session);
                           if (value === 'pin') onSetPinned?.(session.id, !session.pinned);
                           if (value === 'archive') onSetArchived?.(session.id, !session.archived);
                         }}
@@ -297,6 +304,11 @@ export function PrimarySidebar({
                         {onDuplicateSession ? (
                           <MenuItem value="duplicate" disabled={actionsDisabled}>
                             {t('conversation.sessionActions.duplicate', 'Duplicate')}
+                          </MenuItem>
+                        ) : null}
+                        {onExportSession ? (
+                          <MenuItem value="export" disabled={actionsDisabled}>
+                            {t('conversation.sessionActions.export', 'Export Markdown')}
                           </MenuItem>
                         ) : null}
                         {onSetPinned ? (

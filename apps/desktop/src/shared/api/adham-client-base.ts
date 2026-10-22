@@ -48,6 +48,7 @@ import {
   ResetPreferencesResponseSchema,
   SessionListSchema,
   SessionMetadataSchema,
+  ExportSessionResponseSchema,
   SessionSummarySchema,
   StorageStatusSchema,
   SubmittedMessageSchema,
@@ -166,6 +167,11 @@ export interface AdhamClient {
     title: string | null,
     options?: { requestId?: string },
   ): Promise<SessionMetadata>;
+  exportSessionMarkdown(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+  ): Promise<{ path: string; bytes: number }>;
   submitMessage(
     workspaceId: string,
     projectId: string,
@@ -433,6 +439,17 @@ export class AdhamApiClientBase implements AdhamClient {
       request: envelope,
     });
     return SessionMetadataSchema.parse(result.data);
+  }
+
+  async exportSessionMarkdown(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+  ): Promise<{ path: string; bytes: number }> {
+    const result = await invoke<{ path: string; bytes: number }>('export_session_markdown', {
+      context: { workspaceId, projectId, sessionId },
+    });
+    return ExportSessionResponseSchema.parse(result);
   }
 
   async submitMessage(

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
-import type { SessionMetadata } from '@adham/contracts-generated';
+import type { ExportSessionResponse, SessionMetadata } from '@adham/contracts-generated';
 import { rejectionMessage } from '@/shared/api/error-envelope';
 import i18n from '@/shared/i18n';
 
@@ -42,6 +42,11 @@ export interface SessionActionsBackend {
     sessionId: string,
     title: string | null,
   ): Promise<SessionMetadata>;
+  exportSessionMarkdown(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+  ): Promise<ExportSessionResponse>;
 }
 
 export interface UseSessionActionsOptions {
@@ -60,6 +65,7 @@ export function useSessionActions({
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [renameTarget, setRenameTarget] = React.useState<SessionActionTarget | null>(null);
+  const [exportTarget, setExportTarget] = React.useState<SessionActionTarget | null>(null);
 
   const run = React.useCallback(
     async (sessionId: string, action: () => Promise<SessionMetadata>) => {
@@ -86,6 +92,33 @@ export function useSessionActions({
   const cancelRename = React.useCallback(() => {
     setRenameTarget(null);
   }, []);
+
+  const openExport = React.useCallback((target: SessionActionTarget) => {
+    setError(null);
+    setExportTarget(target);
+  }, []);
+
+  const closeExport = React.useCallback(() => {
+    setExportTarget(null);
+    setError(null);
+  }, []);
+
+  const exportSession = React.useCallback(
+    async (target: SessionActionTarget): Promise<ExportSessionResponse | null> => {
+      if (!workspaceId || !projectId) return null;
+      setBusyId(target.id);
+      setError(null);
+      try {
+        return await backend.exportSessionMarkdown(workspaceId, projectId, target.id);
+      } catch (err) {
+        setError(rejectionMessage(err));
+        return null;
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [backend, projectId, workspaceId],
+  );
 
   const saveRename = React.useCallback(
     async (title: string) => {
@@ -195,6 +228,10 @@ export function useSessionActions({
     saveRename,
     saveSummary,
     duplicate,
+    exportTarget,
+    openExport,
+    closeExport,
+    exportSession,
     setPinned,
     setArchived,
   };

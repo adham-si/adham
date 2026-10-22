@@ -36,6 +36,9 @@ pub struct ApiContext {
     /// Per-op cancellation handles for streaming completions (shared across
     /// context clones so a spawned handler and `stop_completion` agree).
     pub completion_runs: std::sync::Arc<crate::handlers::providers::CompletionRuns>,
+    /// Tests point exports at a disposable folder; production resolves the
+    /// platform app-data directory lazily on first export.
+    export_dir: Option<std::path::PathBuf>,
 }
 
 impl Clone for ApiContext {
@@ -48,6 +51,7 @@ impl Clone for ApiContext {
             installation_id: self.installation_id,
             actor_id: self.actor_id,
             content_key: std::sync::Arc::clone(&self.content_key),
+            export_dir: self.export_dir.clone(),
         }
     }
 }
@@ -69,7 +73,23 @@ impl ApiContext {
             installation_id,
             actor_id,
             content_key,
+            export_dir: None,
         }
+    }
+
+    /// Override the exports root (tests use a disposable folder).
+    pub fn with_export_dir(mut self, dir: impl Into<std::path::PathBuf>) -> Self {
+        self.export_dir = Some(dir.into());
+        self
+    }
+
+    pub(crate) fn export_dir(&self) -> Result<std::path::PathBuf, String> {
+        if let Some(dir) = &self.export_dir {
+            return Ok(dir.clone());
+        }
+        adham_platform::PlatformStoragePolicy::resolve()
+            .map(|policy| policy.data_dir().join("exports"))
+            .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))
     }
 
     /// Production startup path.

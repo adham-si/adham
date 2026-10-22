@@ -10,6 +10,7 @@ import {
 import { useOnboarding, OnboardingJourney } from '@/features/onboarding';
 import { SettingsPage } from '@/pages/settings';
 import { SessionDetailsDialog } from '@/features/history/session-details-dialog';
+import { ExportSessionDialog } from '@/features/history/export-session-dialog';
 import { useSessionActions } from '@/features/history/use-session-actions';
 import { useAppPreferences } from '@/shared/settings/use-app-preferences';
 
@@ -117,6 +118,7 @@ function AppBody() {
             onNewSession: () => void newSession(),
             onRenameSession: sessionActions.openRename,
             onDuplicateSession: (session) => void sessionActions.duplicate(session),
+            onExportSession: sessionActions.openExport,
             onSetPinned: (sessionId, pinned) => void sessionActions.setPinned(sessionId, pinned),
             onSetArchived: (sessionId, archived) =>
               void sessionActions.setArchived(sessionId, archived),
@@ -134,6 +136,18 @@ function AppBody() {
             target={provisionTarget}
             onClose={closeProvision}
             onSuccess={handleProvisionSuccess}
+          />
+          <ExportSessionDialog
+            open={sessionActions.exportTarget !== null}
+            sessionTitle={sessionActions.exportTarget?.title ?? ''}
+            busy={sessionActions.busyId !== null}
+            error={sessionActions.error}
+            onClose={sessionActions.closeExport}
+            onExport={() =>
+              sessionActions.exportTarget
+                ? sessionActions.exportSession(sessionActions.exportTarget)
+                : Promise.resolve(null)
+            }
           />
           <SessionDetailsDialog
             open={sessionActions.renameTarget !== null}

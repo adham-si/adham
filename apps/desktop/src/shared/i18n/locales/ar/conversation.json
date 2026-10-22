@@ -116,7 +116,20 @@
       "saveSummary": "حفظ الملخص",
       "resetToAuto": "العودة إلى التلقائي",
       "duplicate": "تكرار",
-      "duplicateTitle": "نسخة من {{title}}"
+      "duplicateTitle": "نسخة من {{title}}",
+      "export": "تصدير Markdown",
+      "exportTitle": "تصدير الجلسة",
+      "exportWarning": "سيؤدي هذا إلى كتابة ملف Markdown غير مشفّر يمكن لأي شخص لديه وصول إلى المجلد قراءته. لن يُحذف عند حذف الجلسة.",
+      "exportSession": "الجلسة: {{title}}",
+      "exportFixedFolder": "يُكتب الملف في مجلد التصدير الثابت للتطبيق. لا توجد نافذة حفظ باسم في هذا الإصدار.",
+      "exportPathLabel": "مسار الملف",
+      "copyPath": "نسخ المسار",
+      "copied": "تم النسخ",
+      "copyFailed": "تعذّر نسخ المسار.",
+      "exportBytes": "{{bytes}} بايت",
+      "exportAction": "تصدير Markdown",
+      "exporting": "جارٍ التصدير…",
+      "close": "إغلاق"
     },
     "bookmarkUnavailable": "الإشارات المرجعية غير متاحة في هذا الإصدار.",
     "bookmarkUpdateFailed": "تعذّر تحديث الإشارة المرجعية."
