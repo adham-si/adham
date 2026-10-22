@@ -146,7 +146,7 @@ The first full pass exposed five files with formatting drift (all verification-o
 
 - `cargo xtask contracts` regenerated the committed TypeScript contracts; `git status` showed no outstanding `packages/contracts-generated` diff afterward.
 - No `package.json` or `pnpm-lock.yaml` change.
-- `Cargo.lock` gained one dependency edge for the already-pinned workspace `zeroize`; no new registry package, version, or license entered the lockfile.
+- `Cargo.lock` records the existing workspace `zeroize` edge and a patch update of `rustls-webpki` from 0.103.15 to 0.103.16 for RUSTSEC-2026-0382; no new registry package or license entered the lockfile.
 - No PDF, OCR, image/vision, audio/video, or cursor package is present.
 
 ## 3. Honest limits and blocked tracks

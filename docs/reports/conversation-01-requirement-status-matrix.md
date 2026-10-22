@@ -144,7 +144,7 @@ Status: `not-implemented`. Durable event/attempt identity repair is tracked in t
 | Targeted history frontend | 8 files, 27 tests passed |
 | `pnpm check` | exit 0; 88 files / 855 tests, format/lint/types/magic-values/deny-exceptions clean |
 
-No new third-party package was added. `Cargo.lock` only records the existing workspace `zeroize` edge for `adham-desktop-api`.
+No new third-party package was added. `Cargo.lock` records the existing workspace `zeroize` edge for `adham-desktop-api` and the RUSTSEC-2026-0382 patch update of `rustls-webpki` 0.103.15 → 0.103.16.
 
 ## Verification run at `980d899`
 
