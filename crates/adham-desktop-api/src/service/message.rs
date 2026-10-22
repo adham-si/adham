@@ -1,7 +1,7 @@
 //! Atomic submit-message service. ID newtypes are `Copy`; `.clone()` below
 //! follows the surrounding codebase style.
 #![allow(clippy::clone_on_copy)]
-use super::common::conflict_msg;
+use super::common::{conflict_msg, ensure_session_active_tx, lock_session_stream_tx};
 use crate::dtos::*;
 use crate::handlers::ApiContext;
 use adham_core_types::*;
@@ -199,6 +199,8 @@ pub async fn submit_message(
         }
         None => return Err("SESSION_NOT_FOUND: session stream does not exist".to_string()),
     }
+    lock_session_stream_tx(&mut tx, &sess_id.to_string()).await?;
+    ensure_session_active_tx(&mut tx, &sess_id.to_string()).await?;
 
     if let Some(receipt) = SqliteEventStore::check_receipt_tx(&mut tx, &request_id)
         .await

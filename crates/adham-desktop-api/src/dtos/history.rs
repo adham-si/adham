@@ -73,3 +73,18 @@ pub struct ExportSessionResponse {
     #[ts(as = "u32")]
     pub bytes: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DeleteSessionPayload {
+    pub confirm: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DeleteSessionResponse {
+    pub session_id: String,
+    pub deleted: bool,
+}

@@ -32,6 +32,7 @@ export interface PrimarySidebarProps {
   onRenameSession?: (session: SessionSummary) => void;
   onDuplicateSession?: (session: SessionSummary) => void;
   onExportSession?: (session: SessionSummary) => void;
+  onDeleteSession?: (session: SessionSummary) => void;
   onSetPinned?: (sessionId: string, pinned: boolean) => void;
   onSetArchived?: (sessionId: string, archived: boolean) => void;
   actionsDisabled?: boolean;
@@ -64,6 +65,7 @@ export function PrimarySidebar({
   onRenameSession,
   onDuplicateSession,
   onExportSession,
+  onDeleteSession,
   onSetPinned,
   onSetArchived,
   actionsDisabled = false,
@@ -242,6 +244,7 @@ export function PrimarySidebar({
                 onRenameSession ||
                   onDuplicateSession ||
                   onExportSession ||
+                  onDeleteSession ||
                   onSetPinned ||
                   onSetArchived,
               );
@@ -292,6 +295,7 @@ export function PrimarySidebar({
                           if (value === 'rename') onRenameSession?.(session);
                           if (value === 'duplicate') onDuplicateSession?.(session);
                           if (value === 'export') onExportSession?.(session);
+                          if (value === 'delete') onDeleteSession?.(session);
                           if (value === 'pin') onSetPinned?.(session.id, !session.pinned);
                           if (value === 'archive') onSetArchived?.(session.id, !session.archived);
                         }}
@@ -309,6 +313,15 @@ export function PrimarySidebar({
                         {onExportSession ? (
                           <MenuItem value="export" disabled={actionsDisabled}>
                             {t('conversation.sessionActions.export', 'Export Markdown')}
+                          </MenuItem>
+                        ) : null}
+                        {onDeleteSession ? (
+                          <MenuItem
+                            value="delete"
+                            disabled={actionsDisabled}
+                            className="text-danger"
+                          >
+                            {t('conversation.sessionActions.delete', 'Delete from history')}
                           </MenuItem>
                         ) : null}
                         {onSetPinned ? (

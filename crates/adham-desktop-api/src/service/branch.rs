@@ -11,6 +11,7 @@
 //! prompts into one context.
 use crate::dtos::{BranchSelectionDto, CommandContext, SetActiveAlternativePayload};
 use crate::handlers::ApiContext;
+use crate::service::common::{ensure_session_active_tx, lock_session_stream_tx};
 use adham_core_types::*;
 use adham_projections::{ConversationMessageView, ConversationProjection};
 use sqlx::{Pool, Sqlite};
@@ -167,6 +168,13 @@ pub async fn set_active_alternative(
     }
 
     let now_us = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
+    let mut tx = ctx
+        .pool
+        .begin()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    lock_session_stream_tx(&mut tx, &session_id.to_string()).await?;
+    ensure_session_active_tx(&mut tx, &session_id.to_string()).await?;
     sqlx::query(
         "INSERT INTO branch_selections (session_id, root_message_id, active_message_id, updated_at_us)
          VALUES (?, ?, ?, ?)
@@ -178,9 +186,12 @@ pub async fn set_active_alternative(
     .bind(&payload.root_message_id)
     .bind(&payload.active_message_id)
     .bind(now_us)
-    .execute(&ctx.pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    tx.commit()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
 
     read_branch_selections(&ctx.pool, &session_id)
         .await

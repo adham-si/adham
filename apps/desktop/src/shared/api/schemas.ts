@@ -338,3 +338,8 @@ export const ExportSessionResponseSchema = z.object({
   path: z.string(),
   bytes: z.number(),
 });
+
+export const DeleteSessionResponseSchema = z.object({
+  sessionId: z.string(),
+  deleted: z.boolean(),
+});

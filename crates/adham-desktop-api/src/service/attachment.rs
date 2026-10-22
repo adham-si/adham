@@ -7,6 +7,7 @@
 
 use crate::dtos::*;
 use crate::handlers::ApiContext;
+use crate::service::common::{ensure_session_active_tx, lock_session_stream_tx};
 use adham_core_types::*;
 use adham_event_log::{AttachmentRecord, SqliteEventStore};
 use std::io::Read;
@@ -208,6 +209,8 @@ pub async fn ingest_text_attachment(
         .begin()
         .await
         .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    lock_session_stream_tx(&mut tx, &ids.sess_id.to_string()).await?;
+    ensure_session_active_tx(&mut tx, &ids.sess_id.to_string()).await?;
     SqliteEventStore::put_content_tx(
         &mut tx,
         ctx.content_key.as_ref(),

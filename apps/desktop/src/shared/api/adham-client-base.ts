@@ -10,6 +10,7 @@ import type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  DeleteSessionResponse,
   GetPreferencesResponse,
   PendingOperationDto,
   PendingOperationList,
@@ -38,6 +39,7 @@ import {
   BootstrapStateSchema,
   BranchSelectionListSchema,
   ConversationPageSchema,
+  DeleteSessionResponseSchema,
   GetPreferencesResponseSchema,
   PendingOperationDtoSchema,
   PendingOperationListSchema,
@@ -66,6 +68,7 @@ export type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  DeleteSessionResponse,
   GetPreferencesResponse,
   PendingOperationDto,
   PendingOperationList,
@@ -439,6 +442,24 @@ export class AdhamApiClientBase implements AdhamClient {
       request: envelope,
     });
     return SessionMetadataSchema.parse(result.data);
+  }
+
+  async deleteSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    confirm: boolean,
+    options?: { requestId?: string },
+  ): Promise<DeleteSessionResponse> {
+    const envelope = this.wrapCommand(
+      { confirm },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<DeleteSessionResponse>>('delete_session', {
+      request: envelope,
+    });
+    return DeleteSessionResponseSchema.parse(result.data);
   }
 
   async exportSessionMarkdown(

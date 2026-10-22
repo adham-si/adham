@@ -46,6 +46,16 @@ pub async fn resolve_scoped_session(
             );
         }
     }
+    let deleted: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM events WHERE stream_id = ? AND event_type = 'SessionDeleted' LIMIT 1",
+    )
+    .bind(&sess_stream)
+    .fetch_optional(&ctx.pool)
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    if deleted.is_some() {
+        return Err("SESSION_DELETED: session is deleted".to_string());
+    }
     Ok(session_id)
 }
 

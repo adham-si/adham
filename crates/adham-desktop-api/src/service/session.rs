@@ -1,6 +1,6 @@
 //! Atomic session creation service. ID newtypes are `Copy`.
 #![allow(clippy::clone_on_copy)]
-use super::common::conflict_msg;
+use super::common::{conflict_msg, ensure_session_active_tx, lock_session_stream_tx};
 use crate::dtos::*;
 use crate::handlers::ApiContext;
 use adham_core_types::history::validate_title;
@@ -28,6 +28,40 @@ fn replay(
         }
         Err(_) => Err("STORAGE_REPAIR_REQUIRED: receipt response unparseable".to_string()),
     }
+}
+
+/// A create receipt must not replay a summary for a session deleted after the
+/// original command. Lock the session before the tombstone check so a
+/// concurrent delete cannot slip between the two.
+async fn replay_if_active(
+    ctx: &ApiContext,
+    request_id: String,
+    receipt: adham_event_log::CommandReceiptRecord,
+) -> Result<CommandResult<SessionSummary>, String> {
+    let summary: SessionSummary = serde_json::from_slice(&receipt.response_json)
+        .map_err(|_| "STORAGE_REPAIR_REQUIRED: receipt response unparseable".to_string())?;
+    let session_id = summary.session_id;
+    let mut tx = ctx
+        .pool
+        .begin()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    let stream_exists: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM streams WHERE stream_id = ?")
+            .bind(format!("session:{session_id}"))
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    // Legacy receipts may predate the stream. Only refuse when the stream is
+    // actually present and carries the tombstone.
+    if stream_exists.is_some() {
+        lock_session_stream_tx(&mut tx, &session_id).await?;
+        ensure_session_active_tx(&mut tx, &session_id).await?;
+    }
+    tx.rollback()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    replay(request_id, receipt)
 }
 
 /// Atomic session creation: event + stream + receipt in one tx.
@@ -109,7 +143,7 @@ pub async fn create_session(
             .await
             .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         if matches {
-            return replay(env.request_id, receipt);
+            return replay_if_active(ctx, env.request_id, receipt).await;
         }
         return Err(conflict_msg());
     }
@@ -194,7 +228,7 @@ pub async fn create_session(
                     && receipt.request_fingerprint == request_fp
                     && receipt.scope_fingerprint == scope_fp;
                 if matches {
-                    return replay(env.request_id, receipt);
+                    return replay_if_active(ctx, env.request_id, receipt).await;
                 }
                 return Err(conflict_msg());
             }

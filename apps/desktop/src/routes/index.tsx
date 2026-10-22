@@ -11,6 +11,7 @@ import { useOnboarding, OnboardingJourney } from '@/features/onboarding';
 import { SettingsPage } from '@/pages/settings';
 import { SessionDetailsDialog } from '@/features/history/session-details-dialog';
 import { ExportSessionDialog } from '@/features/history/export-session-dialog';
+import { DeleteSessionDialog } from '@/features/history/delete-session-dialog';
 import { useSessionActions } from '@/features/history/use-session-actions';
 import { useAppPreferences } from '@/shared/settings/use-app-preferences';
 
@@ -77,6 +78,7 @@ function AppBody() {
   const sessionActions = useSessionActions({
     workspaceId: sel.activeWorkspaceId,
     projectId: sel.activeProjectId,
+    activeSessionId,
     onChanged: refreshSessions,
   });
 
@@ -119,6 +121,7 @@ function AppBody() {
             onRenameSession: sessionActions.openRename,
             onDuplicateSession: (session) => void sessionActions.duplicate(session),
             onExportSession: sessionActions.openExport,
+            onDeleteSession: sessionActions.openDelete,
             onSetPinned: (sessionId, pinned) => void sessionActions.setPinned(sessionId, pinned),
             onSetArchived: (sessionId, archived) =>
               void sessionActions.setArchived(sessionId, archived),
@@ -136,6 +139,18 @@ function AppBody() {
             target={provisionTarget}
             onClose={closeProvision}
             onSuccess={handleProvisionSuccess}
+          />
+          <DeleteSessionDialog
+            open={sessionActions.deleteTarget !== null}
+            sessionTitle={sessionActions.deleteTarget?.title ?? ''}
+            busy={sessionActions.busyId !== null}
+            error={sessionActions.error}
+            onClose={sessionActions.closeDelete}
+            onDelete={() =>
+              sessionActions.deleteTarget
+                ? sessionActions.deleteSession(sessionActions.deleteTarget)
+                : Promise.resolve()
+            }
           />
           <ExportSessionDialog
             open={sessionActions.exportTarget !== null}

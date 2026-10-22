@@ -12,6 +12,7 @@ use super::{
 
 use crate::dtos::*;
 use crate::pending_dtos::{MarkCompletionInterruptedPayload, MarkCompletionInterruptedResponse};
+use crate::service::common::{ensure_session_active_tx, lock_session_stream_tx};
 use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::adapters::AnyAdapter;
@@ -162,6 +163,8 @@ where
         .begin()
         .await
         .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    lock_session_stream_tx(&mut tx, &ids.sess_id.to_string()).await?;
+    ensure_session_active_tx(&mut tx, &ids.sess_id.to_string()).await?;
 
     // idempotent IPC retry: same request → same op handle, never a second dispatch
     if let Some(receipt) = SqliteEventStore::check_receipt_tx(&mut tx, &request_id)

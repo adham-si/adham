@@ -11,7 +11,7 @@ pub mod session;
 pub mod workspace;
 
 pub use history::{
-    CachedContentKeyProvider, duplicate_session, export_session_markdown,
+    CachedContentKeyProvider, delete_session, duplicate_session, export_session_markdown,
     read_bookmarked_message_ids, rename_session, set_message_bookmark, set_session_archived,
     set_session_pinned, set_session_summary,
 };

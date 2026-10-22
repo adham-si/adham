@@ -372,13 +372,22 @@ pub(crate) async fn validate_session_scope(
             if row_ws.as_deref() != Some(&ids.ws_id.to_string())
                 || row_proj.as_deref() != Some(&ids.proj_id.to_string())
             {
-                Err(
+                return Err(
                     "CONTEXT_MISMATCH: session does not belong to specified project or workspace"
                         .to_string(),
-                )
-            } else {
-                Ok(())
+                );
             }
+            let deleted: Option<i64> = sqlx::query_scalar(
+                "SELECT 1 FROM events WHERE stream_id = ? AND event_type = 'SessionDeleted' LIMIT 1",
+            )
+            .bind(&sess_stream)
+            .fetch_optional(&ctx.pool)
+            .await
+            .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+            if deleted.is_some() {
+                return Err("SESSION_DELETED: session is deleted".to_string());
+            }
+            Ok(())
         }
         None => Err("SESSION_NOT_FOUND: session stream does not exist".to_string()),
     }

@@ -129,7 +129,14 @@
       "exportBytes": "{{bytes}} 字节",
       "exportAction": "导出 Markdown",
       "exporting": "正在导出…",
-      "close": "关闭"
+      "close": "关闭",
+      "delete": "从历史记录中删除",
+      "deleteTitle": "从历史记录中删除？",
+      "deleteCannotUndo": "此操作无法撤销。会话将从历史记录中消失，其数据库内容也会被删除。",
+      "deleteSession": "会话：{{title}}",
+      "deleteMetadataRemains": "事件元数据会保留以供审计。这不是取证级擦除：SQLite 日志或备份等存储层副本可能会保留。",
+      "deleteExportsRemain": "你导出的 Markdown 文件仍保留在磁盘上，不会随会话删除。",
+      "deleting": "正在删除…"
     },
     "bookmarkUnavailable": "此版本不支持书签。",
     "bookmarkUpdateFailed": "无法更新书签。"

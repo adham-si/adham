@@ -129,7 +129,14 @@
       "exportBytes": "{{bytes}} bytes",
       "exportAction": "Export Markdown",
       "exporting": "Exporting…",
-      "close": "Close"
+      "close": "Close",
+      "delete": "Delete from history",
+      "deleteTitle": "Delete from history?",
+      "deleteCannotUndo": "This cannot be undone. The session disappears from history and its database content is deleted.",
+      "deleteSession": "Session: {{title}}",
+      "deleteMetadataRemains": "Event metadata remains for audit. This is not forensic erasure: storage-level copies such as SQLite journals or backups may remain.",
+      "deleteExportsRemain": "Markdown files you exported remain on disk and are not deleted with the session.",
+      "deleting": "Deleting…"
     },
     "bookmarkUnavailable": "Bookmarks are unavailable in this build.",
     "bookmarkUpdateFailed": "Could not update the bookmark."

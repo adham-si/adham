@@ -1,7 +1,12 @@
 import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
-import type { ExportSessionResponse, SessionMetadata } from '@adham/contracts-generated';
+import type {
+  DeleteSessionResponse,
+  ExportSessionResponse,
+  SessionMetadata,
+} from '@adham/contracts-generated';
 import { rejectionMessage } from '@/shared/api/error-envelope';
+import { readPendingSend, removePendingSend } from '@/features/conversation/conversation-identity';
 import i18n from '@/shared/i18n';
 
 export interface SessionActionTarget {
@@ -47,11 +52,18 @@ export interface SessionActionsBackend {
     projectId: string,
     sessionId: string,
   ): Promise<ExportSessionResponse>;
+  deleteSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    confirm: boolean,
+  ): Promise<DeleteSessionResponse>;
 }
 
 export interface UseSessionActionsOptions {
   workspaceId: string | null;
   projectId: string | null;
+  activeSessionId?: string | null;
   onChanged: () => void | Promise<void>;
   backend?: SessionActionsBackend;
 }
@@ -59,6 +71,7 @@ export interface UseSessionActionsOptions {
 export function useSessionActions({
   workspaceId,
   projectId,
+  activeSessionId = null,
   onChanged,
   backend = adhamClient,
 }: UseSessionActionsOptions) {
@@ -66,6 +79,7 @@ export function useSessionActions({
   const [error, setError] = React.useState<string | null>(null);
   const [renameTarget, setRenameTarget] = React.useState<SessionActionTarget | null>(null);
   const [exportTarget, setExportTarget] = React.useState<SessionActionTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<SessionActionTarget | null>(null);
 
   const run = React.useCallback(
     async (sessionId: string, action: () => Promise<SessionMetadata>) => {
@@ -102,6 +116,42 @@ export function useSessionActions({
     setExportTarget(null);
     setError(null);
   }, []);
+
+  const openDelete = React.useCallback((target: SessionActionTarget) => {
+    setError(null);
+    setDeleteTarget(target);
+  }, []);
+
+  const closeDelete = React.useCallback(() => {
+    setDeleteTarget(null);
+    setError(null);
+  }, []);
+
+  const deleteSession = React.useCallback(
+    async (target: SessionActionTarget) => {
+      if (!workspaceId || !projectId) return;
+      setBusyId(target.id);
+      setError(null);
+      try {
+        await backend.deleteSession(workspaceId, projectId, target.id, true);
+        if (readPendingSend()?.sessionId === target.id) removePendingSend();
+        if (activeSessionId === target.id) {
+          window.dispatchEvent(
+            new CustomEvent('adham:session-select', {
+              detail: { workspaceId, projectId, sessionId: null },
+            }),
+          );
+        }
+        await onChanged();
+        setDeleteTarget(null);
+      } catch (err) {
+        setError(rejectionMessage(err));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [activeSessionId, backend, onChanged, projectId, workspaceId],
+  );
 
   const exportSession = React.useCallback(
     async (target: SessionActionTarget): Promise<ExportSessionResponse | null> => {
@@ -232,6 +282,10 @@ export function useSessionActions({
     openExport,
     closeExport,
     exportSession,
+    deleteTarget,
+    openDelete,
+    closeDelete,
+    deleteSession,
     setPinned,
     setArchived,
   };

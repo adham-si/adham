@@ -3,6 +3,7 @@
 use super::{ApiContext, EventSink, StreamIds};
 
 use crate::dtos::*;
+use crate::service::common::{ensure_session_active_tx, lock_session_stream_tx};
 use adham_core_types::*;
 use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use adham_provider::adapters::AnyAdapter;
@@ -330,6 +331,17 @@ pub(crate) async fn persist_terminal(
             return "failed";
         }
     };
+
+    if let Err(e) = lock_session_stream_tx(&mut tx, &ids.sess_id.to_string()).await {
+        tracing::error!("completion op {op_id}: terminal persistence refused: {e}");
+        let _ = tx.rollback().await;
+        return "failed";
+    }
+    if let Err(e) = ensure_session_active_tx(&mut tx, &ids.sess_id.to_string()).await {
+        tracing::error!("completion op {op_id}: terminal persistence refused: {e}");
+        let _ = tx.rollback().await;
+        return "failed";
+    }
 
     if require_pending {
         let claimed = match sqlx::query(

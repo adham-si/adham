@@ -17,6 +17,7 @@ describe('PrimarySidebar session actions', () => {
     const onRenameSession = vi.fn();
     const onDuplicateSession = vi.fn();
     const onExportSession = vi.fn();
+    const onDeleteSession = vi.fn();
     const onSetPinned = vi.fn();
     const onSetArchived = vi.fn();
     render(
@@ -26,6 +27,7 @@ describe('PrimarySidebar session actions', () => {
         onRenameSession={onRenameSession}
         onDuplicateSession={onDuplicateSession}
         onExportSession={onExportSession}
+        onDeleteSession={onDeleteSession}
         onSetPinned={onSetPinned}
         onSetArchived={onSetArchived}
       />,
@@ -42,6 +44,10 @@ describe('PrimarySidebar session actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export Markdown' }));
     expect(onExportSession).toHaveBeenCalledWith(session);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete from history' }));
+    expect(onDeleteSession).toHaveBeenCalledWith(session);
 
     fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin' }));
@@ -71,12 +77,14 @@ describe('useSessionActions', () => {
       exportSessionMarkdown: vi
         .fn()
         .mockResolvedValue({ path: '/tmp/exports/History.md', bytes: 12 }),
+      deleteSession: vi.fn().mockResolvedValue({ sessionId: 'sess-1', deleted: true }),
     };
     const onChanged = vi.fn();
     const { result } = renderHook(() =>
       useSessionActions({
         workspaceId: 'ws-1',
         projectId: 'proj-1',
+        activeSessionId: 'sess-1',
         backend,
         onChanged,
       }),
@@ -134,6 +142,30 @@ describe('useSessionActions', () => {
     expect(backend.exportSessionMarkdown).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1');
     expect(exported).toEqual({ path: '/tmp/exports/History.md', bytes: 12 });
     expect(onChanged).toHaveBeenCalledTimes(5);
+
+    sessionStorage.setItem(
+      'adham:compose:pending-send',
+      JSON.stringify({
+        requestId: 'req-1',
+        text: 'pending',
+        workspaceId: 'ws-1',
+        projectId: 'proj-1',
+        sessionId: 'sess-1',
+      }),
+    );
+    const onDeleted = vi.fn();
+    window.addEventListener('adham:session-select', onDeleted);
+    act(() => result.current.openDelete(session));
+    await act(async () => {
+      await result.current.deleteSession(session);
+    });
+    expect(backend.deleteSession).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1', true);
+    expect(sessionStorage.getItem('adham:compose:pending-send')).toBeNull();
+    const deletedDetail = (onDeleted.mock.calls[0]?.[0] as CustomEvent | undefined)?.detail;
+    expect(deletedDetail).toEqual({ workspaceId: 'ws-1', projectId: 'proj-1', sessionId: null });
+    window.removeEventListener('adham:session-select', onDeleted);
+    expect(onChanged).toHaveBeenCalledTimes(6);
+    expect(result.current.deleteTarget).toBeNull();
     await waitFor(() => expect(result.current.busyId).toBeNull());
   });
 });

@@ -521,3 +521,82 @@ async fn test_unknown_message_version_stops_rebuild() {
 
 #[path = "projection_tests/terminal.rs"]
 mod terminal;
+
+#[tokio::test]
+async fn rebuild_skips_deleted_sessions() {
+    let db_path = test_db_path();
+    let pool = create_sqlite_pool(&db_path)
+        .await
+        .expect("create test pool");
+    let store = SqliteEventStore::new(pool.clone());
+    let inst_id = InstallationId::new_v7();
+    let ws_id = WorkspaceId::new_v7();
+    let proj_id = ProjectId::new_v7();
+    let sess_id = SessionId::new_v7();
+    let scope = EventScope {
+        installation_id: inst_id,
+        workspace_id: Some(ws_id),
+        project_id: Some(proj_id),
+        session_id: Some(sess_id),
+    };
+    let stream_id = format!("session:{sess_id}");
+    let message = MessageSubmittedV1 {
+        message_id: MessageId::new_v7(),
+        content_id: ContentId::new_v7(),
+        content_kind: "user_text".to_string(),
+        size_bytes: 4,
+    };
+    store
+        .append_event(AppendEventRequest {
+            stream_id: stream_id.clone(),
+            stream_kind: "session".to_string(),
+            expected_sequence: 0,
+            event_type: "MessageSubmitted".to_string(),
+            event_version: 1,
+            scope: scope.clone(),
+            actor: EventActor {
+                actor_id: ActorId::new_v7(),
+                kind: ActorKind::LocalHuman,
+            },
+            request_id: RequestId::new_v7(),
+            correlation_id: CorrelationId::new_v7(),
+            causation_id: None,
+            payload_json: serde_json::to_vec(&message).unwrap(),
+            metadata_json: b"{}".to_vec(),
+        })
+        .await
+        .expect("append message");
+    store
+        .append_event(AppendEventRequest {
+            stream_id,
+            stream_kind: "session".to_string(),
+            expected_sequence: 1,
+            event_type: adham_core_types::history::EVENT_TYPE_SESSION_DELETED.to_string(),
+            event_version: 1,
+            scope,
+            actor: EventActor {
+                actor_id: ActorId::new_v7(),
+                kind: ActorKind::LocalHuman,
+            },
+            request_id: RequestId::new_v7(),
+            correlation_id: CorrelationId::new_v7(),
+            causation_id: None,
+            payload_json: serde_json::to_vec(&adham_core_types::history::SessionDeletedV1 {})
+                .unwrap(),
+            metadata_json: b"{}".to_vec(),
+        })
+        .await
+        .expect("append delete");
+
+    let replayed = ConversationProjection::rebuild(&pool)
+        .await
+        .expect("rebuild projection");
+    assert_eq!(replayed, 0);
+    let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM conversation_messages")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0);
+
+    let _ = std::fs::remove_file(db_path);
+}

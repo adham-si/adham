@@ -186,4 +186,26 @@ impl SqliteEventStore {
             })
             .collect()
     }
+
+    /// Remove the session's attachment index and link rows. Content is erased
+    /// separately by the delete service; message rows still exist here.
+    pub async fn delete_session_attachments_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        session_id: &SessionId,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "DELETE FROM message_attachments WHERE message_id IN \
+             (SELECT message_id FROM conversation_messages WHERE session_id = ?)",
+        )
+        .bind(session_id.to_string())
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        sqlx::query("DELETE FROM attachment_records WHERE session_id = ?")
+            .bind(session_id.to_string())
+            .execute(&mut **tx)
+            .await
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(())
+    }
 }

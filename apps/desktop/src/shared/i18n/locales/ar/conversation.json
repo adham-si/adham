@@ -129,7 +129,14 @@
       "exportBytes": "{{bytes}} بايت",
       "exportAction": "تصدير Markdown",
       "exporting": "جارٍ التصدير…",
-      "close": "إغلاق"
+      "close": "إغلاق",
+      "delete": "حذف من السجل",
+      "deleteTitle": "حذف من السجل؟",
+      "deleteCannotUndo": "لا يمكن التراجع عن هذا. تختفي الجلسة من السجل ويُحذف محتواها من قاعدة البيانات.",
+      "deleteSession": "الجلسة: {{title}}",
+      "deleteMetadataRemains": "تبقى بيانات الأحداث الوصفية للتدقيق. هذا ليس محوًا جنائيًا: قد تبقى نسخ على مستوى التخزين مثل سجلات SQLite أو النسخ الاحتياطية.",
+      "deleteExportsRemain": "تبقى ملفات Markdown التي صدّرتها على القرص ولا تُحذف مع الجلسة.",
+      "deleting": "جارٍ الحذف…"
     },
     "bookmarkUnavailable": "الإشارات المرجعية غير متاحة في هذا الإصدار.",
     "bookmarkUpdateFailed": "تعذّر تحديث الإشارة المرجعية."
