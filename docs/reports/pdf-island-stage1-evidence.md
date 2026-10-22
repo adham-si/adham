@@ -6,7 +6,7 @@ Date: 2026-10-22. Branch: `feat/conversation-02-pdf`, base `f10f907` (PR #36 mer
 
 **What Stage 1 was authorized to build:** a dependency-free extractor-process prototype — synthetic worker + real supervisor — proving the process boundary before any PDF parser exists. Nothing was installed; no upstream exploit fixtures were created; no production wiring was touched. Per PM's six proof items, each pinned by a test in `crates/adham-pdf-island/tests/island_tests.rs`.
 
-**What Stage 1 explicitly does NOT claim:** parser behavior on hostile PDFs, `pdfEncrypted`/`pdfCorrupt`/`pdfScanOnly` semantics, Windows runtime behavior (compile-gated only), and everything gated on the accept-risk sign-off.
+**What Stage 1 explicitly does NOT claim:** real-PDF acceptance; parser behavior on hostile PDFs; `pdfEncrypted`/`pdfCorrupt`/`pdfScanOnly` semantics; and **os-level filesystem/network confinement — this is a tested resource-containment prototype, not a sandbox** (see "Enforcement reality" below for what each OS actually denies).
 
 ## Proof matrix (all from `cargo test -p adham-pdf-island`)
 
@@ -21,15 +21,24 @@ Date: 2026-10-22. Branch: `feat/conversation-02-pdf`, base `f10f907` (PR #36 mer
 
 Total: **13/13 tests green** (1 source-policy unit + 12 boundary integration), `clippy --all-targets -D warnings` clean, `cargo fmt --check` clean.
 
-## Platform demonstration
+## Platform demonstration (final matrix, revision-tagged `df8230a`, run [39835989412](https://github.com/adham-si/adham/actions/runs/39835989412))
 
-| Platform | Mechanism | Result |
-|---|---|---|
-| macOS (declared dev host) | host run, `cargo test -p adham-pdf-island` + clippy + fmt | green (13/13, 0.66 s) |
-| Linux — **declared target Ubuntu 24.04** | `ubuntu:24.04` container, Rust **1.96.0** = CI-pinned toolchain; suite + clippy `-D warnings` + fmt, run **3×** (default parallel threads) | green each time (12/12, ~0.53 s) |
-| Windows x86_64-pc-windows-msvc | `cargo check --target x86_64-pc-windows-msvc` + `windows-sys 0.59` compile gate (declared feature set incl. `Win32_Security`) | compile-green; **no local runtime** |
+| Platform | Mechanism | Runtime suite result | Worker left-alive sweep |
+|---|---|---|---|
+| macOS (dev host) | host run: `cargo test -p adham-pdf-island` + clippy + fmt | **13/13 green** (0.82 s) | "OK: no adham-pdf-island processes remain" |
+| Linux — **declared target Ubuntu 24.04** | `ubuntu2404-rust:1.96` container (CI-pinned Rust 1.96.0), 3× parallel | **12/12 green** (+1 tripwire) | "OK: no adham-pdf-island processes remain" |
+| Linux CI lane (`ubuntu-24.04`) | CI validation job, Rust 1.96.0 | suite executed green (workspace run) | "OK: no adham-pdf-island processes remain" (job log 19:02:14) |
+| macOS CI lane (`macos-latest`) | CI validation job | suite executed green (workspace run) | "OK: no adham-pdf-island processes remain" (job log 19:03:43) |
+| **Windows x86_64-msvc — runtime executed on `windows-latest`** | CI `validate` job: `cargo test --workspace --locked` | **13/13 green on the runner** — lib tripwire 1/1 (19:05:43.05) + 12 boundary tests at 19:05:43.080–43.818 (0.74 s): `memory_limit_enforced_before_parsing` (Job-Object heap growth ⇒ MemoryLimit), `input_is_bounded_and_refused`, `healthy_run_streams_pages_in_caps`, `timeout_terminates_and_reaps`, `explicit_cancel_terminates_and_reaps`, `island_refuses_filesystem_actions`, `no_secrets_reach_the_island`, `per_page_cap_is_enforced`, `total_char_cap_is_enforced`, `crash_refuses_without_partial_success`, `late_crash_never_leaks_partial_pages`, `garbage_output_refuses_without_partial_success` | "OK: no adham-pdf-island processes remain" (job log 19:05:54) |
 
-Windows runtime gap: the required `windows-latest` CI job already runs the workspace test command, so pushing this branch executes the identical suite on Windows. Push approval is with the human (AGENTS rule). This is the only report row not closed by direct execution.
+The Windows sweep also covers cold cleanup: after every fault path (memory exhaustion, cancellation, timeout kill, spam-over-cap, crash/abort), the runner process table contained zero `adham-pdf-island` workers.
+
+## CI execution record
+
+| Run | Head | Result | Notes |
+|---|---|---|---|
+| [39832719445](https://github.com/adham-si/adham/actions/runs/39832719445) | `3380b1c` | 2 failures, both corrected | (1) windows-lane clippy: `Ordering` unused on non-macOS cfg — fixed `9e80a32` (local clippy now run for all three target triples). (2) cargo-deny `advisories`: advisory-DB refresh surfaced `RUSTSEC-2026-0382` (rustls-webpki 0.103.15, pre-existing `adham-provider`→reqwest→rustls chain — **not** introduced by the island); fixed by lock-only bump `424fa41`. Windows runtime tests did not execute in this run. |
+| [39835989412](https://github.com/adham-si/adham/actions/runs/39835989412) | `df8230a` | **all three jobs success** | Definitive run: Windows runtime suite + left-alive sweep (`Get-Process`/`pgrep -x`, read-only, added in `df8230a`). |
 
 ## Findings that revised the design (recorded in the design doc)
 
@@ -73,9 +82,9 @@ cargo test -p adham-desktop-api still_refuses_pdf_attachments   # PASS
 
 ## Unverified / open
 
-- Windows runtime execution (pending CI push approval).
-- Parser-behavior statuses (`pdfEncrypted` vs `pdfCorrupt` distinguishability), fixtures, fuzz, wiring — Stage 2+, authorization-gated.
-- The dependency-risk decision itself — record at `docs/reports/dependency-record-pdf-inspector.md` awaits the PM's sign-off.
+- Parser behavior on real PDFs (`pdfEncrypted` vs `pdfCorrupt` distinguishability), PoC-style fixtures, fuzz, and production wiring — Stage 2+, authorization-gated. Not attempted in Stage 1.
+- The dependency-risk decision itself — `docs/reports/dependency-record-pdf-inspector.md` awaits the PM's sign-off.
+- fs/network **confinement** remains unimplemented (by-construction only); OS sandboxing is a separate design decision (design doc "Open decisions" #4).
 
 ## Files
 
