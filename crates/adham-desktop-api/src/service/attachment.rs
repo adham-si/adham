@@ -313,6 +313,18 @@ mod tests {
         assert_eq!(classify_text("no-extension"), None);
     }
 
+    /// PDF stays out of the ingest allowlist until the extractor island
+    /// passes its gates; these pins keep it honestly unavailable.
+    #[test]
+    fn still_refuses_pdf_attachments() {
+        assert_eq!(classify_text("report.pdf"), None);
+        assert_eq!(classify_text("docs/pdf"), None);
+        let err = extract_text("report.pdf", b"%PDF-1.7 synthetic")
+            .err()
+            .expect("refuse");
+        assert!(err.contains("attachment.unsupportedType"), "{err}");
+    }
+
     #[test]
     fn sanitizes_file_names_to_a_base_name() {
         assert_eq!(sanitize_file_name("../../etc/passwd"), "passwd");

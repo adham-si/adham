@@ -125,6 +125,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "adham-pdf-island"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "adham-platform"
 version = "0.1.0"
 dependencies = [
