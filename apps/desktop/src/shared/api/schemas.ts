@@ -78,6 +78,17 @@ export const SessionListSchema = z.object({
   unreadableSummaries: z.number().int().nonnegative().default(0),
 });
 
+export const SessionMetadataSchema = z.object({
+  sessionId: z.string(),
+  projectId: z.string(),
+  title: z.string().nullable(),
+  summaryOrigin: z.string().nullable(),
+  pinned: z.boolean(),
+  archived: z.boolean(),
+  createdAt: z.string(),
+  lastActivityAt: z.string(),
+});
+
 export const ListSessionsOptionsSchema = z.object({
   includeArchived: z.boolean().optional(),
   activeSessionId: z.string().nullable().optional(),

@@ -93,7 +93,22 @@
       "retryAction": "Повторить"
     },
     "alternativeUpdateFailed": "Не удалось переключить активную альтернативу.",
-    "feedbackUpdateFailed": "Не удалось сохранить оценку."
+    "feedbackUpdateFailed": "Не удалось сохранить оценку.",
+    "sessionActions": {
+      "label": "Действия с сессией",
+      "rename": "Переименовать",
+      "pin": "Закрепить",
+      "unpin": "Открепить",
+      "archive": "В архив",
+      "unarchive": "Вернуть из архива",
+      "detailsTitle": "Детали сессии",
+      "renameDescription": "Переименуйте сессию. Новое название сохраняется локально.",
+      "titleLabel": "Название",
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "saving": "Сохранение…",
+      "titleRequired": "Введите название."
+    }
   },
   "provision": {
     "workspaceTitle": "Создайте рабочее пространство",

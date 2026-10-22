@@ -48,3 +48,40 @@ pub async fn resolve_scoped_session(
     }
     Ok(session_id)
 }
+
+/// Take the per-session write serialization before any action reads a receipt
+/// or decides whether the session is still active.
+pub async fn lock_session_stream_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    session_id: &str,
+) -> Result<(), String> {
+    let result =
+        sqlx::query("UPDATE streams SET current_sequence = current_sequence WHERE stream_id = ?")
+            .bind(format!("session:{session_id}"))
+            .execute(&mut **tx)
+            .await
+            .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    if result.rows_affected() == 0 {
+        return Err("SESSION_NOT_FOUND: session stream does not exist".to_string());
+    }
+    Ok(())
+}
+
+/// A tombstone wins over every later action, including a replay of a request
+/// that succeeded before the delete.
+pub async fn ensure_session_active_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    session_id: &str,
+) -> Result<(), String> {
+    let deleted: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM events WHERE stream_id = ? AND event_type = 'SessionDeleted' LIMIT 1",
+    )
+    .bind(format!("session:{session_id}"))
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    if deleted.is_some() {
+        return Err("SESSION_DELETED: session is deleted".to_string());
+    }
+    Ok(())
+}

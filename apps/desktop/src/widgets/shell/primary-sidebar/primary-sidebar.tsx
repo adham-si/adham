@@ -1,6 +1,14 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, SidebarItem, AdhamIcon } from '@adham/ui';
+import {
+  Button,
+  SidebarItem,
+  AdhamIcon,
+  MenuContent,
+  MenuItem,
+  MenuRoot,
+  MenuTrigger,
+} from '@adham/ui';
 import { useShellLayout, SHELL_DIMENSIONS } from '../context';
 
 export interface SessionSummary {
@@ -20,6 +28,11 @@ export interface PrimarySidebarProps {
   activeSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: () => void;
+  onRenameSession?: (session: SessionSummary) => void;
+  onSetPinned?: (sessionId: string, pinned: boolean) => void;
+  onSetArchived?: (sessionId: string, archived: boolean) => void;
+  actionsDisabled?: boolean;
+  actionsError?: string | null;
   className?: string;
   error?: string | null;
   onRetry?: () => void;
@@ -45,6 +58,11 @@ export function PrimarySidebar({
   activeSessionId,
   onSelectSession,
   onNewSession,
+  onRenameSession,
+  onSetPinned,
+  onSetArchived,
+  actionsDisabled = false,
+  actionsError,
   className = '',
   error,
   onRetry,
@@ -214,38 +232,87 @@ export function PrimarySidebar({
                 {t('sidebar.summariesUnavailable', 'Some summaries could not be read.')}
               </div>
             ) : null}
-            {filteredSessions.map((session) => (
-              <SidebarItem
-                key={session.id}
-                selected={activeSessionId === session.id}
-                onClick={() => onSelectSession?.(session.id)}
-                className="items-start py-2"
-              >
-                <AdhamIcon size="sm" label={session.title}>
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                </AdhamIcon>
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate">{session.title}</span>
-                    {session.pinned ? (
-                      <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
-                        {t('sidebar.pinned', 'Pinned')}
+            {filteredSessions.map((session) => {
+              const hasActions = Boolean(onRenameSession || onSetPinned || onSetArchived);
+              return (
+                <div key={session.id} className="group relative">
+                  <SidebarItem
+                    selected={activeSessionId === session.id}
+                    onClick={() => onSelectSession?.(session.id)}
+                    className="items-start py-2 pe-8"
+                  >
+                    <AdhamIcon size="sm" label={session.title}>
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                    </AdhamIcon>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate">{session.title}</span>
+                        {session.pinned ? (
+                          <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
+                            {t('sidebar.pinned', 'Pinned')}
+                          </span>
+                        ) : null}
+                        {session.archived ? (
+                          <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
+                            {t('sidebar.archived', 'Archived')}
+                          </span>
+                        ) : null}
                       </span>
-                    ) : null}
-                    {session.archived ? (
-                      <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
-                        {t('sidebar.archived', 'Archived')}
-                      </span>
-                    ) : null}
-                  </span>
-                  {session.summary ? (
-                    <span className="line-clamp-2 text-[11px] font-normal leading-snug text-foreground-muted">
-                      {session.summary}
+                      {session.summary ? (
+                        <span className="line-clamp-2 text-[11px] font-normal leading-snug text-foreground-muted">
+                          {session.summary}
+                        </span>
+                      ) : null}
                     </span>
+                  </SidebarItem>
+                  {hasActions ? (
+                    <MenuRoot>
+                      <MenuTrigger
+                        disabled={actionsDisabled}
+                        aria-label={t('conversation.sessionActions.label', 'Session actions')}
+                        className="absolute end-1 top-1 rounded px-1.5 py-0.5 text-sm text-foreground-muted opacity-0 hover:bg-surface-hover focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <span aria-hidden="true">⋯</span>
+                      </MenuTrigger>
+                      <MenuContent
+                        className="end-0 top-full z-menu mt-1 min-w-40"
+                        label={t('conversation.sessionActions.label', 'Session actions')}
+                        onSelect={(value) => {
+                          if (value === 'rename') onRenameSession?.(session);
+                          if (value === 'pin') onSetPinned?.(session.id, !session.pinned);
+                          if (value === 'archive') onSetArchived?.(session.id, !session.archived);
+                        }}
+                      >
+                        {onRenameSession ? (
+                          <MenuItem value="rename" disabled={actionsDisabled}>
+                            {t('conversation.sessionActions.rename', 'Rename')}
+                          </MenuItem>
+                        ) : null}
+                        {onSetPinned ? (
+                          <MenuItem value="pin" disabled={actionsDisabled}>
+                            {session.pinned
+                              ? t('conversation.sessionActions.unpin', 'Unpin')
+                              : t('conversation.sessionActions.pin', 'Pin')}
+                          </MenuItem>
+                        ) : null}
+                        {onSetArchived ? (
+                          <MenuItem value="archive" disabled={actionsDisabled}>
+                            {session.archived
+                              ? t('conversation.sessionActions.unarchive', 'Unarchive')
+                              : t('conversation.sessionActions.archive', 'Archive')}
+                          </MenuItem>
+                        ) : null}
+                      </MenuContent>
+                    </MenuRoot>
                   ) : null}
-                </span>
-              </SidebarItem>
-            ))}
+                </div>
+              );
+            })}
+            {actionsError ? (
+              <div role="alert" className="px-2 py-1 text-[11px] text-danger-foreground">
+                {actionsError}
+              </div>
+            ) : null}
             {truncated && (
               <div className="px-2 py-1 text-[11px] italic text-foreground-muted">
                 {t('sidebar.sessionsTruncated', 'Showing latest 100 sessions (truncated)')}

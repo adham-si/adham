@@ -22,6 +22,7 @@ import type {
   ResetPreferencesResponse,
   SelectProjectPayload,
   SessionList,
+  SessionMetadata,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -45,6 +46,7 @@ import {
   RebuildProjectionsResponseSchema,
   ResetPreferencesResponseSchema,
   SessionListSchema,
+  SessionMetadataSchema,
   SessionSummarySchema,
   StorageStatusSchema,
   SubmittedMessageSchema,
@@ -72,6 +74,7 @@ export type {
   RecordPendingOperationPayload,
   ResetPreferencesResponse,
   SessionList,
+  SessionMetadata,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -127,6 +130,27 @@ export interface AdhamClient {
     includeArchived?: boolean;
     activeSessionId?: string | null;
   }): Promise<SessionList>;
+  renameSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
+  setSessionPinned(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    pinned: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
+  setSessionArchived(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    archived: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
   submitMessage(
     workspaceId: string,
     projectId: string,
@@ -304,6 +328,60 @@ export class AdhamApiClientBase implements AdhamClient {
       },
     });
     return SessionListSchema.parse(result);
+  }
+
+  async renameSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { title },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('rename_session', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async setSessionPinned(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    pinned: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { pinned },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('set_session_pinned', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async setSessionArchived(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    archived: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { archived },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('set_session_archived', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
   }
 
   async submitMessage(

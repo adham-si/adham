@@ -26,3 +26,24 @@ pub struct ListSessionsOptions {
     #[ts(optional = nullable)]
     pub active_session_id: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RenameSessionPayload {
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetSessionPinnedPayload {
+    pub pinned: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetSessionArchivedPayload {
+    pub archived: bool,
+}

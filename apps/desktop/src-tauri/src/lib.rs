@@ -6,13 +6,14 @@ use adham_desktop_api::{
     DisconnectGoogleAccountPayload, DisconnectOllamaAccountPayload, DiscoverOllamaModelsPayload,
     ErrorEnvelope, GetPreferencesResponse, GoogleAccountDisconnected, IngestAttachmentPathPayload,
     IngestAttachmentPayload, ListProviderAccountsResponse, ListProviderModelsPayload,
-    ListProviderModelsResponse, MarkCompletionInterruptedPayload,
+    ListProviderModelsResponse, ListSessionsOptions, MarkCompletionInterruptedPayload,
     MarkCompletionInterruptedResponse, OllamaAccountDisconnected, PendingOperationDto,
     PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
     ProviderHealthResponse, ProviderModelsList, ReadAttachmentPayload, RebuildProjectionsResponse,
-    RecordPendingOperationPayload, ResetPreferencesResponse, RetryCompletionPayload,
-    SelectProjectPayload, SessionList, SessionSummary, SetActiveAlternativePayload,
-    SetAnswerFeedbackPayload, StopCompletionPayload, StopCompletionResponse, StorageStatus,
+    RecordPendingOperationPayload, RenameSessionPayload, ResetPreferencesResponse,
+    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionMetadata, SessionSummary,
+    SetActiveAlternativePayload, SetAnswerFeedbackPayload, SetSessionArchivedPayload,
+    SetSessionPinnedPayload, StopCompletionPayload, StopCompletionResponse, StorageStatus,
     StreamEventDto, SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
     UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
     WorkspaceList, WorkspaceSummary,
@@ -118,6 +119,36 @@ async fn list_sessions(
     options: Option<ListSessionsOptions>,
 ) -> Result<SessionList, ErrorEnvelope> {
     adham_desktop_api::handle_list_sessions(&state, context, options)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn rename_session(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<RenameSessionPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_rename_session(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_session_pinned(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SetSessionPinnedPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_session_pinned(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_session_archived(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SetSessionArchivedPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_session_archived(&state, request)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -468,6 +499,9 @@ pub fn run() {
             select_project,
             create_session,
             list_sessions,
+            rename_session,
+            set_session_pinned,
+            set_session_archived,
             submit_message,
             ingest_attachment,
             ingest_attachment_path,

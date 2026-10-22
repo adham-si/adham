@@ -93,7 +93,22 @@
       "retryAction": "重试"
     },
     "alternativeUpdateFailed": "无法切换当前备选分支。",
-    "feedbackUpdateFailed": "无法保存你的反馈。"
+    "feedbackUpdateFailed": "无法保存你的反馈。",
+    "sessionActions": {
+      "label": "会话操作",
+      "rename": "重命名",
+      "pin": "固定",
+      "unpin": "取消固定",
+      "archive": "归档",
+      "unarchive": "取消归档",
+      "detailsTitle": "会话详情",
+      "renameDescription": "重命名此会话。新标题将保存在本地。",
+      "titleLabel": "标题",
+      "save": "保存",
+      "cancel": "取消",
+      "saving": "正在保存…",
+      "titleRequired": "请输入标题。"
+    }
   },
   "provision": {
     "workspaceTitle": "创建工作区",

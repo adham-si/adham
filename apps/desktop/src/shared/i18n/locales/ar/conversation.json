@@ -93,7 +93,22 @@
       "retryAction": "إعادة المحاولة"
     },
     "alternativeUpdateFailed": "تعذر تبديل البديل النشط.",
-    "feedbackUpdateFailed": "تعذّر حفظ تقييمك."
+    "feedbackUpdateFailed": "تعذّر حفظ تقييمك.",
+    "sessionActions": {
+      "label": "إجراءات الجلسة",
+      "rename": "إعادة تسمية",
+      "pin": "تثبيت",
+      "unpin": "إلغاء التثبيت",
+      "archive": "أرشفة",
+      "unarchive": "إلغاء الأرشفة",
+      "detailsTitle": "تفاصيل الجلسة",
+      "renameDescription": "أعد تسمية هذه الجلسة. يُحفظ العنوان الجديد محليًا.",
+      "titleLabel": "العنوان",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "saving": "جارٍ الحفظ…",
+      "titleRequired": "أدخل عنوانًا."
+    }
   },
   "provision": {
     "refreshFailed": "تم حفظ التغيير. تعذّرت إعادة التحميل.",

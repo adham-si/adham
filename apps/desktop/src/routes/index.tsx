@@ -9,6 +9,8 @@ import {
 } from '@/features/workspace-selection';
 import { useOnboarding, OnboardingJourney } from '@/features/onboarding';
 import { SettingsPage } from '@/pages/settings';
+import { SessionDetailsDialog } from '@/features/history/session-details-dialog';
+import { useSessionActions } from '@/features/history/use-session-actions';
 import { useAppPreferences } from '@/shared/settings/use-app-preferences';
 
 export const Route = createFileRoute('/')({
@@ -71,6 +73,11 @@ function AppBody() {
     workspaceId: sel.activeWorkspaceId,
     projectId: sel.activeProjectId,
   });
+  const sessionActions = useSessionActions({
+    workspaceId: sel.activeWorkspaceId,
+    projectId: sel.activeProjectId,
+    onChanged: refreshSessions,
+  });
 
   const selectionMenu = (
     <WorkspaceSelection
@@ -108,6 +115,12 @@ function AppBody() {
             creatingSession: sessionsCreating,
             onSelectSession: selectSession,
             onNewSession: () => void newSession(),
+            onRenameSession: sessionActions.openRename,
+            onSetPinned: (sessionId, pinned) => void sessionActions.setPinned(sessionId, pinned),
+            onSetArchived: (sessionId, archived) =>
+              void sessionActions.setArchived(sessionId, archived),
+            actionsDisabled: sessionActions.busyId !== null,
+            actionsError: sessionActions.error,
           }}
         />
       }
@@ -120,6 +133,14 @@ function AppBody() {
             target={provisionTarget}
             onClose={closeProvision}
             onSuccess={handleProvisionSuccess}
+          />
+          <SessionDetailsDialog
+            open={sessionActions.renameTarget !== null}
+            initialTitle={sessionActions.renameTarget?.title ?? ''}
+            busy={sessionActions.busyId !== null}
+            error={sessionActions.error}
+            onClose={sessionActions.cancelRename}
+            onSave={sessionActions.saveRename}
           />
         </>
       }

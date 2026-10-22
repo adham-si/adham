@@ -65,6 +65,12 @@ export type CreateSessionPayload = { title: string | null, };
 
 export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, summary?: string | null, summaryOrigin?: string | null, summaryUnavailable: boolean, pinned: boolean, archived: boolean, lastActivityAt: string, };
 
+export type RenameSessionPayload = { title: string, };
+
+export type SetSessionPinnedPayload = { pinned: boolean, };
+
+export type SetSessionArchivedPayload = { archived: boolean, };
+
 export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, unreadableSummaries: number, };
 
 export type SessionMetadata = { sessionId: string, projectId: string, title: string | null, summaryOrigin: string | null, pinned: boolean, archived: boolean, createdAt: string, lastActivityAt: string, };

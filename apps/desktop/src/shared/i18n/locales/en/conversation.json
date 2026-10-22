@@ -93,7 +93,22 @@
       "retryAction": "Retry"
     },
     "alternativeUpdateFailed": "Could not switch the active alternative.",
-    "feedbackUpdateFailed": "Could not save your feedback."
+    "feedbackUpdateFailed": "Could not save your feedback.",
+    "sessionActions": {
+      "label": "Session actions",
+      "rename": "Rename",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "detailsTitle": "Session details",
+      "renameDescription": "Rename this session. The new title is saved locally.",
+      "titleLabel": "Title",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "titleRequired": "Enter a title."
+    }
   },
   "provision": {
     "workspaceTitle": "Create your workspace",

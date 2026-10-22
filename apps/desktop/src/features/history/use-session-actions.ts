@@ -1,0 +1,117 @@
+import * as React from 'react';
+import { adhamClient } from '@/shared/api/adham-client';
+import type { SessionMetadata } from '@adham/contracts-generated';
+import { rejectionMessage } from '@/shared/api/error-envelope';
+
+export interface SessionActionTarget {
+  id: string;
+  title: string;
+}
+
+export interface SessionActionsBackend {
+  renameSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string,
+  ): Promise<SessionMetadata>;
+  setSessionPinned(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    pinned: boolean,
+  ): Promise<SessionMetadata>;
+  setSessionArchived(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    archived: boolean,
+  ): Promise<SessionMetadata>;
+}
+
+export interface UseSessionActionsOptions {
+  workspaceId: string | null;
+  projectId: string | null;
+  onChanged: () => void | Promise<void>;
+  backend?: SessionActionsBackend;
+}
+
+export function useSessionActions({
+  workspaceId,
+  projectId,
+  onChanged,
+  backend = adhamClient,
+}: UseSessionActionsOptions) {
+  const [busyId, setBusyId] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [renameTarget, setRenameTarget] = React.useState<SessionActionTarget | null>(null);
+
+  const run = React.useCallback(
+    async (sessionId: string, action: () => Promise<SessionMetadata>) => {
+      if (!workspaceId || !projectId) return;
+      setBusyId(sessionId);
+      setError(null);
+      try {
+        await action();
+        await onChanged();
+      } catch (err) {
+        setError(rejectionMessage(err));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [workspaceId, projectId, onChanged],
+  );
+
+  const openRename = React.useCallback((target: SessionActionTarget) => {
+    setError(null);
+    setRenameTarget(target);
+  }, []);
+
+  const cancelRename = React.useCallback(() => {
+    setRenameTarget(null);
+  }, []);
+
+  const saveRename = React.useCallback(
+    async (title: string) => {
+      if (!renameTarget || !workspaceId || !projectId) return;
+      setBusyId(renameTarget.id);
+      setError(null);
+      try {
+        await backend.renameSession(workspaceId, projectId, renameTarget.id, title.trim());
+        await onChanged();
+        setRenameTarget(null);
+      } catch (err) {
+        setError(rejectionMessage(err));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [backend, onChanged, projectId, renameTarget, workspaceId],
+  );
+
+  const setPinned = React.useCallback(
+    (sessionId: string, pinned: boolean) =>
+      run(sessionId, () => backend.setSessionPinned(workspaceId!, projectId!, sessionId, pinned)),
+    [backend, projectId, run, workspaceId],
+  );
+
+  const setArchived = React.useCallback(
+    (sessionId: string, archived: boolean) =>
+      run(sessionId, () =>
+        backend.setSessionArchived(workspaceId!, projectId!, sessionId, archived),
+      ),
+    [backend, projectId, run, workspaceId],
+  );
+
+  return {
+    busyId,
+    error,
+    renameTarget,
+    openRename,
+    cancelRename,
+    saveRename,
+    setPinned,
+    setArchived,
+  };
+}
