@@ -165,7 +165,21 @@ pub(crate) async fn load_all_history_rows(
     let proj_id = ProjectId::from_string(project_id)
         .map_err(|_| "VALIDATION_FAILED: project_id must be UUID".to_string())?;
     let mut tx = ctx.pool.begin().await.map_err(storage_unavailable)?;
-    let (rows, activity) = read_fold_and_activity_tx(&mut tx, &proj_id).await?;
+    let provider = CachedContentKeyProvider::new(std::sync::Arc::clone(&ctx.content_key));
+    let rows = load_all_history_rows_tx(&mut tx, &provider, &ctx.installation_id, &proj_id).await?;
+    tx.commit().await.map_err(storage_unavailable)?;
+    Ok(rows)
+}
+
+/// Fold all sessions and hydrate their summaries inside an existing read
+/// transaction, so search can reuse one cached content key.
+pub(crate) async fn load_all_history_rows_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    provider: &dyn ContentKeyProvider,
+    installation_id: &InstallationId,
+    project_id: &ProjectId,
+) -> Result<(Vec<HistoryRow>, u32), String> {
+    let (rows, activity) = read_fold_and_activity_tx(tx, project_id).await?;
     let mut rows: Vec<HistoryRow> = rows
         .into_iter()
         .map(|mut row| {
@@ -176,10 +190,7 @@ pub(crate) async fn load_all_history_rows(
             row
         })
         .collect();
-    let provider = CachedContentKeyProvider::new(std::sync::Arc::clone(&ctx.content_key));
-    let unreadable =
-        hydrate_summaries_tx(&mut tx, &provider, &ctx.installation_id, &mut rows).await?;
-    tx.commit().await.map_err(storage_unavailable)?;
+    let unreadable = hydrate_summaries_tx(tx, provider, installation_id, &mut rows).await?;
     Ok((rows, unreadable))
 }
 
@@ -503,7 +514,7 @@ async fn load_message_parts_tx(
     Ok(parts)
 }
 
-async fn read_text_tx(
+pub(crate) async fn read_text_tx(
     tx: &mut Transaction<'_, Sqlite>,
     provider: &dyn ContentKeyProvider,
     content_id: &ContentId,

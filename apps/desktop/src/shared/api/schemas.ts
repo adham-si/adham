@@ -343,3 +343,24 @@ export const DeleteSessionResponseSchema = z.object({
   sessionId: z.string(),
   deleted: z.boolean(),
 });
+
+export const SessionSearchResultSchema = z.object({
+  sessionId: z.string(),
+  title: z.string().nullable(),
+  summary: z.string().nullable(),
+  summaryOrigin: z.string().nullable(),
+  lastActivityAt: z.string(),
+  matchKind: z.string(),
+  messageId: z.string().nullable(),
+  role: z.string().nullable(),
+  snippet: z.string().nullable(),
+  attachmentName: z.string().nullable(),
+});
+
+export const SessionSearchResponseSchema = z.object({
+  results: z.array(SessionSearchResultSchema),
+  truncated: z.boolean(),
+  scannedSessions: z.number().int(),
+  scanLimitReached: z.boolean(),
+  skippedUnreadable: z.number().int(),
+});

@@ -89,6 +89,14 @@ export type SetMessageBookmarkPayload = { messageId: string, bookmarked: boolean
 
 export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, unreadableSummaries: number, };
 
+export type SessionSearchFilters = { includeArchived: boolean, pinnedOnly: boolean, bookmarkedOnly: boolean, role: string | null, hasAttachments: boolean, from: string | null, to: string | null, };
+
+export type SessionSearchRequest = { query: string, filters: SessionSearchFilters, };
+
+export type SessionSearchResult = { sessionId: string, title: string | null, summary: string | null, summaryOrigin: string | null, lastActivityAt: string, matchKind: string, messageId: string | null, role: string | null, snippet: string | null, attachmentName: string | null, };
+
+export type SessionSearchResponse = { results: Array<SessionSearchResult>, truncated: boolean, scannedSessions: number, scanLimitReached: boolean, skippedUnreadable: number, };
+
 export type SessionMetadata = { sessionId: string, projectId: string, title: string | null, summaryOrigin: string | null, pinned: boolean, archived: boolean, createdAt: string, lastActivityAt: string, };
 
 export type ListSessionsOptions = { includeArchived: boolean, activeSessionId?: string | null, };

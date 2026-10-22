@@ -2,7 +2,8 @@ use super::ApiContext;
 use crate::dtos::{
     CommandContext, CommandEnvelope, CommandResult, DeleteSessionPayload, DeleteSessionResponse,
     DuplicateSessionPayload, ExportSessionResponse, RenameSessionPayload, SessionMetadata,
-    SetSessionArchivedPayload, SetSessionPinnedPayload, SetSessionSummaryPayload,
+    SessionSearchRequest, SessionSearchResponse, SetSessionArchivedPayload,
+    SetSessionPinnedPayload, SetSessionSummaryPayload,
 };
 
 pub async fn handle_rename_session(
@@ -38,6 +39,14 @@ pub async fn handle_duplicate_session(
     env: CommandEnvelope<DuplicateSessionPayload>,
 ) -> Result<CommandResult<SessionMetadata>, String> {
     crate::service::duplicate_session(ctx, env).await
+}
+
+pub async fn handle_search_history(
+    ctx: &ApiContext,
+    context: CommandContext,
+    request: SessionSearchRequest,
+) -> Result<SessionSearchResponse, String> {
+    crate::service::search_history(ctx, &context, request).await
 }
 
 pub async fn handle_delete_session(

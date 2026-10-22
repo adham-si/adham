@@ -12,13 +12,13 @@ use adham_desktop_api::{
     PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
     ProviderHealthResponse, ProviderModelsList, ReadAttachmentPayload, RebuildProjectionsResponse,
     RecordPendingOperationPayload, RenameSessionPayload, ResetPreferencesResponse,
-    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionMetadata, SessionSummary,
-    SetActiveAlternativePayload, SetAnswerFeedbackPayload, SetMessageBookmarkPayload,
-    SetSessionArchivedPayload, SetSessionPinnedPayload, SetSessionSummaryPayload,
-    StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
-    SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
-    WorkspaceList, WorkspaceSummary,
+    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionMetadata,
+    SessionSearchRequest, SessionSearchResponse, SessionSummary, SetActiveAlternativePayload,
+    SetAnswerFeedbackPayload, SetMessageBookmarkPayload, SetSessionArchivedPayload,
+    SetSessionPinnedPayload, SetSessionSummaryPayload, StopCompletionPayload,
+    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
+    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
+    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -373,6 +373,17 @@ async fn export_session_markdown(
 }
 
 #[tauri::command]
+async fn search_history(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+    request: SessionSearchRequest,
+) -> Result<SessionSearchResponse, ErrorEnvelope> {
+    adham_desktop_api::handle_search_history(&state, context, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn duplicate_session(
     state: tauri::State<'_, ApiContext>,
     request: CommandEnvelope<DuplicateSessionPayload>,
@@ -559,6 +570,7 @@ pub fn run() {
             duplicate_session,
             delete_session,
             export_session_markdown,
+            search_history,
             submit_message,
             ingest_attachment,
             ingest_attachment_path,

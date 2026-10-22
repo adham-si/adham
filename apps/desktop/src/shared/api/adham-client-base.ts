@@ -12,6 +12,8 @@ import type {
   ConversationPage,
   DeleteSessionResponse,
   GetPreferencesResponse,
+  SessionSearchRequest,
+  SessionSearchResponse,
   PendingOperationDto,
   PendingOperationList,
   PlatformInfo,
@@ -41,6 +43,7 @@ import {
   ConversationPageSchema,
   DeleteSessionResponseSchema,
   GetPreferencesResponseSchema,
+  SessionSearchResponseSchema,
   PendingOperationDtoSchema,
   PendingOperationListSchema,
   PlatformInfoSchema,
@@ -70,6 +73,8 @@ export type {
   ConversationPage,
   DeleteSessionResponse,
   GetPreferencesResponse,
+  SessionSearchRequest,
+  SessionSearchResponse,
   PendingOperationDto,
   PendingOperationList,
   PlatformInfo,
@@ -442,6 +447,18 @@ export class AdhamApiClientBase implements AdhamClient {
       request: envelope,
     });
     return SessionMetadataSchema.parse(result.data);
+  }
+
+  async searchHistory(
+    workspaceId: string,
+    projectId: string,
+    request: SessionSearchRequest,
+  ): Promise<SessionSearchResponse> {
+    const result = await invoke<SessionSearchResponse>('search_history', {
+      context: { workspaceId, projectId },
+      request,
+    });
+    return SessionSearchResponseSchema.parse(result);
   }
 
   async deleteSession(
