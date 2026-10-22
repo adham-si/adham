@@ -4,7 +4,9 @@
 //! stays the semantic authority.
 
 use std::process::Child;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
+#[cfg(target_os = "macos")]
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 /// Ad-hoc trace for the harness; prints only when `ISLAND_TRACE` is set.
