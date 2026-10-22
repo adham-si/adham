@@ -162,7 +162,10 @@ export const ConversationPageSchema = z.object({
   projectionPosition: z.string(),
   branchSelections: z.array(BranchSelectionSchema),
   feedback: z.array(AnswerFeedbackSchema),
+  bookmarkedMessageIds: z.array(z.string()).default([]),
 });
+
+export const BookmarkedMessageIdsSchema = z.array(z.string());
 
 export const StorageStatusSchema = z.object({
   status: z.string(),

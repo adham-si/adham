@@ -441,6 +441,7 @@ export function ConversationPanel({
         turnAction,
         busy,
         feedbackByAnswer,
+        bookmarkedMessageIds: conv.bookmarkedMessageIds,
         readAttachmentText: backend.readAttachmentText ? readAttachmentText : undefined,
         onRegenerate: handleTurnAction,
         setActionNotice,

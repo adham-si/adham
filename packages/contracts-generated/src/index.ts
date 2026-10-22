@@ -71,6 +71,8 @@ export type SetSessionPinnedPayload = { pinned: boolean, };
 
 export type SetSessionArchivedPayload = { archived: boolean, };
 
+export type SetMessageBookmarkPayload = { messageId: string, bookmarked: boolean, };
+
 export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, unreadableSummaries: number, };
 
 export type SessionMetadata = { sessionId: string, projectId: string, title: string | null, summaryOrigin: string | null, pinned: boolean, archived: boolean, createdAt: string, lastActivityAt: string, };
@@ -111,7 +113,11 @@ branchSelections: Array<BranchSelectionDto>,
  * Local like/dislike verdicts for this session's answers, so a card shows
  * its stored verdict without a second round trip.
  */
-feedback: Array<AnswerFeedbackDto>, };
+feedback: Array<AnswerFeedbackDto>, 
+/**
+ * Persisted message ids the user bookmarked in this session.
+ */
+bookmarkedMessageIds: Array<string>, };
 
 export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, 
 /**

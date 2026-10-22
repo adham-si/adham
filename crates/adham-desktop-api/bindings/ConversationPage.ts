@@ -13,4 +13,8 @@ branchSelections: Array<BranchSelectionDto>,
  * Local like/dislike verdicts for this session's answers, so a card shows
  * its stored verdict without a second round trip.
  */
-feedback: Array<AnswerFeedbackDto>, };
+feedback: Array<AnswerFeedbackDto>, 
+/**
+ * Persisted message ids the user bookmarked in this session.
+ */
+bookmarkedMessageIds: Array<string>, };

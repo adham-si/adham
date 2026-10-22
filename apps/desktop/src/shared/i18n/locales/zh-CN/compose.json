@@ -77,7 +77,9 @@
       "feedbackTitle": "回答反馈",
       "feedbackLocalNote": "仅保存在此设备上，不会发送给模型。",
       "feedbackSave": "保存",
-      "moreActions": "更多操作"
+      "moreActions": "更多操作",
+      "bookmarkMessage": "为消息添加书签",
+      "removeBookmark": "移除书签"
     },
     "noModelAvailable": "暂无可用模型",
     "modelSetupHint": "请在“设置 → AI 服务商”中配置模型"

@@ -108,7 +108,9 @@
       "cancel": "Отмена",
       "saving": "Сохранение…",
       "titleRequired": "Введите название."
-    }
+    },
+    "bookmarkUnavailable": "Закладки недоступны в этой сборке.",
+    "bookmarkUpdateFailed": "Не удалось обновить закладку."
   },
   "provision": {
     "workspaceTitle": "Создайте рабочее пространство",

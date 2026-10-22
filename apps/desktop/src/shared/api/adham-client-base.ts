@@ -33,6 +33,7 @@ import type {
 import { invoke } from '@tauri-apps/api/core';
 import {
   AnswerFeedbackListSchema,
+  BookmarkedMessageIdsSchema,
   AttachmentDtoSchema,
   BootstrapStateSchema,
   BranchSelectionListSchema,
@@ -516,6 +517,27 @@ export class AdhamApiClientBase implements AdhamClient {
       },
     });
     return AnswerFeedbackListSchema.parse(raw);
+  }
+
+  async setMessageBookmark(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    bookmarked: boolean,
+  ): Promise<string[]> {
+    const raw = await invoke('set_message_bookmark', {
+      context: {
+        workspaceId,
+        projectId,
+        sessionId,
+      },
+      payload: {
+        messageId,
+        bookmarked,
+      },
+    });
+    return BookmarkedMessageIdsSchema.parse(raw);
   }
 
   async getStorageStatus(): Promise<StorageStatus> {

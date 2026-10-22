@@ -12,11 +12,11 @@ use adham_desktop_api::{
     ProviderHealthResponse, ProviderModelsList, ReadAttachmentPayload, RebuildProjectionsResponse,
     RecordPendingOperationPayload, RenameSessionPayload, ResetPreferencesResponse,
     RetryCompletionPayload, SelectProjectPayload, SessionList, SessionMetadata, SessionSummary,
-    SetActiveAlternativePayload, SetAnswerFeedbackPayload, SetSessionArchivedPayload,
-    SetSessionPinnedPayload, StopCompletionPayload, StopCompletionResponse, StorageStatus,
-    StreamEventDto, SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
-    WorkspaceList, WorkspaceSummary,
+    SetActiveAlternativePayload, SetAnswerFeedbackPayload, SetMessageBookmarkPayload,
+    SetSessionArchivedPayload, SetSessionPinnedPayload, StopCompletionPayload,
+    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
+    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
+    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -361,6 +361,17 @@ async fn mark_completion_interrupted(
 }
 
 #[tauri::command]
+async fn set_message_bookmark(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+    payload: SetMessageBookmarkPayload,
+) -> Result<Vec<String>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_message_bookmark(&state, context, payload)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn admin_rebuild_projections(
     state: tauri::State<'_, ApiContext>,
 ) -> Result<RebuildProjectionsResponse, ErrorEnvelope> {
@@ -509,6 +520,7 @@ pub fn run() {
             get_conversation,
             set_active_alternative,
             set_answer_feedback,
+            set_message_bookmark,
             admin_rebuild_projections,
             record_pending_operation,
             list_pending_operations,

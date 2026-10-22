@@ -11,7 +11,8 @@ pub mod session;
 pub mod workspace;
 
 pub use history::{
-    CachedContentKeyProvider, rename_session, set_session_archived, set_session_pinned,
+    CachedContentKeyProvider, read_bookmarked_message_ids, rename_session, set_message_bookmark,
+    set_session_archived, set_session_pinned,
 };
 pub use message::submit_message as submit_message_atomic;
 pub use pending::{clear_pending_operation, list_pending_operations, record_pending_operation};

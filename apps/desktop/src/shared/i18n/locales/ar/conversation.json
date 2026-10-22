@@ -108,7 +108,9 @@
       "cancel": "إلغاء",
       "saving": "جارٍ الحفظ…",
       "titleRequired": "أدخل عنوانًا."
-    }
+    },
+    "bookmarkUnavailable": "الإشارات المرجعية غير متاحة في هذا الإصدار.",
+    "bookmarkUpdateFailed": "تعذّر تحديث الإشارة المرجعية."
   },
   "provision": {
     "refreshFailed": "تم حفظ التغيير. تعذّرت إعادة التحميل.",

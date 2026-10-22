@@ -108,7 +108,9 @@
       "cancel": "Cancel",
       "saving": "Saving…",
       "titleRequired": "Enter a title."
-    }
+    },
+    "bookmarkUnavailable": "Bookmarks are unavailable in this build.",
+    "bookmarkUpdateFailed": "Could not update the bookmark."
   },
   "provision": {
     "workspaceTitle": "Create your workspace",

@@ -89,6 +89,10 @@ export interface MessageCardProps
    *  removes the stored feedback. Only settled, persisted assistant rows get
    *  this: a provisional or streaming bubble offers nothing to rate. */
   onFeedback?: ((verdict: 'like' | 'dislike' | null, reason: string | null) => void) | undefined;
+  /** True when this persisted message has a stored bookmark. */
+  bookmarked?: boolean | undefined;
+  /** When set, the card offers a bookmark star. Only persisted rows get one. */
+  onToggleBookmark?: (() => void) | undefined;
   ref?: React.Ref<HTMLElement>;
 }
 
@@ -127,6 +131,8 @@ export function MessageCard({
   branch,
   feedback,
   onFeedback,
+  bookmarked,
+  onToggleBookmark,
   className,
   ref,
   ...props
@@ -211,6 +217,8 @@ export function MessageCard({
         regenerateDisabled={regenerateDisabled}
         feedback={feedback}
         onFeedback={onFeedback}
+        bookmarked={bookmarked}
+        onToggleBookmark={onToggleBookmark}
         menu={menu}
       />
     </article>

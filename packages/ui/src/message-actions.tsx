@@ -16,6 +16,7 @@ export interface MessageActionIcons {
   like?: React.ReactNode;
   dislike?: React.ReactNode;
   more?: React.ReactNode;
+  bookmark?: React.ReactNode;
 }
 
 /** One-time actions: Edit sits in the row beside Copy; Reply and the branch
@@ -37,6 +38,10 @@ export interface MessageActionsProps {
   regenerateDisabled?: boolean | undefined;
   feedback?: { verdict: 'like' | 'dislike'; reason: string | null } | undefined;
   onFeedback?: ((verdict: 'like' | 'dislike' | null, reason: string | null) => void) | undefined;
+  /** True when the persisted message has a stored bookmark. */
+  bookmarked?: boolean | undefined;
+  /** When set, the card offers a bookmark star for this persisted message. */
+  onToggleBookmark?: (() => void) | undefined;
   menu?: MessageActionMenu | undefined;
 }
 
@@ -56,6 +61,8 @@ export function MessageActions({
   regenerateDisabled,
   feedback,
   onFeedback,
+  bookmarked,
+  onToggleBookmark,
   menu,
 }: MessageActionsProps) {
   const hasMenu = menu !== undefined && (menu.reply !== undefined || menu.makeActive !== undefined);
@@ -65,6 +72,7 @@ export function MessageActions({
     menu?.edit === undefined &&
     regenerate === undefined &&
     onFeedback === undefined &&
+    onToggleBookmark === undefined &&
     !hasMenu
   ) {
     return null;
@@ -82,6 +90,14 @@ export function MessageActions({
       <div className="flex flex-wrap items-center justify-end gap-1 text-foreground-secondary">
         {copyText.length > 0 && (
           <ActionControl label={resolved.copyMessage} icon={icons?.copy} onClick={onCopy} />
+        )}
+        {onToggleBookmark !== undefined && (
+          <ActionControl
+            label={bookmarked === true ? resolved.removeBookmark : resolved.bookmarkMessage}
+            icon={icons?.bookmark}
+            pressed={bookmarked === true}
+            onClick={onToggleBookmark}
+          />
         )}
         {menu?.edit !== undefined && (
           <ActionControl label={resolved.editAction} icon={icons?.edit} onClick={menu.edit} />

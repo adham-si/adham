@@ -224,6 +224,14 @@ pub struct SetActiveAlternativePayload {
     pub active_message_id: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetMessageBookmarkPayload {
+    pub message_id: String,
+    pub bookmarked: bool,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export)]
@@ -295,6 +303,9 @@ pub struct ConversationPage {
     /// Local like/dislike verdicts for this session's answers, so a card shows
     /// its stored verdict without a second round trip.
     pub feedback: Vec<AnswerFeedbackDto>,
+    /// Persisted message ids the user bookmarked in this session.
+    #[serde(default)]
+    pub bookmarked_message_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

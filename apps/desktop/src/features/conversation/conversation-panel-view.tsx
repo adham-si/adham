@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   ArrowDownToLineIcon,
+  Bookmark01Icon,
   BotMessageSquareIcon,
   CopyIcon,
   MoreVerticalIcon,
@@ -54,6 +55,7 @@ const MESSAGE_ICONS: MessageActionIcons = {
   // Mirrored so the thumb faces the same way as the like glyph.
   dislike: <HugeiconsIcon icon={ThumbsDownIcon} className="size-4 -scale-x-100" />,
   more: <HugeiconsIcon icon={MoreVerticalIcon} className="size-4" />,
+  bookmark: <HugeiconsIcon icon={Bookmark01Icon} className="size-4" />,
 };
 
 function formatTimestamp(createdAt: string): string {
@@ -100,6 +102,7 @@ export interface ConversationPanelViewProps {
     turnAction: TurnAction | null;
     busy: boolean;
     feedbackByAnswer: Map<string, AnswerFeedback>;
+    bookmarkedMessageIds: string[];
     readAttachmentText?: ((attachmentId: string) => Promise<AttachmentDto>) | undefined;
     onRegenerate: () => void;
     setActionNotice: (notice: string | null) => void;
@@ -177,6 +180,8 @@ export function ConversationPanelView({
       feedbackSave: t('compose.markdown.feedbackSave'),
       regenerateAction: t('conversation.regenerateAnswer'),
       moreActions: t('compose.markdown.moreActions'),
+      bookmarkMessage: t('compose.markdown.bookmarkMessage'),
+      removeBookmark: t('compose.markdown.removeBookmark'),
     }),
     [t],
   );
@@ -193,6 +198,7 @@ export function ConversationPanelView({
     turnAction,
     busy,
     feedbackByAnswer,
+    bookmarkedMessageIds,
     readAttachmentText,
     onRegenerate: handleTurnAction,
     setActionNotice,
@@ -200,6 +206,7 @@ export function ConversationPanelView({
     draftRef,
     setDraft,
   } = messages;
+  const bookmarkedIds = React.useMemo(() => new Set(bookmarkedMessageIds), [bookmarkedMessageIds]);
   const {
     draft,
     onSubmit: handleSubmit,
@@ -291,6 +298,17 @@ export function ConversationPanelView({
                       : markdownLabels
                   }
                   timestamp={formatTimestamp(m.createdAt)}
+                  data-message-id={m.provisional ? undefined : m.id}
+                  bookmarked={bookmarkedIds.has(m.id)}
+                  onToggleBookmark={
+                    m.provisional
+                      ? undefined
+                      : () => {
+                          void conv
+                            .setMessageBookmark(m.id, !bookmarkedIds.has(m.id))
+                            .then((outcome) => setActionNotice(outcome.ok ? null : outcome.error));
+                        }
+                  }
                   onRegenerate={canRegenerate ? handleTurnAction : undefined}
                   regenerateDisabled={busy}
                   branch={

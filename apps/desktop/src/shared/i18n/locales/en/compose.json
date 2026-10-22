@@ -78,7 +78,9 @@
       "feedbackTitle": "Answer feedback",
       "feedbackLocalNote": "Stored on this device with this answer — never sent to the model.",
       "feedbackSave": "Save",
-      "moreActions": "More actions"
+      "moreActions": "More actions",
+      "bookmarkMessage": "Bookmark message",
+      "removeBookmark": "Remove bookmark"
     },
     "noModelAvailable": "No model available",
     "modelSetupHint": "Set up a model in Settings → AI Providers"

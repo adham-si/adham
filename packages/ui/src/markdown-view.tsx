@@ -43,6 +43,10 @@ export interface MarkdownLabels {
   regenerateAction: string;
   /** Accessible name of the ⋮ trigger that opens the remaining actions. */
   moreActions: string;
+  /** Action that bookmarks a persisted message. */
+  bookmarkMessage: string;
+  /** Action that removes a stored bookmark. */
+  removeBookmark: string;
 }
 
 export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
@@ -68,6 +72,8 @@ export const DEFAULT_MARKDOWN_LABELS: MarkdownLabels = {
   feedbackSave: 'Save',
   regenerateAction: 'Regenerate',
   moreActions: 'More actions',
+  bookmarkMessage: 'Bookmark message',
+  removeBookmark: 'Remove bookmark',
 };
 
 export function resolveMarkdownLabels(labels?: Partial<MarkdownLabels>): MarkdownLabels {

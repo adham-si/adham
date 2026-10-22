@@ -108,7 +108,9 @@
       "cancel": "取消",
       "saving": "正在保存…",
       "titleRequired": "请输入标题。"
-    }
+    },
+    "bookmarkUnavailable": "此版本不支持书签。",
+    "bookmarkUpdateFailed": "无法更新书签。"
   },
   "provision": {
     "workspaceTitle": "创建工作区",
