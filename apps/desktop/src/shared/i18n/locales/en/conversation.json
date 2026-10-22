@@ -107,7 +107,14 @@
       "save": "Save",
       "cancel": "Cancel",
       "saving": "Saving…",
-      "titleRequired": "Enter a title."
+      "titleRequired": "Enter a title.",
+      "detailsDescription": "Rename this session and edit the summary shown in history.",
+      "summaryLabel": "Summary",
+      "summaryAuto": "Auto summary",
+      "summaryUser": "Custom summary",
+      "summaryDescription": "Leave blank to use the auto summary.",
+      "saveSummary": "Save summary",
+      "resetToAuto": "Reset to auto"
     },
     "bookmarkUnavailable": "Bookmarks are unavailable in this build.",
     "bookmarkUpdateFailed": "Could not update the bookmark."

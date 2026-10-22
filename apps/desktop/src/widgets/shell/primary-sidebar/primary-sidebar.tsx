@@ -16,6 +16,7 @@ export interface SessionSummary {
   title: string;
   updatedAt?: string;
   summary?: string;
+  summaryOrigin?: string;
   summaryUnavailable?: boolean;
   pinned?: boolean;
   archived?: boolean;

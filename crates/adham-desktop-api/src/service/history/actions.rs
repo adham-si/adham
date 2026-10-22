@@ -14,7 +14,7 @@ use adham_event_log::{AppendEventRequest, SqliteEventStore};
 use serde::Serialize;
 use std::sync::Arc;
 
-fn parse_scope(
+pub(crate) fn parse_scope(
     context: &CommandContext,
     request_id: &str,
 ) -> Result<(WorkspaceId, ProjectId, SessionId, RequestId), String> {
@@ -44,7 +44,7 @@ fn parse_scope(
     Ok((ws_id, proj_id, sess_id, request_id))
 }
 
-fn receipt_matches(
+pub(crate) fn receipt_matches(
     receipt: &adham_event_log::CommandReceiptRecord,
     ctx: &ApiContext,
     command_type: &str,
@@ -58,7 +58,7 @@ fn receipt_matches(
         && receipt.request_fingerprint == request_fp
 }
 
-fn parse_metadata(
+pub(crate) fn parse_metadata(
     receipt: &adham_event_log::CommandReceiptRecord,
 ) -> Result<SessionMetadata, String> {
     serde_json::from_slice(&receipt.response_json)

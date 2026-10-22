@@ -1,7 +1,7 @@
 use super::ApiContext;
 use crate::dtos::{
     CommandEnvelope, CommandResult, RenameSessionPayload, SessionMetadata,
-    SetSessionArchivedPayload, SetSessionPinnedPayload,
+    SetSessionArchivedPayload, SetSessionPinnedPayload, SetSessionSummaryPayload,
 };
 
 pub async fn handle_rename_session(
@@ -23,4 +23,11 @@ pub async fn handle_set_session_archived(
     env: CommandEnvelope<SetSessionArchivedPayload>,
 ) -> Result<CommandResult<SessionMetadata>, String> {
     crate::service::set_session_archived(ctx, env).await
+}
+
+pub async fn handle_set_session_summary(
+    ctx: &ApiContext,
+    env: CommandEnvelope<SetSessionSummaryPayload>,
+) -> Result<CommandResult<SessionMetadata>, String> {
+    crate::service::set_session_summary(ctx, env).await
 }

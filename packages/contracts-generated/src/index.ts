@@ -69,6 +69,12 @@ export type RenameSessionPayload = { title: string, };
 
 export type SetSessionPinnedPayload = { pinned: boolean, };
 
+export type SetSessionSummaryPayload = { 
+/**
+ * Trimmed text replaces the auto summary; `None` or blank reverts to auto.
+ */
+summary?: string | null, };
+
 export type SetSessionArchivedPayload = { archived: boolean, };
 
 export type SetMessageBookmarkPayload = { messageId: string, bookmarked: boolean, };

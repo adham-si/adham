@@ -107,7 +107,14 @@
       "save": "Сохранить",
       "cancel": "Отмена",
       "saving": "Сохранение…",
-      "titleRequired": "Введите название."
+      "titleRequired": "Введите название.",
+      "detailsDescription": "Переименуйте сеанс и измените сводку, отображаемую в истории.",
+      "summaryLabel": "Сводка",
+      "summaryAuto": "Автосводка",
+      "summaryUser": "Своя сводка",
+      "summaryDescription": "Оставьте пустым, чтобы использовать автосводку.",
+      "saveSummary": "Сохранить сводку",
+      "resetToAuto": "Вернуть автосводку"
     },
     "bookmarkUnavailable": "Закладки недоступны в этой сборке.",
     "bookmarkUpdateFailed": "Не удалось обновить закладку."

@@ -13,10 +13,11 @@ use adham_desktop_api::{
     RecordPendingOperationPayload, RenameSessionPayload, ResetPreferencesResponse,
     RetryCompletionPayload, SelectProjectPayload, SessionList, SessionMetadata, SessionSummary,
     SetActiveAlternativePayload, SetAnswerFeedbackPayload, SetMessageBookmarkPayload,
-    SetSessionArchivedPayload, SetSessionPinnedPayload, StopCompletionPayload,
-    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
-    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
-    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
+    SetSessionArchivedPayload, SetSessionPinnedPayload, SetSessionSummaryPayload,
+    StopCompletionPayload, StopCompletionResponse, StorageStatus, StreamEventDto,
+    SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
+    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
+    WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
@@ -361,6 +362,16 @@ async fn mark_completion_interrupted(
 }
 
 #[tauri::command]
+async fn set_session_summary(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SetSessionSummaryPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_session_summary(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn set_message_bookmark(
     state: tauri::State<'_, ApiContext>,
     context: CommandContext,
@@ -513,6 +524,7 @@ pub fn run() {
             rename_session,
             set_session_pinned,
             set_session_archived,
+            set_session_summary,
             submit_message,
             ingest_attachment,
             ingest_attachment_path,

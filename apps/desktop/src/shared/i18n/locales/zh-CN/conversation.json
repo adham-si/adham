@@ -107,7 +107,14 @@
       "save": "保存",
       "cancel": "取消",
       "saving": "正在保存…",
-      "titleRequired": "请输入标题。"
+      "titleRequired": "请输入标题。",
+      "detailsDescription": "重命名此会话并编辑历史记录中显示的摘要。",
+      "summaryLabel": "摘要",
+      "summaryAuto": "自动摘要",
+      "summaryUser": "自定义摘要",
+      "summaryDescription": "留空以使用自动摘要。",
+      "saveSummary": "保存摘要",
+      "resetToAuto": "恢复自动摘要"
     },
     "bookmarkUnavailable": "此版本不支持书签。",
     "bookmarkUpdateFailed": "无法更新书签。"

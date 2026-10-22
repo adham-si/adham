@@ -54,6 +54,7 @@ describe('useSessionActions', () => {
       renameSession: vi.fn().mockResolvedValue({}),
       setSessionPinned: vi.fn().mockResolvedValue({}),
       setSessionArchived: vi.fn().mockResolvedValue({}),
+      setSessionSummary: vi.fn().mockResolvedValue({ summaryOrigin: 'user' }),
     };
     const onChanged = vi.fn();
     const { result } = renderHook(() =>
@@ -80,6 +81,18 @@ describe('useSessionActions', () => {
       await result.current.setArchived('sess-1', true);
     });
     expect(backend.setSessionArchived).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1', true);
+
+    act(() => result.current.openRename(session));
+    await act(async () => {
+      await result.current.saveSummary('Custom summary');
+    });
+    expect(backend.setSessionSummary).toHaveBeenCalledWith(
+      'ws-1',
+      'proj-1',
+      'sess-1',
+      'Custom summary',
+    );
+    expect(onChanged).toHaveBeenCalledTimes(4);
     await waitFor(() => expect(result.current.busyId).toBeNull());
   });
 });

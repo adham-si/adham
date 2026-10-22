@@ -47,3 +47,12 @@ pub struct SetSessionPinnedPayload {
 pub struct SetSessionArchivedPayload {
     pub archived: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetSessionSummaryPayload {
+    /// Trimmed text replaces the auto summary; `None` or blank reverts to auto.
+    #[ts(optional = nullable)]
+    pub summary: Option<String>,
+}

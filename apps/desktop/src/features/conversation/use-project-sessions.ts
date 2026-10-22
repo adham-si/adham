@@ -90,6 +90,7 @@ export function useProjectSessions({
         title: s.title || `Session ${s.sessionId.slice(0, 8)}`,
         updatedAt: s.lastActivityAt || s.createdAt,
         ...(s.summary ? { summary: s.summary } : {}),
+        ...(s.summaryOrigin ? { summaryOrigin: s.summaryOrigin } : {}),
         summaryUnavailable: Boolean(s.summaryUnavailable),
         pinned: Boolean(s.pinned),
         archived: Boolean(s.archived),

@@ -137,10 +137,13 @@ function AppBody() {
           <SessionDetailsDialog
             open={sessionActions.renameTarget !== null}
             initialTitle={sessionActions.renameTarget?.title ?? ''}
+            initialSummary={sessionActions.renameTarget?.summary ?? null}
+            initialSummaryOrigin={sessionActions.renameTarget?.summaryOrigin ?? null}
             busy={sessionActions.busyId !== null}
             error={sessionActions.error}
             onClose={sessionActions.cancelRename}
             onSave={sessionActions.saveRename}
+            onSaveSummary={sessionActions.saveSummary}
           />
         </>
       }

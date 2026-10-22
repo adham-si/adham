@@ -6,6 +6,8 @@ import { rejectionMessage } from '@/shared/api/error-envelope';
 export interface SessionActionTarget {
   id: string;
   title: string;
+  summary?: string | null;
+  summaryOrigin?: string | null;
 }
 
 export interface SessionActionsBackend {
@@ -26,6 +28,12 @@ export interface SessionActionsBackend {
     projectId: string,
     sessionId: string,
     archived: boolean,
+  ): Promise<SessionMetadata>;
+  setSessionSummary(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    summary: string | null,
   ): Promise<SessionMetadata>;
 }
 
@@ -90,6 +98,39 @@ export function useSessionActions({
     [backend, onChanged, projectId, renameTarget, workspaceId],
   );
 
+  const saveSummary = React.useCallback(
+    async (summary: string | null) => {
+      if (!renameTarget || !workspaceId || !projectId) return;
+      const target = renameTarget;
+      const normalized = summary?.trim() || null;
+      setBusyId(target.id);
+      setError(null);
+      try {
+        const metadata = await backend.setSessionSummary(
+          workspaceId,
+          projectId,
+          target.id,
+          normalized,
+        );
+        await onChanged();
+        setRenameTarget((current) =>
+          current && current.id === target.id
+            ? {
+                ...current,
+                summary: metadata.summaryOrigin === 'user' ? normalized : null,
+                summaryOrigin: metadata.summaryOrigin ?? null,
+              }
+            : current,
+        );
+      } catch (err) {
+        setError(rejectionMessage(err));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [backend, onChanged, projectId, renameTarget, workspaceId],
+  );
+
   const setPinned = React.useCallback(
     (sessionId: string, pinned: boolean) =>
       run(sessionId, () => backend.setSessionPinned(workspaceId!, projectId!, sessionId, pinned)),
@@ -111,6 +152,7 @@ export function useSessionActions({
     openRename,
     cancelRename,
     saveRename,
+    saveSummary,
     setPinned,
     setArchived,
   };

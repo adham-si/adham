@@ -107,7 +107,14 @@
       "save": "حفظ",
       "cancel": "إلغاء",
       "saving": "جارٍ الحفظ…",
-      "titleRequired": "أدخل عنوانًا."
+      "titleRequired": "أدخل عنوانًا.",
+      "detailsDescription": "أعد تسمية هذه الجلسة وعدّل الملخص الظاهر في السجل.",
+      "summaryLabel": "الملخص",
+      "summaryAuto": "ملخص تلقائي",
+      "summaryUser": "ملخص مخصص",
+      "summaryDescription": "اتركه فارغًا لاستخدام الملخص التلقائي.",
+      "saveSummary": "حفظ الملخص",
+      "resetToAuto": "العودة إلى التلقائي"
     },
     "bookmarkUnavailable": "الإشارات المرجعية غير متاحة في هذا الإصدار.",
     "bookmarkUpdateFailed": "تعذّر تحديث الإشارة المرجعية."
