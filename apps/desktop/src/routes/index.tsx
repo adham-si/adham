@@ -13,6 +13,7 @@ import { SessionDetailsDialog } from '@/features/history/session-details-dialog'
 import { ExportSessionDialog } from '@/features/history/export-session-dialog';
 import { DeleteSessionDialog } from '@/features/history/delete-session-dialog';
 import { useSessionActions } from '@/features/history/use-session-actions';
+import { SessionHistoryPanel } from '@/features/history/session-history-panel';
 import { useAppPreferences } from '@/shared/settings/use-app-preferences';
 
 export const Route = createFileRoute('/')({
@@ -61,11 +62,13 @@ function AppBody() {
     [sel],
   );
 
+  const [includeArchived, setIncludeArchived] = React.useState(false);
   const {
     sessions,
     activeSessionId,
     selectSession,
     newSession,
+    loading: sessionsLoading,
     creating: sessionsCreating,
     error: sessionsError,
     truncated: sessionsTruncated,
@@ -74,12 +77,18 @@ function AppBody() {
   } = useProjectSessions({
     workspaceId: sel.activeWorkspaceId,
     projectId: sel.activeProjectId,
+    includeArchived,
   });
+  const [historyRevision, setHistoryRevision] = React.useState(0);
+  const handleHistoryChanged = React.useCallback(async () => {
+    setHistoryRevision((revision) => revision + 1);
+    await refreshSessions();
+  }, [refreshSessions]);
   const sessionActions = useSessionActions({
     workspaceId: sel.activeWorkspaceId,
     projectId: sel.activeProjectId,
     activeSessionId,
-    onChanged: refreshSessions,
+    onChanged: handleHistoryChanged,
   });
 
   const selectionMenu = (
@@ -101,6 +110,32 @@ function AppBody() {
       onCreateProject={openCreateProject}
     />
   );
+  const historyPanel = (
+    <SessionHistoryPanel
+      workspaceId={sel.activeWorkspaceId}
+      projectId={sel.activeProjectId}
+      sessions={sessions}
+      activeSessionId={activeSessionId}
+      loading={sessionsLoading}
+      error={sessionsError}
+      onRetry={() => void refreshSessions()}
+      truncated={sessionsTruncated}
+      unreadableSummaries={sessionsUnreadableSummaries}
+      includeArchived={includeArchived}
+      onIncludeArchivedChange={setIncludeArchived}
+      onSelectSession={selectSession}
+      onRenameSession={sessionActions.openRename}
+      onDuplicateSession={(session) => void sessionActions.duplicate(session)}
+      onExportSession={sessionActions.openExport}
+      onDeleteSession={sessionActions.openDelete}
+      onSetPinned={(sessionId, pinned) => void sessionActions.setPinned(sessionId, pinned)}
+      onSetArchived={(sessionId, archived) => void sessionActions.setArchived(sessionId, archived)}
+      actionsDisabled={sessionActions.busyId !== null}
+      actionsError={sessionActions.error}
+      refreshToken={historyRevision}
+    />
+  );
+
   return (
     <Shell
       titlebar={<Titlebar />}
@@ -109,6 +144,7 @@ function AppBody() {
         <Sidebar
           primaryProps={{
             selectionMenu,
+            historyPanel,
             sessions,
             activeSessionId,
             error: sessionsError,

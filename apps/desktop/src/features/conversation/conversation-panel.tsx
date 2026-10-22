@@ -58,6 +58,54 @@ export function ConversationPanel({
   /** A refused branch switch or feedback save states itself; neither is an
    *  uncertain send, so it is not routed through the send-error notice. */
   const [actionNotice, setActionNotice] = React.useState<string | null>(null);
+  // Search results request a message after the session opens; hold the target
+  // until that session's timeline has rendered it.
+  const [messageFocus, setMessageFocus] = React.useState<{
+    workspaceId?: string;
+    projectId?: string;
+    sessionId: string;
+    messageId: string;
+  } | null>(null);
+  React.useEffect(() => {
+    const onFocus = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        workspaceId?: string;
+        projectId?: string;
+        sessionId?: string;
+        messageId?: string;
+      }>).detail;
+      if (!detail?.sessionId || !detail.messageId) {
+        return;
+      }
+      setMessageFocus({
+        ...(detail.workspaceId ? { workspaceId: detail.workspaceId } : {}),
+        ...(detail.projectId ? { projectId: detail.projectId } : {}),
+        sessionId: detail.sessionId,
+        messageId: detail.messageId,
+      });
+    };
+    window.addEventListener('adham:session-focus-message', onFocus);
+    return () => window.removeEventListener('adham:session-focus-message', onFocus);
+  }, []);
+  React.useEffect(() => {
+    if (!messageFocus || !conv.context) return;
+    if (
+      (messageFocus.workspaceId && conv.context.workspaceId !== messageFocus.workspaceId) ||
+      (messageFocus.projectId && conv.context.projectId !== messageFocus.projectId) ||
+      conv.sessionId !== messageFocus.sessionId
+    ) {
+      return;
+    }
+    const element = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-message-id]'),
+    ).find((node) => node.dataset.messageId === messageFocus.messageId);
+    if (!element) return;
+    setMessageFocus(null);
+    element.scrollIntoView({ block: 'center' });
+    element.classList.add('ring-2', 'ring-action');
+    window.setTimeout(() => element.classList.remove('ring-2', 'ring-action'), 1600);
+    element.focus({ preventScroll: true });
+  }, [conv.context, conv.messages, conv.sessionId, messageFocus]);
   // Feedback by answer row: the stored verdict is the only pressed state.
   const feedbackByAnswer = React.useMemo(
     () => new Map(conv.answerFeedback.map((f) => [f.messageId, f])),

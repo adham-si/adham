@@ -43,6 +43,41 @@ describe('useProjectSessions history contract', () => {
     expect(result.current.unreadableSummaries).toBe(1);
   });
 
+  it('passes includeArchived and refetches when it changes', async () => {
+    const backend = {
+      listSessions: vi.fn().mockResolvedValue({
+        projectId: 'proj-1',
+        sessions: [mockSession()],
+        truncated: false,
+      }),
+      createSession: vi.fn(),
+    };
+
+    const { rerender } = renderHook(
+      ({ includeArchived }) =>
+        useProjectSessions({
+          backend,
+          workspaceId: 'ws-1',
+          projectId: 'proj-1',
+          includeArchived,
+        }),
+      { initialProps: { includeArchived: false } },
+    );
+    await waitFor(() => expect(backend.listSessions).toHaveBeenCalledTimes(1));
+    expect(backend.listSessions).toHaveBeenLastCalledWith({
+      workspaceId: 'ws-1',
+      projectId: 'proj-1',
+    });
+
+    rerender({ includeArchived: true });
+    await waitFor(() => expect(backend.listSessions).toHaveBeenCalledTimes(2));
+    expect(backend.listSessions).toHaveBeenLastCalledWith({
+      workspaceId: 'ws-1',
+      projectId: 'proj-1',
+      includeArchived: true,
+    });
+  });
+
   it('falls back to createdAt for old rows and passes the active session id', async () => {
     const backend = {
       listSessions: vi.fn().mockResolvedValue({

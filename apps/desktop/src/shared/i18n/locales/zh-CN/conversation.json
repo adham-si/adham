@@ -139,7 +139,39 @@
       "deleting": "正在删除…"
     },
     "bookmarkUnavailable": "此版本不支持书签。",
-    "bookmarkUpdateFailed": "无法更新书签。"
+    "bookmarkUpdateFailed": "无法更新书签。",
+    "historySearch": {
+      "placeholder": "搜索会话和消息",
+      "filters": "筛选",
+      "searching": "正在搜索…",
+      "showArchived": "显示已归档",
+      "pinnedOnly": "仅已置顶",
+      "bookmarkedOnly": "仅已收藏",
+      "hasAttachments": "有附件",
+      "role": "角色",
+      "anyRole": "任意角色",
+      "user": "用户",
+      "assistant": "助手",
+      "from": "从",
+      "to": "到",
+      "shortQuery": "请输入至少 2 个字符。",
+      "noResults": "没有匹配的会话或消息。",
+      "results": "搜索结果",
+      "skippedUnreadable": "部分已保存内容无法读取，已跳过。",
+      "scanLimit": "扫描 10,000 条消息后停止搜索。",
+      "resultsTruncated": "仅显示前 50 条结果（已截断）。",
+      "filterOnly": "仅筛选视图。输入查询以搜索消息文本。",
+      "loadingSessions": "正在加载会话…",
+      "match": {
+        "session": "会话",
+        "title": "标题",
+        "summary": "摘要",
+        "message": "消息",
+        "attachment": "附件",
+        "bookmark": "书签"
+      },
+      "unavailableFilters": "暂不可用：代理、参与者、任务状态、模型/提供方、标签/文件夹、成本和产物。这些数据尚不存在。"
+    }
   },
   "provision": {
     "workspaceTitle": "创建工作区",

@@ -299,6 +299,7 @@ export function ConversationPanelView({
                   }
                   timestamp={formatTimestamp(m.createdAt)}
                   data-message-id={m.provisional ? undefined : m.id}
+                  tabIndex={-1}
                   bookmarked={bookmarkedIds.has(m.id)}
                   onToggleBookmark={
                     m.provisional

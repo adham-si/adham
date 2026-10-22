@@ -58,6 +58,17 @@ describe('PrimarySidebar session actions', () => {
     expect(onSetArchived).toHaveBeenCalledWith('sess-1', true);
   });
 
+  it('renders a supplied history panel instead of the built-in title filter', () => {
+    render(
+      <PrimarySidebar
+        sessions={[session]}
+        historyPanel={<div>Custom history panel</div>}
+      />,
+    );
+    expect(screen.getByText('Custom history panel')).toBeDefined();
+    expect(screen.queryByPlaceholderText('Search')).toBeNull();
+  });
+
   it('keeps the archived badge on the active row', () => {
     render(
       <PrimarySidebar sessions={[{ ...session, archived: true }]} activeSessionId={session.id} />,

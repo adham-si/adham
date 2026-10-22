@@ -28,12 +28,15 @@ export interface UseProjectSessionsOptions {
   };
   workspaceId: string | null;
   projectId: string | null;
+  /** Include archived rows in the normal list; search has its own toggle. */
+  includeArchived?: boolean;
 }
 
 export function useProjectSessions({
   backend = adhamClient,
   workspaceId,
   projectId,
+  includeArchived = false,
 }: UseProjectSessionsOptions) {
   const [sessions, setSessions] = React.useState<SidebarSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = React.useState<string | null>(null);
@@ -80,6 +83,7 @@ export function useProjectSessions({
         ...(workspaceId ? { workspaceId } : {}),
         projectId,
         ...(active ? { activeSessionId: active } : {}),
+        ...(includeArchived ? { includeArchived: true } : {}),
       };
       const result = await backend.listSessions(queryContext);
       if (seq !== fetchSeqRef.current) return;
@@ -104,7 +108,7 @@ export function useProjectSessions({
         setLoading(false);
       }
     }
-  }, [backend, projectId, workspaceId]);
+  }, [backend, includeArchived, projectId, workspaceId]);
 
   React.useEffect(() => {
     void fetchSessions();
