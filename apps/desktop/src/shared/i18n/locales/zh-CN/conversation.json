@@ -114,7 +114,9 @@
       "summaryUser": "自定义摘要",
       "summaryDescription": "留空以使用自动摘要。",
       "saveSummary": "保存摘要",
-      "resetToAuto": "恢复自动摘要"
+      "resetToAuto": "恢复自动摘要",
+      "duplicate": "复制",
+      "duplicateTitle": "{{title}} 副本"
     },
     "bookmarkUnavailable": "此版本不支持书签。",
     "bookmarkUpdateFailed": "无法更新书签。"

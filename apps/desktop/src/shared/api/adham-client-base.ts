@@ -159,6 +159,13 @@ export interface AdhamClient {
     summary: string | null,
     options?: { requestId?: string },
   ): Promise<SessionMetadata>;
+  duplicateSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string | null,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
   submitMessage(
     workspaceId: string,
     projectId: string,
@@ -405,6 +412,24 @@ export class AdhamApiClientBase implements AdhamClient {
       options?.requestId,
     );
     const result = await invoke<CommandResult<SessionMetadata>>('set_session_summary', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async duplicateSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string | null,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { title },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('duplicate_session', {
       request: envelope,
     });
     return SessionMetadataSchema.parse(result.data);

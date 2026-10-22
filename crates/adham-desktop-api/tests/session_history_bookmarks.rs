@@ -56,7 +56,7 @@ async fn append_deleted(ctx: &ApiContext, ws: &str, proj: &str, session: &str) {
                 session_id: Some(SessionId::from_string(session).unwrap()),
             },
             actor: EventActor {
-                actor_id: ctx.actor_id.clone(),
+                actor_id: ctx.actor_id,
                 kind: ActorKind::LocalHuman,
             },
             request_id: RequestId::new_v7(),

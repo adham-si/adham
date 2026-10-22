@@ -2,6 +2,7 @@ import * as React from 'react';
 import { adhamClient } from '@/shared/api/adham-client';
 import type { SessionMetadata } from '@adham/contracts-generated';
 import { rejectionMessage } from '@/shared/api/error-envelope';
+import i18n from '@/shared/i18n';
 
 export interface SessionActionTarget {
   id: string;
@@ -34,6 +35,12 @@ export interface SessionActionsBackend {
     projectId: string,
     sessionId: string,
     summary: string | null,
+  ): Promise<SessionMetadata>;
+  duplicateSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string | null,
   ): Promise<SessionMetadata>;
 }
 
@@ -131,6 +138,40 @@ export function useSessionActions({
     [backend, onChanged, projectId, renameTarget, workspaceId],
   );
 
+  const duplicate = React.useCallback(
+    async (target: SessionActionTarget) => {
+      if (!workspaceId || !projectId) return;
+      setBusyId(target.id);
+      setError(null);
+      try {
+        const localized = String(
+          i18n.t('conversation.sessionActions.duplicateTitle', {
+            title: target.title,
+            defaultValue: '{{title}} copy',
+          }),
+        );
+        const title = Array.from(localized).slice(0, 120).join('') || `${target.title} copy`;
+        const metadata = await backend.duplicateSession(
+          workspaceId,
+          projectId,
+          target.id,
+          title,
+        );
+        await onChanged();
+        window.dispatchEvent(
+          new CustomEvent('adham:session-select', {
+            detail: { workspaceId, projectId, sessionId: metadata.sessionId },
+          }),
+        );
+      } catch (err) {
+        setError(rejectionMessage(err));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [backend, onChanged, projectId, workspaceId],
+  );
+
   const setPinned = React.useCallback(
     (sessionId: string, pinned: boolean) =>
       run(sessionId, () => backend.setSessionPinned(workspaceId!, projectId!, sessionId, pinned)),
@@ -153,6 +194,7 @@ export function useSessionActions({
     cancelRename,
     saveRename,
     saveSummary,
+    duplicate,
     setPinned,
     setArchived,
   };

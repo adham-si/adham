@@ -15,6 +15,7 @@ const session = {
 describe('PrimarySidebar session actions', () => {
   it('opens the row menu and dispatches rename, pin, and archive', () => {
     const onRenameSession = vi.fn();
+    const onDuplicateSession = vi.fn();
     const onSetPinned = vi.fn();
     const onSetArchived = vi.fn();
     render(
@@ -22,6 +23,7 @@ describe('PrimarySidebar session actions', () => {
         sessions={[session]}
         activeSessionId={session.id}
         onRenameSession={onRenameSession}
+        onDuplicateSession={onDuplicateSession}
         onSetPinned={onSetPinned}
         onSetArchived={onSetArchived}
       />,
@@ -30,6 +32,10 @@ describe('PrimarySidebar session actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     expect(onRenameSession).toHaveBeenCalledWith(session);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    expect(onDuplicateSession).toHaveBeenCalledWith(session);
 
     fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin' }));
@@ -55,6 +61,7 @@ describe('useSessionActions', () => {
       setSessionPinned: vi.fn().mockResolvedValue({}),
       setSessionArchived: vi.fn().mockResolvedValue({}),
       setSessionSummary: vi.fn().mockResolvedValue({ summaryOrigin: 'user' }),
+      duplicateSession: vi.fn().mockResolvedValue({ sessionId: 'copy-1' }),
     };
     const onChanged = vi.fn();
     const { result } = renderHook(() =>
@@ -93,6 +100,23 @@ describe('useSessionActions', () => {
       'Custom summary',
     );
     expect(onChanged).toHaveBeenCalledTimes(4);
+
+    const onSelect = vi.fn();
+    window.addEventListener('adham:session-select', onSelect);
+    await act(async () => {
+      await result.current.duplicate(session);
+    });
+    expect(backend.duplicateSession).toHaveBeenCalledWith(
+      'ws-1',
+      'proj-1',
+      'sess-1',
+      'History row copy',
+    );
+    expect(onSelect).toHaveBeenCalled();
+    const detail = (onSelect.mock.calls[0]?.[0] as CustomEvent | undefined)?.detail;
+    expect(detail).toEqual({ workspaceId: 'ws-1', projectId: 'proj-1', sessionId: 'copy-1' });
+    window.removeEventListener('adham:session-select', onSelect);
+    expect(onChanged).toHaveBeenCalledTimes(5);
     await waitFor(() => expect(result.current.busyId).toBeNull());
   });
 });

@@ -116,6 +116,7 @@ function AppBody() {
             onSelectSession: selectSession,
             onNewSession: () => void newSession(),
             onRenameSession: sessionActions.openRename,
+            onDuplicateSession: (session) => void sessionActions.duplicate(session),
             onSetPinned: (sessionId, pinned) => void sessionActions.setPinned(sessionId, pinned),
             onSetArchived: (sessionId, archived) =>
               void sessionActions.setArchived(sessionId, archived),

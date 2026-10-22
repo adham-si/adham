@@ -30,6 +30,7 @@ export interface PrimarySidebarProps {
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: () => void;
   onRenameSession?: (session: SessionSummary) => void;
+  onDuplicateSession?: (session: SessionSummary) => void;
   onSetPinned?: (sessionId: string, pinned: boolean) => void;
   onSetArchived?: (sessionId: string, archived: boolean) => void;
   actionsDisabled?: boolean;
@@ -60,6 +61,7 @@ export function PrimarySidebar({
   onSelectSession,
   onNewSession,
   onRenameSession,
+  onDuplicateSession,
   onSetPinned,
   onSetArchived,
   actionsDisabled = false,
@@ -234,7 +236,9 @@ export function PrimarySidebar({
               </div>
             ) : null}
             {filteredSessions.map((session) => {
-              const hasActions = Boolean(onRenameSession || onSetPinned || onSetArchived);
+              const hasActions = Boolean(
+                onRenameSession || onDuplicateSession || onSetPinned || onSetArchived,
+              );
               return (
                 <div key={session.id} className="group relative">
                   <SidebarItem
@@ -280,6 +284,7 @@ export function PrimarySidebar({
                         label={t('conversation.sessionActions.label', 'Session actions')}
                         onSelect={(value) => {
                           if (value === 'rename') onRenameSession?.(session);
+                          if (value === 'duplicate') onDuplicateSession?.(session);
                           if (value === 'pin') onSetPinned?.(session.id, !session.pinned);
                           if (value === 'archive') onSetArchived?.(session.id, !session.archived);
                         }}
@@ -287,6 +292,11 @@ export function PrimarySidebar({
                         {onRenameSession ? (
                           <MenuItem value="rename" disabled={actionsDisabled}>
                             {t('conversation.sessionActions.rename', 'Rename')}
+                          </MenuItem>
+                        ) : null}
+                        {onDuplicateSession ? (
+                          <MenuItem value="duplicate" disabled={actionsDisabled}>
+                            {t('conversation.sessionActions.duplicate', 'Duplicate')}
                           </MenuItem>
                         ) : null}
                         {onSetPinned ? (

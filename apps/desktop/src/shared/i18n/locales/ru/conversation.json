@@ -114,7 +114,9 @@
       "summaryUser": "Своя сводка",
       "summaryDescription": "Оставьте пустым, чтобы использовать автосводку.",
       "saveSummary": "Сохранить сводку",
-      "resetToAuto": "Вернуть автосводку"
+      "resetToAuto": "Вернуть автосводку",
+      "duplicate": "Дублировать",
+      "duplicateTitle": "Копия {{title}}"
     },
     "bookmarkUnavailable": "Закладки недоступны в этой сборке.",
     "bookmarkUpdateFailed": "Не удалось обновить закладку."

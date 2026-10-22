@@ -114,7 +114,9 @@
       "summaryUser": "ملخص مخصص",
       "summaryDescription": "اتركه فارغًا لاستخدام الملخص التلقائي.",
       "saveSummary": "حفظ الملخص",
-      "resetToAuto": "العودة إلى التلقائي"
+      "resetToAuto": "العودة إلى التلقائي",
+      "duplicate": "تكرار",
+      "duplicateTitle": "نسخة من {{title}}"
     },
     "bookmarkUnavailable": "الإشارات المرجعية غير متاحة في هذا الإصدار.",
     "bookmarkUpdateFailed": "تعذّر تحديث الإشارة المرجعية."

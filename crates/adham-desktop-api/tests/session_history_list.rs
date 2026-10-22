@@ -43,13 +43,13 @@ async fn append_history<T: Serialize>(
             event_type: event_type.to_string(),
             event_version: 1,
             scope: EventScope {
-                installation_id: ctx.installation_id.clone(),
+                installation_id: ctx.installation_id,
                 workspace_id: Some(WorkspaceId::from_string(ws).unwrap()),
                 project_id: Some(ProjectId::from_string(proj).unwrap()),
                 session_id: Some(SessionId::from_string(session_id).unwrap()),
             },
             actor: EventActor {
-                actor_id: ctx.actor_id.clone(),
+                actor_id: ctx.actor_id,
                 kind: ActorKind::LocalHuman,
             },
             request_id: RequestId::new_v7(),
@@ -62,6 +62,7 @@ async fn append_history<T: Serialize>(
         .unwrap();
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_message(
     ctx: &ApiContext,
     ws: &str,
@@ -75,7 +76,7 @@ async fn insert_message(
     let content_id = ContentId::new_v7();
     let message_id = MessageId::new_v7();
     let scope = EventScope {
-        installation_id: ctx.installation_id.clone(),
+        installation_id: ctx.installation_id,
         workspace_id: Some(WorkspaceId::from_string(ws).unwrap()),
         project_id: Some(ProjectId::from_string(proj).unwrap()),
         session_id: Some(SessionId::from_string(session_id).unwrap()),

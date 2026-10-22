@@ -131,6 +131,35 @@ impl SqliteEventStore {
         Ok(())
     }
 
+    /// Same list inside a caller transaction, and only for links whose
+    /// message is still persisted in the session.
+    pub async fn list_session_message_attachments_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        session_id: &SessionId,
+    ) -> Result<Vec<(String, AttachmentRecord)>, DomainError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT ma.message_id AS linked_message_id, ar.*
+            FROM message_attachments ma
+            JOIN conversation_messages cm ON cm.message_id = ma.message_id
+            JOIN attachment_records ar
+              ON ar.attachment_id = ma.attachment_id AND ar.session_id = cm.session_id
+            WHERE ar.session_id = ?
+            ORDER BY ma.message_id, ma.position
+            "#,
+        )
+        .bind(session_id.to_string())
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        rows.iter()
+            .map(|r| {
+                let message_id: String = r.get("linked_message_id");
+                row_to_record(r).map(|record| (message_id, record))
+            })
+            .collect()
+    }
+
     /// Attachments linked to this session's messages, ordered by message and
     /// selection position. Grouping happens in the caller.
     pub async fn list_session_message_attachments(

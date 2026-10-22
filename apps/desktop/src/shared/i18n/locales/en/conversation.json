@@ -114,7 +114,9 @@
       "summaryUser": "Custom summary",
       "summaryDescription": "Leave blank to use the auto summary.",
       "saveSummary": "Save summary",
-      "resetToAuto": "Reset to auto"
+      "resetToAuto": "Reset to auto",
+      "duplicate": "Duplicate",
+      "duplicateTitle": "{{title}} copy"
     },
     "bookmarkUnavailable": "Bookmarks are unavailable in this build.",
     "bookmarkUpdateFailed": "Could not update the bookmark."

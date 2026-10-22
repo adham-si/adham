@@ -85,3 +85,30 @@ pub async fn ensure_session_active_tx(
     }
     Ok(())
 }
+
+/// A live completion blocks history mutations. First sends can be recorded
+/// before the session exists, so match those rows by their create request.
+pub(crate) async fn ensure_no_live_operation_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    session_id: &str,
+) -> Result<(), String> {
+    let create_request: Option<String> = sqlx::query_scalar(
+        "SELECT request_id FROM events WHERE stream_id = ? AND event_type IN ('SessionCreated', 'session/created') ORDER BY global_position ASC LIMIT 1",
+    )
+    .bind(format!("session:{session_id}"))
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    let live: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM pending_operations WHERE status = 'pending' AND (session_id = ? OR (session_id IS NULL AND create_request_id = ?)) LIMIT 1",
+    )
+    .bind(session_id)
+    .bind(create_request)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    if live.is_some() {
+        return Err("SESSION_BUSY: a live operation is still running on this session".to_string());
+    }
+    Ok(())
+}

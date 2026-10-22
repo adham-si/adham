@@ -56,3 +56,11 @@ pub struct SetSessionSummaryPayload {
     #[ts(optional = nullable)]
     pub summary: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DuplicateSessionPayload {
+    #[ts(optional = nullable)]
+    pub title: Option<String>,
+}
