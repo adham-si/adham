@@ -1,6 +1,7 @@
 use crate::dtos::*;
 use crate::handlers::ApiContext;
 use crate::pending_dtos::*;
+use crate::service::common::{ensure_session_active_tx, lock_session_stream_tx};
 use adham_core_types::*;
 use adham_event_log::SqliteEventStore;
 use sqlx::Row;
@@ -139,6 +140,27 @@ pub async fn record_pending_operation(
             }
             None => return Err("SESSION_NOT_FOUND: session stream does not exist".to_string()),
         }
+    }
+
+    // A first-send pending row can precede its session. Resolve the create
+    // request if it already exists, so a delete cannot leave a new pending
+    // row behind for a tombstoned session.
+    let created_session: Option<String> = match sess_id {
+        Some(ref s_id) => Some(s_id.to_string()),
+        None => match create_req_id {
+            Some(ref create_id) => sqlx::query_scalar(
+                "SELECT session_id FROM events WHERE request_id = ? AND event_type IN ('SessionCreated', 'session/created') ORDER BY global_position ASC LIMIT 1",
+            )
+            .bind(create_id.to_string())
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?,
+            None => None,
+        },
+    };
+    if let Some(session) = created_session {
+        lock_session_stream_tx(&mut tx, &session).await?;
+        ensure_session_active_tx(&mut tx, &session).await?;
     }
 
     let scope = EventScope {

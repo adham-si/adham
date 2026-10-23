@@ -1,24 +1,29 @@
+//! Size exception (AGENTS.md): Tauri command wiring and invoke registration share one module so the command surface stays auditable.
 use adham_desktop_api::{
     AnswerFeedbackDto, ApiContext, AttachmentDto, BootstrapState, BranchSelectionDto,
     ClearPendingOperationPayload, CommandContext, CommandEnvelope, CommandResult,
     CompleteOncePayload, CompletionStartDto, ConfigureGoogleAccountPayload, ConversationPage,
-    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload,
-    DisconnectGoogleAccountPayload, DisconnectOllamaAccountPayload, DiscoverOllamaModelsPayload,
-    ErrorEnvelope, GetPreferencesResponse, GoogleAccountDisconnected, IngestAttachmentPathPayload,
+    CreateProjectPayload, CreateSessionPayload, CreateWorkspacePayload, DeleteSessionPayload,
+    DeleteSessionResponse, DisconnectGoogleAccountPayload, DisconnectOllamaAccountPayload,
+    DiscoverOllamaModelsPayload, DuplicateSessionPayload, ErrorEnvelope, ExportSessionResponse,
+    GetPreferencesResponse, GoogleAccountDisconnected, IngestAttachmentPathPayload,
     IngestAttachmentPayload, ListProviderAccountsResponse, ListProviderModelsPayload,
-    ListProviderModelsResponse, MarkCompletionInterruptedPayload,
+    ListProviderModelsResponse, ListSessionsOptions, MarkCompletionInterruptedPayload,
     MarkCompletionInterruptedResponse, OllamaAccountDisconnected, PendingOperationDto,
     PendingOperationList, PlatformInfo, ProjectList, ProjectSummary, ProviderAccountDto,
     ProviderHealthResponse, ProviderModelsList, ReadAttachmentPayload, RebuildProjectionsResponse,
-    RecordPendingOperationPayload, ResetPreferencesResponse, RetryCompletionPayload,
-    SelectProjectPayload, SessionList, SessionSummary, SetActiveAlternativePayload,
-    SetAnswerFeedbackPayload, StopCompletionPayload, StopCompletionResponse, StorageStatus,
-    StreamEventDto, SubmitMessagePayload, SubmittedMessage, TestProviderConnectionPayload,
-    UpdatePreferencesPayload, UpdatePreferencesResponse, UpdateProviderAccountPayload,
-    WorkspaceList, WorkspaceSummary,
+    RecordPendingOperationPayload, RenameSessionPayload, ResetPreferencesResponse,
+    RetryCompletionPayload, SelectProjectPayload, SessionList, SessionMetadata,
+    SessionSearchRequest, SessionSearchResponse, SessionSummary, SetActiveAlternativePayload,
+    SetAnswerFeedbackPayload, SetMessageBookmarkPayload, SetSessionArchivedPayload,
+    SetSessionPinnedPayload, SetSessionSummaryPayload, StopCompletionPayload,
+    StopCompletionResponse, StorageStatus, StreamEventDto, SubmitMessagePayload, SubmittedMessage,
+    TestProviderConnectionPayload, UpdatePreferencesPayload, UpdatePreferencesResponse,
+    UpdateProviderAccountPayload, WorkspaceList, WorkspaceSummary,
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 #[cfg(all(test, not(windows)))]
 mod ipc_contract_tests;
@@ -115,8 +120,39 @@ async fn create_session(
 async fn list_sessions(
     state: tauri::State<'_, ApiContext>,
     context: CommandContext,
+    options: Option<ListSessionsOptions>,
 ) -> Result<SessionList, ErrorEnvelope> {
-    adham_desktop_api::handle_list_sessions(&state, context)
+    adham_desktop_api::handle_list_sessions(&state, context, options)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn rename_session(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<RenameSessionPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_rename_session(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_session_pinned(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SetSessionPinnedPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_session_pinned(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_session_archived(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SetSessionArchivedPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_session_archived(&state, request)
         .await
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
@@ -329,6 +365,97 @@ async fn mark_completion_interrupted(
 }
 
 #[tauri::command]
+async fn export_session_markdown(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+    suggested_title: Option<String>,
+) -> Result<Option<ExportSessionResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_validate_export_session(&state, &context)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))?;
+    let file_name = adham_desktop_api::service::suggested_export_file_name(
+        suggested_title.as_deref(),
+        context.session_id.as_deref().unwrap_or("session"),
+    );
+    let (path_tx, path_rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_file_name(file_name)
+        .add_filter("Markdown", &["md"])
+        .save_file(move |path| {
+            let _ = path_tx.send(path);
+        });
+
+    let Some(path) = path_rx.await.map_err(|_| {
+        ErrorEnvelope::from_error_str("EXPORT_WRITE_FAILED: save dialog did not return a path")
+    })?
+    else {
+        return Ok(None);
+    };
+    let destination = path.into_path().map_err(|error| {
+        ErrorEnvelope::from_error_str(&format!("EXPORT_WRITE_FAILED: selected path: {error}"))
+    })?;
+
+    adham_desktop_api::handle_export_session_markdown(&state, context, destination)
+        .await
+        .map(Some)
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn search_history(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+    request: SessionSearchRequest,
+) -> Result<SessionSearchResponse, ErrorEnvelope> {
+    adham_desktop_api::handle_search_history(&state, context, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn duplicate_session(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<DuplicateSessionPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_duplicate_session(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn delete_session(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<DeleteSessionPayload>,
+) -> Result<CommandResult<DeleteSessionResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_delete_session(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_session_summary(
+    state: tauri::State<'_, ApiContext>,
+    request: CommandEnvelope<SetSessionSummaryPayload>,
+) -> Result<CommandResult<SessionMetadata>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_session_summary(&state, request)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
+async fn set_message_bookmark(
+    state: tauri::State<'_, ApiContext>,
+    context: CommandContext,
+    payload: SetMessageBookmarkPayload,
+) -> Result<Vec<String>, ErrorEnvelope> {
+    adham_desktop_api::handle_set_message_bookmark(&state, context, payload)
+        .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))
+}
+
+#[tauri::command]
 async fn admin_rebuild_projections(
     state: tauri::State<'_, ApiContext>,
 ) -> Result<RebuildProjectionsResponse, ErrorEnvelope> {
@@ -419,6 +546,7 @@ pub fn run() {
     });
 
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(api_ctx)
         .setup(|app| {
             let mut window_config = app
@@ -467,6 +595,14 @@ pub fn run() {
             select_project,
             create_session,
             list_sessions,
+            rename_session,
+            set_session_pinned,
+            set_session_archived,
+            set_session_summary,
+            duplicate_session,
+            delete_session,
+            export_session_markdown,
+            search_history,
             submit_message,
             ingest_attachment,
             ingest_attachment_path,
@@ -474,6 +610,7 @@ pub fn run() {
             get_conversation,
             set_active_alternative,
             set_answer_feedback,
+            set_message_bookmark,
             admin_rebuild_projections,
             record_pending_operation,
             list_pending_operations,

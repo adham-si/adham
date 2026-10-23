@@ -1,4 +1,7 @@
 use adham_core_types::MessageCompletionV1;
+
+mod history;
+pub use history::*;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -140,6 +143,20 @@ pub struct SessionSummary {
     pub project_id: String,
     pub title: Option<String>,
     pub created_at: String,
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub summary: Option<String>,
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub summary_origin: Option<String>,
+    #[serde(default)]
+    pub summary_unavailable: bool,
+    #[serde(default)]
+    pub pinned: bool,
+    #[serde(default)]
+    pub archived: bool,
+    #[serde(default)]
+    pub last_activity_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -149,6 +166,8 @@ pub struct SessionList {
     pub project_id: String,
     pub sessions: Vec<SessionSummary>,
     pub truncated: bool,
+    #[serde(default)]
+    pub unreadable_summaries: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -203,6 +222,14 @@ pub struct BranchSelectionDto {
 pub struct SetActiveAlternativePayload {
     pub root_message_id: String,
     pub active_message_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SetMessageBookmarkPayload {
+    pub message_id: String,
+    pub bookmarked: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
@@ -276,6 +303,9 @@ pub struct ConversationPage {
     /// Local like/dislike verdicts for this session's answers, so a card shows
     /// its stored verdict without a second round trip.
     pub feedback: Vec<AnswerFeedbackDto>,
+    /// Persisted message ids the user bookmarked in this session.
+    #[serde(default)]
+    pub bookmarked_message_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -427,59 +457,113 @@ impl ErrorEnvelope {
         let (code, msg_key, retryable) = if err.starts_with("INVALID_COMMAND_VERSION") {
             (
                 PublicErrorCode::InvalidProtocolVersion,
-                "error.invalidProtocolVersion",
+                "error.invalidProtocolVersion".to_string(),
                 false,
             )
-        } else if err.starts_with("VALIDATION_FAILED") {
-            (
-                PublicErrorCode::InvalidRequest,
-                "error.validationFailed",
-                false,
-            )
+        } else if let Some(rest) = err.strip_prefix("VALIDATION_FAILED") {
+            let suffix = rest.strip_prefix(':').map(str::trim).unwrap_or("");
+            // Only token-style suffixes are stable message keys. Free-form
+            // validation prose keeps the generic localized fallback.
+            let key = if !suffix.is_empty()
+                && suffix
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
+                format!("error.validation.{suffix}")
+            } else {
+                "error.validationFailed".to_string()
+            };
+            (PublicErrorCode::InvalidRequest, key, false)
         } else if err.starts_with("WORKSPACE_NOT_FOUND") {
             (
                 PublicErrorCode::WorkspaceNotFound,
-                "error.workspaceNotFound",
+                "error.workspaceNotFound".to_string(),
                 false,
             )
         } else if err.starts_with("PROJECT_NOT_FOUND") {
             (
                 PublicErrorCode::ProjectNotFound,
-                "error.projectNotFound",
+                "error.projectNotFound".to_string(),
+                false,
+            )
+        } else if err.starts_with("SESSION_DELETED") {
+            (
+                PublicErrorCode::SessionNotFound,
+                "error.sessionDeleted".to_string(),
                 false,
             )
         } else if err.starts_with("SESSION_NOT_FOUND") {
             (
                 PublicErrorCode::SessionNotFound,
-                "error.sessionNotFound",
+                "error.sessionNotFound".to_string(),
                 false,
+            )
+        } else if err.starts_with("SESSION_BUSY") {
+            (
+                PublicErrorCode::ConcurrencyConflict,
+                "error.sessionBusy".to_string(),
+                true,
+            )
+        } else if err.starts_with("DUPLICATE_TOO_LARGE") {
+            (
+                PublicErrorCode::PayloadTooLarge,
+                "error.duplicateTooLarge".to_string(),
+                false,
+            )
+        } else if err.starts_with("EXPORT_TOO_LARGE") {
+            (
+                PublicErrorCode::PayloadTooLarge,
+                "error.exportTooLarge".to_string(),
+                false,
+            )
+        } else if err.starts_with("STORAGE_REPAIR_REQUIRED") {
+            (
+                PublicErrorCode::StorageRepairRequired,
+                "error.storageRepairRequired".to_string(),
+                false,
+            )
+        } else if err.starts_with("EXPORT_WRITE_FAILED") {
+            (
+                PublicErrorCode::StorageUnavailable,
+                "error.exportWriteFailed".to_string(),
+                false,
+            )
+        } else if err.starts_with("STORAGE_UNAVAILABLE") {
+            (
+                PublicErrorCode::StorageUnavailable,
+                "error.storageUnavailable".to_string(),
+                true,
             )
         } else if err.starts_with("CONTEXT_MISMATCH") {
             (
                 PublicErrorCode::ContextMismatch,
-                "error.contextMismatch",
+                "error.contextMismatch".to_string(),
                 false,
             )
         } else if err.starts_with("REQUEST_ID_CONFLICT") {
             (
                 PublicErrorCode::RequestIdConflict,
-                "error.requestIdConflict",
+                "error.requestIdConflict".to_string(),
                 false,
             )
         } else if err.starts_with("PREFERENCE_REVISION_CONFLICT") {
             (
                 PublicErrorCode::ConcurrencyConflict,
-                "error.preferencesConflict",
+                "error.preferencesConflict".to_string(),
                 true,
             )
         } else {
-            (PublicErrorCode::InternalError, "error.internalError", true)
+            (
+                PublicErrorCode::InternalError,
+                "error.internalError".to_string(),
+                true,
+            )
         };
 
         Self {
             protocol_version: 1,
             code,
-            message_key: msg_key.to_string(),
+            message_key: msg_key,
             retryable,
             correlation_id: uuid::Uuid::now_v7().to_string(),
             field_errors: Vec::new(),

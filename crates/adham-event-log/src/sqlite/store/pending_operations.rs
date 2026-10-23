@@ -397,6 +397,42 @@ impl SqliteEventStore {
         Ok(())
     }
 
+    /// Purge every pending row for a deleted session, including a first-send
+    /// row recorded before the session existed. Returns the structural content
+    /// ids carried by those rows so the caller can tombstone them too.
+    pub async fn purge_pending_operations_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        session_id: &str,
+        create_request_id: Option<&str>,
+    ) -> Result<Vec<String>, DomainError> {
+        let rows = sqlx::query(
+            "SELECT content_id, title_content_id FROM pending_operations \
+             WHERE session_id = ? OR (session_id IS NULL AND create_request_id = ?)",
+        )
+        .bind(session_id)
+        .bind(create_request_id)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        let mut content_ids = Vec::with_capacity(rows.len() * 2);
+        for row in &rows {
+            content_ids.push(row.get::<String, _>("content_id"));
+            if let Some(title_id) = row.get::<Option<String>, _>("title_content_id") {
+                content_ids.push(title_id);
+            }
+        }
+        sqlx::query(
+            "DELETE FROM pending_operations \
+             WHERE session_id = ? OR (session_id IS NULL AND create_request_id = ?)",
+        )
+        .bind(session_id)
+        .bind(create_request_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(content_ids)
+    }
+
     /// Mark a provider-completion operation resolved (terminal event written).
     /// The row stays for audit + reload reconstruction; idempotent.
     pub async fn resolve_pending_operation_tx(

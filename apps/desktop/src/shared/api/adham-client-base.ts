@@ -1,3 +1,4 @@
+// Size exception (AGENTS.md): the typed IPC client mirrors the whole command surface in one auditable file.
 import type {
   AnswerFeedbackDto,
   AppPreferences,
@@ -10,7 +11,10 @@ import type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  DeleteSessionResponse,
   GetPreferencesResponse,
+  SessionSearchRequest,
+  SessionSearchResponse,
   PendingOperationDto,
   PendingOperationList,
   PlatformInfo,
@@ -22,6 +26,7 @@ import type {
   ResetPreferencesResponse,
   SelectProjectPayload,
   SessionList,
+  SessionMetadata,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -32,11 +37,14 @@ import type {
 import { invoke } from '@tauri-apps/api/core';
 import {
   AnswerFeedbackListSchema,
+  BookmarkedMessageIdsSchema,
   AttachmentDtoSchema,
   BootstrapStateSchema,
   BranchSelectionListSchema,
   ConversationPageSchema,
+  DeleteSessionResponseSchema,
   GetPreferencesResponseSchema,
+  SessionSearchResponseSchema,
   PendingOperationDtoSchema,
   PendingOperationListSchema,
   PlatformInfoSchema,
@@ -45,6 +53,8 @@ import {
   RebuildProjectionsResponseSchema,
   ResetPreferencesResponseSchema,
   SessionListSchema,
+  SessionMetadataSchema,
+  ExportSessionResponseSchema,
   SessionSummarySchema,
   StorageStatusSchema,
   SubmittedMessageSchema,
@@ -62,7 +72,10 @@ export type {
   CommandResult,
   ConversationMessageDto,
   ConversationPage,
+  DeleteSessionResponse,
   GetPreferencesResponse,
+  SessionSearchRequest,
+  SessionSearchResponse,
   PendingOperationDto,
   PendingOperationList,
   PlatformInfo,
@@ -72,6 +85,7 @@ export type {
   RecordPendingOperationPayload,
   ResetPreferencesResponse,
   SessionList,
+  SessionMetadata,
   SessionSummary,
   StorageStatus,
   SubmittedMessage,
@@ -121,7 +135,53 @@ export interface AdhamClient {
     payload: { title: string | null },
     options?: { requestId?: string },
   ): Promise<SessionSummary>;
-  listSessions(context: { workspaceId?: string; projectId: string }): Promise<SessionList>;
+  listSessions(context: {
+    workspaceId?: string;
+    projectId: string;
+    includeArchived?: boolean;
+    activeSessionId?: string | null;
+  }): Promise<SessionList>;
+  renameSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
+  setSessionPinned(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    pinned: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
+  setSessionArchived(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    archived: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
+  setSessionSummary(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    summary: string | null,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
+  duplicateSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string | null,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata>;
+  exportSessionMarkdown(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    suggestedTitle?: string,
+  ): Promise<{ path: string; bytes: number } | null>;
   submitMessage(
     workspaceId: string,
     projectId: string,
@@ -281,15 +341,157 @@ export class AdhamApiClientBase implements AdhamClient {
     return SessionSummarySchema.parse(result.data);
   }
 
-  async listSessions(context: { workspaceId?: string; projectId: string }): Promise<SessionList> {
+  async listSessions(context: {
+    workspaceId?: string;
+    projectId: string;
+    includeArchived?: boolean;
+    activeSessionId?: string | null;
+  }): Promise<SessionList> {
     const result = await invoke<SessionList>('list_sessions', {
       context: {
         workspaceId: context.workspaceId ?? null,
         projectId: context.projectId,
         sessionId: null,
       },
+      options: {
+        includeArchived: context.includeArchived ?? false,
+        activeSessionId: context.activeSessionId ?? null,
+      },
     });
     return SessionListSchema.parse(result);
+  }
+
+  async renameSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { title },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('rename_session', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async setSessionPinned(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    pinned: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { pinned },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('set_session_pinned', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async setSessionArchived(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    archived: boolean,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { archived },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('set_session_archived', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async setSessionSummary(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    summary: string | null,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { summary },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('set_session_summary', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async duplicateSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    title: string | null,
+    options?: { requestId?: string },
+  ): Promise<SessionMetadata> {
+    const envelope = this.wrapCommand(
+      { title },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<SessionMetadata>>('duplicate_session', {
+      request: envelope,
+    });
+    return SessionMetadataSchema.parse(result.data);
+  }
+
+  async searchHistory(
+    workspaceId: string,
+    projectId: string,
+    request: SessionSearchRequest,
+  ): Promise<SessionSearchResponse> {
+    const result = await invoke<SessionSearchResponse>('search_history', {
+      context: { workspaceId, projectId },
+      request,
+    });
+    return SessionSearchResponseSchema.parse(result);
+  }
+
+  async deleteSession(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    confirm: boolean,
+    options?: { requestId?: string },
+  ): Promise<DeleteSessionResponse> {
+    const envelope = this.wrapCommand(
+      { confirm },
+      { workspaceId, projectId, sessionId },
+      options?.requestId,
+    );
+    const result = await invoke<CommandResult<DeleteSessionResponse>>('delete_session', {
+      request: envelope,
+    });
+    return DeleteSessionResponseSchema.parse(result.data);
+  }
+
+  async exportSessionMarkdown(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    suggestedTitle?: string,
+  ): Promise<{ path: string; bytes: number } | null> {
+    const result = await invoke<{ path: string; bytes: number } | null>('export_session_markdown', {
+      context: { workspaceId, projectId, sessionId },
+      suggestedTitle: suggestedTitle ?? null,
+    });
+    return result === null ? null : ExportSessionResponseSchema.parse(result);
   }
 
   async submitMessage(
@@ -424,6 +626,27 @@ export class AdhamApiClientBase implements AdhamClient {
       },
     });
     return AnswerFeedbackListSchema.parse(raw);
+  }
+
+  async setMessageBookmark(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    bookmarked: boolean,
+  ): Promise<string[]> {
+    const raw = await invoke('set_message_bookmark', {
+      context: {
+        workspaceId,
+        projectId,
+        sessionId,
+      },
+      payload: {
+        messageId,
+        bookmarked,
+      },
+    });
+    return BookmarkedMessageIdsSchema.parse(raw);
   }
 
   async getStorageStatus(): Promise<StorageStatus> {

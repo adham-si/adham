@@ -1,3 +1,4 @@
+// Size exception (AGENTS.md): the lazy-creation recovery matrix shares one fixture set.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useConversation } from './use-conversation';
@@ -294,6 +295,12 @@ describe('lazy session creation regressions', () => {
             projectId: 'proj-1',
             title: 'Confirmed Session',
             createdAt: '2026-10-12T00:00:00Z',
+            summary: null,
+            summaryOrigin: null,
+            summaryUnavailable: false,
+            pinned: false,
+            archived: false,
+            lastActivityAt: '2026-10-12T00:00:00Z',
           },
         ],
       })),

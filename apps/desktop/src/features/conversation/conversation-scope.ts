@@ -33,6 +33,8 @@ export type ConversationSnapshot = {
   branchSelections?: BranchSelection[] | undefined;
   /** Present on real pages; a backend without stored verdicts omits it. */
   feedback?: AnswerFeedback[] | undefined;
+  /** Present on real pages; a backend without bookmarks omits it. */
+  bookmarkedMessageIds?: string[] | undefined;
 };
 
 export interface ConversationBackend {
@@ -96,6 +98,15 @@ export interface ConversationBackend {
     verdict: 'like' | 'dislike' | null,
     reason: string | null,
   ): Promise<AnswerFeedback[]>;
+  /** Toggle a persisted message bookmark. Absent on a backend without the
+   *  command, so the star is never offered where it cannot work. */
+  setMessageBookmark?(
+    workspaceId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    bookmarked: boolean,
+  ): Promise<string[]>;
   listSessions?(context: {
     workspaceId?: string;
     projectId: string;

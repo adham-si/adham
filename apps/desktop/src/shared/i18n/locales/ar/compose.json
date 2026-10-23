@@ -81,7 +81,9 @@
       "feedbackTitle": "ملاحظات على الإجابة",
       "feedbackLocalNote": "تُحفظ على هذا الجهاز مع هذه الإجابة — ولا تُرسل إلى النموذج.",
       "feedbackSave": "حفظ",
-      "moreActions": "إجراءات أخرى"
+      "moreActions": "إجراءات أخرى",
+      "bookmarkMessage": "إضافة إشارة مرجعية للرسالة",
+      "removeBookmark": "إزالة الإشارة المرجعية"
     },
     "noModelAvailable": "لا يوجد نموذج متاح",
     "modelSetupHint": "أعدّ نموذجًا من الإعدادات ← مزودو الذكاء الاصطناعي"

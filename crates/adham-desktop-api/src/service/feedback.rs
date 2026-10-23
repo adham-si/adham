@@ -5,7 +5,9 @@
 //! assistant row — one attempt — so a retry's new attempt starts unrated.
 use crate::dtos::{AnswerFeedbackDto, AnswerVerdict, CommandContext, SetAnswerFeedbackPayload};
 use crate::handlers::ApiContext;
-use crate::service::common::resolve_scoped_session;
+use crate::service::common::{
+    ensure_session_active_tx, lock_session_stream_tx, resolve_scoped_session,
+};
 use adham_core_types::{DomainError, SessionId};
 use adham_projections::ConversationProjection;
 use sqlx::{Pool, Sqlite};
@@ -96,6 +98,13 @@ pub async fn set_answer_feedback(
     }
 
     let now_us = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as i64;
+    let mut tx = ctx
+        .pool
+        .begin()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    lock_session_stream_tx(&mut tx, &session_id.to_string()).await?;
+    ensure_session_active_tx(&mut tx, &session_id.to_string()).await?;
     match verdict {
         Some(verdict) => {
             sqlx::query(
@@ -111,7 +120,7 @@ pub async fn set_answer_feedback(
             .bind(verdict)
             .bind(reason)
             .bind(now_us)
-            .execute(&ctx.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         }
@@ -119,11 +128,14 @@ pub async fn set_answer_feedback(
             sqlx::query("DELETE FROM answer_feedback WHERE session_id = ? AND message_id = ?")
                 .bind(session_id.to_string())
                 .bind(&payload.message_id)
-                .execute(&ctx.pool)
+                .execute(&mut *tx)
                 .await
                 .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
         }
     }
+    tx.commit()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
 
     read_answer_feedback(&ctx.pool, &session_id)
         .await

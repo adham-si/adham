@@ -1,5 +1,6 @@
 mod attachment;
 pub mod conversation;
+mod history;
 pub mod message;
 pub mod pending;
 pub mod providers;
@@ -10,6 +11,7 @@ pub mod workspace;
 
 pub use attachment::*;
 pub use conversation::*;
+pub use history::*;
 pub use message::*;
 pub use pending::*;
 pub use providers::*;

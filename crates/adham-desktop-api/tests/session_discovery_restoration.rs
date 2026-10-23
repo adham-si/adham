@@ -21,6 +21,7 @@ async fn test_list_sessions_returns_chronological_order_and_project_scoped() {
             project_id: Some(proj_a.clone()),
             session_id: None,
         },
+        None,
     )
     .await
     .expect("list sessions empty");
@@ -42,6 +43,7 @@ async fn test_list_sessions_returns_chronological_order_and_project_scoped() {
             project_id: Some(proj_a.clone()),
             session_id: None,
         },
+        None,
     )
     .await
     .expect("list sessions A");
@@ -60,6 +62,7 @@ async fn test_list_sessions_returns_chronological_order_and_project_scoped() {
             project_id: Some(proj_b.clone()),
             session_id: None,
         },
+        None,
     )
     .await
     .expect("list sessions B");
@@ -166,6 +169,7 @@ async fn test_list_sessions_rejects_mismatched_workspace() {
             project_id: Some(proj_1.clone()),
             session_id: None,
         },
+        None,
     )
     .await;
 
@@ -185,6 +189,7 @@ async fn test_list_sessions_rejects_mismatched_workspace() {
             project_id: Some(ProjectId::new_v7().to_string()),
             session_id: None,
         },
+        None,
     )
     .await;
 

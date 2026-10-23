@@ -9,7 +9,10 @@
     "resizeLabel": "Resize primary sidebar",
     "defaultWorkspace": "Personal Workspace",
     "defaultProject": "Default Project",
-    "sessionsTruncated": "Showing latest 100 sessions (truncated)"
+    "sessionsTruncated": "Showing latest 100 sessions (truncated)",
+    "pinned": "Pinned",
+    "archived": "Archived",
+    "summariesUnavailable": "Some summaries could not be read."
   },
   "rail": {
     "compose": "Compose",

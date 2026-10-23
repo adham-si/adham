@@ -9,7 +9,10 @@
     "resizeLabel": "调整主侧栏大小",
     "defaultWorkspace": "个人工作区",
     "defaultProject": "默认项目",
-    "sessionsTruncated": "显示最新的 100 个会话（已截断）"
+    "sessionsTruncated": "显示最新的 100 个会话（已截断）",
+    "pinned": "已固定",
+    "archived": "已归档",
+    "summariesUnavailable": "部分摘要无法读取。"
   },
   "rail": {
     "compose": "主工作台",

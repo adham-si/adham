@@ -13,10 +13,12 @@ pub async fn handle_create_session(
 pub async fn handle_list_sessions(
     ctx: &super::ApiContext,
     context: CommandContext,
+    options: Option<ListSessionsOptions>,
 ) -> Result<SessionList, String> {
     let project_id = context
         .project_id
         .as_deref()
         .ok_or("projectId context required")?;
-    crate::service::list_sessions(ctx, project_id, context.workspace_id.as_deref()).await
+    let options = options.unwrap_or_default();
+    crate::service::list_sessions(ctx, project_id, context.workspace_id.as_deref(), &options).await
 }

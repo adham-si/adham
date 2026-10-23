@@ -63,9 +63,43 @@ export type ProjectList = { workspaceId: string, projects: Array<ProjectSummary>
 
 export type CreateSessionPayload = { title: string | null, };
 
-export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, };
+export type DuplicateSessionPayload = { title?: string | null, };
 
-export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, };
+export type DeleteSessionPayload = { confirm: boolean, };
+
+export type DeleteSessionResponse = { sessionId: string, deleted: boolean, };
+
+export type ExportSessionResponse = { path: string, bytes: number, };
+
+export type SessionSummary = { sessionId: string, projectId: string, title: string | null, createdAt: string, summary?: string | null, summaryOrigin?: string | null, summaryUnavailable: boolean, pinned: boolean, archived: boolean, lastActivityAt: string, };
+
+export type RenameSessionPayload = { title: string, };
+
+export type SetSessionPinnedPayload = { pinned: boolean, };
+
+export type SetSessionSummaryPayload = { 
+/**
+ * Trimmed text replaces the auto summary; `None` or blank reverts to auto.
+ */
+summary?: string | null, };
+
+export type SetSessionArchivedPayload = { archived: boolean, };
+
+export type SetMessageBookmarkPayload = { messageId: string, bookmarked: boolean, };
+
+export type SessionList = { projectId: string, sessions: Array<SessionSummary>, truncated: boolean, unreadableSummaries: number, };
+
+export type SessionSearchFilters = { includeArchived: boolean, pinnedOnly: boolean, bookmarkedOnly: boolean, role: string | null, hasAttachments: boolean, from: string | null, to: string | null, };
+
+export type SessionSearchRequest = { query: string, filters: SessionSearchFilters, };
+
+export type SessionSearchResult = { sessionId: string, title: string | null, summary: string | null, summaryOrigin: string | null, lastActivityAt: string, matchKind: string, messageId: string | null, role: string | null, snippet: string | null, attachmentName: string | null, };
+
+export type SessionSearchResponse = { results: Array<SessionSearchResult>, truncated: boolean, scannedSessions: number, scanLimitReached: boolean, skippedUnreadable: number, };
+
+export type SessionMetadata = { sessionId: string, projectId: string, title: string | null, summaryOrigin: string | null, pinned: boolean, archived: boolean, createdAt: string, lastActivityAt: string, };
+
+export type ListSessionsOptions = { includeArchived: boolean, activeSessionId?: string | null, };
 
 export type SubmitMessagePayload = { text: string, 
 /**
@@ -101,7 +135,11 @@ branchSelections: Array<BranchSelectionDto>,
  * Local like/dislike verdicts for this session's answers, so a card shows
  * its stored verdict without a second round trip.
  */
-feedback: Array<AnswerFeedbackDto>, };
+feedback: Array<AnswerFeedbackDto>, 
+/**
+ * Persisted message ids the user bookmarked in this session.
+ */
+bookmarkedMessageIds: Array<string>, };
 
 export type StorageStatus = { status: string, journalMode: string, schemaVersion: number, 
 /**

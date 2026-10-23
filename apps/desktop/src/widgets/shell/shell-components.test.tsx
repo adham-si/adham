@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { act, render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ThemeProvider } from '@/theme/theme-provider';
 import '@/shared/i18n';
@@ -275,6 +275,40 @@ describe('Shell Layout Modular Components', () => {
       fireEvent.click(secondaryBtn);
       expect(screen.queryByTestId('slot-secondary')).toBeNull();
       expect(screen.getByRole('button', { name: 'Show secondary sidebar' })).not.toBeNull();
+    });
+
+    it('reveals the primary sidebar when a first send announces a titled session', () => {
+      render(
+        <TestWrapper>
+          <Shell
+            titlebar={<Titlebar />}
+            primarySidebar={<div data-testid="slot-primary">Primary Content</div>}
+          >
+            <div>Main View</div>
+          </Shell>
+        </TestWrapper>,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide primary sidebar' }));
+      expect(screen.queryByTestId('slot-primary')).toBeNull();
+
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent('adham:session-active', {
+            detail: { sessionId: 'sess-1', title: 'hello' },
+          }),
+        );
+      });
+      expect(screen.getByTestId('slot-primary')).not.toBeNull();
+
+      // Selecting an existing session carries no title and must not reopen it.
+      fireEvent.click(screen.getByRole('button', { name: 'Hide primary sidebar' }));
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent('adham:session-active', { detail: { sessionId: 'sess-1' } }),
+        );
+      });
+      expect(screen.queryByTestId('slot-primary')).toBeNull();
     });
   });
 });

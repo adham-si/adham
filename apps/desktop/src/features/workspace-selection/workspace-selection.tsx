@@ -110,7 +110,7 @@ export function WorkspaceSelection({
         <MenuTrigger
           disabled={disabled || loading}
           aria-label={t('selectScope', 'Select workspace / project')}
-          className="flex w-full items-center justify-between gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-hover disabled:opacity-60"
+          className="flex w-full items-center justify-between gap-1 overflow-hidden rounded-md px-2 py-1.5 text-start text-xs text-foreground hover:bg-surface-hover disabled:opacity-60"
         >
           <span className="truncate font-semibold">
             {loading ? t('loading', 'Loading…') : activeLabel}

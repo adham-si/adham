@@ -63,12 +63,35 @@ export const SessionSummarySchema = z.object({
   projectId: z.string(),
   title: z.string().nullable(),
   createdAt: z.string(),
+  summary: z.string().nullable().default(null),
+  summaryOrigin: z.string().nullable().default(null),
+  summaryUnavailable: z.boolean().default(false),
+  pinned: z.boolean().default(false),
+  archived: z.boolean().default(false),
+  lastActivityAt: z.string().default(''),
 });
 
 export const SessionListSchema = z.object({
   projectId: z.string(),
   sessions: z.array(SessionSummarySchema),
   truncated: z.boolean(),
+  unreadableSummaries: z.number().int().nonnegative().default(0),
+});
+
+export const SessionMetadataSchema = z.object({
+  sessionId: z.string(),
+  projectId: z.string(),
+  title: z.string().nullable(),
+  summaryOrigin: z.string().nullable(),
+  pinned: z.boolean(),
+  archived: z.boolean(),
+  createdAt: z.string(),
+  lastActivityAt: z.string(),
+});
+
+export const ListSessionsOptionsSchema = z.object({
+  includeArchived: z.boolean().optional(),
+  activeSessionId: z.string().nullable().optional(),
 });
 
 export const SubmittedMessageSchema = z.object({
@@ -139,7 +162,10 @@ export const ConversationPageSchema = z.object({
   projectionPosition: z.string(),
   branchSelections: z.array(BranchSelectionSchema),
   feedback: z.array(AnswerFeedbackSchema),
+  bookmarkedMessageIds: z.array(z.string()).default([]),
 });
+
+export const BookmarkedMessageIdsSchema = z.array(z.string());
 
 export const StorageStatusSchema = z.object({
   status: z.string(),
@@ -306,4 +332,35 @@ export const ListProviderAccountsResponseSchema = z.object({
 });
 export const ListProviderModelsResponseSchema = z.object({
   models: z.array(ProviderModelDtoSchema),
+});
+
+export const ExportSessionResponseSchema = z.object({
+  path: z.string(),
+  bytes: z.number(),
+});
+
+export const DeleteSessionResponseSchema = z.object({
+  sessionId: z.string(),
+  deleted: z.boolean(),
+});
+
+export const SessionSearchResultSchema = z.object({
+  sessionId: z.string(),
+  title: z.string().nullable(),
+  summary: z.string().nullable(),
+  summaryOrigin: z.string().nullable(),
+  lastActivityAt: z.string(),
+  matchKind: z.string(),
+  messageId: z.string().nullable(),
+  role: z.string().nullable(),
+  snippet: z.string().nullable(),
+  attachmentName: z.string().nullable(),
+});
+
+export const SessionSearchResponseSchema = z.object({
+  results: z.array(SessionSearchResultSchema),
+  truncated: z.boolean(),
+  scannedSessions: z.number().int(),
+  scanLimitReached: z.boolean(),
+  skippedUnreadable: z.number().int(),
 });

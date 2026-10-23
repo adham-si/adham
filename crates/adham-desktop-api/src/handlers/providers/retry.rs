@@ -9,6 +9,7 @@ use super::{
 };
 
 use crate::dtos::*;
+use crate::service::common::{ensure_session_active_tx, lock_session_stream_tx};
 use adham_core_types::*;
 use adham_event_log::SqliteEventStore;
 use std::collections::HashMap;
@@ -77,6 +78,8 @@ where
         .begin()
         .await
         .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    lock_session_stream_tx(&mut tx, &ids.sess_id.to_string()).await?;
+    ensure_session_active_tx(&mut tx, &ids.sess_id.to_string()).await?;
 
     // idempotent IPC retry: same request → same op handle, never a second
     // attempt. A deliberate second retry is a new request id, and then it IS

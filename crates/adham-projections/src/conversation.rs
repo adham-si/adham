@@ -1,11 +1,13 @@
 //! Conversation projection. ID newtypes are `Copy`; `.clone()` follows codebase style.
 #![allow(clippy::clone_on_copy)]
+use adham_core_types::history::EVENT_TYPE_SESSION_DELETED;
 use adham_core_types::{
     DomainError, EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED, MessageCompletedV1, MessageCompletionV1,
     MessageSubmittedV1, MessageSubmittedV2, MessageUsageV1, OperationId, SessionId,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Row, Sqlite};
+use std::collections::HashSet;
 use time::OffsetDateTime;
 use tracing::info;
 
@@ -378,6 +380,16 @@ impl ConversationProjection {
             .await
             .map_err(|e| DomainError::Storage(e.to_string()))?;
 
+        let deleted_sessions: HashSet<String> = sqlx::query_scalar(
+            "SELECT DISTINCT session_id FROM events WHERE event_type = ? AND session_id IS NOT NULL",
+        )
+        .bind(EVENT_TYPE_SESSION_DELETED)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?
+        .into_iter()
+        .collect();
+
         // 2. Replay message events (user submits + assistant terminals) in
         // strict global order so the rebuild is deterministic.
         let rows = sqlx::query(&format!(
@@ -407,6 +419,11 @@ impl ConversationProjection {
             let occurred_at_us: i64 = row.get("occurred_at_us");
             let event_version: i64 = row.get("event_version");
             let payload_bytes: Vec<u8> = row.get("payload_json");
+
+            if deleted_sessions.contains(&session_id) {
+                last_position = global_position;
+                continue;
+            }
 
             if event_type == EVENT_TYPE_ASSISTANT_MESSAGE_COMPLETED {
                 let payload: MessageCompletedV1 =

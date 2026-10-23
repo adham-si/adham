@@ -68,6 +68,10 @@ pub async fn handle_get_conversation(
     let feedback = crate::service::feedback::read_answer_feedback(&ctx.pool, &session_id)
         .await
         .map_err(|e| e.to_string())?;
+    let bookmarked_message_ids =
+        crate::service::read_bookmarked_message_ids(&ctx.pool, &session_id.to_string())
+            .await
+            .map_err(|e| e.to_string())?;
 
     Ok(ConversationPage {
         items: dtos,
@@ -75,7 +79,19 @@ pub async fn handle_get_conversation(
         projection_position: max_pos.to_string(),
         branch_selections,
         feedback,
+        bookmarked_message_ids,
     })
+}
+
+/// Toggle one persisted message bookmark. Desired-state, idempotent, and
+/// intentionally receipt-free: no event is appended.
+pub async fn handle_set_message_bookmark(
+    ctx: &super::ApiContext,
+    context: CommandContext,
+    payload: SetMessageBookmarkPayload,
+) -> Result<Vec<String>, String> {
+    crate::service::set_message_bookmark(ctx, &context, &payload.message_id, payload.bookmarked)
+        .await
 }
 
 /// Record the active member of an edited branch. Validation lives in the

@@ -170,4 +170,33 @@ impl SqliteEventStore {
             &ciphertext,
         )
     }
+
+    pub async fn erase_content_tx(
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        content_id: &ContentId,
+        reason_code: &str,
+    ) -> Result<(), DomainError> {
+        let now_us = OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000;
+        sqlx::query(
+            r#"
+                INSERT INTO content_tombstones (content_id, erased_at_us, reason_code)
+                VALUES (?, ?, ?)
+                ON CONFLICT(content_id) DO UPDATE SET
+                    erased_at_us = excluded.erased_at_us,
+                    reason_code = excluded.reason_code
+                "#,
+        )
+        .bind(content_id.to_string())
+        .bind(now_us as i64)
+        .bind(reason_code)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| DomainError::Storage(e.to_string()))?;
+        sqlx::query("DELETE FROM content_records WHERE content_id = ?")
+            .bind(content_id.to_string())
+            .execute(&mut **tx)
+            .await
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
+        Ok(())
+    }
 }

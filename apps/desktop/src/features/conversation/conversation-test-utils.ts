@@ -47,6 +47,15 @@ export interface ConversationFakeBackend {
       activeMessageId: string,
     ) => any
   >;
+  setMessageBookmark?: Mock<
+    (
+      workspaceId: string,
+      projectId: string,
+      sessionId: string,
+      messageId: string,
+      bookmarked: boolean,
+    ) => any
+  >;
   setAnswerFeedback: Mock<
     (
       workspaceId: string,

@@ -103,6 +103,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
   // Local like/dislike verdicts keyed by answer row: server-authoritative, so
   // a refusal never flips a chip, and a reload restores the stored verdict.
   const [answerFeedback, setAnswerFeedbackRows] = React.useState<AnswerFeedback[]>([]);
+  // Persisted bookmark ids for the loaded session, server-authoritative so a
+  // refused toggle leaves the star unchanged.
+  const [bookmarkedMessageIds, setBookmarkedMessageIds] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     if (!isDurableSessionStorageAvailable()) {
@@ -180,6 +183,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setMessages(items);
         setBranchSelections(page.branchSelections ?? []);
         setAnswerFeedbackRows(page.feedback ?? []);
+        setBookmarkedMessageIds(page.bookmarkedMessageIds ?? []);
         // Same-flush swap: the recovery snapshot (if any) is replaced by the
         // authoritative rows atomically — never two copies of an answer.
         setRecoverySnapshot(null);
@@ -244,6 +248,7 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
         setContext(resolved.context);
         createdRef.current = resolved.context;
         setMessages([]);
+        setBookmarkedMessageIds([]);
         setRecoverySnapshot(null);
         const pendingFirst = readPendingFirstSend();
         if (
@@ -492,8 +497,9 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     mutationSeqRef,
     setBranchSelections,
     setAnswerFeedbackRows,
+    setBookmarkedMessageIds,
   });
-  const { makeAlternativeActive, setAnswerFeedback } = actions;
+  const { makeAlternativeActive, setAnswerFeedback, setMessageBookmark } = actions;
 
   const stream = useConversationStream({
     backend,
@@ -558,6 +564,8 @@ export function useConversation({ backend }: { backend: ConversationBackend }) {
     makeAlternativeActive,
     answerFeedback,
     setAnswerFeedback,
+    bookmarkedMessageIds,
+    setMessageBookmark,
     streaming,
     recoverySnapshot,
     retry,

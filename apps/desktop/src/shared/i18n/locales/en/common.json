@@ -36,7 +36,23 @@
     "contextMismatch": "Selection changed. Reload and try again.",
     "requestIdConflict": "Conflicting request. Try again.",
     "preferencesConflict": "Settings changed elsewhere. Reloaded the latest values.",
-    "notSaved": "Message was not saved."
+    "notSaved": "Message was not saved.",
+    "sessionDeleted": "This session was deleted.",
+    "sessionBusy": "Another operation is still running on this session.",
+    "duplicateTooLarge": "This session is too large to duplicate.",
+    "exportTooLarge": "This session is too large to export.",
+    "exportWriteFailed": "Could not write to the selected location. Choose another folder or check its permissions.",
+    "storageRepairRequired": "Saved data needs repair before this can continue.",
+    "storageUnavailable": "Local storage is unavailable. Try again.",
+    "validation": {
+      "title_invalid": "Enter a title between 1 and 120 characters.",
+      "summary_too_long": "The summary must be 500 characters or fewer.",
+      "role_requires_query": "Enter a query before filtering by role.",
+      "date_range": "The start date must be before the end date.",
+      "empty_query": "Enter a query or choose a filter.",
+      "query_too_short": "Enter at least 2 characters.",
+      "confirm_required": "Confirm this action to continue."
+    }
   },
   "onboarding": {
     "workspaceHeading": "Set up your workspace",

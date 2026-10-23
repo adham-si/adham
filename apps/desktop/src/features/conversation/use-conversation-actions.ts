@@ -21,6 +21,7 @@ export type ActionsDeps = {
   mutationSeqRef: React.RefObject<number>;
   setBranchSelections: React.Dispatch<React.SetStateAction<BranchSelection[]>>;
   setAnswerFeedbackRows: React.Dispatch<React.SetStateAction<AnswerFeedback[]>>;
+  setBookmarkedMessageIds: React.Dispatch<React.SetStateAction<string[]>>;
 };
 
 export function useConversationActions(deps: ActionsDeps) {
@@ -33,6 +34,7 @@ export function useConversationActions(deps: ActionsDeps) {
     mutationSeqRef,
     setBranchSelections,
     setAnswerFeedbackRows,
+    setBookmarkedMessageIds,
   } = deps;
 
   /** Switch which member of an edited branch the session continues from.
@@ -111,5 +113,37 @@ export function useConversationActions(deps: ActionsDeps) {
     [backend, context, generationRef, isStale, loadSeqRef, mutationSeqRef, setAnswerFeedbackRows],
   );
 
-  return { makeAlternativeActive, setAnswerFeedback };
+  /** Toggle one persisted message bookmark. The response is the session's
+   *  ids after the write; a refusal never flips the star. */
+  const setMessageBookmark = React.useCallback(
+    async (messageId: string, bookmarked: boolean): Promise<SubmitOutcome> => {
+      const ctx = context;
+      if (!ctx?.sessionId || backend.setMessageBookmark === undefined) {
+        return { ok: false, error: i18n.t('conversation.bookmarkUnavailable'), uncertain: false };
+      }
+      const generation = generationRef.current;
+      const loadSeq = loadSeqRef.current;
+      const mutationSeq = mutationSeqRef.current;
+      try {
+        const ids = await backend.setMessageBookmark(
+          ctx.workspaceId,
+          ctx.projectId,
+          ctx.sessionId,
+          messageId,
+          bookmarked,
+        );
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return { ok: true };
+        setBookmarkedMessageIds(ids);
+        return { ok: true };
+      } catch (err) {
+        if (isStale(generation, loadSeq, mutationSeq, ctx.sessionId)) return { ok: true };
+        const message =
+          err instanceof Error ? err.message : i18n.t('conversation.bookmarkUpdateFailed');
+        return { ok: false, error: message, uncertain: false };
+      }
+    },
+    [backend, context, generationRef, isStale, loadSeqRef, mutationSeqRef, setBookmarkedMessageIds],
+  );
+
+  return { makeAlternativeActive, setAnswerFeedback, setMessageBookmark };
 }

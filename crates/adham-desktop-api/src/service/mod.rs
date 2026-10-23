@@ -3,12 +3,19 @@ pub mod attachment_dispatch;
 pub mod branch;
 pub mod common;
 pub mod feedback;
+pub mod history;
 pub mod message;
 pub mod pending;
 pub mod selection;
 pub mod session;
 pub mod workspace;
 
+pub use history::{
+    CachedContentKeyProvider, delete_session, duplicate_session, export_session_markdown,
+    read_bookmarked_message_ids, rename_session, search_history, set_message_bookmark,
+    set_session_archived, set_session_pinned, set_session_summary, suggested_export_file_name,
+    validate_export_session,
+};
 pub use message::submit_message as submit_message_atomic;
 pub use pending::{clear_pending_operation, list_pending_operations, record_pending_operation};
 pub use selection::{list_projects, list_workspaces, select_project as select_project_atomic};
