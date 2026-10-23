@@ -38,7 +38,8 @@ The Windows sweep also covers cold cleanup: after every fault path (memory exhau
 | Run | Head | Result | Notes |
 |---|---|---|---|
 | [39832719445](https://github.com/adham-si/adham/actions/runs/39832719445) | `3380b1c` | 2 failures, both corrected | (1) windows-lane clippy: `Ordering` unused on non-macOS cfg — fixed `9e80a32` (local clippy now run for all three target triples). (2) cargo-deny `advisories`: advisory-DB refresh surfaced `RUSTSEC-2026-0382` (rustls-webpki 0.103.15, pre-existing `adham-provider`→reqwest→rustls chain — **not** introduced by the island); fixed by lock-only bump `424fa41`. Windows runtime tests did not execute in this run. |
-| [39835989412](https://github.com/adham-si/adham/actions/runs/39835989412) | `df8230a` | **all three jobs success** | Definitive run: Windows runtime suite + left-alive sweep (`Get-Process`/`pgrep -x`, read-only, added in `df8230a`). |
+| [39835989412](https://github.com/adham-si/adham/actions/runs/39835989412) | `df8230a` | **all three jobs success** | Definitive pre-rebase run: Windows runtime suite + left-alive sweep (`Get-Process`/`pgrep -x`, read-only, added in `df8230a`). |
+| [40035708894](https://github.com/adham-si/adham/actions/runs/40035708894) | `d817545` | **all three jobs success** | Rebased final: Windows 11m20s, macOS 7m4s, Linux 4m18s. Rust tests, PDF island left-alive sweep, P0 regression, contracts, cargo-deny, and pnpm audit green. Jobs: [Windows](https://github.com/adham-si/adham/actions/runs/40035708894/job/120694515072), [macOS](https://github.com/adham-si/adham/actions/runs/40035708894/job/120694514779), [Linux](https://github.com/adham-si/adham/actions/runs/40035708894/job/120694514620). |
 
 ## Rebase overlap findings (2026-10-23)
 
@@ -48,7 +49,7 @@ The Windows sweep also covers cold cleanup: after every fault path (memory exhau
 - `crates/adham-desktop-api/src/service/attachment.rs` keeps the history-lane changes and adds only the PDF-refusal test.
 - `.github/workflows/ci.yml` keeps the existing lanes and adds only the left-alive sweep.
 - Local documentation commit `7340a74` was not on `main` or the PR head; its Stage-2 gate record replayed cleanly as `7bd047e`.
-- Final rebased CI is recorded in the [PR #37 check suite](https://github.com/adham-si/adham/pull/37/checks). No parser dependency, production PDF wiring, tabs, or redesign is included.
+- Final rebased CI: [run 40035708894](https://github.com/adham-si/adham/actions/runs/40035708894) at `d817545` — all three jobs success; exact job links are in the execution record above. No parser dependency, production PDF wiring, tabs, or redesign is included.
 
 ## Findings that revised the design (recorded in the design doc)
 
