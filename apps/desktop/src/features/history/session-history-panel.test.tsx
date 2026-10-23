@@ -75,6 +75,66 @@ describe('SessionHistoryPanel', () => {
     expect(onRenameSession).toHaveBeenCalledWith(session);
   });
 
+  it('keeps the same layout contract for long/short, pinned/unpinned, and active/inactive rows', () => {
+    const longSummary =
+      'Alpha — a long mixed العربية English summary that must stay clamped without changing the stored text.';
+    const longSession = {
+      id: 'sess-long',
+      title: 'Alpha — العربية English title',
+      updatedAt: '2026-10-22T10:00:00Z',
+      summary: longSummary,
+      pinned: true,
+      archived: false,
+    };
+    const shortSession = {
+      id: 'sess-short',
+      title: 'djfh',
+      updatedAt: '2026-10-22T09:00:00Z',
+      summary: 'short',
+      pinned: false,
+      archived: false,
+    };
+    renderPanel({
+      sessions: [longSession, shortSession],
+      activeSessionId: shortSession.id,
+      onRenameSession: vi.fn(),
+    });
+
+    const longButton = screen.getByText(longSession.title).closest('button');
+    const shortButton = screen.getByText(shortSession.title).closest('button');
+    if (!longButton || !shortButton) throw new Error('session row buttons were not rendered');
+
+    for (const button of [longButton, shortButton]) {
+      for (const className of [
+        'w-full',
+        'h-20',
+        'font-normal',
+        'items-start',
+        'overflow-hidden',
+        'ps-3',
+        'pe-8',
+      ]) {
+        expect(button.classList.contains(className)).toBe(true);
+      }
+      expect(button.className).not.toContain('font-medium');
+    }
+    expect(shortButton.classList.contains('bg-selection')).toBe(true);
+    expect(longButton.classList.contains('bg-selection')).toBe(false);
+
+    expect(screen.getByText(longSession.title).getAttribute('dir')).toBe('auto');
+    expect(screen.getByText(longSummary).getAttribute('dir')).toBe('auto');
+    expect(screen.getByText(longSummary).classList.contains('line-clamp-2')).toBe(true);
+    expect(screen.getByText(longSummary).textContent).toBe(longSummary);
+
+    const triggers = screen.getAllByRole('button', { name: 'Session actions' });
+    expect(triggers).toHaveLength(2);
+    for (const trigger of triggers) {
+      expect(trigger.classList.contains('size-6')).toBe(true);
+      expect(trigger.classList.contains('end-2')).toBe(true);
+      expect(trigger.classList.contains('top-2')).toBe(true);
+    }
+  });
+
   it('does not search a one-character query and explains the minimum', async () => {
     const api = backend(response());
     renderPanel({ backend: api });

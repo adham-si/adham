@@ -45,43 +45,56 @@ export function SessionRow({
       onSetArchived,
   );
   return (
-    <div className="group relative">
+    <div className="group relative w-full min-w-0">
       <SidebarItem
         selected={active}
         onClick={() => onSelect(session.id)}
-        className="items-start py-2 pe-8"
+        className="h-20 w-full min-w-0 items-start overflow-hidden py-2 ps-3 pe-8 font-normal"
       >
         <AdhamIcon size="sm" label={session.title}>
           <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
         </AdhamIcon>
-        <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate">{session.title}</span>
-            {session.pinned ? (
-              <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
-                {t('sidebar.pinned', 'Pinned')}
-              </span>
-            ) : null}
-            {session.archived ? (
-              <span className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted">
-                {t('sidebar.archived', 'Archived')}
-              </span>
-            ) : null}
+            <span dir="auto" className="min-w-0 flex-1 truncate">
+              {session.title}
+            </span>
+            <span className="flex shrink-0 items-center gap-1">
+              {session.pinned ? (
+                <span
+                  dir="auto"
+                  className="rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted"
+                >
+                  {t('sidebar.pinned', 'Pinned')}
+                </span>
+              ) : null}
+              {session.archived ? (
+                <span
+                  dir="auto"
+                  className="rounded bg-surface-subtle px-1 py-0.5 text-[10px] font-normal text-foreground-muted"
+                >
+                  {t('sidebar.archived', 'Archived')}
+                </span>
+              ) : null}
+            </span>
           </span>
           {matchLabel ? (
-            <span className="text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
+            <span
+              dir="auto"
+              className="text-[10px] font-medium uppercase tracking-wide text-foreground-muted"
+            >
               {matchLabel}
             </span>
           ) : null}
           {attachmentName ? (
-            <span className="truncate text-[11px] font-normal text-foreground-muted">
+            <span dir="auto" className="truncate text-[11px] font-normal text-foreground-muted">
               {attachmentName}
             </span>
           ) : null}
           {(snippet ?? session.summary) ? (
             <span
               dir="auto"
-              className="line-clamp-2 text-[11px] font-normal leading-snug text-foreground-muted"
+              className="line-clamp-2 min-w-0 text-[11px] font-normal leading-snug text-foreground-muted"
             >
               {snippet ?? session.summary}
             </span>
@@ -93,7 +106,7 @@ export function SessionRow({
           <MenuTrigger
             disabled={actionsDisabled}
             aria-label={t('conversation.sessionActions.label', 'Session actions')}
-            className="absolute end-1 top-1 rounded px-1.5 py-0.5 text-sm text-foreground-muted opacity-0 hover:bg-surface-hover focus-visible:opacity-100 group-hover:opacity-100"
+            className="absolute end-2 top-2 flex size-6 items-center justify-center rounded text-sm leading-none text-foreground-muted opacity-0 hover:bg-surface-hover focus-visible:opacity-100 group-hover:opacity-100"
           >
             <span aria-hidden="true">⋯</span>
           </MenuTrigger>
