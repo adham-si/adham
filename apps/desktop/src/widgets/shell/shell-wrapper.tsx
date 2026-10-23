@@ -36,8 +36,20 @@ function ShellInner({
   ...props
 }: ShellProps & { innerRef?: React.ForwardedRef<HTMLDivElement> }) {
   const { t } = useTranslation();
-  const { navRailOpen, sidebarOpen, secondarySidebarOpen, panelOpen } = useShellLayout();
+  const { navRailOpen, sidebarOpen, secondarySidebarOpen, panelOpen, setSidebarOpen } =
+    useShellLayout();
   const isFullWidthHeader = config?.headerPosition === 'full-width';
+
+  // A first send carries the new title; reveal the list it lands in even if
+  // the user had closed the sidebar. Ordinary session selection stays quiet.
+  React.useEffect(() => {
+    const onSessionCreated = (event: Event) => {
+      const detail = (event as CustomEvent<{ title?: string | null }>).detail;
+      if (detail?.title) setSidebarOpen(true);
+    };
+    window.addEventListener('adham:session-active', onSessionCreated);
+    return () => window.removeEventListener('adham:session-active', onSessionCreated);
+  }, [setSidebarOpen]);
 
   const navRailNode = navRail && navRailOpen ? navRail : null;
   const sidebarNode = sidebar ? sidebar : null;
