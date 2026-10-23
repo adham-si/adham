@@ -1,3 +1,4 @@
+// Size exception (AGENTS.md): export acceptance cases share one disposable database fixture and cleanup.
 mod common;
 use common::*;
 
