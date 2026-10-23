@@ -4,7 +4,7 @@
 **Decision:** accepted for the native Save As panel used by Markdown export in PR #39  
 **Human approval:** operator approved native Save As on 2026-10-23 with the requirement to keep the selected destination narrow, preserve the plaintext warning/5 MB cap/atomic write, and complete this record before commit.
 
-The dependency is present only in the uncommitted PR #39 working tree. This record is completed before commit, release, or merge; no shipped artifact contains it yet.
+The dependency is committed on the PR #39 branch but is not merged or released. This record was completed before the dependency commit; no shipped artifact contains it yet.
 
 ## Section 9 record
 
