@@ -13,6 +13,7 @@ members = [
     "crates/adham-graph",
     "crates/adham-memory",
     "crates/adham-extensions",
+    "crates/adham-pdf-island",
     "apps/desktop/src-tauri",
     "xtask",
 ]
