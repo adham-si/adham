@@ -29,6 +29,26 @@ describe('DeleteSessionDialog', () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
+  it('cancels without deleting', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    render(
+      <DeleteSessionDialog
+        open
+        sessionTitle="History row"
+        busy={false}
+        error={null}
+        onClose={onClose}
+        onDelete={onDelete}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
   it('disables both actions while busy and shows the failure', async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
