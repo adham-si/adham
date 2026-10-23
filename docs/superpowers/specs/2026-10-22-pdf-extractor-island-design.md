@@ -101,13 +101,12 @@ Demo matrix (commands + outputs in `docs/reports/pdf-island-stage1-evidence.md`)
 
 ## Cross-lane shared-file ownership (measured, not guessed)
 
-Branches: this lane `feat/conversation-02-pdf` (= main + PR #36 merge), teammate `feat/conversation-03-history`, both cut from current `main` head; PR #36 is **not on main yet**.
+Branches: this lane `feat/conversation-02-pdf`, rebased onto `main` at `78ff6a8` (history PR #39 merged). The history lane is merged; the rebased PDF head is `7bd047e`.
 
-- Files changed by both lanes vs main since their common base: **245** (the whole conversation-01 lineage is in both).
-- Files that actually **differ between the two lane tips**: **75** — the real rebase surface. Among them: core-types events/identifiers, event-log, projections, desktop-api dtos/handlers/service, ipc contract tests, extensions/tooling, event schema JSON — all history-lane owned; none are mine to touch.
-- **Attachment files are identical across lane tips** (`git diff` empty for `service/attachment.rs`, `dtos/attachment.rs`) — converged content, zero conflict.
-- This lane's Stage-1 footprint: new crate `crates/adham-pdf-island/*` (exclusive), root `Cargo.toml` + `Cargo.lock` (workspace-shared, **append-only** member + exactly the island crate's dep nodes), two attachment-module tests (test-only), docs (exclusive).
-- Owned integration points for later waves: `service/attachment.rs` + wrappers, `dtos/attachment.rs`, i18n attachment locales, UI `features/conversation/attachments/` — **merge order stays history → pdf rebase**.
+- Rebase overlap was measured against the merged history lane. The only conflict was `Cargo.lock`: main's `tokio 1.53.3`, `tauri-plugin-dialog 2.8.3`, and `windows-sys 0.61.2` were preserved; the island adds its own `windows-sys 0.59.0` node and crate entry. `rustls-webpki 0.103.16` was already on main, so the PDF lock-only commit became empty and was dropped.
+- Root `Cargo.toml` adds only the `crates/adham-pdf-island` member. `service/attachment.rs` keeps the history-lane changes and adds only the PDF-refusal test. `.github/workflows/ci.yml` keeps the existing lanes and adds only the left-alive sweep.
+- This lane's Stage-1 footprint: new crate `crates/adham-pdf-island/*` (exclusive), root `Cargo.toml` + `Cargo.lock` (workspace-shared, **append-only** member + island dep nodes), test-only attachment addition, docs (exclusive).
+- Owned integration points for later waves: `service/attachment.rs` + wrappers, `dtos/attachment.rs`, i18n attachment locales, UI `features/conversation/attachments/` — history is merged; no PDF integration is included in this PR.
 
 ## Dependency record (section-9, ready for the risk decision)
 
@@ -121,7 +120,7 @@ Branches: this lane `feat/conversation-02-pdf` (= main + PR #36 merge), teammate
 
 ## Stage-2 hardening prerequisites (recorded 2026-10-22, PM-ordered — gates, not notes)
 
-From the Stage-1 full-diff review at `2ce01ea`; each holds regardless of other sign-offs:
+From the Stage-1 full-diff review at `2ce01ea`, replayed as `7bd047e`; each holds regardless of other sign-offs. These are future gates, not completed protections:
 
 1. **Bounded stderr draining — mandatory before parser integration.** `supervisor.rs` currently collects the island's stderr with an unbounded read; a parser-era island that floods stderr could exhaust the supervisor itself. Land a capped tail (ring, ~64 KiB) **plus a stderr-flood regression test** (a stdin-only island mode that floods stderr indefinitely, with a proof the supervisor stays bounded and reaps) before any parser code enters the island.
 2. **Terminal-TRUNC handling — prerequisite for the real-parser hand-off.** Stage 1 tolerates `TRUNC` mid-stream and pages after it (chars stay cap-guarded). The parser wave must enforce: at most one `TRUNC`, as the final stdout line only; anything after it is a `MalformedOutput` refusal.
@@ -129,11 +128,11 @@ From the Stage-1 full-diff review at `2ce01ea`; each holds regardless of other s
 
 ## Teammate coordination (as instructed)
 
-The parallel teammate is on `feat/conversation-03-history` (issue #32 history; worktree `.kilo/worktrees/conversation-01-lifecycle`; history events in core-types, event-log schema, projections, settings/conversation UI). Measured ownership above replaces the draft's warnings: Stage-1 files cannot collide; wave 3 files are exactly where the 75-file divergence ends (dtos/handlers/i18n) — rebase after history merges, do not rebase the teammate.
+The parallel history lane merged as PR #39. The PDF lane was rebased onto it; the overlap is recorded in the evidence report. No history-lane change was reverted, and no PDF integration is included in this PR.
 
 ## Open decisions for the human (still blocked on 1–3; unchanged by Stage 1)
 
 1. **Accept-risk sign-off** for 1.25.2 behind the island walls (recommended: walls hold against today's known PoCs; alternative: wait for a fixed release — PDF stays honestly unavailable meanwhile).
 2. **Numbers nod**: 30 s clock, ~512 MiB RSS (kill-on-limit on macOS; observed trips 538–584 MiB across 6 run-measurements, no tighter bound demonstrated), 20k/page, 1 MiB line guard as contract.
-3. **Merge order**: history (teammate) before pdf; pdf rebases onto merged history.
+3. **Merge order**: history merged as #39; pdf rebase completed. This PR remains infrastructure-only and unmerged.
 4. **OS-level confinement** (deferred, unimplemented): Stage-1 fs/network restraint is by-construction (no such code compiles into the island) plus a sources tripwire — not OS access control. Real confinement (macOS seatbelt profile, Linux seccomp/AppArmor/namespace, Windows AppContainer/restricted token) needs its own design + authorization before the parser stage.

@@ -1,6 +1,6 @@
 # PDF island — Stage 1 evidence (dependency-free extractor-process prototype)
 
-Date: 2026-10-22. Branch: `feat/conversation-02-pdf`, base `f10f907` (PR #36 merge). The changeset carrying this report is the revision for all gate claims below. All data is synthetic — no user content, no secrets, no raw app-data paths.
+Date: 2026-10-23 (rebased). Branch: `feat/conversation-02-pdf`, rebased onto `main` at `78ff6a8` (history PR #39 merged). The rebased code head is `7bd047e`; the docs-only evidence commit that carries this report follows it. All data is synthetic — no user content, no secrets, no raw app-data paths.
 
 ## Scope
 
@@ -21,7 +21,7 @@ Date: 2026-10-22. Branch: `feat/conversation-02-pdf`, base `f10f907` (PR #36 mer
 
 Total: **13/13 tests green** (1 source-policy unit + 12 boundary integration), `clippy --all-targets -D warnings` clean, `cargo fmt --check` clean.
 
-## Platform demonstration (final matrix, revision-tagged `df8230a`, run [39835989412](https://github.com/adham-si/adham/actions/runs/39835989412))
+## Platform demonstration (pre-rebase Stage-1 matrix at `df8230a`, run [39835989412](https://github.com/adham-si/adham/actions/runs/39835989412))
 
 | Platform | Mechanism | Runtime suite result | Worker left-alive sweep |
 |---|---|---|---|
@@ -39,6 +39,16 @@ The Windows sweep also covers cold cleanup: after every fault path (memory exhau
 |---|---|---|---|
 | [39832719445](https://github.com/adham-si/adham/actions/runs/39832719445) | `3380b1c` | 2 failures, both corrected | (1) windows-lane clippy: `Ordering` unused on non-macOS cfg — fixed `9e80a32` (local clippy now run for all three target triples). (2) cargo-deny `advisories`: advisory-DB refresh surfaced `RUSTSEC-2026-0382` (rustls-webpki 0.103.15, pre-existing `adham-provider`→reqwest→rustls chain — **not** introduced by the island); fixed by lock-only bump `424fa41`. Windows runtime tests did not execute in this run. |
 | [39835989412](https://github.com/adham-si/adham/actions/runs/39835989412) | `df8230a` | **all three jobs success** | Definitive run: Windows runtime suite + left-alive sweep (`Get-Process`/`pgrep -x`, read-only, added in `df8230a`). |
+
+## Rebase overlap findings (2026-10-23)
+
+- The lane was rebased from the pre-#39 base `f10f907` onto `78ff6a8` (history PR #39 merged).
+- `Cargo.lock` was the only conflict. Main's `tokio 1.53.3`, `tauri-plugin-dialog 2.8.3`, and `windows-sys 0.61.2` selections were preserved; the island adds its own `windows-sys 0.59.0` dependency node and crate entry. `rustls-webpki 0.103.16` was already present on main, so the PDF lock-only commit `424fa41` became empty and was dropped by the rebase. The final lock diff is append-only: the island crate entry only.
+- Root `Cargo.toml` adds only the `crates/adham-pdf-island` member. No history-lane manifest change was reverted.
+- `crates/adham-desktop-api/src/service/attachment.rs` keeps the history-lane changes and adds only the PDF-refusal test.
+- `.github/workflows/ci.yml` keeps the existing lanes and adds only the left-alive sweep.
+- Local documentation commit `7340a74` was not on `main` or the PR head; its Stage-2 gate record replayed cleanly as `7bd047e`.
+- Final rebased CI is recorded in the [PR #37 check suite](https://github.com/adham-si/adham/pull/37/checks). No parser dependency, production PDF wiring, tabs, or redesign is included.
 
 ## Findings that revised the design (recorded in the design doc)
 
@@ -82,14 +92,14 @@ cargo test -p adham-desktop-api still_refuses_pdf_attachments   # PASS
 
 ## Final code review (2026-10-22) — synthetic scope only
 
-Full-diff review at head `2ce01ea` (island crate + tests + CI sweep + docs + lock): **approved, strictly for the synthetic scope as shipped** — no PDF parser, stdin-synthetic worker only, PDF attachments still refuse at ingest. The verdict does not cover parser-integrated behavior, real PDFs, hostile input, or OS confinement (not implemented; resource walls only). No security-critical defect found in the synthetic scope; the review's non-blocking resource/protocol notes were promoted to design gates ("Stage-2 hardening prerequisites" in the design doc).
+Full-diff review at pre-rebase head `2ce01ea`, replayed as rebased head `7bd047e` (island crate + tests + CI sweep + docs + lock): **approved, strictly for the synthetic scope as shipped** — no PDF parser, stdin-synthetic worker only, PDF attachments still refuse at ingest. The verdict does not cover parser-integrated behavior, real PDFs, hostile input, or OS confinement (not implemented; resource walls only). No security-critical defect found in the synthetic scope; the review's non-blocking resource/protocol notes were promoted to design gates ("Stage-2 hardening prerequisites" in the design doc).
 
 ## Unverified / open
 
 - Parser behavior on real PDFs (`pdfEncrypted` vs `pdfCorrupt` distinguishability), PoC-style fixtures, fuzz, and production wiring — Stage 2+, authorization-gated. Not attempted in Stage 1.
 - The dependency-risk decision itself — `docs/reports/dependency-record-pdf-inspector.md` awaits the PM's sign-off.
 - fs/network **confinement** remains unimplemented (by-construction only); OS sandboxing is a separate design decision (design doc "Open decisions" #4).
-- PM-ordered gates recorded 2026-10-22: bounded stderr draining (+ stderr-flood regression test) is **mandatory before parser integration**; terminal-TRUNC handling and Unicode-safe truncation are **prerequisites for the real-parser hand-off**.
+- PM-ordered gates recorded 2026-10-22: bounded stderr draining (+ stderr-flood regression test) is **mandatory before parser integration**; terminal-TRUNC handling and Unicode-safe truncation are **prerequisites for the real-parser hand-off**. These are recorded future gates, not completed protections: Stage 1 still has an unbounded stderr read, tolerates mid-stream `TRUNC`, and has no Unicode-safe truncation implementation.
 
 ## Files
 
