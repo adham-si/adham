@@ -5,6 +5,7 @@ use crate::dtos::{
     SessionSearchRequest, SessionSearchResponse, SetSessionArchivedPayload,
     SetSessionPinnedPayload, SetSessionSummaryPayload,
 };
+use std::path::PathBuf;
 
 pub async fn handle_rename_session(
     ctx: &ApiContext,
@@ -56,9 +57,17 @@ pub async fn handle_delete_session(
     crate::service::delete_session(ctx, env).await
 }
 
+pub async fn handle_validate_export_session(
+    ctx: &ApiContext,
+    context: &CommandContext,
+) -> Result<(), String> {
+    crate::service::validate_export_session(ctx, context).await
+}
+
 pub async fn handle_export_session_markdown(
     ctx: &ApiContext,
     context: CommandContext,
+    destination: PathBuf,
 ) -> Result<ExportSessionResponse, String> {
-    crate::service::export_session_markdown(ctx, context).await
+    crate::service::export_session_markdown(ctx, context, destination).await
 }

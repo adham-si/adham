@@ -151,9 +151,13 @@ async fn delete_tombstones_purges_and_keeps_exported_markdown() {
         .await
         .unwrap();
 
-    let exported = handle_export_session_markdown(&ctx, context(&ws, &proj, Some(&session)))
-        .await
-        .unwrap();
+    let export_path = db_path.with_extension("exports").join(
+        adham_desktop_api::service::suggested_export_file_name(Some("Victim"), &session),
+    );
+    let exported =
+        handle_export_session_markdown(&ctx, context(&ws, &proj, Some(&session)), export_path)
+            .await
+            .unwrap();
     let exported_body = std::fs::read_to_string(&exported.path).unwrap();
     let content_ids: Vec<String> =
         sqlx::query_scalar("SELECT content_id FROM content_records WHERE session_id = ?")

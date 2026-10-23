@@ -13,7 +13,8 @@ pub mod workspace;
 pub use history::{
     CachedContentKeyProvider, delete_session, duplicate_session, export_session_markdown,
     read_bookmarked_message_ids, rename_session, search_history, set_message_bookmark,
-    set_session_archived, set_session_pinned, set_session_summary,
+    set_session_archived, set_session_pinned, set_session_summary, suggested_export_file_name,
+    validate_export_session,
 };
 pub use message::submit_message as submit_message_atomic;
 pub use pending::{clear_pending_operation, list_pending_operations, record_pending_operation};

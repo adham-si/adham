@@ -178,6 +178,20 @@ describe('AdhamApiClient request identity', () => {
     );
   });
 
+  it('returns null and passes the suggested title when export Save As is canceled', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(null);
+    const client = new AdhamApiClient();
+
+    await expect(
+      client.exportSessionMarkdown('ws-1', 'proj-1', 'sess-1', 'History row'),
+    ).resolves.toBeNull();
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('export_session_markdown', {
+      context: { workspaceId: 'ws-1', projectId: 'proj-1', sessionId: 'sess-1' },
+      suggestedTitle: 'History row',
+    });
+  });
+
   it('validates getPlatformInfo returns schema-parsed platform metadata', async () => {
     vi.mocked(invoke).mockResolvedValueOnce({
       os: 'macos',

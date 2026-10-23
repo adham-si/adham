@@ -86,6 +86,8 @@ const MESSAGE_KEY_FALLBACKS: Record<string, string> = {
   'error.sessionBusy': 'Another operation is still running on this session.',
   'error.duplicateTooLarge': 'This session is too large to duplicate.',
   'error.exportTooLarge': 'This session is too large to export.',
+  'error.exportWriteFailed':
+    'Could not write to the selected location. Choose another folder or check its permissions.',
   'error.storageRepairRequired': 'Saved data needs repair before this can continue.',
   'error.storageUnavailable': 'Local storage is unavailable. Try again.',
   'error.validation.title_invalid': 'Enter a title between 1 and 120 characters.',

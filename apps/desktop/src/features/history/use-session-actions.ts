@@ -51,7 +51,8 @@ export interface SessionActionsBackend {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-  ): Promise<ExportSessionResponse>;
+    suggestedTitle: string,
+  ): Promise<ExportSessionResponse | null>;
   deleteSession(
     workspaceId: string,
     projectId: string,
@@ -79,6 +80,7 @@ export function useSessionActions({
   const [error, setError] = React.useState<string | null>(null);
   const [renameTarget, setRenameTarget] = React.useState<SessionActionTarget | null>(null);
   const [exportTarget, setExportTarget] = React.useState<SessionActionTarget | null>(null);
+  const [exportNotice, setExportNotice] = React.useState<ExportSessionResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<SessionActionTarget | null>(null);
 
   const run = React.useCallback(
@@ -109,12 +111,17 @@ export function useSessionActions({
 
   const openExport = React.useCallback((target: SessionActionTarget) => {
     setError(null);
+    setExportNotice(null);
     setExportTarget(target);
   }, []);
 
   const closeExport = React.useCallback(() => {
     setExportTarget(null);
     setError(null);
+  }, []);
+
+  const closeExportNotice = React.useCallback(() => {
+    setExportNotice(null);
   }, []);
 
   const openDelete = React.useCallback((target: SessionActionTarget) => {
@@ -158,8 +165,19 @@ export function useSessionActions({
       if (!workspaceId || !projectId) return null;
       setBusyId(target.id);
       setError(null);
+      setExportNotice(null);
       try {
-        return await backend.exportSessionMarkdown(workspaceId, projectId, target.id);
+        const exported = await backend.exportSessionMarkdown(
+          workspaceId,
+          projectId,
+          target.id,
+          target.title,
+        );
+        if (exported) {
+          setExportNotice(exported);
+          setExportTarget(null);
+        }
+        return exported;
       } catch (err) {
         setError(rejectionMessage(err));
         return null;
@@ -274,8 +292,10 @@ export function useSessionActions({
     saveSummary,
     duplicate,
     exportTarget,
+    exportNotice,
     openExport,
     closeExport,
+    closeExportNotice,
     exportSession,
     deleteTarget,
     openDelete,

@@ -41,6 +41,7 @@
     "sessionBusy": "Another operation is still running on this session.",
     "duplicateTooLarge": "This session is too large to duplicate.",
     "exportTooLarge": "This session is too large to export.",
+    "exportWriteFailed": "Could not write to the selected location. Choose another folder or check its permissions.",
     "storageRepairRequired": "Saved data needs repair before this can continue.",
     "storageUnavailable": "Local storage is unavailable. Try again.",
     "validation": {

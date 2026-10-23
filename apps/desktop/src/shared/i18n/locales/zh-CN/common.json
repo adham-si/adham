@@ -41,6 +41,7 @@
     "sessionBusy": "此会话仍有其他操作正在运行。",
     "duplicateTooLarge": "此会话过大，无法复制。",
     "exportTooLarge": "此会话过大，无法导出。",
+    "exportWriteFailed": "无法写入所选位置。请选择其他文件夹或检查其权限。",
     "storageRepairRequired": "保存的数据需要修复后才能继续。",
     "storageUnavailable": "本地存储不可用。请重试。",
     "validation": {

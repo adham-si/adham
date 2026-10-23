@@ -4,13 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExportSessionDialog } from './export-session-dialog';
 
 describe('ExportSessionDialog', () => {
-  it('warns before export, then shows the path, bytes, and copies it', async () => {
+  it('warns before export and closes after a successful save', async () => {
     const user = userEvent.setup();
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    });
+    const onClose = vi.fn();
     const onExport = vi.fn().mockResolvedValue({ path: '/tmp/exports/History-id.md', bytes: 1536 });
     render(
       <ExportSessionDialog
@@ -18,23 +14,42 @@ describe('ExportSessionDialog', () => {
         sessionTitle="History row"
         busy={false}
         error={null}
-        onClose={vi.fn()}
+        onClose={onClose}
         onExport={onExport}
       />,
     );
 
     expect(screen.getByText(/unencrypted Markdown file/)).toBeDefined();
     expect(screen.getByText(/not deleted when you delete the session/)).toBeDefined();
-    expect(screen.getByText(/fixed exports folder/)).toBeDefined();
+    expect(screen.queryByText(/fixed exports folder/)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onExport).toHaveBeenCalledTimes(1);
+    expect(screen.queryByDisplayValue('/tmp/exports/History-id.md')).toBeNull();
+    expect(screen.queryByText(/Export complete/)).toBeNull();
+  });
+
+  it('keeps the dialog open when the native Save As panel is canceled', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onExport = vi.fn().mockResolvedValue(null);
+    render(
+      <ExportSessionDialog
+        open
+        sessionTitle="History row"
+        busy={false}
+        error={null}
+        onClose={onClose}
+        onExport={onExport}
+      />,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Export Markdown' }));
     await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));
-    expect(screen.getByDisplayValue('/tmp/exports/History-id.md')).toBeDefined();
-    expect(screen.getByText('1,536 bytes')).toBeDefined();
-
-    await user.click(screen.getByRole('button', { name: 'Copy path' }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('/tmp/exports/History-id.md'));
-    expect(screen.getByRole('button', { name: 'Copied' })).toBeDefined();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Export Markdown' })).toBeDefined();
   });
 
   it('shows the localized failure and disables export while busy', async () => {

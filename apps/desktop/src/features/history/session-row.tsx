@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { AdhamIcon, MenuContent, MenuItem, MenuRoot, MenuTrigger, SidebarItem } from '@adham/ui';
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger, SidebarItem } from '@adham/ui';
 import type { SessionSummary } from '@/widgets/shell/primary-sidebar/primary-sidebar';
 
 export interface SessionRowProps {
@@ -49,11 +49,8 @@ export function SessionRow({
       <SidebarItem
         selected={active}
         onClick={() => onSelect(session.id)}
-        className="h-20 w-full min-w-0 items-start overflow-hidden py-2 ps-3 pe-8 font-normal"
+        className="h-22 w-full min-w-0 items-start overflow-hidden py-2 ps-3 pe-8 rtl:text-right ltr:text-left font-normal"
       >
-        <AdhamIcon size="sm" label={session.title}>
-          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-        </AdhamIcon>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
             <span dir="auto" className="min-w-0 flex-1 truncate">
@@ -78,23 +75,27 @@ export function SessionRow({
               ) : null}
             </span>
           </span>
-          {matchLabel ? (
-            <span
-              dir="auto"
-              className="text-[10px] font-medium uppercase tracking-wide text-foreground-muted"
-            >
-              {matchLabel}
-            </span>
-          ) : null}
-          {attachmentName ? (
-            <span dir="auto" className="truncate text-[11px] font-normal text-foreground-muted">
-              {attachmentName}
+          {matchLabel || attachmentName ? (
+            <span className="flex min-w-0 items-center gap-1.5 text-[10px] leading-none text-foreground-muted">
+              {matchLabel ? (
+                <span
+                  dir="auto"
+                  className="shrink-0 rounded bg-surface-subtle px-1 py-0.5 font-medium uppercase tracking-wide"
+                >
+                  {matchLabel}
+                </span>
+              ) : null}
+              {attachmentName ? (
+                <span dir="auto" className="min-w-0 truncate" title={attachmentName}>
+                  {attachmentName}
+                </span>
+              ) : null}
             </span>
           ) : null}
           {(snippet ?? session.summary) ? (
             <span
               dir="auto"
-              className="line-clamp-2 min-w-0 text-[11px] font-normal leading-snug text-foreground-muted"
+              className="line-clamp-2 min-w-0 break-words text-start text-[11px] font-normal leading-snug text-foreground-muted"
             >
               {snippet ?? session.summary}
             </span>

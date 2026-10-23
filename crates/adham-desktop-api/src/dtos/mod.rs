@@ -522,6 +522,12 @@ impl ErrorEnvelope {
                 "error.storageRepairRequired".to_string(),
                 false,
             )
+        } else if err.starts_with("EXPORT_WRITE_FAILED") {
+            (
+                PublicErrorCode::StorageUnavailable,
+                "error.exportWriteFailed".to_string(),
+                false,
+            )
         } else if err.starts_with("STORAGE_UNAVAILABLE") {
             (
                 PublicErrorCode::StorageUnavailable,

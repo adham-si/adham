@@ -12,7 +12,7 @@ pub use actions::{rename_session, set_session_archived, set_session_pinned};
 pub use bookmarks::{read_bookmarked_message_ids, set_message_bookmark};
 pub use delete::delete_session;
 pub use duplicate::duplicate_session;
-pub use export::export_session_markdown;
+pub use export::{export_session_markdown, suggested_export_file_name, validate_export_session};
 pub use key_cache::CachedContentKeyProvider;
 pub use list::list_sessions;
 #[allow(unused_imports)]

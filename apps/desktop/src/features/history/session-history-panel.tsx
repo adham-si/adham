@@ -60,16 +60,22 @@ function sessionFromResult(result: SessionSearchResult): SessionSummary {
   };
 }
 
-function matchLabel(matchKind: string, t: (key: string, fallback: string) => string): string {
-  switch (matchKind) {
+function matchLabel(
+  result: SessionSearchResult,
+  t: (key: string, fallback: string) => string,
+): string {
+  if (result.matchKind === 'attachment') {
+    return result.snippet
+      ? t('conversation.historySearch.match.attachmentText', 'Attachment text')
+      : t('conversation.historySearch.match.attachmentFileName', 'Attachment file name');
+  }
+  switch (result.matchKind) {
     case 'title':
       return t('conversation.historySearch.match.title', 'Title');
     case 'summary':
       return t('conversation.historySearch.match.summary', 'Summary');
     case 'message':
       return t('conversation.historySearch.match.message', 'Message');
-    case 'attachment':
-      return t('conversation.historySearch.match.attachment', 'Attachment');
     case 'bookmark':
       return t('conversation.historySearch.match.bookmark', 'Bookmark');
     default:
@@ -190,12 +196,26 @@ export function SessionHistoryPanel({
         <div className="mt-1.5 flex items-center justify-between gap-2">
           <button
             type="button"
+            aria-label={t('conversation.historySearch.filters', 'Filters')}
+            title={t('conversation.historySearch.filters', 'Filters')}
             aria-expanded={showFilters}
             aria-controls="session-history-filters"
             onClick={() => setShowFilters((current) => !current)}
-            className="rounded px-1 py-0.5 text-[11px] font-medium text-foreground-muted hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-action"
+            className={`relative flex size-7 items-center justify-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-action ${
+              showFilters
+                ? 'border-focus bg-selection text-action'
+                : 'border-border-subtle bg-surface text-foreground-muted hover:bg-surface-hover hover:text-foreground'
+            }`}
           >
-            {t('conversation.historySearch.filters', 'Filters')}
+            <AdhamIcon size="sm">
+              <path d="M4 5h16l-6 7v5l-4 2v-7z" />
+            </AdhamIcon>
+            {activeFilter ? (
+              <span
+                aria-hidden="true"
+                className="absolute end-1 top-1 size-1.5 rounded-full bg-action"
+              />
+            ) : null}
           </button>
           {search.loading ? (
             <span role="status" className="text-[11px] text-foreground-muted">
@@ -550,7 +570,7 @@ function SearchResults({
               session={session}
               active={activeSessionId === result.sessionId}
               onSelect={() => onSelect(result)}
-              matchLabel={matchLabel(result.matchKind, t)}
+              matchLabel={matchLabel(result, t)}
               snippet={result.snippet ?? undefined}
               attachmentName={result.attachmentName ?? undefined}
               onRenameSession={onRenameSession}

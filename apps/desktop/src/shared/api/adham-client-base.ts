@@ -180,7 +180,8 @@ export interface AdhamClient {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-  ): Promise<{ path: string; bytes: number }>;
+    suggestedTitle?: string,
+  ): Promise<{ path: string; bytes: number } | null>;
   submitMessage(
     workspaceId: string,
     projectId: string,
@@ -484,11 +485,13 @@ export class AdhamApiClientBase implements AdhamClient {
     workspaceId: string,
     projectId: string,
     sessionId: string,
-  ): Promise<{ path: string; bytes: number }> {
-    const result = await invoke<{ path: string; bytes: number }>('export_session_markdown', {
+    suggestedTitle?: string,
+  ): Promise<{ path: string; bytes: number } | null> {
+    const result = await invoke<{ path: string; bytes: number } | null>('export_session_markdown', {
       context: { workspaceId, projectId, sessionId },
+      suggestedTitle: suggestedTitle ?? null,
     });
-    return ExportSessionResponseSchema.parse(result);
+    return result === null ? null : ExportSessionResponseSchema.parse(result);
   }
 
   async submitMessage(

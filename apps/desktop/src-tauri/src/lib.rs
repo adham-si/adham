@@ -23,6 +23,7 @@ use adham_desktop_api::{
 };
 #[cfg(target_os = "macos")]
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 #[cfg(all(test, not(windows)))]
 mod ipc_contract_tests;
@@ -365,11 +366,40 @@ async fn mark_completion_interrupted(
 
 #[tauri::command]
 async fn export_session_markdown(
+    app: tauri::AppHandle,
     state: tauri::State<'_, ApiContext>,
     context: CommandContext,
-) -> Result<ExportSessionResponse, ErrorEnvelope> {
-    adham_desktop_api::handle_export_session_markdown(&state, context)
+    suggested_title: Option<String>,
+) -> Result<Option<ExportSessionResponse>, ErrorEnvelope> {
+    adham_desktop_api::handle_validate_export_session(&state, &context)
         .await
+        .map_err(|e| ErrorEnvelope::from_error_str(&e))?;
+    let file_name = adham_desktop_api::service::suggested_export_file_name(
+        suggested_title.as_deref(),
+        context.session_id.as_deref().unwrap_or("session"),
+    );
+    let (path_tx, path_rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_file_name(file_name)
+        .add_filter("Markdown", &["md"])
+        .save_file(move |path| {
+            let _ = path_tx.send(path);
+        });
+
+    let Some(path) = path_rx.await.map_err(|_| {
+        ErrorEnvelope::from_error_str("EXPORT_WRITE_FAILED: save dialog did not return a path")
+    })?
+    else {
+        return Ok(None);
+    };
+    let destination = path.into_path().map_err(|error| {
+        ErrorEnvelope::from_error_str(&format!("EXPORT_WRITE_FAILED: selected path: {error}"))
+    })?;
+
+    adham_desktop_api::handle_export_session_markdown(&state, context, destination)
+        .await
+        .map(Some)
         .map_err(|e| ErrorEnvelope::from_error_str(&e))
 }
 
@@ -516,6 +546,7 @@ pub fn run() {
     });
 
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(api_ctx)
         .setup(|app| {
             let mut window_config = app

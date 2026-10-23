@@ -145,8 +145,15 @@ describe('useSessionActions', () => {
     await act(async () => {
       exported = await result.current.exportSession(session);
     });
-    expect(backend.exportSessionMarkdown).toHaveBeenCalledWith('ws-1', 'proj-1', 'sess-1');
+    expect(backend.exportSessionMarkdown).toHaveBeenCalledWith(
+      'ws-1',
+      'proj-1',
+      'sess-1',
+      'History row',
+    );
     expect(exported).toEqual({ path: '/tmp/exports/History.md', bytes: 12 });
+    expect(result.current.exportTarget).toBeNull();
+    expect(result.current.exportNotice).toEqual({ path: '/tmp/exports/History.md', bytes: 12 });
     expect(onChanged).toHaveBeenCalledTimes(5);
 
     sessionStorage.setItem(

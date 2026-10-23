@@ -359,7 +359,9 @@ describe('WorkspaceSelection', () => {
         onSelectProject={onSelect}
       />,
     );
-    await user.click(screen.getByRole('button', { name: /select workspace/i }));
+    const trigger = screen.getByRole('button', { name: /select workspace/i });
+    expect(trigger.classList.contains('text-start')).toBe(true);
+    await user.click(trigger);
     expect(screen.getByText('WS')).toBeDefined();
     expect(screen.getByRole('menuitem', { name: 'Proj' })).toBeDefined();
     expect(screen.getByText('No projects yet')).toBeDefined();

@@ -120,8 +120,9 @@
       "export": "Export Markdown",
       "exportTitle": "Export session",
       "exportWarning": "This writes an unencrypted Markdown file that anyone with access to the folder can read. It is not deleted when you delete the session.",
+      "exportSucceededTitle": "Export complete",
+      "exportSucceeded": "The file is saved outside Adham and will remain if you delete the session.",
       "exportSession": "Session: {{title}}",
-      "exportFixedFolder": "The file is written to the app's fixed exports folder. There is no Save As dialog in this build.",
       "exportPathLabel": "File path",
       "copyPath": "Copy path",
       "copied": "Copied",
@@ -168,6 +169,8 @@
         "summary": "Summary",
         "message": "Message",
         "attachment": "Attachment",
+        "attachmentText": "Attachment text",
+        "attachmentFileName": "Attachment file name",
         "bookmark": "Bookmark"
       },
       "unavailableFilters": "Not available yet: agents, participants, task status, model/provider, tags/folders, cost, and artifacts. Their data does not exist yet."

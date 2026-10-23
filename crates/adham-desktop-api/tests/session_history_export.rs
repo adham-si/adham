@@ -175,6 +175,14 @@ fn remove_export_dir(db_path: &Path) {
     let _ = std::fs::remove_dir_all(db_path.with_extension("exports"));
 }
 
+fn destination(db_path: &Path, title: Option<&str>, session: &str) -> PathBuf {
+    db_path
+        .with_extension("exports")
+        .join(adham_desktop_api::service::suggested_export_file_name(
+            title, session,
+        ))
+}
+
 #[tokio::test]
 async fn export_writes_markdown_with_summary_and_all_branch_rows() {
     let db_path = test_db_path();
@@ -257,9 +265,11 @@ async fn export_writes_markdown_with_summary_and_all_branch_rows() {
     .await
     .unwrap();
 
-    let exported = handle_export_session_markdown(&ctx, context(&ws, &proj, &source))
-        .await
-        .unwrap();
+    let export_path = destination(&db_path, Some("Branch report"), &source);
+    let exported =
+        handle_export_session_markdown(&ctx, context(&ws, &proj, &source), export_path.clone())
+            .await
+            .unwrap();
     let markdown = std::fs::read_to_string(&exported.path).unwrap();
     assert_eq!(exported.bytes, markdown.len() as u64);
     assert!(markdown.starts_with("# Branch report"));
@@ -285,7 +295,7 @@ async fn export_writes_markdown_with_summary_and_all_branch_rows() {
     )
     .await
     .unwrap();
-    let exported = handle_export_session_markdown(&ctx, context(&ws, &proj, &source))
+    let exported = handle_export_session_markdown(&ctx, context(&ws, &proj, &source), export_path)
         .await
         .unwrap();
     let markdown = std::fs::read_to_string(&exported.path).unwrap();
@@ -297,7 +307,7 @@ async fn export_writes_markdown_with_summary_and_all_branch_rows() {
 }
 
 #[tokio::test]
-async fn export_rejects_over_5_mb_without_a_partial_file() {
+async fn export_rejects_over_5_mb_without_touching_an_existing_destination() {
     let db_path = test_db_path();
     let ctx = setup_ctx(&db_path).await;
     let ws = create_test_workspace(&ctx, "WS").await;
@@ -306,11 +316,64 @@ async fn export_rejects_over_5_mb_without_a_partial_file() {
     let huge = "x".repeat(5 * 1024 * 1024 + 1);
     insert_message(&ctx, &ws, &proj, &source, "user", &huge, None, 0).await;
 
-    let err = handle_export_session_markdown(&ctx, context(&ws, &proj, &source))
-        .await
-        .expect_err("over cap");
+    let export_path = destination(&db_path, Some("Huge"), &source);
+    std::fs::create_dir_all(export_path.parent().unwrap()).unwrap();
+    std::fs::write(&export_path, b"existing destination").unwrap();
+
+    let err =
+        handle_export_session_markdown(&ctx, context(&ws, &proj, &source), export_path.clone())
+            .await
+            .expect_err("over cap");
     assert!(err.contains("EXPORT_TOO_LARGE"), "{err}");
-    assert!(export_files(&db_path.with_extension("exports")).is_empty());
+    assert_eq!(
+        std::fs::read(&export_path).unwrap(),
+        b"existing destination",
+        "failed export must not touch the existing destination"
+    );
+    assert_eq!(
+        export_files(&db_path.with_extension("exports")).len(),
+        1,
+        "failed export must not leave a temporary sibling"
+    );
+
+    drop(ctx);
+    let _ = std::fs::remove_file(&db_path);
+    remove_export_dir(&db_path);
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn export_write_failure_preserves_an_existing_destination() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let db_path = test_db_path();
+    let ctx = setup_ctx(&db_path).await;
+    let ws = create_test_workspace(&ctx, "WS").await;
+    let proj = create_test_project(&ctx, &ws, "Proj").await;
+    let source = create_test_session(&ctx, &ws, &proj, Some("Readonly")).await;
+    insert_message(&ctx, &ws, &proj, &source, "user", "new body", None, 0).await;
+
+    let export_dir = db_path.with_extension("exports");
+    std::fs::create_dir_all(&export_dir).unwrap();
+    let export_path = export_dir.join("readonly.md");
+    std::fs::write(&export_path, b"existing destination").unwrap();
+
+    let mut readonly = std::fs::metadata(&export_dir).unwrap().permissions();
+    readonly.set_mode(0o500);
+    std::fs::set_permissions(&export_dir, readonly).unwrap();
+    let result =
+        handle_export_session_markdown(&ctx, context(&ws, &proj, &source), export_path.clone())
+            .await;
+    let mut writable = std::fs::metadata(&export_dir).unwrap().permissions();
+    writable.set_mode(0o700);
+    std::fs::set_permissions(&export_dir, writable).unwrap();
+
+    let err = result.expect_err("read-only destination must fail");
+    assert!(err.contains("EXPORT_WRITE_FAILED"), "{err}");
+    assert_eq!(
+        std::fs::read(&export_path).unwrap(),
+        b"existing destination"
+    );
 
     drop(ctx);
     let _ = std::fs::remove_file(&db_path);
@@ -318,33 +381,106 @@ async fn export_rejects_over_5_mb_without_a_partial_file() {
 }
 
 #[tokio::test]
-async fn export_filename_uses_full_id_and_sanitized_slug() {
+async fn export_preflight_rejects_foreign_deleted_and_busy_sessions() {
     let db_path = test_db_path();
     let ctx = setup_ctx(&db_path).await;
     let ws = create_test_workspace(&ctx, "WS").await;
     let proj = create_test_project(&ctx, &ws, "Proj").await;
-    let first = create_test_session(&ctx, &ws, &proj, Some("Same")).await;
-    let second = create_test_session(&ctx, &ws, &proj, Some("Same")).await;
-    let first_export = handle_export_session_markdown(&ctx, context(&ws, &proj, &first))
-        .await
-        .unwrap();
-    let second_export = handle_export_session_markdown(&ctx, context(&ws, &proj, &second))
-        .await
-        .unwrap();
-    assert_ne!(first_export.path, second_export.path);
-    assert!(first_export.path.ends_with(&format!("Same-{first}.md")));
-    assert!(second_export.path.ends_with(&format!("Same-{second}.md")));
 
-    let odd = create_test_session(&ctx, &ws, &proj, Some("../A/B:*? C")).await;
-    let odd_export = handle_export_session_markdown(&ctx, context(&ws, &proj, &odd))
+    let foreign = create_test_session(&ctx, &ws, &proj, Some("Foreign")).await;
+    let other_ws = WorkspaceId::new_v7().to_string();
+    let err = handle_validate_export_session(&ctx, &context(&other_ws, &proj, &foreign))
+        .await
+        .expect_err("foreign workspace");
+    assert!(err.contains("CONTEXT_MISMATCH"), "{err}");
+
+    let deleted = create_test_session(&ctx, &ws, &proj, Some("Deleted")).await;
+    append_deleted(&ctx, &ws, &proj, &deleted).await;
+    let err = handle_validate_export_session(&ctx, &context(&ws, &proj, &deleted))
+        .await
+        .expect_err("deleted session");
+    assert!(err.contains("SESSION_DELETED"), "{err}");
+
+    let busy = create_test_session(&ctx, &ws, &proj, Some("Busy")).await;
+    let create_request: String = sqlx::query_scalar(
+        "SELECT request_id FROM events WHERE stream_id = ? AND event_type = 'SessionCreated' LIMIT 1",
+    )
+    .bind(format!("session:{busy}"))
+    .fetch_one(&ctx.pool)
+    .await
+    .unwrap();
+    insert_pending(&ctx, &ws, &proj, Some(&create_request), "pending").await;
+    let err = handle_validate_export_session(&ctx, &context(&ws, &proj, &busy))
+        .await
+        .expect_err("busy session");
+    assert!(err.contains("SESSION_BUSY"), "{err}");
+    sqlx::query("UPDATE pending_operations SET status = 'resolved' WHERE status = 'pending'")
+        .execute(&ctx.pool)
         .await
         .unwrap();
-    let name = Path::new(&odd_export.path)
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap();
-    assert_eq!(name, format!("A-B-C-{odd}.md"));
+    handle_validate_export_session(&ctx, &context(&ws, &proj, &busy))
+        .await
+        .expect("resolved pending rows allow the preflight");
+
+    drop(ctx);
+    let _ = std::fs::remove_file(&db_path);
+    remove_export_dir(&db_path);
+}
+
+#[test]
+fn suggested_export_filename_uses_full_id_and_sanitized_slug() {
+    let first = "01a16573-2ac5-7109-b277-54a4c3dea120";
+    let second = "01a16573-2ac5-7109-b277-54a4c3dea121";
+    assert_eq!(
+        adham_desktop_api::service::suggested_export_file_name(Some("Same"), first),
+        format!("Same-{first}.md")
+    );
+    assert_eq!(
+        adham_desktop_api::service::suggested_export_file_name(Some("Same"), second),
+        format!("Same-{second}.md")
+    );
+    assert_eq!(
+        adham_desktop_api::service::suggested_export_file_name(Some("../A/B:*? C"), "id"),
+        "A-B-C-id.md"
+    );
+    assert_eq!(
+        adham_desktop_api::service::suggested_export_file_name(None, "id"),
+        "session-id.md"
+    );
+    assert_eq!(
+        adham_desktop_api::service::suggested_export_file_name(Some(" \n\t "), "id"),
+        "session-id.md"
+    );
+    assert!(
+        adham_desktop_api::service::suggested_export_file_name(Some("Report"), "id")
+            .ends_with(".md")
+    );
+}
+
+#[tokio::test]
+async fn export_writes_to_the_selected_destination() {
+    let db_path = test_db_path();
+    let ctx = setup_ctx(&db_path).await;
+    let ws = create_test_workspace(&ctx, "WS").await;
+    let proj = create_test_project(&ctx, &ws, "Proj").await;
+    let source = create_test_session(&ctx, &ws, &proj, Some("Chosen")).await;
+    insert_message(&ctx, &ws, &proj, &source, "user", "selected path", None, 0).await;
+    let destination = db_path
+        .with_extension("exports")
+        .join("my-chosen-export.md");
+
+    let exported =
+        handle_export_session_markdown(&ctx, context(&ws, &proj, &source), destination.clone())
+            .await
+            .unwrap();
+
+    assert_eq!(Path::new(&exported.path), destination);
+    assert!(destination.exists());
+    assert!(
+        std::fs::read_to_string(&destination)
+            .unwrap()
+            .contains("selected path")
+    );
 
     drop(ctx);
     let _ = std::fs::remove_file(&db_path);
@@ -358,11 +494,13 @@ async fn export_overwrites_same_session_and_sets_owner_only_mode() {
     let ws = create_test_workspace(&ctx, "WS").await;
     let proj = create_test_project(&ctx, &ws, "Proj").await;
     let source = create_test_session(&ctx, &ws, &proj, Some("Overwrite")).await;
-    let first = handle_export_session_markdown(&ctx, context(&ws, &proj, &source))
-        .await
-        .unwrap();
+    let export_path = destination(&db_path, Some("Overwrite"), &source);
+    let first =
+        handle_export_session_markdown(&ctx, context(&ws, &proj, &source), export_path.clone())
+            .await
+            .unwrap();
     insert_message(&ctx, &ws, &proj, &source, "user", "first body", None, 0).await;
-    let second = handle_export_session_markdown(&ctx, context(&ws, &proj, &source))
+    let second = handle_export_session_markdown(&ctx, context(&ws, &proj, &source), export_path)
         .await
         .unwrap();
     assert_eq!(first.path, second.path);
@@ -395,9 +533,13 @@ async fn export_refuses_deleted_busy_and_unreadable_sessions() {
 
     let deleted = create_test_session(&ctx, &ws, &proj, Some("Deleted")).await;
     append_deleted(&ctx, &ws, &proj, &deleted).await;
-    let err = handle_export_session_markdown(&ctx, context(&ws, &proj, &deleted))
-        .await
-        .expect_err("deleted session");
+    let err = handle_export_session_markdown(
+        &ctx,
+        context(&ws, &proj, &deleted),
+        destination(&db_path, Some("Deleted"), &deleted),
+    )
+    .await
+    .expect_err("deleted session");
     assert!(err.contains("SESSION_DELETED"), "{err}");
 
     let busy = create_test_session(&ctx, &ws, &proj, Some("Busy")).await;
@@ -409,17 +551,25 @@ async fn export_refuses_deleted_busy_and_unreadable_sessions() {
     .await
     .unwrap();
     insert_pending(&ctx, &ws, &proj, Some(&create_request), "pending").await;
-    let err = handle_export_session_markdown(&ctx, context(&ws, &proj, &busy))
-        .await
-        .expect_err("busy session");
+    let err = handle_export_session_markdown(
+        &ctx,
+        context(&ws, &proj, &busy),
+        destination(&db_path, Some("Busy"), &busy),
+    )
+    .await
+    .expect_err("busy session");
     assert!(err.contains("SESSION_BUSY"), "{err}");
     sqlx::query("UPDATE pending_operations SET status = 'resolved' WHERE status = 'pending'")
         .execute(&ctx.pool)
         .await
         .unwrap();
-    handle_export_session_markdown(&ctx, context(&ws, &proj, &busy))
-        .await
-        .expect("resolved rows do not block");
+    handle_export_session_markdown(
+        &ctx,
+        context(&ws, &proj, &busy),
+        destination(&db_path, Some("Busy"), &busy),
+    )
+    .await
+    .expect("resolved rows do not block");
 
     let unreadable = create_test_session(&ctx, &ws, &proj, Some("Unreadable")).await;
     sqlx::query(
@@ -465,13 +615,21 @@ async fn export_refuses_deleted_busy_and_unreadable_sessions() {
         .execute(&ctx.pool)
         .await
         .unwrap();
-    let err = handle_export_session_markdown(&ctx, context(&ws, &proj, &summary_session))
-        .await
-        .expect_err("missing summary");
+    let err = handle_export_session_markdown(
+        &ctx,
+        context(&ws, &proj, &summary_session),
+        destination(&db_path, Some("Summary"), &summary_session),
+    )
+    .await
+    .expect_err("missing summary");
     assert!(err.contains("STORAGE_REPAIR_REQUIRED"), "{err}");
-    let err = handle_export_session_markdown(&ctx, context(&ws, &proj, &unreadable))
-        .await
-        .expect_err("missing content");
+    let err = handle_export_session_markdown(
+        &ctx,
+        context(&ws, &proj, &unreadable),
+        destination(&db_path, Some("Unreadable"), &unreadable),
+    )
+    .await
+    .expect_err("missing content");
     assert!(err.contains("STORAGE_REPAIR_REQUIRED"), "{err}");
 
     drop(ctx);

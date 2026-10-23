@@ -539,4 +539,8 @@ fn validation_errors_keep_their_specific_key() {
     let deleted = ErrorEnvelope::from_error_str("SESSION_DELETED: session is deleted");
     assert_eq!(deleted.code, PublicErrorCode::SessionNotFound);
     assert_eq!(deleted.message_key, "error.sessionDeleted");
+    let export_write = ErrorEnvelope::from_error_str("EXPORT_WRITE_FAILED: selected destination");
+    assert_eq!(export_write.code, PublicErrorCode::StorageUnavailable);
+    assert_eq!(export_write.message_key, "error.exportWriteFailed");
+    assert!(!export_write.retryable);
 }

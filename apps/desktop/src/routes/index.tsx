@@ -11,6 +11,7 @@ import { useOnboarding, OnboardingJourney } from '@/features/onboarding';
 import { SettingsPage } from '@/pages/settings';
 import { SessionDetailsDialog } from '@/features/history/session-details-dialog';
 import { ExportSessionDialog } from '@/features/history/export-session-dialog';
+import { ExportSessionToast } from '@/features/history/export-session-toast';
 import { DeleteSessionDialog } from '@/features/history/delete-session-dialog';
 import { useSessionActions } from '@/features/history/use-session-actions';
 import { SessionHistoryPanel } from '@/features/history/session-history-panel';
@@ -210,6 +211,10 @@ function AppBody() {
             onClose={sessionActions.cancelRename}
             onSave={sessionActions.saveRename}
             onSaveSummary={sessionActions.saveSummary}
+          />
+          <ExportSessionToast
+            result={sessionActions.exportNotice}
+            onClose={sessionActions.closeExportNotice}
           />
         </>
       }

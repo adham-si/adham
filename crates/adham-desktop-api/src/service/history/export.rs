@@ -1,5 +1,5 @@
-//! Export the persisted transcript as plaintext Markdown in the app-data
-//! `exports/` folder. This is deliberately not encrypted and is not removed by
+//! Export the persisted transcript as plaintext Markdown to the caller-selected
+//! destination. This is deliberately not encrypted and is not removed by
 //! session deletion; the UI warns before writing.
 use crate::dtos::{CommandContext, ExportSessionResponse};
 use crate::handlers::ApiContext;
@@ -26,6 +26,19 @@ const MAX_EXPORT_BYTES: usize = 5 * 1024 * 1024;
 const SLUG_SCALARS: usize = 40;
 const SLUG_BYTES: usize = 120;
 static TEMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
+async fn validate_export_source_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    session: &str,
+    ws_id: &WorkspaceId,
+    proj_id: &ProjectId,
+) -> Result<(), String> {
+    lock_session_stream_tx(tx, session).await?;
+    ensure_session_active_tx(tx, session).await?;
+    ensure_source_scope_tx(tx, session, ws_id, proj_id).await?;
+    ensure_no_live_operation_tx(tx, session).await?;
+    Ok(())
+}
 
 fn parse_context(context: &CommandContext) -> Result<(WorkspaceId, ProjectId, SessionId), String> {
     let ws = WorkspaceId::from_string(
@@ -82,6 +95,10 @@ fn slug(title: Option<&str>) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+pub fn suggested_export_file_name(title: Option<&str>, session_id: &str) -> String {
+    format!("{}-{}.md", slug(title), session_id)
 }
 
 fn clip_chars(text: &str, max: usize) -> String {
@@ -204,9 +221,9 @@ fn temp_path(target: &Path) -> PathBuf {
 }
 
 fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), String> {
-    if let Some(parent) = target.parent() {
+    if let Some(parent) = target.parent().filter(|path| !path.as_os_str().is_empty()) {
         fs::create_dir_all(parent)
-            .map_err(|e| format!("STORAGE_UNAVAILABLE: export folder: {e}"))?;
+            .map_err(|e| format!("EXPORT_WRITE_FAILED: destination folder: {e}"))?;
     }
     let mut temp = None;
     let mut file = None;
@@ -227,18 +244,18 @@ fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), String> {
             }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => {
-                return Err(format!("STORAGE_UNAVAILABLE: export temp file: {error}"));
+                return Err(format!("EXPORT_WRITE_FAILED: temporary file: {error}"));
             }
         }
     }
     let (temp, mut file) = temp
         .zip(file)
-        .ok_or_else(|| "STORAGE_UNAVAILABLE: export temp file collision".to_string())?;
+        .ok_or_else(|| "EXPORT_WRITE_FAILED: temporary file collision".to_string())?;
     let result = (|| -> Result<(), String> {
         file.write_all(bytes)
-            .map_err(|e| format!("STORAGE_UNAVAILABLE: export write: {e}"))?;
+            .map_err(|e| format!("EXPORT_WRITE_FAILED: write: {e}"))?;
         file.sync_all()
-            .map_err(|e| format!("STORAGE_UNAVAILABLE: export sync: {e}"))?;
+            .map_err(|e| format!("EXPORT_WRITE_FAILED: sync: {e}"))?;
         drop(file);
         replace_file(&temp, target)
     })();
@@ -248,28 +265,35 @@ fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), String> {
     result
 }
 
-#[cfg(not(windows))]
 fn replace_file(temp: &Path, target: &Path) -> Result<(), String> {
-    fs::rename(temp, target).map_err(|e| format!("STORAGE_UNAVAILABLE: export replace: {e}"))
+    // `fs::rename` replaces an existing file atomically: MoveFileExW with
+    // MOVEFILE_REPLACE_EXISTING on Windows, rename(2) elsewhere. A failed
+    // replacement must leave the original target untouched.
+    fs::rename(temp, target).map_err(|e| format!("EXPORT_WRITE_FAILED: replace: {e}"))
 }
 
-#[cfg(windows)]
-fn replace_file(temp: &Path, target: &Path) -> Result<(), String> {
-    match fs::rename(temp, target) {
-        Ok(()) => Ok(()),
-        Err(_) if target.exists() => {
-            fs::remove_file(target)
-                .map_err(|e| format!("STORAGE_UNAVAILABLE: export replace: {e}"))?;
-            fs::rename(temp, target)
-                .map_err(|e| format!("STORAGE_UNAVAILABLE: export replace: {e}"))
-        }
-        Err(error) => Err(format!("STORAGE_UNAVAILABLE: export replace: {error}")),
-    }
+pub async fn validate_export_session(
+    ctx: &ApiContext,
+    context: &CommandContext,
+) -> Result<(), String> {
+    let (ws_id, proj_id, session_id) = parse_context(context)?;
+    let session = session_id.to_string();
+    let mut tx = ctx
+        .pool
+        .begin()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    validate_export_source_tx(&mut tx, &session, &ws_id, &proj_id).await?;
+    tx.rollback()
+        .await
+        .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
+    Ok(())
 }
 
 pub async fn export_session_markdown(
     ctx: &ApiContext,
     context: CommandContext,
+    destination: PathBuf,
 ) -> Result<ExportSessionResponse, String> {
     let (ws_id, proj_id, session_id) = parse_context(&context)?;
     let session = session_id.to_string();
@@ -278,10 +302,7 @@ pub async fn export_session_markdown(
         .begin()
         .await
         .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
-    lock_session_stream_tx(&mut tx, &session).await?;
-    ensure_session_active_tx(&mut tx, &session).await?;
-    ensure_source_scope_tx(&mut tx, &session, &ws_id, &proj_id).await?;
-    ensure_no_live_operation_tx(&mut tx, &session).await?;
+    validate_export_source_tx(&mut tx, &session, &ws_id, &proj_id).await?;
 
     let provider = CachedContentKeyProvider::new(Arc::clone(&ctx.content_key));
     let title = read_title_tx(&mut tx, &session).await?;
@@ -330,16 +351,13 @@ pub async fn export_session_markdown(
         return Err("EXPORT_TOO_LARGE: the export exceeds 5 MB".to_string());
     }
 
-    let exports = ctx.export_dir()?;
-    let file_name = format!("{}-{}.md", slug(title.as_deref()), session_id);
-    let path = exports.join(file_name);
-    write_atomic(&path, markdown.as_bytes())?;
+    write_atomic(&destination, markdown.as_bytes())?;
     tx.rollback()
         .await
         .map_err(|e| format!("STORAGE_UNAVAILABLE: {e}"))?;
 
     Ok(ExportSessionResponse {
-        path: path.to_string_lossy().to_string(),
+        path: destination.to_string_lossy().to_string(),
         bytes: markdown.len() as u64,
     })
 }
